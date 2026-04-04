@@ -1,0 +1,20 @@
+{
+    "name": "location-based-webxr",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Open-source AR+GPS framework and recorder app for location-based WebXR experiences.",
+    "scripts": {
+        "build:framework": "cd GpsPlusSlamJs_AppFramework && npm run build",
+        "build:recorder": "cd GpsPlusSlamJs_AppFramework && npm install && npm run build && cd ../GpsPlusSlamJs_RecorderApp && npm install && npm run build",
+        "test:framework": "cd GpsPlusSlamJs_AppFramework && npm test",
+        "test:recorder": "cd GpsPlusSlamJs_RecorderApp && npm test",
+        "test:recorder:unit": "cd GpsPlusSlamJs_RecorderApp && npm run test:unit",
+        "test:recorder:e2e": "cd GpsPlusSlamJs_RecorderApp && npm run test:e2e",
+        "test": "npm run test:framework && npm run test:recorder"
+    },
+    "engines": {
+        "node": ">=20.0.0",
+        "npm": ">=10.0.0"
+    },
+    "license": "Apache-2.0"
+}

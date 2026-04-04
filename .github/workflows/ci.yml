@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  framework-tests:
+    name: Framework Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: GpsPlusSlamJs_AppFramework/package-lock.json
+      - name: Install dependencies
+        working-directory: GpsPlusSlamJs_AppFramework
+        run: npm ci
+      - name: Run tests (format, lint, typecheck, unit)
+        working-directory: GpsPlusSlamJs_AppFramework
+        run: npm run test:core
+
+  recorder-unit-tests:
+    name: Recorder Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: GpsPlusSlamJs_RecorderApp/package-lock.json
+      - name: Install dependencies
+        working-directory: GpsPlusSlamJs_RecorderApp
+        run: npm ci --ignore-scripts
+      - name: Run tests (format, lint, typecheck, unit)
+        working-directory: GpsPlusSlamJs_RecorderApp
+        run: npm run test:core
+
+  recorder-e2e-tests:
+    name: Recorder E2E Tests
+    runs-on: ubuntu-latest
+    needs: recorder-unit-tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: GpsPlusSlamJs_RecorderApp/package-lock.json
+      - name: Install dependencies
+        working-directory: GpsPlusSlamJs_RecorderApp
+        run: npm ci
+      - name: Install Playwright browsers
+        working-directory: GpsPlusSlamJs_RecorderApp
+        run: npx playwright install --with-deps chromium
+      - name: Run E2E tests
+        working-directory: GpsPlusSlamJs_RecorderApp
+        run: npm run test:e2e
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: GpsPlusSlamJs_RecorderApp/test-results/
+          retention-days: 14

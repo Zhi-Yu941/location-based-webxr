@@ -47,7 +47,7 @@ import { createRequire } from 'node:module';
  */
 export function extractTokenLiteral(source) {
   const m = source.match(
-    /(?:COMMUNITY_LICENSE_KEY|[A-Za-z_$][\w$]*)\s*=\s*['"`]([A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+)['"`]/
+    /(?:COMMUNITY_LICENSE_KEY|[A-Za-z_$][\w$]*)\s*=\s*['"`]([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)['"`]/
   );
   return m ? m[1] : null;
 }

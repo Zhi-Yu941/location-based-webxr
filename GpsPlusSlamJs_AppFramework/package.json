@@ -103,5 +103,14 @@
     "framework"
   ],
   "author": "cs-util-com",
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cs-util-com/location-based-webxr.git",
+    "directory": "GpsPlusSlamJs_AppFramework"
+  },
+  "homepage": "https://github.com/cs-util-com/location-based-webxr#readme",
+  "bugs": {
+    "url": "https://github.com/cs-util-com/location-based-webxr/issues"
+  }
 }

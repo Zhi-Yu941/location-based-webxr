@@ -34,21 +34,29 @@ jobs:
     if: startsWith(github.event.release.tag_name, 'app-framework@')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # Check out the exact tagged commit so a later push to main cannot
           # change what gets published.
           ref: ${{ github.event.release.tag_name }}
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          # Node 24 is the current Active LTS. npm Trusted Publishing
+          # requires Node ≥22.14.0 / npm ≥11.5.1; Node 24 ships npm 11.x.
+          # See the matching note in the private repo's publish.yml.
+          node-version: "24"
           cache: "pnpm"
           # Even with Trusted Publishing (no token), the registry-url line
           # in .npmrc is still required so pnpm targets the public registry.
           registry-url: "https://registry.npmjs.org"
+
+      - name: Pin npm to latest
+        # See the matching note in the private repo's publish.yml: ensures
+        # the freshest Trusted Publishing OIDC code path.
+        run: npm install -g npm@latest
 
       - name: Verify tag matches package.json version
         # Two-version model: package.json#version is the source of truth
@@ -78,9 +86,31 @@ jobs:
       # gps-plus-slam-app-framework` keeps installing the GA `latest`.
       - name: Publish AppFramework
         working-directory: GpsPlusSlamJs_AppFramework
+        # Use `npm publish` (not `pnpm publish`) for Trusted Publishing.
+        # As of pnpm 10 the CLI signs sigstore provenance but does not
+        # exchange the GitHub OIDC token for an npm publish credential,
+        # which makes the PUT go out unauthenticated and yields a
+        # misleading `404 Not Found` from the registry. The npm CLI
+        # bundled with Node 20 (npm ≥10) is the canonical Trusted
+        # Publishing implementation. See the matching comment in the
+        # private repo's `.github/workflows/publish.yml`.
         run: |
+          # Run prepublishOnly explicitly (npm publish on a prebuilt tgz
+          # does NOT invoke it). Keeps `build` + `verify:pack` +
+          # `verify:community-key-lifetime` in the chain.
+          pnpm run prepublishOnly
+
+          # Pack into a deterministic filename. `pnpm pack` honours the
+          # same `files`/`exports` config as `pnpm publish`.
+          TARBALL=$(pnpm pack --pack-destination . --silent | tail -n 1)
+          echo "Built tarball: $TARBALL"
+
+          # Pre-releases land on the `next` dist-tag so
+          # `npm install gps-plus-slam-app-framework` keeps installing
+          # GA `latest`. `--provenance` is intentionally omitted: Trusted
+          # Publishing generates provenance automatically.
           if [ "${{ github.event.release.prerelease }}" = "true" ]; then
-            pnpm publish --access public --no-git-checks --tag next --provenance
+            npm publish "$TARBALL" --access public --tag next
           else
-            pnpm publish --access public --no-git-checks --provenance
+            npm publish "$TARBALL" --access public
           fi

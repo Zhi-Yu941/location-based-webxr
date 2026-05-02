@@ -36,7 +36,6 @@ const entryFiles = [
 
   // licensing/
   'src/licensing/index.ts',
-  'src/licensing/community-license-key.ts',
 
   // ref-points/
   'src/ref-points/index.ts',

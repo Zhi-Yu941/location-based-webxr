@@ -11,6 +11,6 @@
  */
 import { validateLicenseKey } from 'gps-plus-slam-js';
 
-import { COMMUNITY_LICENSE_KEY } from './licensing/community-license-key.js';
+import { COMMUNITY_LICENSE_KEY } from 'gps-plus-slam-js/community-license-key';
 
 validateLicenseKey(COMMUNITY_LICENSE_KEY);

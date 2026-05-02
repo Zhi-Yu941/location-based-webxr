@@ -45,7 +45,7 @@ Redux store factory for the Recorder App. Uses Redux Toolkit's `configureStore` 
 | `storageBackend`  | `StorageBackend`  | `OpfsStorageBackend`    | Persistence backend (F2 abstraction)                                                                                                                                                     |
 | `onWriteFailure`  | `(Error) => void` | -                       | Callback on write failure (for toast)                                                                                                                                                    |
 | `enableDevChecks` | `boolean`         | `true`                  | Enable Redux dev-only checks (disable for replay)                                                                                                                                        |
-| `licenseKey`      | `string`          | `COMMUNITY_LICENSE_KEY` | Library license key (Ed25519 verified). Defaults to the bundled community key from `licensing/community-license-key.ts`. Validation always runs — invalid, empty, or expired keys throw. |
+| `licenseKey`      | `string`          | `COMMUNITY_LICENSE_KEY` | Library license key (Ed25519 verified). Defaults to the bundled community key re-exported from the core lib's `gps-plus-slam-js/community-license-key` sub-path. Validation always runs — invalid, empty, or expired keys throw. |
 
 ## Architecture
 

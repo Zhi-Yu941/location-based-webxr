@@ -12,7 +12,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { createRecorderStore } from './store';
-import { COMMUNITY_LICENSE_KEY } from '../licensing/community-license-key.js';
+import { COMMUNITY_LICENSE_KEY } from 'gps-plus-slam-js/community-license-key';
 import { NullStorageBackend } from '../storage/null-storage-backend';
 
 vi.mock('../storage/file-system', () => ({

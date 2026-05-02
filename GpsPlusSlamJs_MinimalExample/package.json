@@ -16,7 +16,7 @@
     "node": ">=20.19.0"
   },
   "dependencies": {
-    "gps-plus-slam-app-framework": "^1.0.1",
+    "gps-plus-slam-app-framework": "^1.0.4",
     "three": "^0.184.0"
   },
   "devDependencies": {

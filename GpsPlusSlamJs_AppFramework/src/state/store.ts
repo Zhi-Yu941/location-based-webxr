@@ -32,7 +32,7 @@ import { routingReducer, type RoutingState } from './routing-slice';
 import type { SessionMetadata as OpfsSessionMetadata } from '../storage/opfs-storage';
 import { OpfsStorageBackend } from '../storage/opfs-storage-backend';
 import { createPersistenceMiddleware } from './persistence-middleware';
-import { COMMUNITY_LICENSE_KEY } from '../licensing/community-license-key.js';
+import { COMMUNITY_LICENSE_KEY } from 'gps-plus-slam-js/community-license-key';
 
 // Re-export for convenience
 export type { RecordingOptions } from './recording-options';

@@ -18,8 +18,12 @@ None — this file is loaded by vitest via
 
 - Uses the public `validateLicenseKey()` API exported from
   `gps-plus-slam-js`, with the bundled `COMMUNITY_LICENSE_KEY` from
-  `./licensing/community-license-key` — exercising the real activation code
-  path (signature verification + expiry check).
+  `gps-plus-slam-js/community-license-key` — exercising the real
+  activation code path (signature verification + expiry check). The
+  community key now lives **inside the core lib** and is re-signed by
+  `gps-plus-slam-js`'s own CI; see
+  [../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-01-community-key-resign-cross-repo-issue.md](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-01-community-key-resign-cross-repo-issue.md)
+  §3.6 (Option F) for the rationale.
 - Same pattern as RecorderApp's integration tests
   (`GpsPlusSlamJs_RecorderApp/src/state/recording-replay.integration.test.ts`).
 - `gps-plus-slam-js` is resolved from `node_modules` — either the published

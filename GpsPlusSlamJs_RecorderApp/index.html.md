@@ -128,7 +128,7 @@ Every ID below is referenced by TypeScript code. Removing or renaming any of the
 | `save-status` | `p` | `hud.ts` | `.textContent` set to save location path |
 | `scenario-select` | `select` | `hud.ts` | `<option>` elements appended dynamically; `change` listener |
 | `new-scenario-section` | `div` | `hud.ts` | `.hidden` toggled + opacity animation (CSS transition contract) |
-| `new-scenario-name` | `input` | `hud.ts` | `.value` read for custom scenario name |
+| `new-scenario-name` | `input` | `hud.ts` | `.value` read for custom scenario name; pre-filled with `Default Scenario` (UX 2026-05-03) so users can tap Enter AR without typing when no existing scenarios are found |
 | `session-notes` | `textarea` | `main.ts`, `hud.ts` | `.value` read; `.disabled` toggled |
 | `permission-section` | `div` | — | Container for permission rows |
 | `perm-filestorage` | `div` | `hud.ts` | Permission row container |

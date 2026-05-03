@@ -90,11 +90,18 @@ import type { LatLong, Matrix4 } from 'gps-plus-slam-app-framework/core';
 import { calcGpsCoords } from 'gps-plus-slam-app-framework/core';
 import type { LeafletMapOverlay } from 'gps-plus-slam-app-framework/visualization/leaflet-map-overlay';
 import { getBuildInfo } from '../utils/build-info';
+import { DEFAULT_SCENARIO } from '../ui/session-browser';
 
 const log = createLogger('RecordingSession');
 
-/** Single fallback used everywhere a scenario name is needed but unavailable. */
-const FALLBACK_SCENARIO = 'Default Scenario';
+/**
+ * Single fallback used everywhere a scenario name is needed but unavailable.
+ * Re-exported from `session-browser.DEFAULT_SCENARIO` so that the recording
+ * pipeline and the replay browser's metadata-merge contract stay in sync
+ * (any divergence would silently break the "missing-metadata + Default
+ * Scenario" merge for newly-recorded zips).
+ */
+const FALLBACK_SCENARIO = DEFAULT_SCENARIO;
 
 function getSanitizedPageUrl(): string | undefined {
   const href = globalThis.location?.href;

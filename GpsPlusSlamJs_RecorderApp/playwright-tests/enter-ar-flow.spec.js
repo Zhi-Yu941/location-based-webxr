@@ -229,6 +229,13 @@ test.describe('With Permissions Granted', () => {
     }) => {
       // Why this test matters: With mandatory storage selection complete,
       // the hint shows when a scenario name is needed (for new scenarios).
+      // The new-scenario-name input is prefilled with the canonical default
+      // (UX feedback 2026-05-03), so we explicitly clear it to exercise the
+      // empty-name path.
+      await callRealPopulateScenarios(page, []);
+      await page.locator('#new-scenario-name').clear();
+      await page.evaluate(() => window.testHooks.validateEnterButton());
+
       const enterButton = page.locator('#btn-enter-ar');
       await expect(enterButton).toBeDisabled();
 
@@ -242,11 +249,14 @@ test.describe('With Permissions Granted', () => {
     test('shows hint about scenario name when new scenario selected but name empty', async ({
       page,
     }) => {
-      // Why this test matters: When user selects "+ Create new scenario", they need
-      // to know that entering a name is required before they can proceed.
+      // Why this test matters: When user selects "+ Create new scenario" and
+      // clears the prefilled default, they need to know that entering a name
+      // is required before they can proceed.
 
       // Simulate folder selection with no existing scenarios
       await callRealPopulateScenarios(page, []);
+      await page.locator('#new-scenario-name').clear();
+      await page.evaluate(() => window.testHooks.validateEnterButton());
 
       // At this point, only "__new__" is selected (first option)
       const enterButton = page.locator('#btn-enter-ar');
@@ -301,22 +311,47 @@ test.describe('With Permissions Granted', () => {
       page,
     }) => {
       // Why this test matters: Verifies the complete flow of creating a new
-      // scenario and being able to proceed to AR mode.
+      // scenario and being able to proceed to AR mode. We clear the prefill
+      // first so this test exercises the user-typing flow rather than the
+      // default-prefill flow (which is covered by a separate test).
 
       await callRealPopulateScenarios(page, []);
+      const nameInput = page.locator('#new-scenario-name');
+      await nameInput.clear();
+      await page.evaluate(() => window.testHooks.validateEnterButton());
 
-      // Only "__new__" option exists, button should be disabled
+      // After clearing, button should be disabled
       const enterButton = page.locator('#btn-enter-ar');
       await expect(enterButton).toBeDisabled();
 
       // Enter a scenario name
-      const nameInput = page.locator('#new-scenario-name');
       await nameInput.fill('My Test Scenario');
 
       // Button should now be enabled
       await expect(enterButton).toBeEnabled();
 
       // Hint should be hidden
+      const hint = page.locator('#enter-ar-hint');
+      await expect(hint).toBeHidden();
+    });
+
+    test('Enter AR button is enabled by default with prefilled scenario name', async ({
+      page,
+    }) => {
+      // Why this test matters: UX feedback 2026-05-03 — when a folder has no
+      // existing scenarios, the user should be able to tap "Enter AR" without
+      // typing because `index.html` prefills the new-scenario-name input with
+      // the canonical default scenario name. See
+      // docs/2026-05-03-setup-screen-defaults-and-permission-rerequest.md.
+
+      await callRealPopulateScenarios(page, []);
+
+      const nameInput = page.locator('#new-scenario-name');
+      await expect(nameInput).toHaveValue('Default Scenario');
+
+      const enterButton = page.locator('#btn-enter-ar');
+      await expect(enterButton).toBeEnabled();
+
       const hint = page.locator('#enter-ar-hint');
       await expect(hint).toBeHidden();
     });

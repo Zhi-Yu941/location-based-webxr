@@ -140,7 +140,13 @@ test.describe('Test Hooks Match Real Behavior', () => {
 
     const enterBtn = page.locator('#btn-enter-ar');
 
-    // Initially disabled (no scenario selected)
+    // Clear the index.html prefill (UX feedback 2026-05-03) — otherwise OPFS
+    // auto-init may have already populated `__new__` with the prefilled name,
+    // which would enable the button before any explicit scenario selection.
+    await page.locator('#new-scenario-name').clear();
+    await page.evaluate(() => window.testHooks.validateEnterButton());
+
+    // Initially disabled (no scenario selected, no name typed)
     await expect(enterBtn).toBeDisabled();
 
     // Simulate existing scenario chosen
@@ -173,6 +179,10 @@ test.describe('Test Hooks Match Real Behavior', () => {
       window.testHooks.populateScenarios(['Existing']);
     });
     await page.locator('#scenario-select').selectOption('__new__');
+
+    // Clear the index.html prefill (UX feedback 2026-05-03) so we exercise
+    // the empty-name path.
+    await page.locator('#new-scenario-name').clear();
 
     // Validate with empty name input
     await page.evaluate(() => {

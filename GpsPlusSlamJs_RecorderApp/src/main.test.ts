@@ -300,6 +300,7 @@ vi.mock('./ui/hud', () => ({
 
 // Mock session-browser for handleOpenFolder tests (Issue 1 — 2026-02-27 + 2026-03-01)
 vi.mock('./ui/session-browser', () => ({
+  DEFAULT_SCENARIO: 'Default Scenario',
   listScenariosFromFolder: vi.fn().mockResolvedValue([]),
   extractScenarioNamesFromZips: vi.fn().mockResolvedValue([]),
   listSessionZipsInScenario: vi.fn().mockResolvedValue([]),

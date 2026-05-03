@@ -7,6 +7,7 @@
 import type { PermissionCheckResult } from 'gps-plus-slam-app-framework/sensors/permission-checker';
 import { listFormatter } from 'gps-plus-slam-app-framework/utils/list-formatter';
 import { getRequiredElement } from '../utils/dom-helpers';
+import { DEFAULT_SCENARIO } from './session-browser';
 
 export interface UICallbacks {
   onOpenFolder: () => Promise<void>;
@@ -224,7 +225,16 @@ export function initUI(cbs: UICallbacks): void {
   });
 
   // New scenario name input - revalidate on typing
-  const newScenarioName = document.getElementById('new-scenario-name');
+  const newScenarioName = document.getElementById(
+    'new-scenario-name'
+  ) as HTMLInputElement | null;
+  // Pre-fill with the canonical default scenario so users can tap "Enter AR"
+  // without typing when no existing scenarios are found (UX 2026-05-03).
+  // Sourced from `DEFAULT_SCENARIO` so the canonical name lives in exactly
+  // one place; HTML cannot import a TS constant directly.
+  if (newScenarioName && newScenarioName.value === '') {
+    newScenarioName.value = DEFAULT_SCENARIO;
+  }
   newScenarioName?.addEventListener('input', () => {
     validateEnterButton();
   });

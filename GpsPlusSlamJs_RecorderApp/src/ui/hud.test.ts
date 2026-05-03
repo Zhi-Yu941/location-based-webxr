@@ -461,6 +461,12 @@ describe('validateEnterButton', () => {
     scenarioSelect.appendChild(option);
     scenarioSelect.value = '__new__';
 
+    // Clear the index.html prefill so we exercise the "no name typed" path.
+    const newScenarioName = document.getElementById(
+      'new-scenario-name'
+    ) as HTMLInputElement;
+    newScenarioName.value = '';
+
     validateEnterButton();
 
     expect(hint.classList.contains('hidden')).toBe(false);
@@ -623,9 +629,37 @@ describe('populateScenarios', () => {
 
   /**
    * Why this test matters:
-   * Bug fix verification - when populateScenarios auto-selects the first
-   * existing scenario, it must trigger onScenarioChange so that
-   * currentScenarioName in main.ts is properly synchronized.
+   * UX feedback 2026-05-03: when a folder has no existing scenarios, the
+   * user should be able to tap "Enter AR" without typing — `index.html`
+   * pre-fills `#new-scenario-name` with the canonical default scenario
+   * name. populateScenarios must not clobber this prefill, and once all
+   * other gating conditions are met the Enter AR button must be enabled
+   * automatically. See docs/2026-05-03-setup-screen-defaults-and-permission-rerequest.md.
+   */
+  it('preserves prefilled new-scenario-name and enables Enter AR without typing', () => {
+    setupMinimalDOM();
+    initUI(createMockCallbacks());
+
+    // Satisfy the other gating conditions so validateEnterButton can flip.
+    setFolderSelected(true);
+    setSaveLocationSelected(true);
+    setPermissionsReady(true);
+
+    populateScenarios([]);
+
+    const newScenarioName = document.getElementById(
+      'new-scenario-name'
+    ) as HTMLInputElement;
+    expect(newScenarioName.value).toBe('Default Scenario');
+
+    const btnEnterAR = document.getElementById(
+      'btn-enter-ar'
+    ) as HTMLButtonElement;
+    expect(btnEnterAR.disabled).toBe(false);
+  });
+
+  /**
+   * Why this test matters:
    * Without this, handleStartRecording would use 'Default Scenario' fallback.
    */
   it('invokes onScenarioChange when auto-selecting first existing scenario', () => {

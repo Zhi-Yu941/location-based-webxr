@@ -109,10 +109,12 @@ describe('Recording Replay Integration', () => {
 
     it('session.json is present in the produced zip', async () => {
       // Why: the round-trip helper writes session metadata (post-F2-fix behavior);
-      // this validates that the produce→consume path includes session.json
+      // this validates that the produce→consume path includes session.json.
+      // The framework's SessionMetadata now carries the recorder's scenario name
+      // in the opaque `contextTag` field.
       const metadata = await loadSessionMetadata(zipData);
       expect(metadata).not.toBeNull();
-      expect(metadata!.scenarioName).toBe(testZip.scenarioName);
+      expect(metadata!.contextTag).toBe(testZip.scenarioName);
     });
   });
 

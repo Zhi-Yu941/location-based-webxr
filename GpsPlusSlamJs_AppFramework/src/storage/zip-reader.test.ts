@@ -123,7 +123,7 @@ describe('zip-reader', () => {
       // Why: the round-trip zip includes session.json with full metadata
       // (post-F2-fix behavior); the reader must parse it correctly
       expect(sessionMetadata).not.toBeNull();
-      expect(sessionMetadata!.scenarioName).toBe(testZip.scenarioName);
+      expect(sessionMetadata!.contextTag).toBe(testZip.scenarioName);
       expect(sessionMetadata!.version).toBe(1);
       expect(sessionMetadata!.actionCount).toBe(testZip.totalActionCount);
       expect(sessionMetadata!.frameCount).toBe(testZip.frameCount);
@@ -513,13 +513,13 @@ describe('loadSessionMetadataFromBlob', () => {
   });
 
   it('returns session metadata with scenarioName from a Blob', async () => {
-    // Why: Basic functionality check — read scenarioName from session.json
-    // inside a zip provided as a Blob.
+    // Why: Basic functionality check — read scenarioName (now carried in
+    // contextTag) from session.json inside a zip provided as a Blob.
     const blob = new Blob([testZip.zipData as BlobPart]);
     const metadata = await loadSessionMetadataFromBlob(blob);
 
     expect(metadata).not.toBeNull();
-    expect(metadata!.scenarioName).toBe(testZip.scenarioName);
+    expect(metadata!.contextTag).toBe(testZip.scenarioName);
     expect(metadata!.version).toBe(1);
   });
 
@@ -563,7 +563,7 @@ describe('loadSessionMetadataFromBlob', () => {
     const metadata = await loadSessionMetadataFromBlob(file);
 
     expect(metadata).not.toBeNull();
-    expect(metadata!.scenarioName).toBe(testZip.scenarioName);
+    expect(metadata!.contextTag).toBe(testZip.scenarioName);
   });
 });
 

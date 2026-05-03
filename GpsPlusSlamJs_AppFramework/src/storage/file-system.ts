@@ -39,6 +39,7 @@ let storageInitialized = false;
 
 // Legacy scenario directory management (will move to recorder in Iter 3)
 let scenariosDir: FileSystemDirectoryHandle | null = null;
+let currentScenarioHandle: FileSystemDirectoryHandle | null = null;
 
 /**
  * Reset module state - exported for testing only
@@ -49,6 +50,7 @@ export function resetStorageState(): void {
   _currentSessionName = null;
   storageInitialized = false;
   scenariosDir = null;
+  currentScenarioHandle = null;
   resetOpfsStorage();
 }
 
@@ -62,6 +64,7 @@ export function resetStorageState(): void {
 export function resetForNewSession(): void {
   _currentScenarioName = null;
   _currentSessionName = null;
+  currentScenarioHandle = null;
   resetSessionHandles();
 }
 
@@ -227,6 +230,7 @@ export async function startSession(
     const scenarioHandle = await dir.getDirectoryHandle(scenarioName, {
       create: true,
     });
+    currentScenarioHandle = scenarioHandle;
     const sessionName = `recording-${formatTimestamp(new Date())}`;
     const sessionHandle = await scenarioHandle.getDirectoryHandle(sessionName, {
       create: true,
@@ -438,10 +442,10 @@ export async function loadScenarioRefPoints(
  * Legacy: uses scenario directory layout.
  */
 export function getCurrentScenarioHandle(): FileSystemDirectoryHandle | null {
-  if (!scenariosDir || !_currentScenarioName) return null;
-  // Return is async in nature but this function is sync for backwards compat.
-  // The handle is obtained during startSession or setCurrentScenario.
-  return null;
+  if (!_currentScenarioName) return null;
+  // The handle is cached during startSession / setCurrentScenario /
+  // ensureScenarioDirectory; this accessor is sync for backwards compat.
+  return currentScenarioHandle;
 }
 
 /**
@@ -459,6 +463,7 @@ export async function setCurrentScenario(
   try {
     const handle = await scenRoot.getDirectoryHandle(scenarioName);
     _currentScenarioName = scenarioName;
+    currentScenarioHandle = handle;
     return handle;
   } catch {
     log.warn('Scenario not found:', scenarioName);
@@ -483,6 +488,7 @@ export async function ensureScenarioDirectory(
       create: true,
     });
     _currentScenarioName = scenarioName;
+    currentScenarioHandle = handle;
     return handle;
   } catch (err) {
     log.error('Failed to create scenario directory:', err);

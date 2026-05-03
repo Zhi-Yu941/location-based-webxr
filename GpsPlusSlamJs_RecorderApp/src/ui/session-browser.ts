@@ -244,18 +244,26 @@ export async function discoverScenariosFromZipMetadata(
     }
   );
 
-  // Group by scenarioName from metadata
+  // Group by scenarioName from metadata.
+  // The framework now stores the recorder's scenario name in the opaque
+  // `contextTag` field (post-Iter 0 of the AppFramework/RecorderApp boundary
+  // migration). Older zips used a dedicated `scenarioName` field — fall back
+  // to it for backwards compatibility with previously-exported recordings.
   for (const { name, handle, metadata } of metadataResults) {
     // Merge missing metadata and "Default Scenario" into the same canonical
     // group (UX feedback 2026-03-23 Issue 2).
     let scenarioName: string;
-    if (
-      metadata &&
-      typeof metadata.scenarioName === 'string' &&
-      metadata.scenarioName.length > 0 &&
-      metadata.scenarioName !== DEFAULT_SCENARIO
-    ) {
-      scenarioName = metadata.scenarioName;
+    const legacyScenarioName = (metadata as { scenarioName?: unknown } | null)
+      ?.scenarioName;
+    const tag =
+      typeof metadata?.contextTag === 'string' && metadata.contextTag.length > 0
+        ? metadata.contextTag
+        : typeof legacyScenarioName === 'string' &&
+            legacyScenarioName.length > 0
+          ? legacyScenarioName
+          : null;
+    if (tag !== null && tag !== DEFAULT_SCENARIO) {
+      scenarioName = tag;
     } else {
       scenarioName = DEFAULT_SCENARIO;
     }

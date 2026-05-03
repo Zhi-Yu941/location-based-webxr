@@ -317,11 +317,13 @@ describe('Issue 1 precondition: session.json present in produced zips (post-F2 f
     // Why: loadSessionMetadata is the exact function the Issue 1 fix will
     // use to extract scenarioName from each root-level zip. This test
     // validates the full chain: produce zip → loadSessionMetadata → get
-    // scenarioName. If this passes, Issue 1 Option D can rely on it.
+    // scenarioName (carried in the opaque `contextTag` field post-Iter 0
+    // of the AppFramework/RecorderApp boundary migration). If this passes,
+    // Issue 1 Option D can rely on it.
     const testZip = await produceTestZip({ scenarioName: 'ParkWalk' });
     const metadata = await loadSessionMetadata(testZip.zipData);
     expect(metadata).not.toBeNull();
-    expect(metadata!.scenarioName).toBe('ParkWalk');
+    expect(metadata!.contextTag).toBe('ParkWalk');
   });
 
   it('produced zip contains actions and session.json together', async () => {

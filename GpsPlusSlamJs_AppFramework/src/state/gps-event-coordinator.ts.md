@@ -86,7 +86,7 @@ Creates a GPS callback function that dispatches combined events.
 import {
   createGpsPositionHandler,
   updateDeviceOrientation,
-} from './recording-coordinator';
+} from './gps-event-coordinator';
 import { getCurrentArPose } from '../ar/webxr-session';
 import { startGpsWatch, startOrientationWatch } from '../sensors/gps';
 
@@ -130,7 +130,7 @@ expect(store.getState().recorder.gpsEventCount).toBe(1);
 
 ## Tests
 
-- `recording-coordinator.test.ts` - 31 tests covering:
+- `gps-event-coordinator.test.ts` - 31 tests covering:
   - Pose conversion (object to array format)
   - Payload building (with and without orientation)
   - GPS handler dispatching (recording mode checks)

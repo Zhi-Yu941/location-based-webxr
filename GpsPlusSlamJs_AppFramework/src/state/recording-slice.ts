@@ -1,11 +1,10 @@
 /**
- * Redux slice for recorder session management.
+ * Redux slice for recording session lifecycle management.
  *
  * Extracted from store.ts to enable proper separation of concerns and
  * break circular dependencies with persistence-middleware.ts.
  *
- * Manages: recording state, session metadata, write failure tracking,
- * current scenario name, depth sample passthrough.
+ * Manages: recording state, session metadata, write failure tracking.
  *
  * @see docs/2026-04-07-architecture-observations-consolidated.md §4
  */
@@ -15,7 +14,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import { type RecordingOptions } from './recording-options';
 import type { DepthSample } from '../types/ar-types';
 
-// --- Recorder-specific Types ---
+// --- Recording-specific Types ---
 
 export interface SessionMetadata {
   scenarioName: string;
@@ -27,7 +26,7 @@ export interface SessionMetadata {
   recordingOptions?: RecordingOptions;
 }
 
-export interface RecorderState {
+export interface RecordingState {
   isRecording: boolean;
   sessionMetadata: SessionMetadata | null;
   actionCount: number;
@@ -40,18 +39,18 @@ export interface RecorderState {
 
 // --- Initial State ---
 
-const initialRecorderState: RecorderState = {
+const initialRecordingState: RecordingState = {
   isRecording: false,
   sessionMetadata: null,
   actionCount: 0,
   failedWriteCount: 0,
 };
 
-// --- Recorder Slice ---
+// --- Recording Slice ---
 
-const recorderSlice = createSlice({
-  name: 'recorder',
-  initialState: initialRecorderState,
+const recordingSlice = createSlice({
+  name: 'recording',
+  initialState: initialRecordingState,
   reducers: {
     startSession(state, action: PayloadAction<SessionMetadata>) {
       state.isRecording = true;
@@ -89,6 +88,6 @@ export const {
   endSession,
   recordDepthSample,
   recordWriteFailure,
-} = recorderSlice.actions;
+} = recordingSlice.actions;
 
-export const recorderReducer = recorderSlice.reducer;
+export const recordingReducer = recordingSlice.reducer;

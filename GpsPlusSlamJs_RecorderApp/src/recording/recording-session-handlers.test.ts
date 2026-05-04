@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Recording Session Handlers Tests
  *
  * Why these tests matter:
@@ -121,10 +121,10 @@ const {
       .fn()
       .mockReturnValue(mockCaptureFailureTrackerInstance),
     mockStartSession: vi.fn((payload: unknown) => ({
-      type: 'recorder/startSession',
+      type: 'recording/startSession',
       payload,
     })),
-    mockEndSession: vi.fn(() => ({ type: 'recorder/endSession' })),
+    mockEndSession: vi.fn(() => ({ type: 'recording/endSession' })),
     mockStartImageCapture: vi.fn(),
     mockStopImageCapture: vi.fn(),
     mockStartDepthCapture: vi.fn(),
@@ -188,7 +188,7 @@ const {
 
 // â”€â”€ Module mocks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-vi.mock('gps-plus-slam-app-framework/state/recording-coordinator', () => ({
+vi.mock('gps-plus-slam-app-framework/state/gps-event-coordinator', () => ({
   resetCoordinatorState: mockResetCoordinatorState,
   createGpsPositionHandler: mockCreateGpsPositionHandler,
   updateDeviceOrientation: mockUpdateDeviceOrientation,
@@ -330,7 +330,7 @@ function createMockStore(): RecorderStore {
         },
         referencePoints: [],
       },
-      recorder: {
+      recording: {
         sessionMetadata: {
           scenarioName: 'TestScenario',
           sessionName: 'test-session',
@@ -878,7 +878,8 @@ describe('handleStopRecording', () => {
     // exportSessionAsZip is called directly (not via a Worker)
     expect(mockExportSessionAsZip).toHaveBeenCalledWith(
       expect.any(String), // scenarioName
-      expect.any(String) // sessionName
+      expect.any(String), // sessionName
+      expect.any(Object) // options { contributors }
     );
   });
 
@@ -1046,7 +1047,7 @@ describe('handleStopRecording', () => {
         },
         referencePoints: [],
       },
-      recorder: {
+      recording: {
         sessionMetadata: {
           scenarioName: 'Test',
           sessionName: 'test-session',

@@ -80,7 +80,7 @@ const { available, used } = await checkStorageQuota();
 ## Directory Structure
 
 ```
-/gps-recorder/
+/gps-plus-slam/
   └── scenarios/
       ├── {scenario-name}/
       │   ├── recording-YYYY-MM-DD_HH-MM-SSutc/
@@ -115,7 +115,7 @@ const { available, used } = await checkStorageQuota();
 
 ### Soft Reset (Issue 4)
 
-- `resetSessionHandles(): void` — Clears session-level handles (`currentScenarioHandle`, `currentSessionHandle`, `actionsHandle`, `framesHandle`) while preserving directory-level handles (`opfsRoot`, `gpsRecorderDir`, `scenariosDir`). Called by `file-system.ts:resetForNewSession()` as part of the soft-reset flow.
+- `resetSessionHandles(): void` — Clears session-level handles (`currentScenarioHandle`, `currentSessionHandle`, `actionsHandle`, `framesHandle`) while preserving directory-level handles (`opfsRoot`, `gpsPlusSlamDir`, `scenariosDir`). Called by `file-system.ts:resetForNewSession()` as part of the soft-reset flow.
 
 Write failures (e.g., disk full, quota exceeded) will propagate the error to the caller after safely aborting the writable stream to release file locks.
 

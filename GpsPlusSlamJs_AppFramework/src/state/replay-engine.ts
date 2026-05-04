@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Replay Engine
  *
  * Controls timed playback of recorded sessions by dispatching actions
@@ -8,7 +8,7 @@
  * - Cancellable async loop with AbortController for pause/resume
  * - Speed factor as a mutable variable, changeable mid-playback
  * - extractActionTimestamp explicitly returns null for depthSample
- *   (uses performance.now, not epoch ms — Risk R4)
+ *   (uses performance.now, not epoch ms â€” Risk R4)
  * - Max delay clamp prevents hanging on stale recordings
  *
  * @see docs/2026-02-19-replay-mode.md Issue 2 (Option D), Issue 3
@@ -40,7 +40,7 @@ export type ErrorCallback = (actionIndex: number, error: Error) => void;
 /** Max consecutive dispatch errors before auto-pause (Risk R7) */
 const MAX_CONSECUTIVE_ERRORS = 10;
 
-/** Minimal action shape for replay — just needs type and optional payload */
+/** Minimal action shape for replay â€” just needs type and optional payload */
 export interface ReplayAction {
   type: string;
   payload?: unknown;
@@ -84,8 +84,8 @@ export function extractActionTimestamp(action: ReplayAction): number | null {
       return null;
     }
 
-    case 'recorder/startSession': {
-      // payload.startTime — epoch ms
+    case 'recording/startSession': {
+      // payload.startTime â€” epoch ms
       if (typeof payload.startTime === 'number') {
         return payload.startTime;
       }
@@ -93,7 +93,7 @@ export function extractActionTimestamp(action: ReplayAction): number | null {
     }
 
     case 'gpsData/markReferencePoint': {
-      // payload.timestamp — epoch ms (optional field, may fall back to rawGpsPoint/gpsPoint)
+      // payload.timestamp â€” epoch ms (optional field, may fall back to rawGpsPoint/gpsPoint)
       if (typeof payload.timestamp === 'number') {
         return payload.timestamp;
       }
@@ -111,12 +111,12 @@ export function extractActionTimestamp(action: ReplayAction): number | null {
       return null;
     }
 
-    case 'recorder/recordDepthSample':
-      // EXPLICITLY null — uses performance.now() (relative), NOT epoch ms.
+    case 'recording/recordDepthSample':
+      // EXPLICITLY null â€” uses performance.now() (relative), NOT epoch ms.
       // Mixing clock domains in delay calculation produces garbage. (Risk R4)
       return null;
 
-    case 'recorder/endSession':
+    case 'recording/endSession':
       // No timestamp in payload
       return null;
 
@@ -163,7 +163,7 @@ export function computeInterActionDelay(
  *
  * Uses AbortController for pause/cancel:
  * - play() starts the async loop
- * - pause() aborts the current controller → loop exits
+ * - pause() aborts the current controller â†’ loop exits
  * - resume() creates a new controller and restarts from current index
  * - setSpeed() updates a closure variable, picked up on next delay calc
  * - dispose() stops everything and resets state

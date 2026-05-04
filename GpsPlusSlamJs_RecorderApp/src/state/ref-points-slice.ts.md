@@ -1,4 +1,4 @@
-# ref-points-slice.ts
+﻿# ref-points-slice.ts
 
 ## Purpose
 
@@ -31,7 +31,7 @@ Redux slice managing reference point state that was previously stored as closure
 
 | Selector                     | Input            | Output            | Description                                     |
 | ---------------------------- | ---------------- | ----------------- | ----------------------------------------------- |
-| `selectCachedKnownRefPoints` | `RefPointsState` | `KnownRefPoint[]` | Memoized derivation of H3-indexed known ref pts |
+| `selectCachedKnownRefPoints` | `RefPointsState` | `KnownGeoAnchor[]` | Memoized derivation of H3-indexed known ref pts |
 
 ### Exports
 

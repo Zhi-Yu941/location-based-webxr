@@ -20,7 +20,7 @@ import type {
   Vector3,
   Quaternion,
 } from 'gps-plus-slam-js';
-import { extractOdomPosition } from '../state/recording-coordinator';
+import { extractOdomPosition } from '../state/gps-event-coordinator';
 
 const log = createLogger('TrackingState');
 

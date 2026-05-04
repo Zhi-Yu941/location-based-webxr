@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Reference Point Importer Module
  *
  * Extracts reference points from ZIP files in a folder, enabling reuse of
@@ -16,7 +16,7 @@
 import { BlobReader, ZipReader, TextWriter } from '@zip.js/zip.js';
 import type { RefPointDefinition } from './ref-point-loader';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
-import { h3RefsMatch, isH3Index } from 'gps-plus-slam-app-framework/ref-points/h3-ref-point';
+import { h3CellsMatch, isH3Index } from 'gps-plus-slam-app-framework/geo/h3-proximity';
 
 const log = createLogger('RefPointImporter');
 
@@ -288,7 +288,7 @@ export async function importRefPointsFromFolder(
             ? allRefPoints.some(
                 (existing) =>
                   isH3Index(existing.id) &&
-                  h3RefsMatch(existing.id, refPoint.id)
+                  h3CellsMatch(existing.id, refPoint.id)
               )
             : seenIds.has(refPoint.id);
 

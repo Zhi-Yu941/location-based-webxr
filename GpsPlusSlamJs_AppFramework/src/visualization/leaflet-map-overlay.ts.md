@@ -40,10 +40,6 @@ Constructor — creates an overlay instance (does not show it yet).
 | `addRawGpsPoint(lat, lon)`         | Append point to raw GPS polyline (yellow)                          |
 | `addFusedPoint(lat, lon)`          | Append point to fused polyline (cyan)                              |
 | `addAlignmentSnapshot(lat, lon)`   | Add point to red alignment snapshot polyline                       |
-| `addRefPoint(lat, lon, name)`      | Add named reference point marker with popup (current session, red) |
-| `addPriorRefPoint(lat, lon, name)` | Add prior ref point marker (green, 80% opacity, "(prior)" popup)   |
-| `addPriorRefPoints(refPoints[])`   | Bulk-add prior ref points from array of `{lat, lon, name}`         |
-| `clearPriorRefPoints()`            | Remove all prior ref point markers (keeps current-session markers) |
 | `setZoomLevel(zoom)`               | Set zoom level (clamped 0–19)                                      |
 | `zoomIn()`                         | Increment zoom by 1 (clamped at max)                               |
 | `zoomOut()`                        | Decrement zoom by 1 (clamped at min)                               |
@@ -67,7 +63,7 @@ Constructor — creates an overlay instance (does not show it yet).
 - User position dot color uses `VIS_COLORS.USER_POSITION.css` from the centralized palette.
 - CSS3DObject scale = `worldSize / mapSizePx` so the DOM map appears at the configured world size.
 - CSS3DObject is parented to `mapParent` (default: camera), positioned at `(0, heightOffset, -0.5)`, rotated `−π/2` on X to lie in the XZ plane.
-- Colors match `VIS_COLORS` constants: raw GPS = yellow, fused = cyan, snapshot = red, ref point = green.
+- Colors match `VIS_COLORS` constants: raw GPS = yellow, fused = cyan, snapshot = red.
 
 ## Examples
 
@@ -91,4 +87,4 @@ overlay.dispose();
 
 ## Tests
 
-- `leaflet-map-overlay.test.ts` — 47 unit tests covering constructor defaults, visibility toggling, GPS position, live overlays, 3D positioning, buffered data, zoom level control (setZoomLevel, zoomIn, zoomOut, clamping), tile error callback (onTileError invocation, graceful degradation, multiple errors), CSS3DObject compatibility (off-screen style clearing), dispose, prior reference point support (addPriorRefPoint, addPriorRefPoints, clearPriorRefPoints, color/opacity/label differentiation, buffered display), and DOM hardcoding audit regressions (P5 no hardcoded classNames, P6 VIS_COLORS.USER_POSITION usage, P9 offscreenRoot option).
+- `leaflet-map-overlay.test.ts` — unit tests covering constructor defaults, visibility toggling, GPS position, live overlays, 3D positioning, buffered data, zoom level control (setZoomLevel, zoomIn, zoomOut, clamping), tile error callback (onTileError invocation, graceful degradation, multiple errors), CSS3DObject compatibility (off-screen style clearing), dispose, and DOM hardcoding audit regressions (P5 no hardcoded classNames, P6 VIS_COLORS.USER_POSITION usage, P9 offscreenRoot option). Reference-point markers were stripped in Iter 4D of the boundary cleanup; recorder-side composition lives in `GpsPlusSlamJs_RecorderApp/src/visualization/`.

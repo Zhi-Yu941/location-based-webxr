@@ -58,7 +58,7 @@ const {
       sessionRefPointUsage?: Record<string, number>;
     };
   } = {
-    recorder: {
+    recording: {
       sessionMetadata: {
         scenarioName: 'TestScenario',
         sessionName: 'recording-test',
@@ -166,20 +166,20 @@ vi.mock('./state/recorder-store', async () => {
     createRecorderStore: () => mockStore,
     store: mockStore,
     startSession: vi.fn((payload: unknown) => ({
-      type: 'recorder/startSession',
+      type: 'recording/startSession',
       payload,
     })),
-    endSession: vi.fn(() => ({ type: 'recorder/endSession' })),
+    endSession: vi.fn(() => ({ type: 'recording/endSession' })),
     add2dImage: vi.fn((payload: unknown) => ({
-      type: 'recorder/add2dImage',
+      type: 'recording/add2dImage',
       payload,
     })),
     recordDepthSample: vi.fn((payload: unknown) => ({
-      type: 'recorder/recordDepthSample',
+      type: 'recording/recordDepthSample',
       payload,
     })),
     markReferencePoint: vi.fn((payload: unknown) => ({
-      type: 'recorder/markReferencePoint',
+      type: 'recording/markReferencePoint',
       payload,
     })),
     setImportedRefPoints: actual.setImportedRefPoints,
@@ -382,7 +382,7 @@ vi.mock('gps-plus-slam-app-framework/sensors/permission-checker', () => ({
   }),
 }));
 
-vi.mock('gps-plus-slam-app-framework/state/recording-coordinator', () => ({
+vi.mock('gps-plus-slam-app-framework/state/gps-event-coordinator', () => ({
   createGpsPositionHandler: vi.fn().mockReturnValue(() => {}),
   updateDeviceOrientation: vi.fn(),
   resetCoordinatorState: vi.fn(),

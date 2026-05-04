@@ -1,4 +1,4 @@
-/**
+﻿/**
  * File System Storage Module Tests
  *
  * Tests error handling, state management, and type guards.
@@ -77,7 +77,7 @@ describe('File System Storage', () => {
   describe('isRefPointAction type guard', () => {
     it('returns true for valid reference point action', () => {
       const action = {
-        type: 'recorder/markRefPoint',
+        type: 'recording/markRefPoint',
         payload: {
           id: 'ref-001',
           gpsPosition: { lat: 48.8584, lon: 2.2945 },
@@ -102,24 +102,24 @@ describe('File System Storage', () => {
 
     it('returns false for wrong action type', () => {
       const action = {
-        type: 'recorder/startSession',
+        type: 'recording/startSession',
         payload: { id: 'ref-001' },
       };
       expect(isRefPointAction(action)).toBe(false);
     });
 
     it('returns false when payload is missing', () => {
-      const action = { type: 'recorder/markRefPoint' };
+      const action = { type: 'recording/markRefPoint' };
       expect(isRefPointAction(action)).toBe(false);
     });
 
     it('returns false when payload is null', () => {
-      const action = { type: 'recorder/markRefPoint', payload: null };
+      const action = { type: 'recording/markRefPoint', payload: null };
       expect(isRefPointAction(action)).toBe(false);
     });
 
     it('returns false for array payload', () => {
-      const action = { type: 'recorder/markRefPoint', payload: [] };
+      const action = { type: 'recording/markRefPoint', payload: [] };
       expect(isRefPointAction(action)).toBe(false);
     });
   });
@@ -257,7 +257,7 @@ describe('File System Storage - Integration with Mocks', () => {
      */
     it('writes action to JSON file with correct naming', async () => {
       const action = {
-        type: 'recorder/recordGpsEvent',
+        type: 'recording/recordGpsEvent',
         payload: { lat: 50.0, lon: 8.0 },
       };
 
@@ -381,7 +381,7 @@ describe('File System Storage - Integration with Mocks', () => {
       // Create a session with a regular action (not a ref point)
       await startSession('TestScenario');
       await writeAction(
-        { type: 'recorder/recordGpsEvent', payload: { lat: 50.0, lon: 8.0 } },
+        { type: 'recording/recordGpsEvent', payload: { lat: 50.0, lon: 8.0 } },
         1
       );
 
@@ -399,7 +399,7 @@ describe('File System Storage - Integration with Mocks', () => {
       // Create a session with a ref point action
       await startSession('RefPointScenario');
       const refPointAction = {
-        type: 'recorder/markRefPoint',
+        type: 'recording/markRefPoint',
         payload: {
           id: 'ref-001',
           gpsPosition: { lat: 48.8584, lon: 2.2945 },

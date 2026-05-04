@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Unit tests for zip-reader.ts
  *
  * Why these tests matter: The zip-reader module provides production-ready
@@ -96,7 +96,7 @@ describe('zip-reader', () => {
 
     it('first action is recorder/startSession', () => {
       // Why: recordings must start with a startSession action
-      expect(actions[0].action.type).toBe('recorder/startSession');
+      expect(actions[0].action.type).toBe('recording/startSession');
     });
 
     it('preserves action payloads', () => {
@@ -197,13 +197,13 @@ describe('zip-reader', () => {
     it('logs a warning for action files with non-numeric names', async () => {
       // Why: files like "actions/my-notes.json" pass the filter but produce
       // NaN indices. A warning makes diagnosis easier without rejecting
-      // the file outright — the action is still dispatched.
+      // the file outright â€” the action is still dispatched.
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       const data = await createZipWithActions([
         {
           name: 'actions/000001.json',
-          content: '{"type":"recorder/startSession"}',
+          content: '{"type":"recording/startSession"}',
         },
         {
           name: 'actions/my-notes.json',
@@ -229,11 +229,11 @@ describe('zip-reader', () => {
 
     it('still includes actions with unexpected names in results', async () => {
       // Why: the user explicitly wants all action files dispatched, even
-      // those with unexpected names — only a warning, not rejection.
+      // those with unexpected names â€” only a warning, not rejection.
       const data = await createZipWithActions([
         {
           name: 'actions/000001.json',
-          content: '{"type":"recorder/startSession"}',
+          content: '{"type":"recording/startSession"}',
         },
         {
           name: 'actions/readme.json',
@@ -241,7 +241,7 @@ describe('zip-reader', () => {
         },
         {
           name: 'actions/000002.json',
-          content: '{"type":"recorder/stopSession"}',
+          content: '{"type":"recording/stopSession"}',
         },
       ]);
 
@@ -260,11 +260,11 @@ describe('zip-reader', () => {
       const data = await createZipWithActions([
         {
           name: 'actions/000001.json',
-          content: '{"type":"recorder/startSession"}',
+          content: '{"type":"recording/startSession"}',
         },
         {
           name: 'actions/000002.json',
-          content: '{"type":"recorder/gps"}',
+          content: '{"type":"recording/gps"}',
         },
       ]);
 
@@ -315,7 +315,7 @@ describe('zip-reader', () => {
         { name: 'actions/000002.json', content: '{ INVALID JSON !!!' },
         {
           name: 'actions/000003.json',
-          content: '{"type":"recorder/endSession"}',
+          content: '{"type":"recording/endSession"}',
         },
       ]);
 
@@ -323,7 +323,7 @@ describe('zip-reader', () => {
 
       expect(result).toHaveLength(2);
       expect(result[0]!.action.type).toBe('gpsData/setZeroPos');
-      expect(result[1]!.action.type).toBe('recorder/endSession');
+      expect(result[1]!.action.type).toBe('recording/endSession');
     });
 
     it('logs a warning for each skipped malformed entry', async () => {
@@ -334,7 +334,7 @@ describe('zip-reader', () => {
       const data = await createZipWithActions([
         {
           name: 'actions/000001.json',
-          content: '{"type":"recorder/startSession"}',
+          content: '{"type":"recording/startSession"}',
         },
         { name: 'actions/000002.json', content: 'not json at all' },
         { name: 'actions/000003.json', content: '{truncated' },
@@ -355,7 +355,7 @@ describe('zip-reader', () => {
     });
 
     it('returns empty array when all action files are malformed', async () => {
-      // Why: even if every file is corrupt, the function should not throw —
+      // Why: even if every file is corrupt, the function should not throw â€”
       // the caller gets an empty array and can handle it gracefully.
       const data = await createZipWithActions([
         { name: 'actions/000001.json', content: '' },
@@ -369,7 +369,7 @@ describe('zip-reader', () => {
 
   describe('action shape validation (valid JSON but invalid action structure)', () => {
     // Why this suite matters:
-    // JSON.parse succeeds for values like null, 42, "hello", [] — all of which
+    // JSON.parse succeeds for values like null, 42, "hello", [] â€” all of which
     // lack the required `type` string. The `as RecordedAction` cast provides no
     // runtime safety. These tests verify that loadActionsFromZip rejects such
     // entries instead of silently pushing them into the results array.
@@ -402,30 +402,30 @@ describe('zip-reader', () => {
         const data = await createZipWithActions([
           {
             name: 'actions/000001.json',
-            content: '{"type":"recorder/startSession"}',
+            content: '{"type":"recording/startSession"}',
           },
           { name: 'actions/000002.json', content },
           {
             name: 'actions/000003.json',
-            content: '{"type":"recorder/endSession"}',
+            content: '{"type":"recording/endSession"}',
           },
         ]);
 
         const result = await loadActionsFromZip(data);
 
         expect(result).toHaveLength(2);
-        expect(result[0]!.action.type).toBe('recorder/startSession');
-        expect(result[1]!.action.type).toBe('recorder/endSession');
+        expect(result[0]!.action.type).toBe('recording/startSession');
+        expect(result[1]!.action.type).toBe('recording/endSession');
       }
     );
 
     it('skips an object without a type property', async () => {
       // Why: { "payload": "data" } is a valid JSON object but not a valid
-      // Redux action — the `type` field is required.
+      // Redux action â€” the `type` field is required.
       const data = await createZipWithActions([
         {
           name: 'actions/000001.json',
-          content: '{"type":"recorder/startSession"}',
+          content: '{"type":"recording/startSession"}',
         },
         {
           name: 'actions/000002.json',
@@ -436,7 +436,7 @@ describe('zip-reader', () => {
       const result = await loadActionsFromZip(data);
 
       expect(result).toHaveLength(1);
-      expect(result[0]!.action.type).toBe('recorder/startSession');
+      expect(result[0]!.action.type).toBe('recording/startSession');
     });
 
     it('skips an object with a non-string type property', async () => {
@@ -445,7 +445,7 @@ describe('zip-reader', () => {
       const data = await createZipWithActions([
         {
           name: 'actions/000001.json',
-          content: '{"type":"recorder/startSession"}',
+          content: '{"type":"recording/startSession"}',
         },
         { name: 'actions/000002.json', content: '{"type":123}' },
       ]);
@@ -453,7 +453,7 @@ describe('zip-reader', () => {
       const result = await loadActionsFromZip(data);
 
       expect(result).toHaveLength(1);
-      expect(result[0]!.action.type).toBe('recorder/startSession');
+      expect(result[0]!.action.type).toBe('recording/startSession');
     });
 
     it('logs warnings for each skipped invalid-shape entry', async () => {
@@ -465,7 +465,7 @@ describe('zip-reader', () => {
         { name: 'actions/000002.json', content: '{"payload":"no type"}' },
         {
           name: 'actions/000003.json',
-          content: '{"type":"recorder/ok"}',
+          content: '{"type":"recording/ok"}',
         },
       ]);
 
@@ -492,7 +492,7 @@ describe('loadSessionMetadataFromBlob', () => {
   // Why this suite matters:
   // The original loadSessionMetadata requires the caller to load the entire zip
   // file into a Uint8Array. For metadata-only discovery (discoverScenariosFromZipMetadata),
-  // this wastes memory — zip.js can read just the central directory + session.json
+  // this wastes memory â€” zip.js can read just the central directory + session.json
   // entry from a Blob without buffering the full file. This Blob-based variant
   // enables memory-efficient scanning of many large zip files.
 
@@ -504,7 +504,7 @@ describe('loadSessionMetadataFromBlob', () => {
 
   it('returns the same metadata as loadSessionMetadata for a valid zip', async () => {
     // Why: The Blob-based variant must produce identical results to the
-    // Uint8Array-based one — it's a memory optimization, not a behavior change.
+    // Uint8Array-based one â€” it's a memory optimization, not a behavior change.
     const blob = new Blob([testZip.zipData as BlobPart]);
     const blobResult = await loadSessionMetadataFromBlob(blob);
     const arrayResult = await loadSessionMetadata(testZip.zipData);
@@ -513,7 +513,7 @@ describe('loadSessionMetadataFromBlob', () => {
   });
 
   it('returns session metadata with scenarioName from a Blob', async () => {
-    // Why: Basic functionality check — read scenarioName (now carried in
+    // Why: Basic functionality check â€” read scenarioName (now carried in
     // contextTag) from session.json inside a zip provided as a Blob.
     const blob = new Blob([testZip.zipData as BlobPart]);
     const metadata = await loadSessionMetadataFromBlob(blob);
@@ -524,13 +524,13 @@ describe('loadSessionMetadataFromBlob', () => {
   });
 
   it('returns null when session.json is absent from the zip', async () => {
-    // Why: Graceful degradation — pre-F2-fix zips may not have session.json.
+    // Why: Graceful degradation â€” pre-F2-fix zips may not have session.json.
     const { ZipWriter, Uint8ArrayWriter, TextReader } =
       await import('@zip.js/zip.js');
     const zipWriter = new ZipWriter(new Uint8ArrayWriter());
     await zipWriter.add(
       'actions/000001.json',
-      new TextReader('{"type":"recorder/startSession"}')
+      new TextReader('{"type":"recording/startSession"}')
     );
     const zipBytes = await zipWriter.close();
     const blob = new Blob([zipBytes]);
@@ -555,7 +555,7 @@ describe('loadSessionMetadataFromBlob', () => {
 
   it('accepts a File object since File extends Blob', async () => {
     // Why: In the browser, handle.getFile() returns a File (which is a Blob).
-    // The function must work with File objects directly — this is the real
+    // The function must work with File objects directly â€” this is the real
     // call path in discoverScenariosFromZipMetadata.
     const file = new File([testZip.zipData as BlobPart], 'recording.zip', {
       type: 'application/zip',
@@ -575,13 +575,13 @@ import { loadGpsPathFromBlob } from './zip-reader';
 
 describe('loadGpsPathFromBlob', () => {
   // Why this suite matters:
-  // UX feedback 2026-03-23 Issue 1 — when a session is selected in the replay
+  // UX feedback 2026-03-23 Issue 1 â€” when a session is selected in the replay
   // setup screen, a GPS path preview map is shown. This function extracts
   // GPS coordinates from a zip using BlobReader (memory-efficient, same pattern
   // as loadSessionMetadataFromBlob) without keeping all actions in memory.
 
   it('extracts GPS coordinates from a zip with GPS actions', async () => {
-    // Why: Core happy-path — a realistic zip with 10 GPS events should
+    // Why: Core happy-path â€” a realistic zip with 10 GPS events should
     // produce 10 coordinate pairs in the correct lat/lng order.
     const zip = await produceTestZip({
       gpsEventCount: 5,
@@ -611,7 +611,7 @@ describe('loadGpsPathFromBlob', () => {
 
     const coords = await loadGpsPathFromBlob(blob);
 
-    // Only 3 GPS events — images, startSession, and setZeroPos are excluded
+    // Only 3 GPS events â€” images, startSession, and setZeroPos are excluded
     expect(coords).toHaveLength(3);
   });
 
@@ -627,7 +627,7 @@ describe('loadGpsPathFromBlob', () => {
   });
 
   it('returns empty array for invalid/corrupted zip', async () => {
-    // Why: Corrupted zips should not crash the preview — graceful degradation.
+    // Why: Corrupted zips should not crash the preview â€” graceful degradation.
     const blob = new Blob([new Uint8Array([0, 1, 2, 3])]);
 
     const coords = await loadGpsPathFromBlob(blob);

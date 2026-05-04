@@ -27,7 +27,7 @@ Wraps OPFS (Origin Private File System) to persist Redux actions and captured fr
 ## Folder Structure (OPFS)
 
 ```
-/gps-recorder/
+/gps-plus-slam/
   scenarios/
     <scenario-name>/
       recording-2025-02-28_14-30-11utc/

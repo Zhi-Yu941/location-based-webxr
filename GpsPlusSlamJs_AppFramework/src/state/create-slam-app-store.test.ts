@@ -1,5 +1,5 @@
-/**
- * Tests for `createSlamAppStore` — the framework's composable Redux store
+﻿/**
+ * Tests for `createSlamAppStore` â€” the framework's composable Redux store
  * factory introduced in Iter 1 of the AppFramework/RecorderApp boundary
  * migration ([plan](../../../../GpsPlusSlamJs_Docs/docs/2026-05-03-appframework-vs-recorderapp-boundary-analysis.md)).
  *
@@ -7,7 +7,7 @@
  * It wires:
  * - The three library reducers (`gpsData`, `gpsElements`, `arElements`).
  * - The framework-owned recording lifecycle slice (`recorder`).
- * - The persistence middleware bridging Redux → `StorageBackend`.
+ * - The persistence middleware bridging Redux â†’ `StorageBackend`.
  *
  * Recorder-only state (routing, ref-points, scenario name) is supplied
  * by the consumer via `extraReducers` / `extraMiddleware`. The factory
@@ -17,7 +17,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createSlice } from '@reduxjs/toolkit';
 import { createSlamAppStore } from './create-slam-app-store';
-import { startSession, endSession } from './recorder-slice';
+import { startSession, endSession } from './recording-slice';
 import type { StorageBackend } from '../storage/storage-backend';
 import { NullStorageBackend } from '../storage/null-storage-backend';
 
@@ -48,9 +48,9 @@ describe('createSlamAppStore', () => {
       // a framework-owned concern; every app built on it gets it for free.
       const store = createSlamAppStore({ storageBackend: backend });
       const state = store.getState();
-      expect(state.recorder).toBeDefined();
-      expect(state.recorder.isRecording).toBe(false);
-      expect(state.recorder.actionCount).toBe(0);
+      expect(state.recording).toBeDefined();
+      expect(state.recording.isRecording).toBe(false);
+      expect(state.recording.actionCount).toBe(0);
     });
 
     it('does NOT include routing, refPoints, or scenario reducers by default', () => {
@@ -74,15 +74,15 @@ describe('createSlamAppStore', () => {
           startTime: 1,
         })
       );
-      expect(store.getState().recorder.isRecording).toBe(true);
+      expect(store.getState().recording.isRecording).toBe(true);
       store.dispatch(endSession());
-      expect(store.getState().recorder.isRecording).toBe(false);
+      expect(store.getState().recording.isRecording).toBe(false);
     });
   });
 
   describe('extraReducers', () => {
     it('mounts caller-supplied reducers under their slice keys', () => {
-      // Why: composable factory contract — recorder will plug routing /
+      // Why: composable factory contract â€” recorder will plug routing /
       // refPoints / scenario through this seam without the framework knowing.
       const counter = createSlice({
         name: 'counter',
@@ -128,13 +128,13 @@ describe('createSlamAppStore', () => {
         extraMiddleware: [trackingMiddleware],
       });
       store.dispatch(endSession());
-      expect(seen).toContain('recorder/endSession');
+      expect(seen).toContain('recording/endSession');
     });
   });
 
   describe('storage backend wiring', () => {
     it('routes writeFrame / writeSessionMetadata through the supplied backend', async () => {
-      // Why: A1 fix — abstraction boundary; tests must be able to substitute
+      // Why: A1 fix â€” abstraction boundary; tests must be able to substitute
       // a NullStorageBackend / spy backend in place of OPFS.
       const writeFrame = vi.fn().mockResolvedValue(undefined);
       const writeSessionMetadata = vi.fn().mockResolvedValue(undefined);
@@ -163,7 +163,7 @@ describe('createSlamAppStore', () => {
 
   describe('license validation', () => {
     it('throws when an invalid license key is supplied', () => {
-      // Why: the framework must never run without a valid license — including
+      // Why: the framework must never run without a valid license â€” including
       // the bundled community key path. Empty / bad keys are a hard fail.
       expect(() =>
         createSlamAppStore({ storageBackend: backend, licenseKey: '' })

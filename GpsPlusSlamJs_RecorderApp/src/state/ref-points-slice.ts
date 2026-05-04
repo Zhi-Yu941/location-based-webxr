@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Redux slice for reference point state that was previously stored
  * in closure variables inside ref-point-handlers.ts.
  *
@@ -15,7 +15,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { ImportedRefPoint } from '../storage/ref-point-importer';
 import type { RefPointMark } from '../storage/ref-point-loader';
-import { gpsToH3, type KnownRefPoint } from 'gps-plus-slam-app-framework';
+import { gpsToH3, type KnownGeoAnchor } from 'gps-plus-slam-app-framework/geo/h3-proximity';
 
 // ---------------------------------------------------------------------------
 // State shape
@@ -112,7 +112,7 @@ export const refPointsReducer = refPointsSlice.reducer;
 // ---------------------------------------------------------------------------
 
 /**
- * Memoized selector that derives KnownRefPoint[] (with H3 indices) from
+ * Memoized selector that derives KnownGeoAnchor[] (with H3 indices) from
  * importedRefPoints. Replaces the closure-based `recomputeKnownRefPoints()`
  * in ref-point-handlers.ts.
  *
@@ -121,7 +121,7 @@ export const refPointsReducer = refPointsSlice.reducer;
  */
 export const selectCachedKnownRefPoints = createSelector(
   (state: RefPointsState) => state.importedRefPoints,
-  (importedRefPoints): KnownRefPoint[] =>
+  (importedRefPoints): KnownGeoAnchor[] =>
     importedRefPoints.map((rp) => ({
       h3Index: gpsToH3(rp.lat, rp.lon),
       displayName: rp.name || rp.id,

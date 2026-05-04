@@ -1,9 +1,9 @@
-/**
+﻿/**
  * Recorder Store Tests
  *
  * Combined library + recorder Redux store integration tests. Migrated from
  * the framework's old `state/store.test.ts` as part of Iter 1 of the
- * AppFramework / RecorderApp boundary migration â€” the recorder now owns
+ * AppFramework / RecorderApp boundary migration Ã¢â‚¬â€ the recorder now owns
  * `createRecorderStore`, so its tests live alongside it.
  *
  * Tests verify that:
@@ -40,7 +40,7 @@ describe('Recorder Store', () => {
 
   describe('Recorder State', () => {
     it('should initialize with default recorder state', () => {
-      const state = store.getState().recorder;
+      const state = store.getState().recording;
       expect(state.isRecording).toBe(false);
       expect(state.sessionMetadata).toBeNull();
       expect(state.actionCount).toBe(0);
@@ -56,7 +56,7 @@ describe('Recorder Store', () => {
         })
       );
 
-      const state = store.getState().recorder;
+      const state = store.getState().recording;
       expect(state.isRecording).toBe(true);
       expect(state.sessionMetadata?.scenarioName).toBe('Test Scenario');
     });
@@ -71,7 +71,7 @@ describe('Recorder Store', () => {
       );
       store.dispatch(endSession());
 
-      const state = store.getState().recorder;
+      const state = store.getState().recording;
       expect(state.isRecording).toBe(false);
     });
 
@@ -91,7 +91,7 @@ describe('Recorder Store', () => {
     });
 
     // Why this test matters: Starting a new session should NOT reset the
-    // scenario name â€” user selects it before recording and it persists.
+    // scenario name Ã¢â‚¬â€ user selects it before recording and it persists.
     it('should preserve currentScenarioName across startSession', () => {
       store.dispatch(setCurrentScenarioName('Downtown'));
       store.dispatch(
@@ -144,7 +144,7 @@ describe('Recorder Store', () => {
       const state = store.getState();
       const gpsEvents = state.gpsData?.gpsEvents;
       expect(gpsEvents?.odometryPositions.length).toBe(1);
-      // Dispatched [1,2,3] (raw WebXR) â†’ reducer applies webxrToNUE â†’ [-3, 2, 1]
+      // Dispatched [1,2,3] (raw WebXR) Ã¢â€ â€™ reducer applies webxrToNUE Ã¢â€ â€™ [-3, 2, 1]
       expect(gpsEvents?.odometryPositions[0]).toEqual([-3, 2, 1]);
       expect(gpsEvents?.gpsPositions.length).toBe(1);
       expect(gpsEvents?.gpsPositions[0].latitude).toBeCloseTo(48.8567);
@@ -299,7 +299,7 @@ describe('Recorder Store', () => {
 
       // startSession itself should be persisted
       expect(writeAction).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'recorder/startSession' }),
+        expect.objectContaining({ type: 'recording/startSession' }),
         expect.any(Number)
       );
 
@@ -346,7 +346,7 @@ describe('Recorder Store', () => {
 
       // First action should have index 1 (1-based), not 0
       expect(writeAction).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'recorder/startSession' }),
+        expect.objectContaining({ type: 'recording/startSession' }),
         1
       );
 
@@ -384,7 +384,7 @@ describe('Recorder Store', () => {
       );
       // startSession = index 1
       expect(writeSpy1).toHaveBeenLastCalledWith(
-        expect.objectContaining({ type: 'recorder/startSession' }),
+        expect.objectContaining({ type: 'recording/startSession' }),
         1
       );
 
@@ -395,14 +395,14 @@ describe('Recorder Store', () => {
         2
       );
 
-      // Create a SECOND store â€” this must NOT affect store1's counter
+      // Create a SECOND store Ã¢â‚¬â€ this must NOT affect store1's counter
       const spyBackend2 = new NullStorageBackend();
       createRecorderStore({
         storageBackend: spyBackend2,
         enableDevChecks: false,
       });
 
-      // Dispatch on store1 again â€” index must continue at 3, not restart at 1
+      // Dispatch on store1 again Ã¢â‚¬â€ index must continue at 3, not restart at 1
       store1.dispatch(setZeroPos({ lat: 1, lon: 1 }));
       expect(writeSpy1).toHaveBeenLastCalledWith(
         expect.objectContaining({ type: 'gpsData/setZeroPos' }),
@@ -424,7 +424,7 @@ describe('Recorder Store', () => {
 
     it('should initialize failedWriteCount to 0', () => {
       // Why: Baseline state should have no failed writes
-      const state = store.getState().recorder;
+      const state = store.getState().recording;
       expect(state.failedWriteCount).toBe(0);
     });
 
@@ -440,7 +440,7 @@ describe('Recorder Store', () => {
 
       store.dispatch(recordWriteFailure('Test error message'));
 
-      const state = store.getState().recorder;
+      const state = store.getState().recording;
       expect(state.failedWriteCount).toBe(1);
     });
 
@@ -458,7 +458,7 @@ describe('Recorder Store', () => {
       store.dispatch(recordWriteFailure('Error 2'));
       store.dispatch(recordWriteFailure('Error 3'));
 
-      const state = store.getState().recorder;
+      const state = store.getState().recording;
       expect(state.failedWriteCount).toBe(3);
     });
 
@@ -473,7 +473,7 @@ describe('Recorder Store', () => {
         })
       );
       store.dispatch(recordWriteFailure('Error'));
-      expect(store.getState().recorder.failedWriteCount).toBe(1);
+      expect(store.getState().recording.failedWriteCount).toBe(1);
 
       // Start a new session on the same store instance - this tests that
       // startSession reducer resets failedWriteCount, not store initialization
@@ -485,7 +485,7 @@ describe('Recorder Store', () => {
         })
       );
 
-      const state = store.getState().recorder;
+      const state = store.getState().recording;
       expect(state.failedWriteCount).toBe(0);
     });
 
@@ -534,7 +534,7 @@ describe('Recorder Store', () => {
 
       // Wait for the async write to fail and update state
       await vi.waitFor(() => {
-        expect(store.getState().recorder.failedWriteCount).toBe(1);
+        expect(store.getState().recording.failedWriteCount).toBe(1);
       });
     });
 
@@ -544,7 +544,7 @@ describe('Recorder Store', () => {
        * When writeAction fails, we dispatch recordWriteFailure to track the failure.
        * If recordWriteFailure itself were persisted, and that write also failed,
        * we'd get infinite recursion:
-       *   writeAction fails â†’ recordWriteFailure â†’ writeAction â†’ fails â†’ recordWriteFailure â†’ ...
+       *   writeAction fails Ã¢â€ â€™ recordWriteFailure Ã¢â€ â€™ writeAction Ã¢â€ â€™ fails Ã¢â€ â€™ recordWriteFailure Ã¢â€ â€™ ...
        *
        * This test ensures recordWriteFailure is excluded from persistence.
        * This also enables us to use dispatch() consistently in the catch block
@@ -574,7 +574,7 @@ describe('Recorder Store', () => {
       expect(writeAction).not.toHaveBeenCalled();
 
       // But state should still be updated
-      expect(store.getState().recorder.failedWriteCount).toBe(1);
+      expect(store.getState().recording.failedWriteCount).toBe(1);
     });
 
     it('should call onWriteFailure with normalized Error when rejection is non-Error', async () => {
@@ -618,7 +618,7 @@ describe('Recorder Store', () => {
      */
 
     it('should accept a storageBackend option and use it for persistence', () => {
-      // Why: Core F2 behavior â€” injected backend replaces the hard-coded import
+      // Why: Core F2 behavior Ã¢â‚¬â€ injected backend replaces the hard-coded import
       const mockBackend = {
         writeAction: vi.fn().mockResolvedValue(undefined),
         writeFrame: vi.fn().mockResolvedValue(undefined),
@@ -640,7 +640,7 @@ describe('Recorder Store', () => {
       );
 
       expect(mockBackend.writeAction).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'recorder/startSession' }),
+        expect.objectContaining({ type: 'recording/startSession' }),
         1
       );
     });
@@ -707,7 +707,7 @@ describe('Recorder Store', () => {
     });
 
     it('should not persist when using NullStorageBackend in replay mode', () => {
-      // Why: Validates the replay use case â€” no persistence side effects
+      // Why: Validates the replay use case Ã¢â‚¬â€ no persistence side effects
       const backend = new NullStorageBackend();
       const spy = vi.spyOn(backend, 'writeAction');
 
@@ -726,13 +726,13 @@ describe('Recorder Store', () => {
       expect(spy).toHaveBeenCalledTimes(2);
       // State is still updated correctly
       expect(replayStore.getState().gpsData).not.toBeNull();
-      expect(replayStore.getState().recorder.isRecording).toBe(true);
+      expect(replayStore.getState().recording.isRecording).toBe(true);
     });
   });
 
   describe('writeFrame and writeSessionMetadata delegation (A1)', () => {
     /**
-     * Why these tests matter (Finding A1 â€” Architecture Audit):
+     * Why these tests matter (Finding A1 Ã¢â‚¬â€ Architecture Audit):
      * main.ts imports writeFrame/writeSessionMetadata directly from file-system.ts,
      * bypassing the StorageBackend abstraction. This means NullStorageBackend is
      * ineffective for frame/metadata writes during replay/testing.
@@ -795,7 +795,7 @@ describe('Recorder Store', () => {
       expect(mockBackend.writeSessionMetadata).toHaveBeenCalledWith(metadata);
     });
 
-    it('should use NullStorageBackend for writeFrame in replay mode â€” no side effects', async () => {
+    it('should use NullStorageBackend for writeFrame in replay mode Ã¢â‚¬â€ no side effects', async () => {
       // Why: In replay mode, frame writes must be silently suppressed.
       // Before A1 fix, main.ts called file-system.ts directly, ignoring NullStorageBackend.
       const backend = new NullStorageBackend();
@@ -822,7 +822,7 @@ describe('Recorder Store', () => {
     });
   });
 
-  describe('Routing State (Bug 2 â€” SPA audit)', () => {
+  describe('Routing State (Bug 2 Ã¢â‚¬â€ SPA audit)', () => {
     // Why: Bug 2 requires currentScreen to live in Redux, not a module
     // variable. The store must include routing state and handle routing/
     // prefixed actions.

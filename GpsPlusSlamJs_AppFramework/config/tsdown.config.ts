@@ -37,9 +37,9 @@ const entryFiles = [
   // licensing/
   'src/licensing/index.ts',
 
-  // ref-points/
-  'src/ref-points/index.ts',
-  'src/ref-points/h3-ref-point.ts',
+  // geo/
+  'src/geo/index.ts',
+  'src/geo/h3-proximity.ts',
 
   // sensors/
   'src/sensors/index.ts',
@@ -52,8 +52,9 @@ const entryFiles = [
   'src/state/app-selectors.ts',
   'src/state/create-slam-app-store.ts',
   'src/state/persistence-middleware.ts',
-  'src/state/recorder-slice.ts',
-  'src/state/recording-coordinator.ts',
+  'src/state/recording-slice.ts',
+  'src/state/gps-event-coordinator.ts',
+  'src/state/gps-ar-pose-sampler.ts',
   'src/state/recording-options.ts',
   'src/state/recording-replayer.ts',
   'src/state/replay-engine.ts',
@@ -99,7 +100,7 @@ const entryFiles = [
   'src/visualization/leaflet-map-overlay.ts',
   'src/visualization/lerp-utils.ts',
   'src/visualization/map-overlay.ts',
-  'src/visualization/reference-points.ts',
+  'src/visualization/gps-anchored-mesh-manager.ts',
   'src/visualization/three-dispose.ts',
   'src/visualization/vis-colors.ts',
 ];

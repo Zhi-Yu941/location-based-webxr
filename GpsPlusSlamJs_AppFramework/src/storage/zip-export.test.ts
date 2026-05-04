@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ZIP Export Module Tests
  *
  * Tests for exporting OPFS session data as ZIP files.
@@ -65,7 +65,7 @@ async function unzipBlob(blob: Blob): Promise<Map<string, Uint8Array>> {
  * Build a scenario-layout session under OPFS for tests that exercise
  * the framework's legacy scenario branch in `exportSessionAsZip`.
  *
- * Creates `gps-recorder/scenarios/{scenarioName}/recording-{ts}/`
+ * Creates `gps-plus-slam/scenarios/{scenarioName}/recording-{ts}/`
  * with empty `actions/` and `frames/` subdirectories, and wires the
  * handles into opfs-storage so subsequent `writeAction` / `writeFrame` /
  * `writeSessionMetadata` calls target this session.

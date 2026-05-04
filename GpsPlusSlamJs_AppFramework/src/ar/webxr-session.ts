@@ -45,7 +45,7 @@ import {
   nueQuaternionToWebXR as _nueQuaternionToWebXR,
 } from 'gps-plus-slam-js';
 import type { ARPose } from '../types/ar-types';
-import { getLastDeviceOrientation } from '../state/recording-coordinator';
+import { getLastDeviceOrientation } from '../state/gps-event-coordinator';
 import {
   DEFAULT_RECORDING_OPTIONS,
   type ArCrashIsolationOptions,

@@ -37,7 +37,7 @@ import {
 import { wireStoreSubscribers } from 'gps-plus-slam-app-framework/state/store-subscribers';
 import { wireRefPointSubscribers } from '../state/ref-point-subscribers';
 import { gpsEventVisualizer } from 'gps-plus-slam-app-framework/visualization/gps-event-markers';
-import { refPointVisualizer } from 'gps-plus-slam-app-framework/visualization/reference-points';
+import { refPointVisualizer } from '../visualization/ref-point-visualizer';
 import {
   getArPose,
   nuePositionToWebXR,

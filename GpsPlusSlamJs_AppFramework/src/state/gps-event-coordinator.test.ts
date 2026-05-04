@@ -26,10 +26,10 @@ import {
   getLastDeviceOrientation,
   resetCoordinatorState,
   eulerToQuaternion,
-} from './recording-coordinator';
+} from './gps-event-coordinator';
 import type { ReducersMapObject } from '@reduxjs/toolkit';
 import { createSlamAppStore, type SlamAppStore } from './create-slam-app-store';
-import { startSession } from './recorder-slice';
+import { startSession } from './recording-slice';
 import { NullStorageBackend } from '../storage/null-storage-backend';
 import type { StorageBackend } from '../storage/storage-backend';
 type RecorderStore = SlamAppStore<ReducersMapObject>;
@@ -124,7 +124,7 @@ describe('Recording Coordinator', () => {
     /**
      * Why this test matters:
      * Verifies the RawGpsPoint construction with all raw sensor fields.
-     * Derived fields (coordinates, weight, zeroRef, deviceRotation) must NOT be present —
+     * Derived fields (coordinates, weight, zeroRef, deviceRotation) must NOT be present â€”
      * they are computed by the reducer (raw-storage pattern).
      */
     it('builds RawGpsPoint with all raw sensor fields', () => {
@@ -179,8 +179,8 @@ describe('Recording Coordinator', () => {
 
     /**
      * Why this test matters:
-     * Weight computation belongs in the core library (IP protection §3.2).
-     * The framework no longer passes weight at all — it's computed by the reducer.
+     * Weight computation belongs in the core library (IP protection Â§3.2).
+     * The framework no longer passes weight at all â€” it's computed by the reducer.
      */
     it('does not set weight (core library computes it in reducer)', () => {
       const highAccuracy: GpsPosition = {
@@ -208,7 +208,7 @@ describe('Recording Coordinator', () => {
       const highResult = buildRawGpsPoint(highAccuracy, null);
       const lowResult = buildRawGpsPoint(lowAccuracy, null);
 
-      // RawGpsPoint does not include weight — reducer computes it
+      // RawGpsPoint does not include weight â€” reducer computes it
       expect(highResult).not.toHaveProperty('weight');
       expect(lowResult).not.toHaveProperty('weight');
       // Accuracy is still passed through for the core to use
@@ -420,7 +420,7 @@ describe('Recording Coordinator', () => {
       expect(state.gpsData).not.toBeNull();
       expect(state.gpsData?.gpsEvents?.odometryPositions.length).toBe(1);
       // extractOdomPosition returns raw WebXR [1,2,3].
-      // Reducer applies webxrToNUE → state stores [-3, 2, 1] (NUE).
+      // Reducer applies webxrToNUE â†’ state stores [-3, 2, 1] (NUE).
       expect(state.gpsData?.gpsEvents?.odometryPositions[0]).toEqual([
         -3, 2, 1,
       ]);
@@ -530,8 +530,8 @@ describe('Recording Coordinator', () => {
 
       const state = store.getState();
       expect(state.gpsData?.gpsEvents?.odometryPositions.length).toBe(3);
-      // AR pose {x: poseCounter, y: 0, z: 0} → raw WebXR [poseCounter, 0, 0]
-      // Reducer webxrToNUE → NUE [0, 0, poseCounter]. East at index [2].
+      // AR pose {x: poseCounter, y: 0, z: 0} â†’ raw WebXR [poseCounter, 0, 0]
+      // Reducer webxrToNUE â†’ NUE [0, 0, poseCounter]. East at index [2].
       // Last pose (poseCounter=3): east component [2] = 3
       expect(state.gpsData?.gpsEvents?.odometryPositions[2][2]).toBe(3);
     });
@@ -625,60 +625,60 @@ describe('Recording Coordinator', () => {
 
     /**
      * Why this test matters:
-     * 90° rotation around Z axis (alpha/compass) is common.
+     * 90Â° rotation around Z axis (alpha/compass) is common.
      * Verifies the Z-axis rotation component.
      */
     it('handles 90 degree alpha rotation (compass heading)', () => {
       const result = eulerToQuaternion(90, 0, 0);
 
-      // 90° around Z: quaternion = [0, 0, sin(45°), cos(45°)] = [0, 0, 0.707, 0.707]
+      // 90Â° around Z: quaternion = [0, 0, sin(45Â°), cos(45Â°)] = [0, 0, 0.707, 0.707]
       expect(result[0]).toBeCloseTo(0, 5); // x
       expect(result[1]).toBeCloseTo(0, 5); // y
-      expect(result[2]).toBeCloseTo(Math.sin(Math.PI / 4), 3); // z ≈ 0.707
-      expect(result[3]).toBeCloseTo(Math.cos(Math.PI / 4), 3); // w ≈ 0.707
+      expect(result[2]).toBeCloseTo(Math.sin(Math.PI / 4), 3); // z â‰ˆ 0.707
+      expect(result[3]).toBeCloseTo(Math.cos(Math.PI / 4), 3); // w â‰ˆ 0.707
     });
 
     /**
      * Why this test matters:
-     * 90° rotation around X axis (beta/pitch) tests the X component.
+     * 90Â° rotation around X axis (beta/pitch) tests the X component.
      */
     it('handles 90 degree beta rotation (pitch)', () => {
       const result = eulerToQuaternion(0, 90, 0);
 
-      // 90° around X: quaternion = [sin(45°), 0, 0, cos(45°)] = [0.707, 0, 0, 0.707]
-      expect(result[0]).toBeCloseTo(Math.sin(Math.PI / 4), 3); // x ≈ 0.707
+      // 90Â° around X: quaternion = [sin(45Â°), 0, 0, cos(45Â°)] = [0.707, 0, 0, 0.707]
+      expect(result[0]).toBeCloseTo(Math.sin(Math.PI / 4), 3); // x â‰ˆ 0.707
       expect(result[1]).toBeCloseTo(0, 5); // y
       expect(result[2]).toBeCloseTo(0, 5); // z
-      expect(result[3]).toBeCloseTo(Math.cos(Math.PI / 4), 3); // w ≈ 0.707
+      expect(result[3]).toBeCloseTo(Math.cos(Math.PI / 4), 3); // w â‰ˆ 0.707
     });
 
     /**
      * Why this test matters:
-     * 90° rotation around Y axis (gamma/roll) tests the Y component.
+     * 90Â° rotation around Y axis (gamma/roll) tests the Y component.
      */
     it('handles 90 degree gamma rotation (roll)', () => {
       const result = eulerToQuaternion(0, 0, 90);
 
-      // 90° around Y: quaternion = [0, sin(45°), 0, cos(45°)] = [0, 0.707, 0, 0.707]
+      // 90Â° around Y: quaternion = [0, sin(45Â°), 0, cos(45Â°)] = [0, 0.707, 0, 0.707]
       expect(result[0]).toBeCloseTo(0, 5); // x
-      expect(result[1]).toBeCloseTo(Math.sin(Math.PI / 4), 3); // y ≈ 0.707
+      expect(result[1]).toBeCloseTo(Math.sin(Math.PI / 4), 3); // y â‰ˆ 0.707
       expect(result[2]).toBeCloseTo(0, 5); // z
-      expect(result[3]).toBeCloseTo(Math.cos(Math.PI / 4), 3); // w ≈ 0.707
+      expect(result[3]).toBeCloseTo(Math.cos(Math.PI / 4), 3); // w â‰ˆ 0.707
     });
 
     /**
      * Why this test matters:
-     * 360° rotation should be equivalent to identity (full rotation).
+     * 360Â° rotation should be equivalent to identity (full rotation).
      */
     it('handles 360 degree rotation returning to identity', () => {
       const result = eulerToQuaternion(360, 0, 0);
 
-      // 360° rotation = identity (but quaternion might be [0,0,0,-1] which is equivalent)
+      // 360Â° rotation = identity (but quaternion might be [0,0,0,-1] which is equivalent)
       // Both [0,0,0,1] and [0,0,0,-1] represent the same rotation
       expect(result[0]).toBeCloseTo(0, 5); // x
       expect(result[1]).toBeCloseTo(0, 5); // y
       expect(result[2]).toBeCloseTo(0, 5); // z
-      expect(Math.abs(result[3])).toBeCloseTo(1, 5); // w = ±1
+      expect(Math.abs(result[3])).toBeCloseTo(1, 5); // w = Â±1
     });
 
     /**
@@ -688,11 +688,11 @@ describe('Recording Coordinator', () => {
     it('handles negative angles correctly', () => {
       const result = eulerToQuaternion(-90, 0, 0);
 
-      // -90° around Z: quaternion = [0, 0, -sin(45°), cos(45°)]
+      // -90Â° around Z: quaternion = [0, 0, -sin(45Â°), cos(45Â°)]
       expect(result[0]).toBeCloseTo(0, 5); // x
       expect(result[1]).toBeCloseTo(0, 5); // y
-      expect(result[2]).toBeCloseTo(-Math.sin(Math.PI / 4), 3); // z ≈ -0.707
-      expect(result[3]).toBeCloseTo(Math.cos(Math.PI / 4), 3); // w ≈ 0.707
+      expect(result[2]).toBeCloseTo(-Math.sin(Math.PI / 4), 3); // z â‰ˆ -0.707
+      expect(result[3]).toBeCloseTo(Math.cos(Math.PI / 4), 3); // w â‰ˆ 0.707
     });
 
     /**
@@ -709,7 +709,7 @@ describe('Recording Coordinator', () => {
     /**
      * Why this test matters:
      * Combined rotations must work correctly for real device orientations.
-     * A device pointing north, tilted 45° forward, rolled 10° right.
+     * A device pointing north, tilted 45Â° forward, rolled 10Â° right.
      */
     it('handles combined rotations', () => {
       const result = eulerToQuaternion(0, 45, 10);
@@ -723,24 +723,24 @@ describe('Recording Coordinator', () => {
 
     /**
      * Why this test matters:
-     * Edge case - 180° rotation should be handled correctly.
+     * Edge case - 180Â° rotation should be handled correctly.
      */
     it('handles 180 degree rotation', () => {
       const result = eulerToQuaternion(180, 0, 0);
 
-      // 180° around Z: quaternion = [0, 0, 1, 0] or [0, 0, -1, 0]
+      // 180Â° around Z: quaternion = [0, 0, 1, 0] or [0, 0, -1, 0]
       expect(result[0]).toBeCloseTo(0, 5); // x
       expect(result[1]).toBeCloseTo(0, 5); // y
-      expect(Math.abs(result[2])).toBeCloseTo(1, 3); // z = ±1
-      expect(result[3]).toBeCloseTo(0, 3); // w ≈ 0
+      expect(Math.abs(result[2])).toBeCloseTo(1, 3); // z = Â±1
+      expect(result[3]).toBeCloseTo(0, 3); // w â‰ˆ 0
     });
 
     /**
      * Why this test matters:
-     * Validates W3C DeviceOrientation spec compliance. The spec §A.2 defines
+     * Validates W3C DeviceOrientation spec compliance. The spec Â§A.2 defines
      * the combined quaternion formula for intrinsic Z-X'-Y'' Tait-Bryan angles.
-     * For alpha=90°, beta=45°, gamma=30° the reference quaternion must match
-     * q = qZ · qX · qY (not the reverse). This catches wrong multiplication order.
+     * For alpha=90Â°, beta=45Â°, gamma=30Â° the reference quaternion must match
+     * q = qZ Â· qX Â· qY (not the reverse). This catches wrong multiplication order.
      */
     it('matches W3C reference quaternion for alpha=90, beta=45, gamma=30', () => {
       const alpha = 90,
@@ -748,7 +748,7 @@ describe('Recording Coordinator', () => {
         gamma = 30;
       const q = eulerToQuaternion(alpha, beta, gamma);
 
-      // W3C spec §A.2 closed-form formula:
+      // W3C spec Â§A.2 closed-form formula:
       const toRad = Math.PI / 180;
       const cX = Math.cos((beta * toRad) / 2);
       const sX = Math.sin((beta * toRad) / 2);
@@ -762,23 +762,23 @@ describe('Recording Coordinator', () => {
       const expectedZ = cX * cY * sZ + sX * sY * cZ;
       const expectedW = cX * cY * cZ - sX * sY * sZ;
 
-      expect(q[0]).toBeCloseTo(expectedX, 4); // x ≈ 0.0924
-      expect(q[1]).toBeCloseTo(expectedY, 4); // y ≈ 0.4305
-      expect(q[2]).toBeCloseTo(expectedZ, 4); // z ≈ 0.7011
-      expect(q[3]).toBeCloseTo(expectedW, 4); // w ≈ 0.5610
+      expect(q[0]).toBeCloseTo(expectedX, 4); // x â‰ˆ 0.0924
+      expect(q[1]).toBeCloseTo(expectedY, 4); // y â‰ˆ 0.4305
+      expect(q[2]).toBeCloseTo(expectedZ, 4); // z â‰ˆ 0.7011
+      expect(q[3]).toBeCloseTo(expectedW, 4); // w â‰ˆ 0.5610
     });
 
     /**
      * Why this test matters:
      * Validates the ZXY rotation order by applying a combined rotation to a vector.
      * For intrinsic Z-X'-Y'' order per W3C spec:
-     * R = Rz(α) · Rx(β) · Ry(γ), so q = qZ · qX · qY.
-     * With alpha=90° (Z), beta=90° (X), gamma=0° (Y):
+     * R = Rz(Î±) Â· Rx(Î²) Â· Ry(Î³), so q = qZ Â· qX Â· qY.
+     * With alpha=90Â° (Z), beta=90Â° (X), gamma=0Â° (Y):
      * Starting with unit vector [1, 0, 0] (pointing east):
-     * - Rz(90°): [1,0,0] → [0,1,0]
-     * - Rx(90°): has no effect on [0,1,0] becoming [0,0,1] in this intrinsic frame;
+     * - Rz(90Â°): [1,0,0] â†’ [0,1,0]
+     * - Rx(90Â°): has no effect on [0,1,0] becoming [0,0,1] in this intrinsic frame;
      *   the combined world-frame result is [0,1,0].
-     * Verified numerically: qZ·qX applied to [1,0,0] yields [0,1,0].
+     * Verified numerically: qZÂ·qX applied to [1,0,0] yields [0,1,0].
      */
     it('applies rotations in correct ZXY order', () => {
       const q = eulerToQuaternion(90, 90, 0);

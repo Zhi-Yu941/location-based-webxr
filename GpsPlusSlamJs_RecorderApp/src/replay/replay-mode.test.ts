@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Replay Mode Integration â€” Unit Tests
  *
  * @vitest-environment jsdom
@@ -49,7 +49,7 @@ vi.mock('../state/recorder-store', () => ({
   createRecorderStore: vi.fn(() => ({
     getState: vi.fn(() => ({
       gpsData: null,
-      recorder: { isRecording: false },
+      recording: { isRecording: false },
     })),
     dispatch: vi.fn(),
     subscribe: vi.fn(() => vi.fn()),
@@ -89,7 +89,7 @@ function makeMockZipActions() {
       index: 1,
       filename: 'actions/000001.json',
       action: {
-        type: 'recorder/startSession',
+        type: 'recording/startSession',
         payload: {
           scenarioName: 'Test',
           sessionName: 'test-1',
@@ -117,7 +117,7 @@ function makeMockZipActions() {
     {
       index: 3,
       filename: 'actions/000003.json',
-      action: { type: 'recorder/endSession' },
+      action: { type: 'recording/endSession' },
     },
   ];
 }

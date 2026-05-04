@@ -4,7 +4,7 @@
  * Production implementation of StorageBackend that delegates to the
  * existing file-system.ts facade (which in turn uses OPFS).
  *
- * Provides flat session layout: gps-recorder/sessions/{timestamp}/…
+ * Provides flat session layout: gps-plus-slam/sessions/{timestamp}/…
  */
 
 import type { SessionMetadata } from './opfs-storage';

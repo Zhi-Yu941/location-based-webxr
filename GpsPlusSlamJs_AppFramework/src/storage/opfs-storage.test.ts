@@ -42,17 +42,17 @@ describe('opfs-storage', () => {
   });
 
   describe('initOpfsStorage', () => {
-    it('creates gps-recorder/sessions/ directory structure in OPFS root', async () => {
-      // Why: flat layout uses sessions/ directly under gps-recorder/
+    it('creates gps-plus-slam/sessions/ directory structure in OPFS root', async () => {
+      // Why: flat layout uses sessions/ directly under gps-plus-slam/
       // (scenarios/ is recorder-only, handled by ScenarioWrappingStorageBackend)
       await initOpfsStorage();
 
-      const gpsRecorderDir = await opfsRoot.getDirectoryHandle('gps-recorder');
-      expect(gpsRecorderDir).toBeDefined();
-      expect(gpsRecorderDir.name).toBe('gps-recorder');
+      const gpsPlusSlamDir = await opfsRoot.getDirectoryHandle('gps-plus-slam');
+      expect(gpsPlusSlamDir).toBeDefined();
+      expect(gpsPlusSlamDir.name).toBe('gps-plus-slam');
 
       const sessionsDir = await (
-        gpsRecorderDir as unknown as MockOPFSDirectoryHandle
+        gpsPlusSlamDir as unknown as MockOPFSDirectoryHandle
       ).getDirectoryHandle('sessions');
       expect(sessionsDir).toBeDefined();
       expect(sessionsDir.name).toBe('sessions');

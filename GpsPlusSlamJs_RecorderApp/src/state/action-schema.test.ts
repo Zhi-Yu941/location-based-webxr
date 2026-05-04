@@ -80,7 +80,7 @@ describe('Action Schema Validation', () => {
         payload: SessionMetadata;
       };
 
-      expect(action.type).toBe('recorder/startSession');
+      expect(action.type).toBe('recording/startSession');
       expect(action.payload).toEqual(metadata);
       expect(typeof action.payload.startTime).toBe('number');
     });
@@ -313,7 +313,7 @@ describe('Action Schema Validation', () => {
       await flushWrites();
 
       const depthAction = writtenActions.find(
-        (a) => (a as RecordedAction).type === 'recorder/recordDepthSample'
+        (a) => (a as RecordedAction).type === 'recording/recordDepthSample'
       ) as { type: string; payload: DepthSample };
 
       expect(depthAction).toBeDefined();
@@ -346,7 +346,7 @@ describe('Action Schema Validation', () => {
       await flushWrites();
 
       const depthAction = writtenActions.find(
-        (a) => (a as RecordedAction).type === 'recorder/recordDepthSample'
+        (a) => (a as RecordedAction).type === 'recording/recordDepthSample'
       );
       expect(depthAction).toBeDefined();
 

@@ -3,7 +3,7 @@
  *
  * Why these tests matter:
  * The ref-point handlers module encapsulates all reference-point state and
- * event handlers extracted from main.ts (Finding #7 — main.ts decomposition,
+ * event handlers extracted from main.ts (Finding #7 â€” main.ts decomposition,
  * Step 2). These tests verify each handler's behavior in isolation, ensuring
  * the extraction preserves the exact same behavior as the original.
  *
@@ -25,7 +25,7 @@ import type {
   RefPointMark,
 } from '../storage/ref-point-loader';
 
-// ── Hoisted mocks ──────────────────────────────────────────────────────
+// â”€â”€ Hoisted mocks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const {
   mockGetCurrentArPose,
@@ -74,14 +74,14 @@ const {
   mockShowToast: vi.fn(),
   mockIsRefPointPickerVisible: vi.fn<() => boolean>().mockReturnValue(false),
   mockMarkReferencePoint: vi.fn((payload: unknown) => ({
-    type: 'recorder/markReferencePoint',
+    type: 'recording/markReferencePoint',
     payload,
   })),
   mockCalcGpsCoords: vi.fn().mockReturnValue({ lat: 49.123, lon: 8.456 }),
   mockFusedGpsFromOdom: vi.fn().mockReturnValue({ lat: 49.123, lon: 8.456 }),
 }));
 
-// ── Module mocks ───────────────────────────────────────────────────────
+// â”€â”€ Module mocks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 vi.mock('gps-plus-slam-app-framework/ar/webxr-session', () => ({
   getCurrentArPose: mockGetCurrentArPose,
@@ -117,7 +117,7 @@ vi.mock('../ui/ref-point-picker', () => ({
   createRefPointPickerHtml: vi.fn(),
 }));
 
-vi.mock('gps-plus-slam-app-framework/state/recording-coordinator', () => ({
+vi.mock('gps-plus-slam-app-framework/state/gps-event-coordinator', () => ({
   extractOdomPosition: mockExtractOdomPosition,
   extractOdomRotation: mockExtractOdomRotation,
 }));
@@ -145,7 +145,7 @@ vi.mock('gps-plus-slam-app-framework/utils/logger', () => ({
   }),
 }));
 
-// ── Imports (after mocks) ──────────────────────────────────────────────
+// â”€â”€ Imports (after mocks) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 import {
   createRefPointHandlers,
@@ -154,7 +154,7 @@ import {
 } from './ref-point-handlers';
 import { refPointsReducer } from '../state/ref-points-slice';
 
-// ── Helpers ────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function createMockStore(
   gpsPositions: GpsPoint[] = [],
@@ -264,7 +264,7 @@ function createMockScenarioHandle(
   return { kind: 'directory', name } as unknown as FileSystemDirectoryHandle;
 }
 
-// ── Test suites ────────────────────────────────────────────────────────
+// â”€â”€ Test suites â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe('createRefPointHandlers', () => {
   let handlers: RefPointHandlers;
@@ -372,10 +372,10 @@ describe('ref-point state management', () => {
 });
 
 // ============================================================================
-// handleMarkRefPoint — validation
+// handleMarkRefPoint â€” validation
 // ============================================================================
 
-describe('handleMarkRefPoint — validation', () => {
+describe('handleMarkRefPoint â€” validation', () => {
   let handlers: RefPointHandlers;
 
   beforeEach(() => {
@@ -430,10 +430,10 @@ describe('handleMarkRefPoint — validation', () => {
 });
 
 // ============================================================================
-// handleMarkRefPoint — picker integration
+// handleMarkRefPoint â€” picker integration
 // ============================================================================
 
-describe('handleMarkRefPoint — picker integration', () => {
+describe('handleMarkRefPoint â€” picker integration', () => {
   let handlers: RefPointHandlers;
   const mockArPose = createMockArPose();
   const mockGpsPoint = createMockGpsPoint();
@@ -462,7 +462,7 @@ describe('handleMarkRefPoint — picker integration', () => {
     mockListRefPointIds.mockResolvedValue(['scenarioPoint']);
     mockShowRefPointPicker.mockResolvedValue({ id: 'MyNew', isNew: true });
 
-    // Imported refs are far from GPS (49, 8) — won't match as re-observation
+    // Imported refs are far from GPS (49, 8) â€” won't match as re-observation
     handlers.setImportedRefPoints([
       {
         id: 'importedA',
@@ -484,7 +484,7 @@ describe('handleMarkRefPoint — picker integration', () => {
 
     expect(mockShowRefPointPicker).toHaveBeenCalled();
     const passedIds = mockShowRefPointPicker.mock.calls[0][0];
-    // No suggestions — scenario IDs are H3 hex, imported names are for distant locations
+    // No suggestions â€” scenario IDs are H3 hex, imported names are for distant locations
     expect(passedIds).toEqual([]);
   });
 
@@ -579,7 +579,7 @@ describe('handleMarkRefPoint — picker integration', () => {
     mockListRefPointIds.mockResolvedValue(['8b1f1a5c2e3d4f1']);
     mockShowRefPointPicker.mockResolvedValue({ id: 'My Point', isNew: true });
 
-    // Imported refs far away — no nearby match, new ref point flow
+    // Imported refs far away â€” no nearby match, new ref point flow
     handlers.setImportedRefPoints([
       {
         id: 'FarAway',
@@ -599,10 +599,10 @@ describe('handleMarkRefPoint — picker integration', () => {
 });
 
 // ============================================================================
-// handleMarkRefPoint — dispatch, persist, visualize
+// handleMarkRefPoint â€” dispatch, persist, visualize
 // ============================================================================
 
-describe('handleMarkRefPoint — full flow', () => {
+describe('handleMarkRefPoint â€” full flow', () => {
   let handlers: RefPointHandlers;
   let mockStore: RecorderStore;
   const mockArPose = createMockArPose();
@@ -718,10 +718,10 @@ describe('handleMarkRefPoint — full flow', () => {
 });
 
 // ============================================================================
-// handleMarkRefPoint — concurrent call prevention
+// handleMarkRefPoint â€” concurrent call prevention
 // ============================================================================
 
-describe('handleMarkRefPoint — concurrent call prevention', () => {
+describe('handleMarkRefPoint â€” concurrent call prevention', () => {
   // Why: Two rapid taps on "Mark Reference Point" must not both proceed.
   // The synchronous lock prevents the second call from entering the async section.
   it('should block concurrent calls via synchronous lock', async () => {
@@ -784,10 +784,10 @@ describe('handleMarkRefPoint — concurrent call prevention', () => {
 });
 
 // ============================================================================
-// handleMarkRefPoint — re-observation cooldown
+// handleMarkRefPoint â€” re-observation cooldown
 // ============================================================================
 
-describe('handleMarkRefPoint — re-observation cooldown', () => {
+describe('handleMarkRefPoint â€” re-observation cooldown', () => {
   /**
    * Why: Rapid double-taps on the re-observation button produce duplicate
    * markings for the same H3 cell (Aachen audit Issue 3). A per-cell cooldown
@@ -810,7 +810,7 @@ describe('handleMarkRefPoint — re-observation cooldown', () => {
       createDefaultDeps({ getStore: () => store })
     );
 
-    // Import a ref point at the GPS position (49, 8) → re-observation path
+    // Import a ref point at the GPS position (49, 8) â†’ re-observation path
     handlers.setImportedRefPoints([
       {
         id: 'Bank',
@@ -888,7 +888,7 @@ describe('handleMarkRefPoint — re-observation cooldown', () => {
       createDefaultDeps({ getStore: () => store })
     );
 
-    // No imported ref points → new ref point flow (picker shown)
+    // No imported ref points â†’ new ref point flow (picker shown)
     await handlers.handleMarkRefPoint();
     expect(mockMarkReferencePoint).toHaveBeenCalledTimes(1);
 
@@ -920,7 +920,7 @@ describe('handleMarkRefPoint — re-observation cooldown', () => {
       createDefaultDeps({ getStore: () => store })
     );
 
-    // Import a ref point at the GPS position → re-observation path
+    // Import a ref point at the GPS position â†’ re-observation path
     handlers.setImportedRefPoints([
       {
         id: 'Bank',
@@ -935,7 +935,7 @@ describe('handleMarkRefPoint — re-observation cooldown', () => {
     await handlers.handleMarkRefPoint();
     expect(mockMarkReferencePoint).toHaveBeenCalledTimes(1);
 
-    // Cooldown is now active — second call should be ignored
+    // Cooldown is now active â€” second call should be ignored
     await handlers.handleMarkRefPoint();
     expect(mockMarkReferencePoint).toHaveBeenCalledTimes(1);
 
@@ -960,7 +960,7 @@ describe('handleMarkRefPoint — re-observation cooldown', () => {
 });
 
 // ============================================================================
-// buildRefPointObservation — unit test
+// buildRefPointObservation â€” unit test
 // ============================================================================
 
 describe('buildRefPointObservation (via handleMarkRefPoint)', () => {
@@ -1002,7 +1002,7 @@ describe('buildRefPointObservation (via handleMarkRefPoint)', () => {
 // H3-based reference point IDs
 // ============================================================================
 
-describe('handleMarkRefPoint — H3-based ID', () => {
+describe('handleMarkRefPoint â€” H3-based ID', () => {
   // Why: The naming bug (docs/2026-03-08-ref-point-naming-investigation.md)
   // showed that user-entered names are unreliable on mobile. The ref point ID
   // must be the H3 resolution-11 hex index computed from the GPS at capture
@@ -1141,7 +1141,7 @@ describe('checkNearbyRefPoint', () => {
       },
     ]);
 
-    // Check from the same location — should match
+    // Check from the same location â€” should match
     const result = handlers.checkNearbyRefPoint(49.0, 8.0);
     expect(result?.displayName).toBe('Bank');
   });
@@ -1162,7 +1162,7 @@ describe('checkNearbyRefPoint', () => {
       },
     ]);
 
-    // Check from a distant location (~111 km away) — should not match
+    // Check from a distant location (~111 km away) â€” should not match
     const result = handlers.checkNearbyRefPoint(50.0, 9.0);
     expect(result).toBeUndefined();
   });
@@ -1205,7 +1205,7 @@ describe('checkNearbyRefPoint', () => {
    * Why this test matters:
    * knownRefPoints are cached eagerly when setImportedRefPoints is called.
    * If someone removes the cache invalidation, the old ref points would
-   * still be returned after updating — this test catches that.
+   * still be returned after updating â€” this test catches that.
    */
   it('reflects updated ref points after a second setImportedRefPoints call', () => {
     // Initial set: "Bank" at (49.0, 8.0)
@@ -1247,7 +1247,7 @@ describe('checkNearbyRefPoint', () => {
    * The H3 indices for imported ref points are deterministic and only
    * change when setImportedRefPoints is called. This test verifies that
    * repeated proximity checks return consistent results without relying
-   * on re-mapping — if the cache were accidentally removed, the test
+   * on re-mapping â€” if the cache were accidentally removed, the test
    * still passes behaviorally but documents the expected invariant.
    */
   it('returns consistent results across many rapid calls', () => {
@@ -1276,11 +1276,11 @@ describe('checkNearbyRefPoint', () => {
 });
 
 // ============================================================================
-// fusedGpsPoint in observation (Step 2 — prior ref points plan)
+// fusedGpsPoint in observation (Step 2 â€” prior ref points plan)
 // ============================================================================
 
-describe('buildRefPointObservation — fusedGpsPoint', () => {
-  // Identity matrix — transforms odom position 1:1 to aligned position
+describe('buildRefPointObservation â€” fusedGpsPoint', () => {
+  // Identity matrix â€” transforms odom position 1:1 to aligned position
   const IDENTITY_MATRIX = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
   function setupFullFlowMocks(alignmentMatrix: number[] | null = null) {
@@ -1361,7 +1361,7 @@ describe('buildRefPointObservation — fusedGpsPoint', () => {
     });
   });
 
-  // Why: Without alignment matrix, fusedGpsFromOdom should not be called —
+  // Why: Without alignment matrix, fusedGpsFromOdom should not be called â€”
   // there is no fused GPS to compute.
   it('should not call fusedGpsFromOdom when alignment matrix is absent', async () => {
     const { store } = setupFullFlowMocks(null);
@@ -1375,7 +1375,7 @@ describe('buildRefPointObservation — fusedGpsPoint', () => {
   });
 
   // Why: When fusedGpsFromOdom returns altitude (origin has altitude),
-  // the observation's fusedGpsPoint must include it — otherwise altitude
+  // the observation's fusedGpsPoint must include it â€” otherwise altitude
   // from the aligned VIO pipeline is silently lost.
   it('should include altitude when fusedGpsFromOdom returns it', async () => {
     const { store } = setupFullFlowMocks(IDENTITY_MATRIX);
@@ -1398,7 +1398,7 @@ describe('buildRefPointObservation — fusedGpsPoint', () => {
 
   // Why: fusedGpsFromOdom expects NUE-convention input because the alignment
   // matrix is computed from NUE state data. Passing raw WebXR swaps axes.
-  // webxrToNUE([x,y,z]) = [-z, y, x], so [10, 5, -3] → [3, 5, 10].
+  // webxrToNUE([x,y,z]) = [-z, y, x], so [10, 5, -3] â†’ [3, 5, 10].
   it('should convert odomPosition to NUE before calling fusedGpsFromOdom', async () => {
     const { store } = setupFullFlowMocks(IDENTITY_MATRIX);
     // Override with asymmetric values to detect axis swap
@@ -1436,18 +1436,18 @@ describe('buildRefPointObservation — fusedGpsPoint', () => {
 });
 
 // ============================================================================
-// Current-session visualization — prefer fused GPS over raw
+// Current-session visualization â€” prefer fused GPS over raw
 // ============================================================================
 
 /**
  * Why these tests matter: the red sphere shown immediately after marking
  * must sit at the same spot where a future session's green sphere will
- * appear. The saved observation already carries fusedGpsPoint (§7 of
+ * appear. The saved observation already carries fusedGpsPoint (Â§7 of
  * 2026-04-24-refpoint-positioning-investigation.md), and the loader now
- * prefers fused — so the in-session visualizer must match. Otherwise the
+ * prefers fused â€” so the in-session visualizer must match. Otherwise the
  * red sphere jumps position the next time the scenario is opened.
  */
-describe('visualizeRefPoint — prefers fused GPS', () => {
+describe('visualizeRefPoint â€” prefers fused GPS', () => {
   const IDENTITY_MATRIX = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
   function setup(alignmentMatrix: number[] | null) {
@@ -1519,7 +1519,7 @@ describe('visualizeRefPoint — prefers fused GPS', () => {
  * ref point. isNeighborCell drives the visibility of this button.
  * See: docs/2026-04-18-ref-point-proximity-button-improvements.md, Part B.
  */
-describe('checkNearbyRefPoint — isNeighborCell', () => {
+describe('checkNearbyRefPoint â€” isNeighborCell', () => {
   let handlers: RefPointHandlers;
 
   beforeEach(() => {
@@ -1547,7 +1547,7 @@ describe('checkNearbyRefPoint — isNeighborCell', () => {
 
   // Why: When the user is in a neighbor cell (within gridDisk but different
   // center cell), isNeighborCell should be true. At H3 res-11, a shift of
-  // ~0.0003° (~33m) should land in a neighbor cell while still in the gridDisk.
+  // ~0.0003Â° (~33m) should land in a neighbor cell while still in the gridDisk.
   it('returns isNeighborCell=true when in a neighbor gridDisk cell', () => {
     handlers.setImportedRefPoints([
       {
@@ -1559,7 +1559,7 @@ describe('checkNearbyRefPoint — isNeighborCell', () => {
       },
     ]);
 
-    // ~33m north — should be in a neighbor cell at H3 res-11 (~25m edge)
+    // ~33m north â€” should be in a neighbor cell at H3 res-11 (~25m edge)
     const result = handlers.checkNearbyRefPoint(49.0003, 8.0);
     expect(result).toBeDefined();
     expect(result!.displayName).toBe('Bank');
@@ -1593,7 +1593,7 @@ describe('checkNearbyRefPoint — isNeighborCell', () => {
  * even when the user is near a known one.
  * See: docs/2026-04-18-ref-point-proximity-button-improvements.md, Part B.
  */
-describe('handleMarkRefPoint — forceNew', () => {
+describe('handleMarkRefPoint â€” forceNew', () => {
   // Why: When forceNew is true and re-observation would normally
   // fire, the picker should be shown instead of skipping.
   it('shows picker when forceNew=true even near a known ref point', async () => {
@@ -1611,7 +1611,7 @@ describe('handleMarkRefPoint — forceNew', () => {
       getCurrentSessionName: () => 'test-session',
     });
 
-    // Import a ref point at the user's location — normally would trigger re-observation
+    // Import a ref point at the user's location â€” normally would trigger re-observation
     handlers.setImportedRefPoints([
       {
         id: 'Bank',
@@ -1662,13 +1662,13 @@ describe('handleMarkRefPoint — forceNew', () => {
 });
 
 // ============================================================================
-// handleMarkRefPoint — re-observation toast feedback (Finding 3)
+// handleMarkRefPoint â€” re-observation toast feedback (Finding 3)
 // ============================================================================
 
 /**
  * Why these tests matter
  * ----------------------
- * Field test 2026-04-29 — Finding 3 in
+ * Field test 2026-04-29 â€” Finding 3 in
  * `GpsPlusSlamJs_Docs/docs/2026-04-29-ref-points-user-feedback.md`: pressing
  * the capture button gives no visible feedback when the press lands on the
  * single-click re-observation branch (no picker is shown, so the user has no
@@ -1679,7 +1679,7 @@ describe('handleMarkRefPoint — forceNew', () => {
  * picker UI. The toast must fire after the on-disk persistence has settled
  * so it reflects the durable end state.
  */
-describe('handleMarkRefPoint — re-observation toast feedback', () => {
+describe('handleMarkRefPoint â€” re-observation toast feedback', () => {
   function setupReObservationFixture() {
     vi.clearAllMocks();
     mockIsRefPointPickerVisible.mockReturnValue(false);
@@ -1747,7 +1747,7 @@ describe('handleMarkRefPoint — re-observation toast feedback', () => {
     const handlers = createRefPointHandlers(
       createDefaultDeps({ getStore: () => store })
     );
-    // No imported ref points near GPS → picker path
+    // No imported ref points near GPS â†’ picker path
     await handlers.handleMarkRefPoint();
 
     expect(mockShowRefPointPicker).toHaveBeenCalledTimes(1);
@@ -1762,7 +1762,7 @@ describe('handleMarkRefPoint — re-observation toast feedback', () => {
 
     // Second tap inside the 10s cooldown window
     await handlers.handleMarkRefPoint();
-    // Still only the first toast — cooldown rejections are silent
+    // Still only the first toast â€” cooldown rejections are silent
     expect(mockShowToast).toHaveBeenCalledTimes(1);
   });
 

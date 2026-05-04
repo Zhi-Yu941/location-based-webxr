@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Recording Session Handlers
  *
  * Encapsulates all recording-session lifecycle state and event handlers,
@@ -15,7 +15,7 @@ import {
   resetCoordinatorState,
   createGpsPositionHandler,
   updateDeviceOrientation,
-} from 'gps-plus-slam-app-framework/state/recording-coordinator';
+} from 'gps-plus-slam-app-framework/state/gps-event-coordinator';
 import { startSession, endSession } from '../state/recorder-store';
 import type { RecorderStore } from '../state/recorder-store';
 import { wireStoreSubscribers } from 'gps-plus-slam-app-framework/state/store-subscribers';
@@ -82,7 +82,7 @@ import {
   replaceScreenState,
 } from '../ui/navigation';
 import { gpsEventVisualizer } from 'gps-plus-slam-app-framework/visualization/gps-event-markers';
-import { refPointVisualizer } from 'gps-plus-slam-app-framework/visualization/reference-points';
+import { refPointVisualizer } from '../visualization/ref-point-visualizer';
 import { computeFusedPath } from 'gps-plus-slam-app-framework/utils/fused-path';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
 import type { LatLong, Matrix4 } from 'gps-plus-slam-app-framework/core';
@@ -446,7 +446,7 @@ export function createRecordingSessionHandlers(
     // Get state before dispatch
     const store = deps.getStore();
     const state = store.getState();
-    const sessionMetadata = state.recorder.sessionMetadata;
+    const sessionMetadata = state.recording.sessionMetadata;
     const gpsEvents = state.gpsData?.gpsEvents;
     const refPoints = state.gpsData?.referencePoints ?? [];
     const gpsPositions = gpsEvents?.gpsPositions ?? [];
@@ -605,7 +605,7 @@ export function createRecordingSessionHandlers(
         ? { lat: lastGps.latitude, lng: lastGps.longitude }
         : null,
       totalDistanceMeters,
-      failedWriteCount: state.recorder.failedWriteCount,
+      failedWriteCount: state.recording.failedWriteCount,
       rawGpsPath: gpsPositions.map((p) => ({
         lat: p.latitude,
         lng: p.longitude,

@@ -57,8 +57,12 @@ export {
   MapOverlay,
 } from './map-overlay.js';
 
-// --- reference-points ---
-export { RefPointVisualizer, refPointVisualizer } from './reference-points.js';
+// --- gps-anchored-mesh-manager ---
+export {
+  GpsAnchoredMeshManager,
+  type GpsAnchoredItem,
+  type GpsAnchoredMeshManagerOptions,
+} from './gps-anchored-mesh-manager.js';
 
 // --- three-dispose ---
 export {

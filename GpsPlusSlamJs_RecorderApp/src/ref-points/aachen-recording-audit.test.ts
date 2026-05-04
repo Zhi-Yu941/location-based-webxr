@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Aachen Recording Audit — Ref Point Display & Storage Bugs
  *
  * Two Aachen sessions recorded on 2026-04-09 (morning and evening) exposed
@@ -40,10 +40,10 @@ import {
 import type { ImportedRefPoint } from '../storage/ref-point-importer';
 import {
   gpsToH3,
-  findNearbyRefPoint,
-  h3RefsMatch,
+  findNearbyGeoAnchor,
+  h3CellsMatch,
   isH3Index,
-} from 'gps-plus-slam-app-framework/ref-points/h3-ref-point';
+} from 'gps-plus-slam-app-framework/geo/h3-proximity';
 import { averageGpsPerRefPoint } from '../storage/ref-point-loader';
 import type { RefPointDefinition } from '../storage/ref-point-loader';
 
@@ -160,7 +160,7 @@ describe('Aachen 2026-04-09 Recording Audit', () => {
     it('morning session has expected action types', () => {
       if (!dataAvailable) return;
       const types = new Set(morningActions.map((a) => a.type));
-      expect(types).toContain('recorder/startSession');
+      expect(types).toContain('recording/startSession');
       expect(types).toContain('gpsData/setZeroPos');
       expect(types).toContain('gpsData/recordGpsEvent');
       expect(types).toContain('gpsData/markReferencePoint');
@@ -169,7 +169,7 @@ describe('Aachen 2026-04-09 Recording Audit', () => {
     it('evening session has expected action types', () => {
       if (!dataAvailable) return;
       const types = new Set(eveningActions.map((a) => a.type));
-      expect(types).toContain('recorder/startSession');
+      expect(types).toContain('recording/startSession');
       expect(types).toContain('gpsData/setZeroPos');
       expect(types).toContain('gpsData/recordGpsEvent');
       expect(types).toContain('gpsData/markReferencePoint');
@@ -228,7 +228,7 @@ describe('Aachen 2026-04-09 Recording Audit', () => {
   // =========================================================================
 
   describe('Cross-session ref point consistency', () => {
-    it('all 3 morning ref points match a ref point in the evening (via h3RefsMatch)', () => {
+    it('all 3 morning ref points match a ref point in the evening (via h3CellsMatch)', () => {
       if (!dataAvailable) return;
 
       const morningIds = morningRefPoints.map((rp) => rp.payload.id);
@@ -239,7 +239,7 @@ describe('Aachen 2026-04-09 Recording Audit', () => {
       // Every morning ref point should have at least one H3-matching evening point
       for (const morningId of morningIds) {
         const hasMatch = eveningIds.some((eveningId) =>
-          h3RefsMatch(morningId, eveningId)
+          h3CellsMatch(morningId, eveningId)
         );
         expect(
           hasMatch,
@@ -248,7 +248,7 @@ describe('Aachen 2026-04-09 Recording Audit', () => {
       }
     });
 
-    it('all unique evening ref points match a morning ref point (via h3RefsMatch)', () => {
+    it('all unique evening ref points match a morning ref point (via h3CellsMatch)', () => {
       if (!dataAvailable) return;
 
       const morningIds = morningRefPoints.map((rp) => rp.payload.id);
@@ -258,7 +258,7 @@ describe('Aachen 2026-04-09 Recording Audit', () => {
 
       for (const eveningId of eveningIds) {
         const hasMatch = morningIds.some((morningId) =>
-          h3RefsMatch(morningId, eveningId)
+          h3CellsMatch(morningId, eveningId)
         );
         expect(
           hasMatch,
@@ -373,7 +373,7 @@ describe('Aachen 2026-04-09 Recording Audit', () => {
         sourceZipName: '',
       }));
 
-      // 4. selectCachedKnownRefPoints derives KnownRefPoint[] for proximity
+      // 4. selectCachedKnownRefPoints derives KnownGeoAnchor[] for proximity
       const refPointsState: RefPointsState = {
         importedRefPoints,
         sessionRefPointUsage: {},
@@ -425,11 +425,11 @@ describe('Aachen 2026-04-09 Recording Audit', () => {
   describe('Proximity button label updates correctly between locations', () => {
     /**
      * Why: The user reported the button "didn't update" when walking
-     * between ref points. This test verifies that findNearbyRefPoint
+     * between ref points. This test verifies that findNearbyGeoAnchor
      * returns different results at different GPS positions. The actual
      * issue was likely BUG 1 (all labels looked alike as H3 hashes).
      */
-    it('findNearbyRefPoint returns correct ref point at each morning location', () => {
+    it('findNearbyGeoAnchor returns correct ref point at each morning location', () => {
       if (!dataAvailable) return;
 
       // Build known ref points from morning data (simulating what the
@@ -443,11 +443,11 @@ describe('Aachen 2026-04-09 Recording Audit', () => {
         lon: rp.lon,
       }));
 
-      // At each morning ref point's location, findNearbyRefPoint should
+      // At each morning ref point's location, findNearbyGeoAnchor should
       // return that specific ref point (not a random one)
       for (const rp of morningRefPoints) {
         const { latitude, longitude } = rp.payload.gpsPoint;
-        const match = findNearbyRefPoint(latitude, longitude, knownRefPoints);
+        const match = findNearbyGeoAnchor(latitude, longitude, knownRefPoints);
 
         expect(
           match,
@@ -456,13 +456,13 @@ describe('Aachen 2026-04-09 Recording Audit', () => {
 
         // The matched H3 index should correspond to THIS ref point
         expect(
-          h3RefsMatch(match!.h3Index, rp.payload.id),
+          h3CellsMatch(match!.h3Index, rp.payload.id),
           `At location of ref ${rp.payload.id}, found ${match!.h3Index} which doesn't H3-match`
         ).toBe(true);
       }
     });
 
-    it('three morning ref points are distinguished by findNearbyRefPoint (no cross-contamination)', () => {
+    it('three morning ref points are distinguished by findNearbyGeoAnchor (no cross-contamination)', () => {
       if (!dataAvailable) return;
 
       const morningDefs = buildRefPointDefsFromActions(morningRefPoints);
@@ -478,7 +478,7 @@ describe('Aachen 2026-04-09 Recording Audit', () => {
       const matchedH3s = new Set<string>();
       for (const rp of morningRefPoints) {
         const { latitude, longitude } = rp.payload.gpsPoint;
-        const match = findNearbyRefPoint(latitude, longitude, knownRefPoints);
+        const match = findNearbyGeoAnchor(latitude, longitude, knownRefPoints);
         expect(match).toBeDefined();
         matchedH3s.add(match!.h3Index);
       }

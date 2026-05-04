@@ -47,8 +47,8 @@ State machine that detects AR tracking loss and restart events, distinguishing b
   - If `markOriginReset()` was NOT called → **Case 1**: `onTrackingRecovered()` fires (if provided). No alignment correction needed.
 - The `originResetDuringLoss` flag is cleared after every LOST → TRACKING transition regardless of case.
 - `lastValidPose` is updated every frame during TRACKING so it always reflects the most recent good pose.
-- Payload construction uses `eulerToQuaternion()` from `recording-coordinator` for sensor orientation conversion.
-- Payload position fields (`lastValidOdomPos`, `newOdomPos`) are converted to NUE convention via `extractOdomPosition()` from `recording-coordinator` — matching the convention used by `recordGpsEvent.odomPosition`.
+- Payload construction uses `eulerToQuaternion()` from `gps-event-coordinator` for sensor orientation conversion.
+- Payload position fields (`lastValidOdomPos`, `newOdomPos`) are converted to NUE convention via `extractOdomPosition()` from `gps-event-coordinator` — matching the convention used by `recordGpsEvent.odomPosition`.
 - Payload now includes `newOdomPos` (camera position when tracking resumes) and `resetTransform` (serialized `XRReferenceSpaceEvent.transform` — the old-to-new origin delta, or `null` if the runtime couldn't determine it). These fields are captured for diagnostic analysis of field recordings.
 
 ## Examples

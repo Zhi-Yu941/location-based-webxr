@@ -8,7 +8,7 @@
  */
 
 import type { ARPose, DepthPoint, DepthSample } from '../types/ar-types';
-import { extractOdomPosition } from '../state/recording-coordinator';
+import { extractOdomPosition } from '../state/gps-event-coordinator';
 
 export type { DepthSample } from '../types/ar-types';
 

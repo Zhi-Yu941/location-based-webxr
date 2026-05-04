@@ -122,13 +122,6 @@ export class LeafletMapOverlay {
   private rawGpsPoints: L.LatLngExpression[] = [];
   private fusedPoints: L.LatLngExpression[] = [];
   private snapshotPoints: L.LatLngExpression[] = [];
-  private refPoints: Array<{
-    lat: number;
-    lng: number;
-    name: string;
-    isPrior: boolean;
-    marker: L.Marker | null;
-  }> = [];
 
   // Leaflet overlay layers
   private userMarker: L.Marker | null = null;
@@ -259,38 +252,6 @@ export class LeafletMapOverlay {
     }
   }
 
-  addRefPoint(lat: number, lon: number, name: string): void {
-    const marker = this.leafletMap
-      ? this.createRefPointMarker(lat, lon, name, false)
-      : null;
-    this.refPoints.push({ lat, lng: lon, name, isPrior: false, marker });
-  }
-
-  addPriorRefPoint(lat: number, lon: number, name: string): void {
-    const marker = this.leafletMap
-      ? this.createRefPointMarker(lat, lon, name, true)
-      : null;
-    this.refPoints.push({ lat, lng: lon, name, isPrior: true, marker });
-  }
-
-  addPriorRefPoints(
-    refPoints: Array<{ lat: number; lon: number; name: string }>
-  ): void {
-    for (const rp of refPoints) {
-      this.addPriorRefPoint(rp.lat, rp.lon, rp.name);
-    }
-  }
-
-  clearPriorRefPoints(): void {
-    this.refPoints = this.refPoints.filter((rp) => {
-      if (rp.isPrior) {
-        rp.marker?.remove();
-        return false;
-      }
-      return true;
-    });
-  }
-
   // -------------------------------------------------------------------------
   // Zoom
   // -------------------------------------------------------------------------
@@ -358,7 +319,6 @@ export class LeafletMapOverlay {
     this.rawGpsPoints = [];
     this.fusedPoints = [];
     this.snapshotPoints = [];
-    this.refPoints = [];
 
     this.cssObject = null;
 
@@ -418,10 +378,6 @@ export class LeafletMapOverlay {
     this.fusedPolyline = null;
     this.snapshotPolyline?.remove();
     this.snapshotPolyline = null;
-    for (const rp of this.refPoints) {
-      rp.marker?.remove();
-      rp.marker = null;
-    }
 
     // Destroy Leaflet map
     if (this.leafletMap) {
@@ -522,18 +478,6 @@ export class LeafletMapOverlay {
         opacity: 0.8,
       }).addTo(this.leafletMap);
     }
-
-    // Reference points — only create markers for entries that don't have one
-    for (const rp of this.refPoints) {
-      if (!rp.marker) {
-        rp.marker = this.createRefPointMarker(
-          rp.lat,
-          rp.lng,
-          rp.name,
-          rp.isPrior
-        );
-      }
-    }
   }
 
   private updateUserMarker(): void {
@@ -553,29 +497,5 @@ export class LeafletMapOverlay {
         }),
       }).addTo(this.leafletMap);
     }
-  }
-
-  private createRefPointMarker(
-    lat: number,
-    lon: number,
-    name: string,
-    isPrior: boolean
-  ): L.Marker {
-    const color = isPrior
-      ? VIS_COLORS.PRIOR_REF_POINT.css
-      : VIS_COLORS.CURRENT_REF_POINT.css;
-    const opacity = isPrior ? 'opacity:0.8;' : '';
-    const label = isPrior ? `📌 ${name} (prior)` : name;
-
-    return L.marker([lat, lon], {
-      icon: L.divIcon({
-        className: '',
-        html: `<div style="background:${color};width:12px;height:12px;border-radius:50%;border:2px solid white;${opacity}"></div>`,
-        iconSize: [12, 12],
-        iconAnchor: [6, 6],
-      }),
-    })
-      .bindPopup(label)
-      .addTo(this.leafletMap!);
   }
 }

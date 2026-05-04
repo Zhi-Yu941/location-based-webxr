@@ -95,7 +95,7 @@ const mockFolderHandle = {
  */
 function createMockStore(): RecorderStore {
   const state = {
-    recorder: {
+    recording: {
       isRecording: false,
       sessionMetadata: null,
       actionCount: 0,

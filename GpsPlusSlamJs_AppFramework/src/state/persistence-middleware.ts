@@ -1,17 +1,17 @@
-/**
+﻿/**
  * Redux middleware for action persistence during recording sessions.
  *
  * Replaces the inline persistence logic previously embedded in the manual
- * dispatch wrapper. Actions matching gpsData/* or recorder/* (except
- * recorder/recordWriteFailure) are written to the StorageBackend when
- * the recorder is in recording state.
+ * dispatch wrapper. Actions matching gpsData/* or recording/* (except
+ * recording/recordWriteFailure) are written to the StorageBackend when
+ * the recording slice is in recording state.
  *
- * @see docs/2026-04-07-architecture-observations-consolidated.md §4
+ * @see docs/2026-04-07-architecture-observations-consolidated.md Â§4
  */
 
 import type { Middleware, UnknownAction } from '@reduxjs/toolkit';
 import type { StorageBackend } from '../storage/storage-backend';
-import { recordWriteFailure } from './recorder-slice';
+import { recordWriteFailure } from './recording-slice';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('PersistenceMiddleware');
@@ -74,12 +74,12 @@ export interface PersistenceMiddlewareOptions {
  * during active recording sessions.
  *
  * Persistence rules:
- * - Only persists when `state.recorder.isRecording` is true (checked AFTER
+ * - Only persists when `state.recording.isRecording` is true (checked AFTER
  *   the action is reduced, so `startSession` itself is included).
- * - Persists `gpsData/*` and `recorder/*` actions.
- * - Excludes `recorder/recordWriteFailure` to prevent recursive persistence.
+ * - Persists `gpsData/*` and `recording/*` actions.
+ * - Excludes `recording/recordWriteFailure` to prevent recursive persistence.
  * - Excludes `routing/*`, `refPoints/*`, and any other non-recording actions.
- * - Uses 1-based indexing for action files (000001.json, 000002.json, …).
+ * - Uses 1-based indexing for action files (000001.json, 000002.json, â€¦).
  * - Each middleware instance maintains its own action index (Bug 10 fix).
  */
 export function createPersistenceMiddleware(
@@ -99,9 +99,9 @@ export function createPersistenceMiddleware(
     // Capture recording state BEFORE reducer runs so we can detect
     // endSession (which sets isRecording=false in the reducer).
     const stateBefore = store.getState() as {
-      recorder?: { isRecording: boolean };
+      recording?: { isRecording: boolean };
     };
-    const wasRecording = stateBefore.recorder?.isRecording ?? false;
+    const wasRecording = stateBefore.recording?.isRecording ?? false;
 
     // Let reducers handle the action first
     const result = next(action);
@@ -111,18 +111,18 @@ export function createPersistenceMiddleware(
     }
 
     // Reset action index when a new session starts (Issue 4)
-    if (actionType === 'recorder/startSession') {
+    if (actionType === 'recording/startSession') {
       actionIndex = 0;
     }
 
     // Check recording state AFTER reducers ran (so startSession is included).
     // Special-case endSession: wasRecording was true before the reducer,
-    // but isRecording is now false — still needs to be persisted (Issue 5).
+    // but isRecording is now false â€” still needs to be persisted (Issue 5).
     const stateAfter = store.getState() as {
-      recorder?: { isRecording: boolean };
+      recording?: { isRecording: boolean };
     };
-    const isRecording = stateAfter.recorder?.isRecording ?? false;
-    const isEndSession = actionType === 'recorder/endSession';
+    const isRecording = stateAfter.recording?.isRecording ?? false;
+    const isEndSession = actionType === 'recording/endSession';
 
     // Persist if actively recording, or if this is the endSession action
     // that just flipped isRecording to false (Issue 5).
@@ -132,11 +132,11 @@ export function createPersistenceMiddleware(
       return result;
     }
 
-    // Only persist gpsData/ and recorder/ actions (excluding recordWriteFailure)
+    // Only persist gpsData/ and recording/ actions (excluding recordWriteFailure)
     const shouldPersistAction =
       actionType.startsWith('gpsData/') ||
-      (actionType.startsWith('recorder/') &&
-        actionType !== 'recorder/recordWriteFailure');
+      (actionType.startsWith('recording/') &&
+        actionType !== 'recording/recordWriteFailure');
 
     if (!shouldPersistAction) {
       return result;

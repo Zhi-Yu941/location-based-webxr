@@ -29,7 +29,6 @@ import {
   selectGpsPositions,
   selectOdometryPositions,
   selectOdometryRotations,
-  selectReferencePoints,
   selectZeroReference,
 } from './app-selectors';
 
@@ -59,7 +58,6 @@ export interface StoreSubscriberDeps {
     addRawGpsPoint?: (lat: number, lon: number) => void;
     addFusedPoint?: (lat: number, lon: number) => void;
     addAlignmentSnapshot?: (lat: number, lon: number) => void;
-    addRefPoint?: (lat: number, lon: number, name: string) => void;
   } | null;
 
   /**
@@ -221,32 +219,10 @@ export function wireStoreSubscribers(
     )
   );
 
-  // 3. Reference points → forward to map overlay
-  unsubs.push(
-    subscribeToSelector(
-      store,
-      selectReferencePoints,
-      (refPoints, prevPoints) => {
-        const prevCount = prevPoints?.length ?? 0;
-        if (!deps.mapOverlay?.addRefPoint || refPoints.length <= prevCount) {
-          return;
-        }
-        for (let i = prevCount; i < refPoints.length; i++) {
-          const rp = refPoints[i]!;
-          deps.mapOverlay.addRefPoint(
-            rp.gpsPoint.latitude,
-            rp.gpsPoint.longitude,
-            rp.id
-          );
-        }
-      }
-    )
-  );
-
-  // 4. Prior / current ref-point marks — the recorder app owns the
-  // ref-points slice and wires its own visualizer subscription on top of
-  // this function (see RecorderApp's wireRefPointSubscribers). Framework
-  // remains agnostic of ref points after Iter 3 of the boundary migration.
+  // 3. Reference points — the recorder app owns the ref-points slice and
+  // wires its own visualizer + map-overlay subscription on top of this
+  // function (see RecorderApp's wireRefPointSubscribers). Framework remains
+  // agnostic of ref points after Iter 4 of the boundary migration.
 
   return () => {
     for (const unsub of unsubs) unsub();

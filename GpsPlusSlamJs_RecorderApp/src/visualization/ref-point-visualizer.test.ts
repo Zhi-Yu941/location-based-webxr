@@ -1,19 +1,26 @@
-/**
+﻿/**
  * Reference Point Visualizer Tests
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { RefPointVisualizer } from './reference-points';
+import { validateLicenseKey } from 'gps-plus-slam-js';
+import { COMMUNITY_LICENSE_KEY } from 'gps-plus-slam-js/community-license-key';
+import { RefPointVisualizer } from './ref-point-visualizer';
 import type { RefPointMark } from '../storage/ref-point-loader';
 import type { LatLong } from 'gps-plus-slam-js';
 import * as THREE from 'three';
 
+// Activate the gps-plus-slam-js license once for this suite so calls into
+// `calcRelativeCoordsInMeters` from `GpsAnchoredMeshManager` succeed without
+// a store being constructed first.
+validateLicenseKey(COMMUNITY_LICENSE_KEY);
+
 // Mock the webxr-session module
-vi.mock('../ar/webxr-session', () => ({
+vi.mock('gps-plus-slam-app-framework/ar/webxr-session', () => ({
   getScene: vi.fn(),
 }));
 
-import { getScene } from '../ar/webxr-session';
+import { getScene } from 'gps-plus-slam-app-framework/ar/webxr-session';
 
 describe('RefPointVisualizer', () => {
   let visualizer: RefPointVisualizer;

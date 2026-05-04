@@ -1,11 +1,11 @@
-/**
+﻿/**
  * Property-Based Tests for H3 Ref Point Proximity Matching
  *
- * These tests verify invariants of findNearbyRefPoint and approxDistanceMetres
+ * These tests verify invariants of findNearbyGeoAnchor and approxDistanceMetres
  * using randomized inputs, catching edge cases that example-based tests miss.
  *
  * Why these tests matter:
- * 1. findNearbyRefPoint must always return the closest candidate when multiple
+ * 1. findNearbyGeoAnchor must always return the closest candidate when multiple
  *    ref points have overlapping gridDisk zones — regardless of array order.
  * 2. approxDistanceMetres must be consistent with haversine for small distances.
  * 3. The distance helper must satisfy basic metric space properties.
@@ -17,11 +17,11 @@ import { describe, it, expect } from 'vitest';
 import * as fc from 'fast-check';
 import { latLngToCell, gridDisk } from 'h3-js';
 import {
-  findNearbyRefPoint,
+  findNearbyGeoAnchor,
   approxDistanceMetres,
-  type KnownRefPoint,
+  type KnownGeoAnchor,
   H3_RESOLUTION,
-} from './h3-ref-point';
+} from './h3-proximity';
 
 // ---------------------------------------------------------------------------
 // Arbitraries
@@ -77,10 +77,10 @@ describe('approxDistanceMetres properties', () => {
 });
 
 // ---------------------------------------------------------------------------
-// findNearbyRefPoint closest-match properties
+// findNearbyGeoAnchor closest-match properties
 // ---------------------------------------------------------------------------
 
-describe('findNearbyRefPoint closest-match properties', () => {
+describe('findNearbyGeoAnchor closest-match properties', () => {
   // Why: When two ref points overlap and a query point is between them,
   // the returned ref point must always be the one with smaller distance,
   // regardless of array order. This is the core invariant that the
@@ -94,13 +94,13 @@ describe('findNearbyRefPoint closest-match properties', () => {
         arbLerp,
         (baseLat, baseLon, offset, t) => {
           // Two ref points separated by `offset` degrees north-south
-          const rpA: KnownRefPoint = {
+          const rpA: KnownGeoAnchor = {
             h3Index: latLngToCell(baseLat, baseLon, H3_RESOLUTION),
             displayName: 'A',
             lat: baseLat,
             lon: baseLon,
           };
-          const rpB: KnownRefPoint = {
+          const rpB: KnownGeoAnchor = {
             h3Index: latLngToCell(baseLat + offset, baseLon, H3_RESOLUTION),
             displayName: 'B',
             lat: baseLat + offset,
@@ -124,8 +124,8 @@ describe('findNearbyRefPoint closest-match properties', () => {
 
           // Both candidates in range — the result must be the same
           // regardless of array order
-          const matchAB = findNearbyRefPoint(queryLat, queryLon, [rpA, rpB]);
-          const matchBA = findNearbyRefPoint(queryLat, queryLon, [rpB, rpA]);
+          const matchAB = findNearbyGeoAnchor(queryLat, queryLon, [rpA, rpB]);
+          const matchBA = findNearbyGeoAnchor(queryLat, queryLon, [rpB, rpA]);
           expect(matchAB?.displayName).toBe(matchBA?.displayName);
 
           // The result must be the closest by distance
@@ -149,19 +149,19 @@ describe('findNearbyRefPoint closest-match properties', () => {
     );
   });
 
-  // Why: When only one ref point is in range, findNearbyRefPoint must
+  // Why: When only one ref point is in range, findNearbyGeoAnchor must
   // return it — the single-match fast path must still work correctly.
   it('returns the single candidate when only one is in range', () => {
     fc.assert(
       fc.property(arbLat, arbLon, (lat, lon) => {
-        const rp: KnownRefPoint = {
+        const rp: KnownGeoAnchor = {
           h3Index: latLngToCell(lat, lon, H3_RESOLUTION),
           displayName: 'Solo',
           lat,
           lon,
         };
         // Query at the exact same position — guaranteed to be in gridDisk
-        const match = findNearbyRefPoint(lat, lon, [rp]);
+        const match = findNearbyGeoAnchor(lat, lon, [rp]);
         expect(match).toBe(rp);
       })
     );

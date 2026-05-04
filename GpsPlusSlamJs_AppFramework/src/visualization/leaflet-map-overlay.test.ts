@@ -1,4 +1,4 @@
-/**
+﻿/**
  * LeafletMapOverlay Tests
  *
  * TDD tests for the new Leaflet-in-CSS3DRenderer map overlay that replaces
@@ -9,12 +9,12 @@
  * - Native tile loading (multi-tile, caching, zoom)
  *
  * Tests are structured by concern:
- * 1. Constructor / defaults — verifies configuration
- * 2. Show / hide / toggle — visibility lifecycle
- * 3. GPS position — setGpsPosition and map centering
- * 4. Live overlays — addRawGpsPoint, addFusedPoint, etc.
- * 5. Dispose — resource cleanup
- * 6. Store subscriber compatibility — matches { setGpsPosition } interface
+ * 1. Constructor / defaults â€” verifies configuration
+ * 2. Show / hide / toggle â€” visibility lifecycle
+ * 3. GPS position â€” setGpsPosition and map centering
+ * 4. Live overlays â€” addRawGpsPoint, addFusedPoint, etc.
+ * 5. Dispose â€” resource cleanup
+ * 6. Store subscriber compatibility â€” matches { setGpsPosition } interface
  *
  * @vitest-environment jsdom
  */
@@ -23,7 +23,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
 
 // ---------------------------------------------------------------------------
-// Mock Leaflet — same pattern as summary-map.test.ts
+// Mock Leaflet â€” same pattern as summary-map.test.ts
 // ---------------------------------------------------------------------------
 
 let lastMapInstance: ReturnType<typeof createMockMap>;
@@ -156,7 +156,7 @@ vi.mock('leaflet', () => {
   };
 });
 
-// Mock CSS3DObject — the addon expects a DOM element and creates a THREE.Object3D
+// Mock CSS3DObject â€” the addon expects a DOM element and creates a THREE.Object3D
 vi.mock('three/addons/renderers/CSS3DRenderer.js', () => {
   class MockCSS3DObject extends THREE.Object3D {
     element: HTMLElement;
@@ -276,7 +276,7 @@ describe('LeafletMapOverlay', () => {
       overlay.dispose();
     });
 
-    // Why: Backward compat — attaches to camera by default
+    // Why: Backward compat â€” attaches to camera by default
     it('should attach to camera when mapParent is not provided', () => {
       const { overlay, camera } = createOverlay();
       overlay.setGpsPosition(50.0, 8.0);
@@ -300,7 +300,7 @@ describe('LeafletMapOverlay', () => {
       overlay.dispose();
     });
 
-    // Why: Basic show lifecycle — sets visibility and adds to parent
+    // Why: Basic show lifecycle â€” sets visibility and adds to parent
     it('should show when GPS position is set', () => {
       const { overlay } = createOverlay();
       overlay.setGpsPosition(50.0, 8.0);
@@ -335,8 +335,8 @@ describe('LeafletMapOverlay', () => {
       overlay.dispose();
     });
 
-    // Why: Regression test — mesh persists across hide→show cycles
-    it('should re-add to parent after hide→show cycle', () => {
+    // Why: Regression test â€” mesh persists across hideâ†’show cycles
+    it('should re-add to parent after hideâ†’show cycle', () => {
       const { overlay, camera } = createOverlay();
       overlay.setGpsPosition(50.0, 8.0);
       overlay.show();
@@ -347,7 +347,7 @@ describe('LeafletMapOverlay', () => {
       overlay.dispose();
     });
 
-    // Why: show() is idempotent — no duplicates
+    // Why: show() is idempotent â€” no duplicates
     it('should not create duplicate children on repeated show()', () => {
       const { overlay, camera } = createOverlay();
       overlay.setGpsPosition(50.0, 8.0);
@@ -473,7 +473,7 @@ describe('LeafletMapOverlay', () => {
           polylineCount++;
         }
       });
-      // At least 1 polyline (fused — raw might not have points yet)
+      // At least 1 polyline (fused â€” raw might not have points yet)
       expect(polylineCount).toBeGreaterThanOrEqual(1);
       overlay.dispose();
     });
@@ -499,26 +499,6 @@ describe('LeafletMapOverlay', () => {
       overlay.dispose();
     });
 
-    // Why: Reference points shown as colored markers with label popups
-    it('should add reference point marker with label', () => {
-      const { overlay } = createOverlay();
-      overlay.setGpsPosition(50.0, 8.0);
-      overlay.show();
-
-      overlay.addRefPoint(50.001, 8.001, 'TestPoint');
-
-      const map = overlay.getLeafletMap()!;
-      let markerCount = 0;
-      map.eachLayer((layer) => {
-        if ('getLatLng' in layer) {
-          markerCount++;
-        }
-      });
-      // User position + ref point
-      expect(markerCount).toBeGreaterThanOrEqual(2);
-      overlay.dispose();
-    });
-
     // Why: Points added before show() should appear when the map is shown
     it('should buffer overlay data added before show()', () => {
       const { overlay } = createOverlay();
@@ -529,7 +509,6 @@ describe('LeafletMapOverlay', () => {
       overlay.addRawGpsPoint(50.001, 8.001);
       overlay.addFusedPoint(50.0, 8.0);
       overlay.addAlignmentSnapshot(50.001, 8.001);
-      overlay.addRefPoint(50.002, 8.002, 'Pre-show point');
 
       overlay.show();
 
@@ -537,13 +516,13 @@ describe('LeafletMapOverlay', () => {
       let layerCount = 0;
       map.eachLayer(() => layerCount++);
       // Tile layer + user marker + raw polyline + fused polyline +
-      // snapshot polyline + ref point marker = at least 6 layers
-      expect(layerCount).toBeGreaterThanOrEqual(5);
+      // snapshot polyline = at least 5 layers
+      expect(layerCount).toBeGreaterThanOrEqual(4);
       overlay.dispose();
     });
 
-    // Why: Overlay data should survive hide→show cycles
-    it('should preserve overlay data across hide→show cycles', () => {
+    // Why: Overlay data should survive hideâ†’show cycles
+    it('should preserve overlay data across hideâ†’show cycles', () => {
       const { overlay } = createOverlay();
       overlay.setGpsPosition(50.0, 8.0);
       overlay.show();
@@ -584,7 +563,7 @@ describe('LeafletMapOverlay', () => {
       overlay.dispose();
     });
 
-    // Why: Map must face up (XZ plane) — rotation -90° on X
+    // Why: Map must face up (XZ plane) â€” rotation -90Â° on X
     it('should rotate the CSS3DObject to face up', () => {
       const { overlay, camera } = createOverlay();
       overlay.setGpsPosition(50.0, 8.0);
@@ -666,7 +645,7 @@ describe('LeafletMapOverlay', () => {
     });
 
     // Why: Zoom should be clamped to valid range
-    it('should clamp zoom level to valid range (0–19)', () => {
+    it('should clamp zoom level to valid range (0â€“19)', () => {
       const { overlay } = createOverlay();
       overlay.setZoomLevel(25);
       expect(overlay.getZoomLevel()).toBeLessThanOrEqual(19);
@@ -719,7 +698,7 @@ describe('LeafletMapOverlay', () => {
       overlay.dispose();
     });
 
-    // Why: zoomIn()/zoomOut() should work before show() — changes buffered zoom level
+    // Why: zoomIn()/zoomOut() should work before show() â€” changes buffered zoom level
     it('should update zoom level before show() is called', () => {
       const { overlay } = createOverlay({ zoomLevel: 15 });
       overlay.zoomIn();
@@ -737,14 +716,14 @@ describe('LeafletMapOverlay', () => {
   // ---------------------------------------------------------------------------
 
   describe('backward compat', () => {
-    // Why: updatePosition() is called in the frame loop — must be a safe no-op
+    // Why: updatePosition() is called in the frame loop â€” must be a safe no-op
     it('should have updatePosition() as a no-op', () => {
       const { overlay } = createOverlay();
       expect(() => overlay.updatePosition()).not.toThrow();
       overlay.dispose();
     });
 
-    // Why: getMapSize/getHeightOffset are used in tests — equivalent accessors needed
+    // Why: getMapSize/getHeightOffset are used in tests â€” equivalent accessors needed
     it('should expose getWorldSize() and getHeightOffset()', () => {
       const { overlay } = createOverlay();
       expect(typeof overlay.getWorldSize()).toBe('number');
@@ -836,7 +815,7 @@ describe('LeafletMapOverlay', () => {
       const leafletMap = overlay.getLeafletMap();
       expect(leafletMap).not.toBeNull();
 
-      // Find the mapContainer — it's the div with our specific size
+      // Find the mapContainer â€” it's the div with our specific size
       const allDivs = document.querySelectorAll('div');
       let mapContainer: HTMLElement | null = null;
       for (const div of allDivs) {
@@ -856,191 +835,16 @@ describe('LeafletMapOverlay', () => {
     });
   });
 
-  // ---------------------------------------------------------------------------
-  // 8. Prior reference points
-  // ---------------------------------------------------------------------------
-
-  describe('prior reference points', () => {
-    // Why: Prior ref points must be buffered before show() like current ones
-    it('should buffer prior ref point data added before show()', () => {
-      const { overlay } = createOverlay();
-      overlay.setGpsPosition(50.0, 8.0);
-
-      overlay.addPriorRefPoint(50.001, 8.001, 'PriorA');
-      overlay.addPriorRefPoint(50.002, 8.002, 'PriorB');
-
-      overlay.show();
-
-      // User marker + 2 prior markers = at least 3 markers
-      expect(markerInstances.length).toBeGreaterThanOrEqual(3);
-      overlay.dispose();
-    });
-
-    // Why: Prior ref points must create markers immediately when map is live
-    it('should create marker immediately when map is already shown', () => {
-      const { overlay } = createOverlay();
-      overlay.setGpsPosition(50.0, 8.0);
-      overlay.show();
-
-      const markersBefore = markerInstances.length;
-      overlay.addPriorRefPoint(50.001, 8.001, 'LivePrior');
-      expect(markerInstances.length).toBe(markersBefore + 1);
-      overlay.dispose();
-    });
-
-    // Why: Bulk add should be equivalent to multiple individual adds
-    it('should support bulk addPriorRefPoints()', () => {
-      const { overlay } = createOverlay();
-      overlay.setGpsPosition(50.0, 8.0);
-      overlay.show();
-
-      const markersBefore = markerInstances.length;
-      overlay.addPriorRefPoints([
-        { lat: 50.001, lon: 8.001, name: 'Bulk1' },
-        { lat: 50.002, lon: 8.002, name: 'Bulk2' },
-        { lat: 50.003, lon: 8.003, name: 'Bulk3' },
-      ]);
-      expect(markerInstances.length).toBe(markersBefore + 3);
-      overlay.dispose();
-    });
-
-    // Why: clearPriorRefPoints must remove prior markers but keep current-session ones
-    it('should clear only prior markers, keeping current-session markers', () => {
-      const { overlay } = createOverlay();
-      overlay.setGpsPosition(50.0, 8.0);
-      overlay.show();
-
-      // Add current + prior markers
-      overlay.addRefPoint(50.001, 8.001, 'CurrentA');
-      overlay.addPriorRefPoint(50.002, 8.002, 'PriorA');
-      overlay.addPriorRefPoint(50.003, 8.003, 'PriorB');
-
-      // Prior markers should have .remove() called on them
-      const priorMarker1 = markerInstances[markerInstances.length - 2]; // PriorA
-      const priorMarker2 = markerInstances[markerInstances.length - 1]; // PriorB
-
-      overlay.clearPriorRefPoints();
-
-      expect(priorMarker1.remove).toHaveBeenCalled();
-      expect(priorMarker2.remove).toHaveBeenCalled();
-      overlay.dispose();
-    });
-
-    // Why: Prior markers use green (VIS_COLORS.PRIOR_REF_POINT), current markers use red
-    it('should use PRIOR_REF_POINT color for prior markers', async () => {
-      const { overlay } = createOverlay();
-      overlay.setGpsPosition(50.0, 8.0);
-      overlay.show();
-
-      overlay.addPriorRefPoint(50.001, 8.001, 'PriorTest');
-
-      // L.divIcon is called with html containing the prior ref point color
-      const L = (await import('leaflet')).default;
-      const divIconCalls = vi.mocked(L.divIcon).mock.calls;
-      const lastCall = divIconCalls[divIconCalls.length - 1][0] as {
-        html: string;
-      };
-      expect(lastCall.html).toContain('#00ff00'); // VIS_COLORS.PRIOR_REF_POINT.css
-      overlay.dispose();
-    });
-
-    // Why: Prior markers should show "(prior)" in popup for visual distinction
-    it('should include "(prior)" label in popup for prior markers', () => {
-      const { overlay } = createOverlay();
-      overlay.setGpsPosition(50.0, 8.0);
-      overlay.show();
-
-      overlay.addPriorRefPoint(50.001, 8.001, 'BenchCorner');
-
-      const lastMarker = markerInstances[markerInstances.length - 1];
-      expect(lastMarker.bindPopup).toHaveBeenCalledWith(
-        expect.stringContaining('(prior)')
-      );
-      overlay.dispose();
-    });
-
-    // Why: dispose() must clear prior ref point data
-    it('should clear prior ref point data on dispose', () => {
-      const { overlay } = createOverlay();
-      overlay.setGpsPosition(50.0, 8.0);
-
-      overlay.addPriorRefPoint(50.001, 8.001, 'PriorDispose');
-      overlay.dispose();
-
-      // After dispose, show should not create prior markers
-      overlay.setGpsPosition(50.0, 8.0);
-      overlay.show();
-      // Only user marker should exist (no prior markers survive dispose)
-      expect(markerInstances.length).toBeLessThanOrEqual(1);
-      overlay.dispose();
-    });
-
-    // Why: clearPriorRefPoints() before show() should clear buffered prior data
-    it('should clear buffered prior ref points before show', () => {
-      const { overlay } = createOverlay();
-      overlay.setGpsPosition(50.0, 8.0);
-
-      overlay.addPriorRefPoint(50.001, 8.001, 'Buffered');
-      overlay.clearPriorRefPoints();
-      overlay.show();
-
-      // Only user marker, no prior markers
-      const refPointMarkers = markerInstances.filter((m) =>
-        m.bindPopup.mock.calls.some(
-          (call: unknown[]) =>
-            typeof call[0] === 'string' && call[0].includes('prior')
-        )
-      );
-      expect(refPointMarkers).toHaveLength(0);
-      overlay.dispose();
-    });
-
-    // Why: After a hide/show cycle, applyBufferedOverlays re-runs and can
-    // duplicate entries in the internal markers array while refPointData stays
-    // the same size. clearPriorRefPoints must still remove ALL prior markers
-    // — including duplicates — without leaving orphaned layers on the map.
-    // This test exposes the parallel-array desync that the old two-array
-    // design suffers from when show() is called more than once.
-    it('should remove all prior markers after a hide/show cycle', () => {
-      const { overlay } = createOverlay();
-      overlay.setGpsPosition(50.0, 8.0);
-      overlay.show();
-
-      overlay.addPriorRefPoint(50.001, 8.001, 'PriorX');
-      overlay.addRefPoint(50.002, 8.002, 'CurrentY');
-
-      // Hide then show triggers applyBufferedOverlays again, which can
-      // create duplicate marker instances for each refPointData entry.
-      overlay.hide();
-      overlay.show();
-
-      overlay.clearPriorRefPoints();
-
-      // Every marker created with a "prior" label must have been removed.
-      const priorMarkers = markerInstances.filter((m) =>
-        m.bindPopup.mock.calls.some(
-          (call: unknown[]) =>
-            typeof call[0] === 'string' && String(call[0]).includes('prior')
-        )
-      );
-      expect(priorMarkers.length).toBeGreaterThanOrEqual(1);
-      for (const pm of priorMarkers) {
-        expect(pm.remove).toHaveBeenCalled();
-      }
-
-      overlay.dispose();
-    });
-  });
 
   // ---------------------------------------------------------------------------
-  // DOM hardcoding audit — regression tests
+  // DOM hardcoding audit â€” regression tests
   // ---------------------------------------------------------------------------
 
   describe('DOM hardcoding audit regressions', () => {
     /**
      * Why this test matters:
      * Leaflet divIcon className values that nothing consumes are leaky
-     * abstractions — they could collide with host-app CSS rules.
+     * abstractions â€” they could collide with host-app CSS rules.
      * See: 2026-04-01-code-review-dom-hardcoding-audit.md, Finding 2 (P5).
      */
     it('divIcon markers do not set hardcoded CSS class names', async () => {

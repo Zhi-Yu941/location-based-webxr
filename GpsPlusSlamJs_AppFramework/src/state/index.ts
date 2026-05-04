@@ -1,20 +1,20 @@
 /**
- * State module — Combined store factory, recording coordinator, replay engine, store subscribers.
+ * State module â€” Combined store factory, recording coordinator, replay engine, store subscribers.
  */
 
-// --- recorder-slice (recorder session state, lives in framework so persistence
+// --- recording-slice (recorder session state, lives in framework so persistence
 //     middleware can read it; the store factory itself is in the recorder app). ---
 export {
-  type RecorderState,
+  type RecordingState,
   type SessionMetadata,
   startSession,
   endSession,
   recordDepthSample,
   recordWriteFailure,
-  recorderReducer,
-} from './recorder-slice.js';
+  recordingReducer,
+} from './recording-slice.js';
 
-// --- ref-points-slice — moved to recorder app in Iter 3 of the
+// --- ref-points-slice â€” moved to recorder app in Iter 3 of the
 //     AppFramework / RecorderApp boundary migration. Recorder consumers
 //     import these from their own local slice now. ---
 
@@ -39,7 +39,7 @@ export type { DepthPoint, DepthSample } from '../types/ar-types.js';
 export type { StorageBackend } from '../storage/storage-backend.js';
 export type { SessionMetadata as OpfsSessionMetadata } from '../storage/opfs-storage.js';
 
-// --- recording-coordinator ---
+// --- gps-event-coordinator ---
 export {
   type RecordingCoordinatorConfig,
   updateDeviceOrientation,
@@ -51,7 +51,15 @@ export {
   buildRawGpsPoint,
   buildRecordGpsEventPayload,
   createGpsPositionHandler,
-} from './recording-coordinator.js';
+} from './gps-event-coordinator.js';
+
+// --- gps-ar-pose-sampler ---
+export {
+  type GpsAnchorSample,
+  type GpsAnchorSampleGpsPoint,
+  type CaptureGpsAnchorSampleOptions,
+  captureGpsAnchorSample,
+} from './gps-ar-pose-sampler.js';
 
 // --- recording-options ---
 export {

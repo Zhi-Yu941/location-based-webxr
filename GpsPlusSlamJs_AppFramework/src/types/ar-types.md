@@ -69,7 +69,7 @@ interface DepthPoint {
 }
 ```
 
-This is the **canonical definition** — the single source of truth used throughout the codebase. Consumers include `webxr-session.ts`, `depth-sampler.ts`, `tracking-state.ts`, `image-capture.ts`, `recording-coordinator.ts`, and `store.ts`. Some modules (e.g., `webxr-session.ts`) also re-export it.
+This is the **canonical definition** — the single source of truth used throughout the codebase. Consumers include `webxr-session.ts`, `depth-sampler.ts`, `tracking-state.ts`, `image-capture.ts`, `gps-event-coordinator.ts`, and `store.ts`. Some modules (e.g., `webxr-session.ts`) also re-export it.
 
 ### `DepthSample`
 

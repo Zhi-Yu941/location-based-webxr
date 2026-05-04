@@ -1,9 +1,13 @@
 /**
- * H3 Reference Point Matching
+ * H3 Geo-Anchor Proximity Matching
  *
- * Utility for matching GPS positions to known reference points using
- * H3 hexagonal grid indices. Uses gridDisk(cell, 1) to create a ~65m
+ * Generic utility for matching GPS positions to known geo-anchored points
+ * using H3 hexagonal grid indices. Uses gridDisk(cell, 1) to create a ~65m
  * safe zone that absorbs GPS jitter of 3-10m.
+ *
+ * Renamed from `ref-points/h3-ref-point.ts` in Iter 4 to drop recorder-only
+ * naming. The math is unchanged; only the public type/function names were
+ * generalised so the framework can serve any geo-anchored consumer.
  *
  * @see docs/2026-03-08-ref-point-naming-investigation.md §6
  */
@@ -14,11 +18,11 @@ import { latLngToCell, gridDisk } from 'h3-js';
 export const H3_RESOLUTION = 11;
 
 /**
- * A known reference point with its H3 cell index and GPS coordinates,
+ * A known geo-anchored point with its H3 cell index and GPS coordinates,
  * used for proximity matching. GPS coordinates are needed to rank
  * multiple candidates by distance when their gridDisk zones overlap.
  */
-export interface KnownRefPoint {
+export interface KnownGeoAnchor {
   readonly h3Index: string;
   readonly displayName?: string;
   readonly lat: number;
@@ -58,28 +62,28 @@ export function approxDistanceMetres(
 }
 
 /**
- * Find the known reference point closest to the given GPS position,
+ * Find the known geo-anchor closest to the given GPS position,
  * provided it falls within the gridDisk safe zone.
  *
  * The safe zone is the center cell plus its 6 neighbors (~65m radius),
- * which absorbs GPS jitter of 3-10m while keeping ref points >130m apart
+ * which absorbs GPS jitter of 3-10m while keeping anchors >130m apart
  * distinguishable.
  *
- * When multiple ref points have overlapping safe zones (65–130 m apart),
+ * When multiple anchors have overlapping safe zones (65–130 m apart),
  * the closest one by equirectangular distance is returned.
  */
-export function findNearbyRefPoint(
+export function findNearbyGeoAnchor(
   lat: number,
   lng: number,
-  knownRefPoints: readonly KnownRefPoint[]
-): KnownRefPoint | undefined {
-  if (knownRefPoints.length === 0) {
+  knownAnchors: readonly KnownGeoAnchor[]
+): KnownGeoAnchor | undefined {
+  if (knownAnchors.length === 0) {
     return undefined;
   }
   const currentCell = latLngToCell(lat, lng, H3_RESOLUTION);
   const safeZone = gridDisk(currentCell, 1);
 
-  const candidates = knownRefPoints.filter((rp) =>
+  const candidates = knownAnchors.filter((rp) =>
     safeZone.includes(rp.h3Index)
   );
 
@@ -104,7 +108,7 @@ export function findNearbyRefPoint(
  * (i.e., one falls within the other's gridDisk safe zone).
  * This is the canonical cross-session matching check.
  */
-export function h3RefsMatch(h3a: string, h3b: string): boolean {
+export function h3CellsMatch(h3a: string, h3b: string): boolean {
   if (h3a === h3b) {
     return true;
   }

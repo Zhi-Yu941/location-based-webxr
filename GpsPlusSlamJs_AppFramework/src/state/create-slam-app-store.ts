@@ -1,5 +1,5 @@
-/**
- * `createSlamAppStore` — composable Redux store factory for AR+GPS apps.
+﻿/**
+ * `createSlamAppStore` â€” composable Redux store factory for AR+GPS apps.
  *
  * Introduced in Iter 1 of the AppFramework/RecorderApp boundary migration.
  * Wires the three library reducers (`gpsData`, `gpsElements`, `arElements`),
@@ -8,12 +8,12 @@
  * Recorder-only state (routing screen, ref-points, scenario) is plugged in
  * by the consumer via `extraReducers` / `extraMiddleware`. The factory itself
  * never references those concepts so apps that don't need them (POI viewers,
- * navigation arrows, …) compose freely.
+ * navigation arrows, â€¦) compose freely.
  *
  * The legacy `createRecorderStore` from `store.ts` is built on top of this
  * factory and will move out of the framework in Iter 1D.
  *
- * @see docs/2026-05-03-appframework-vs-recorderapp-boundary-analysis.md — Iter 1
+ * @see docs/2026-05-03-appframework-vs-recorderapp-boundary-analysis.md â€” Iter 1
  */
 
 import {
@@ -33,17 +33,17 @@ import {
 import { COMMUNITY_LICENSE_KEY } from 'gps-plus-slam-js/community-license-key';
 import type { StorageBackend } from '../storage/storage-backend';
 import type { SessionMetadata as OpfsSessionMetadata } from '../storage/opfs-storage';
-import { recorderReducer, type RecorderState } from './recorder-slice';
+import { recordingReducer, type RecordingState } from './recording-slice';
 import { createPersistenceMiddleware } from './persistence-middleware';
 
 /**
  * Base shape produced by `createSlamAppStore` with no `extraReducers`.
  *
  * Library state (`gpsData` / `gpsElements` / `arElements`) plus the
- * framework recording slice (`recorder`).
+ * framework recording slice (`recording`).
  */
 export interface SlamAppRootState extends LibraryRootState {
-  recorder: RecorderState;
+  recording: RecordingState;
 }
 
 /** A bare-minimum middleware signature compatible with RTK's middleware list. */
@@ -91,7 +91,7 @@ export interface SlamAppStoreOptions<
    * Apps with a paid license override here. Validation always runs and throws
    * on invalid / expired / empty keys.
    *
-   * @see EULA.md §3 — License Key
+   * @see EULA.md Â§3 â€” License Key
    */
   licenseKey?: string;
 }
@@ -150,7 +150,7 @@ export function createSlamAppStore<
     gpsData: gpsDataReducer,
     gpsElements: gpsElementsReducer,
     arElements: arElementsReducer,
-    recorder: recorderReducer,
+    recording: recordingReducer,
     ...(extraReducers ?? ({} as ExtraReducers)),
   };
 

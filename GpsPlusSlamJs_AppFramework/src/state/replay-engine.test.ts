@@ -1,5 +1,5 @@
-/**
- * Replay Engine — Unit Tests
+﻿/**
+ * Replay Engine â€” Unit Tests
  *
  * Why these tests matter: They verify the core replay engine that controls
  * timed playback of recorded sessions. This includes:
@@ -30,7 +30,7 @@ const createRecorderStore = (opts?: { storageBackend?: StorageBackend }) =>
   });
 
 // ---------------------------------------------------------------------------
-// Synthetic action fixtures — explicitly encode timestamp assumptions
+// Synthetic action fixtures â€” explicitly encode timestamp assumptions
 // ---------------------------------------------------------------------------
 
 /** recordGpsEvent action with epoch timestamp in payload.rawGpsPoint.timestamp (new format) */
@@ -73,7 +73,7 @@ function makeGpsActionOldFormat(timestamp: number) {
 /** startSession action with epoch timestamp in payload.startTime */
 function makeStartSessionAction(startTime: number) {
   return {
-    type: 'recorder/startSession' as const,
+    type: 'recording/startSession' as const,
     payload: {
       scenarioName: 'Test Scenario',
       sessionName: 'test-session',
@@ -82,21 +82,21 @@ function makeStartSessionAction(startTime: number) {
   };
 }
 
-/** endSession action — no usable timestamp */
+/** endSession action â€” no usable timestamp */
 function makeEndSessionAction() {
   return {
-    type: 'recorder/endSession' as const,
+    type: 'recording/endSession' as const,
   };
 }
 
 /**
- * depthSample action — uses performance.now() (relative), NOT epoch ms.
+ * depthSample action â€” uses performance.now() (relative), NOT epoch ms.
  * extractActionTimestamp MUST return null for this type to avoid mixing
  * clock domains (Risk R4).
  */
 function makeDepthSampleAction(relativeTimestamp: number) {
   return {
-    type: 'recorder/recordDepthSample' as const,
+    type: 'recording/recordDepthSample' as const,
     payload: {
       timestamp: relativeTimestamp,
       cameraPos: [0, 0, 0] as Vector3,
@@ -147,7 +147,7 @@ function makeMarkRefPointActionOldFormat(timestamp: number) {
   };
 }
 
-/** Unknown action type — extractActionTimestamp should return null */
+/** Unknown action type â€” extractActionTimestamp should return null */
 function makeUnknownAction() {
   return {
     type: 'someSlice/unknownAction' as const,
@@ -167,7 +167,7 @@ describe('extractActionTimestamp', () => {
   });
 
   it('returns epoch ms from recordGpsEvent with old gpsPoint format', () => {
-    // Why: Old recordings use gpsPoint instead of rawGpsPoint — must still extract timestamps
+    // Why: Old recordings use gpsPoint instead of rawGpsPoint â€” must still extract timestamps
     const ts = 1708300000000;
     expect(extractActionTimestamp(makeGpsActionOldFormat(ts))).toBe(ts);
   });
@@ -185,7 +185,7 @@ describe('extractActionTimestamp', () => {
   });
 
   it('returns null for depthSample (uses performance.now, not epoch)', () => {
-    // Why: Risk R4 — depthSample uses performance.now() which is relative
+    // Why: Risk R4 â€” depthSample uses performance.now() which is relative
     // to page load, NOT epoch ms. Mixing these produces garbage delays.
     expect(extractActionTimestamp(makeDepthSampleAction(12345.67))).toBeNull();
   });
@@ -201,13 +201,13 @@ describe('extractActionTimestamp', () => {
   });
 
   it('returns null when rawGpsPoint is missing from recordGpsEvent', () => {
-    // Why: Defensive — malformed actions shouldn't crash the replay engine
+    // Why: Defensive â€” malformed actions shouldn't crash the replay engine
     const broken = { type: 'gpsData/recordGpsEvent', payload: {} };
     expect(extractActionTimestamp(broken)).toBeNull();
   });
 
   it('returns epoch ms from markReferencePoint with old gpsPoint fallback', () => {
-    // Why: Old recordings use gpsPoint — timestamp extraction must still work
+    // Why: Old recordings use gpsPoint â€” timestamp extraction must still work
     const ts = 1708300005000;
     const action = makeMarkRefPointActionOldFormat(ts);
     // Remove top-level timestamp to force the gpsPoint fallback path
@@ -216,7 +216,7 @@ describe('extractActionTimestamp', () => {
   });
 
   it('returns null when payload is missing entirely', () => {
-    // Why: Defensive — some actions may be bare {type} objects
+    // Why: Defensive â€” some actions may be bare {type} objects
     const bare = { type: 'gpsData/recordGpsEvent' };
     expect(extractActionTimestamp(bare)).toBeNull();
   });
@@ -228,7 +228,7 @@ describe('extractActionTimestamp', () => {
 
 describe('computeInterActionDelay', () => {
   it('returns (ts2 - ts1) / speedFactor for two timestamped actions', () => {
-    // Why: Core delay computation — the fundamental replay pacing logic
+    // Why: Core delay computation â€” the fundamental replay pacing logic
     const delay = computeInterActionDelay(1000, 2000, 1);
     expect(delay).toBe(1000);
   });
@@ -250,12 +250,12 @@ describe('computeInterActionDelay', () => {
   });
 
   it('returns 0 when both timestamps are null', () => {
-    // Why: Both null → no timing info → dispatch immediately
+    // Why: Both null â†’ no timing info â†’ dispatch immediately
     expect(computeInterActionDelay(null, null, 1)).toBe(0);
   });
 
   it('clamps to 0 when next timestamp is before current (negative)', () => {
-    // Why: Negative delays are nonsensical (clock went backwards) → clamp to 0
+    // Why: Negative delays are nonsensical (clock went backwards) â†’ clamp to 0
     const delay = computeInterActionDelay(2000, 1000, 1);
     expect(delay).toBe(0);
   });
@@ -268,7 +268,7 @@ describe('computeInterActionDelay', () => {
   });
 
   it('applies speed factor before max delay clamp', () => {
-    // Why: At 10x speed, a 60s gap becomes 6s — still under the 30s clamp
+    // Why: At 10x speed, a 60s gap becomes 6s â€” still under the 30s clamp
     const delay = computeInterActionDelay(0, 60_000, 10);
     expect(delay).toBe(6000);
   });
@@ -312,7 +312,7 @@ describe('ReplayEngine', () => {
   // --- Play: dispatches all actions in order ---
 
   it('dispatches all actions in order', async () => {
-    // Why: The most basic contract — all recorded actions must be replayed
+    // Why: The most basic contract â€” all recorded actions must be replayed
     const store = createStore();
     const dispatchSpy = vi.spyOn(store, 'dispatch');
 
@@ -376,7 +376,7 @@ describe('ReplayEngine', () => {
     const t0 = 1708300000000;
     const actions = [
       makeGpsAction(t0),
-      makeGpsAction(t0 + 10_000), // 10s gap → 1s at 10x
+      makeGpsAction(t0 + 10_000), // 10s gap â†’ 1s at 10x
     ];
 
     const playPromise = engine.play(actions, store, 10);
@@ -397,15 +397,15 @@ describe('ReplayEngine', () => {
   // --- Actions without timestamps dispatch with 0 delay ---
 
   it('dispatches actions without timestamps with 0 delay', async () => {
-    // Why: depthSample, endSession, unknown types → no wait
+    // Why: depthSample, endSession, unknown types â†’ no wait
     const store = createStore();
     const dispatchSpy = vi.spyOn(store, 'dispatch');
 
     const t0 = 1708300000000;
     const actions = [
       makeGpsAction(t0),
-      makeDepthSampleAction(123.45), // no epoch ts → 0 delay
-      makeEndSessionAction(), // no ts → 0 delay
+      makeDepthSampleAction(123.45), // no epoch ts â†’ 0 delay
+      makeEndSessionAction(), // no ts â†’ 0 delay
     ];
 
     const playPromise = engine.play(actions, store, 1);
@@ -427,7 +427,7 @@ describe('ReplayEngine', () => {
     const t0 = 1708300000000;
     const actions = [
       makeGpsAction(t0),
-      makeGpsAction(t0 + 120_000), // 2 minute gap → clamped to 30s
+      makeGpsAction(t0 + 120_000), // 2 minute gap â†’ clamped to 30s
     ];
 
     const playPromise = engine.play(actions, store, 1);
@@ -435,7 +435,7 @@ describe('ReplayEngine', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(dispatchSpy).toHaveBeenCalledTimes(1);
 
-    // Should NOT wait the full 120s — clamped to DEFAULT_MAX_DELAY_MS (30s)
+    // Should NOT wait the full 120s â€” clamped to DEFAULT_MAX_DELAY_MS (30s)
     await vi.advanceTimersByTimeAsync(DEFAULT_MAX_DELAY_MS);
     expect(dispatchSpy).toHaveBeenCalledTimes(2);
 
@@ -496,7 +496,7 @@ describe('ReplayEngine', () => {
     // Pause mid-delay (before second action arrives at 5000ms)
     engine.pause();
 
-    // Resume — second action dispatches immediately (partial delay discarded)
+    // Resume â€” second action dispatches immediately (partial delay discarded)
     void engine.resume();
     await vi.advanceTimersByTimeAsync(0);
     expect(dispatchSpy).toHaveBeenCalledTimes(2);
@@ -520,7 +520,7 @@ describe('ReplayEngine', () => {
     const actions = [
       makeGpsAction(t0),
       makeGpsAction(t0 + 1000), // 1s gap
-      makeGpsAction(t0 + 11_000), // 10s gap → will be 1s at 10x
+      makeGpsAction(t0 + 11_000), // 10s gap â†’ will be 1s at 10x
     ];
 
     void engine.play(actions, store, 1);
@@ -609,7 +609,7 @@ describe('ReplayEngine', () => {
   // --- Edge cases ---
 
   it('handles empty action list gracefully', async () => {
-    // Why: Edge case — no actions in the recording
+    // Why: Edge case â€” no actions in the recording
     const store = createStore();
     const completeCallback = vi.fn();
     engine.onComplete(completeCallback);
@@ -619,11 +619,11 @@ describe('ReplayEngine', () => {
     await playPromise;
 
     expect(completeCallback).toHaveBeenCalledTimes(1);
-    expect(store.getState().recorder.isRecording).toBe(false);
+    expect(store.getState().recording.isRecording).toBe(false);
   });
 
   it('handles single action', async () => {
-    // Why: Edge case — recording with only one action
+    // Why: Edge case â€” recording with only one action
     const store = createStore();
     const dispatchSpy = vi.spyOn(store, 'dispatch');
     const completeCallback = vi.fn();
@@ -646,7 +646,7 @@ describe('ReplayEngine', () => {
     expect(engine.getState()).toBe('idle');
   });
 
-  it('state transitions: idle → playing → paused → playing → completed', async () => {
+  it('state transitions: idle â†’ playing â†’ paused â†’ playing â†’ completed', async () => {
     // Why: State machine must follow expected transitions
     const store = createStore();
     const t0 = 1708300000000;
@@ -871,7 +871,7 @@ describe('abortableDelay listener cleanup', () => {
 
     expect(engine.getState()).toBe('completed');
 
-    // 3 delays between 4 actions — each should clean up its listener
+    // 3 delays between 4 actions â€” each should clean up its listener
     const abortRemovals = removeEventListenerSpy.mock.calls.filter(
       ([event]) => event === 'abort'
     );
@@ -907,7 +907,7 @@ describe('abortableDelay listener cleanup', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(dispatchSpy).toHaveBeenCalledTimes(1); // actionsA[0]
 
-    // Start second playback — should cancel the first
+    // Start second playback â€” should cancel the first
     dispatchSpy.mockClear();
     const secondPromise = engine.play(actionsB, store, 1);
 
@@ -919,7 +919,7 @@ describe('abortableDelay listener cleanup', () => {
     // Only actionsB should have been dispatched (2 items), not leftover actionsA
     const dispatched = dispatchSpy.mock.calls.map((call) => call[0].type);
     expect(dispatched).toEqual([
-      'recorder/startSession',
+      'recording/startSession',
       'gpsData/recordGpsEvent',
     ]);
   });
@@ -931,13 +931,13 @@ describe('abortableDelay listener cleanup', () => {
 
 describe('ReplayEngine.setSpeed() validation', () => {
   it('rejects zero speed factor', () => {
-    // Why: speed=0 ⇒ division by zero in computeInterActionDelay ⇒ Infinity delay
+    // Why: speed=0 â‡’ division by zero in computeInterActionDelay â‡’ Infinity delay
     const engine = new ReplayEngine();
     expect(() => engine.setSpeed(0)).toThrow(RangeError);
   });
 
   it('rejects negative speed factor', () => {
-    // Why: negative speed produces negative delays, clamped to 0 ⇒ instant replay
+    // Why: negative speed produces negative delays, clamped to 0 â‡’ instant replay
     const engine = new ReplayEngine();
     expect(() => engine.setSpeed(-1)).toThrow(RangeError);
   });
@@ -949,13 +949,13 @@ describe('ReplayEngine.setSpeed() validation', () => {
   });
 
   it('rejects Infinity speed factor', () => {
-    // Why: Infinity ⇒ zero delay always ⇒ busy-loop dispatch
+    // Why: Infinity â‡’ zero delay always â‡’ busy-loop dispatch
     const engine = new ReplayEngine();
     expect(() => engine.setSpeed(Infinity)).toThrow(RangeError);
   });
 
   it('accepts valid positive finite speed factor', () => {
-    // Why: sanity check — normal use cases should not throw
+    // Why: sanity check â€” normal use cases should not throw
     const engine = new ReplayEngine();
     expect(() => engine.setSpeed(0.5)).not.toThrow();
     expect(() => engine.setSpeed(1)).not.toThrow();

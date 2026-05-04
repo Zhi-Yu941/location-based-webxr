@@ -1,5 +1,5 @@
 /**
- * Property-based tests for recording-coordinator.ts
+ * Property-based tests for gps-event-coordinator.ts
  *
  * Why these tests matter:
  * Unit tests verify specific examples, but property-based tests verify
@@ -23,7 +23,7 @@ import {
   type Vector3,
   type Quaternion,
 } from 'gps-plus-slam-js';
-import { eulerToQuaternion } from './recording-coordinator';
+import { eulerToQuaternion } from './gps-event-coordinator';
 
 /**
  * Apply a quaternion rotation to a 3D vector.

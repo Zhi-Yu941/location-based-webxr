@@ -1,5 +1,5 @@
-/**
- * Round-Trip Test Helpers — Produce realistic recording zips programmatically.
+﻿/**
+ * Round-Trip Test Helpers â€” Produce realistic recording zips programmatically.
  *
  * Why this exists: Tests need recording zip files for the replay pipeline,
  * zip-reader, and state verification. Rather than depending on static
@@ -10,18 +10,18 @@
  * The helper writes actions via writeAction(), writes frames via writeFrame(),
  * writes session metadata via writeSessionMetadata(), and exports via
  * exportSessionAsZip(). OPFS mocks are installed and cleaned up internally
- * — no side effects leak to the calling test.
+ * â€” no side effects leak to the calling test.
  *
- * DESIGN BOUNDARY — VALID ZIPS ONLY
+ * DESIGN BOUNDARY â€” VALID ZIPS ONLY
  *
  * This helper intentionally produces only valid, realistic zips. Do NOT add
  * options to generate broken/incomplete zips (missing session.json, malformed
  * JSON, missing actions, etc.). Its value comes from exercising the real
- * production pipeline end-to-end — mixing in "intentionally broken" modes
+ * production pipeline end-to-end â€” mixing in "intentionally broken" modes
  * would undermine that contract.
  *
  * For error-handling / robustness tests, use hand-crafted zips via ZipWriter
- * directly — see createZipWithActions() in zip-reader.test.ts for the
+ * directly â€” see createZipWithActions() in zip-reader.test.ts for the
  * established pattern. That approach gives precise byte-level control over
  * exactly what's broken, which is strictly better for negative test cases.
  */
@@ -99,10 +99,10 @@ const DEFAULTS: ProduceTestZipOptions = {
  *
  * Action sequence produced (with defaults):
  *   1. recorder/startSession        (index 1)
- *   2. gpsData/add2dImage × 2       (indices 2-3, before setZeroPos — dropped on replay)
+ *   2. gpsData/add2dImage Ã— 2       (indices 2-3, before setZeroPos â€” dropped on replay)
  *   3. gpsData/setZeroPos            (index 4)
- *   4. gpsData/recordGpsEvent × 10   (indices 5-14)
- *   5. gpsData/add2dImage × 5        (indices 15-19, after setZeroPos — kept on replay)
+ *   4. gpsData/recordGpsEvent Ã— 10   (indices 5-14)
+ *   5. gpsData/add2dImage Ã— 5        (indices 15-19, after setZeroPos â€” kept on replay)
  *
  * GPS events use varied odom/GPS positions that produce a non-identity
  * alignment matrix when replayed through the library store.
@@ -140,7 +140,7 @@ export async function produceTestZip(
       deviceInfo: options.deviceInfo,
     };
     await writeAndRecordAction({
-      type: 'recorder/startSession',
+      type: 'recording/startSession',
       payload: startPayload,
     });
 
@@ -162,7 +162,7 @@ export async function produceTestZip(
       payload: { lat: options.zeroPos.lat, lon: options.zeroPos.lon },
     });
 
-    // --- gpsData/recordGpsEvent × N ---
+    // --- gpsData/recordGpsEvent Ã— N ---
     // Odom path: expanding arc in XZ plane
     // GPS coordinates: northeast diagonal in XY plane
     // This intentionally differs so the alignment matrix is non-identity.

@@ -26,7 +26,7 @@ import {
 import {
   extractOdomPosition,
   extractOdomRotation,
-} from 'gps-plus-slam-app-framework/state/recording-coordinator';
+} from 'gps-plus-slam-app-framework/state/gps-event-coordinator';
 import { showError, updateStatus } from '../ui/hud';
 import { showToast } from '../ui/toast';
 import {
@@ -43,8 +43,8 @@ import { fusedGpsFromOdom } from 'gps-plus-slam-app-framework/utils/fused-path';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
 import {
   gpsToH3,
-  findNearbyRefPoint,
-} from 'gps-plus-slam-app-framework/ref-points/h3-ref-point';
+  findNearbyGeoAnchor,
+} from 'gps-plus-slam-app-framework/geo/h3-proximity';
 import { webxrToNUE } from 'gps-plus-slam-app-framework/core';
 import type { Vector3, Quaternion } from 'gps-plus-slam-app-framework/core';
 import type { RecorderStore } from '../state/recorder-store';
@@ -279,7 +279,7 @@ export function createRefPointHandlers(
       // When forceNew is set, skip the proximity check to force the picker.
       const nearbyMatch = options?.forceNew
         ? undefined
-        : findNearbyRefPoint(
+        : findNearbyGeoAnchor(
             lastGpsPoint.latitude,
             lastGpsPoint.longitude,
             cachedKnownRefPoints
@@ -425,7 +425,7 @@ export function createRefPointHandlers(
       const cachedKnown = selectCachedKnownRefPoints(
         deps.getStore().getState().refPoints
       );
-      const match = findNearbyRefPoint(lat, lng, cachedKnown);
+      const match = findNearbyGeoAnchor(lat, lng, cachedKnown);
       if (!match) return undefined;
       const currentCell = gpsToH3(lat, lng);
       return {

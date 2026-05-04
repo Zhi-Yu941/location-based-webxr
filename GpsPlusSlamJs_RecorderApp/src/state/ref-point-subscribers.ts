@@ -18,29 +18,7 @@
 
 import type { RecorderStore } from './recorder-store';
 import type { RefPointMark } from '../storage/ref-point-loader';
-import type { RefPointMark as VisualizerRefPointMark, RefPointVisualizer } from 'gps-plus-slam-app-framework/visualization/reference-points';
-
-/**
- * Project a recorder-side {@link RefPointMark} into the visualizer-side
- * shape. The recorder's mark uses `LatLongAlt | undefined` for
- * `gpsPosition` while the visualizer requires it to be defined; marks
- * without a GPS fix are filtered out by the caller before this helper
- * runs.
- */
-function toVisualizerMark(mark: RefPointMark): VisualizerRefPointMark | null {
-  if (!mark.gpsPosition) return null;
-  return {
-    id: mark.id,
-    odomPosition: mark.odomPosition,
-    odomRotation: mark.odomRotation,
-    gpsPosition: {
-      lat: mark.gpsPosition.lat,
-      lon: mark.gpsPosition.lon,
-      altitude: mark.gpsPosition.altitude,
-    },
-    timestamp: mark.timestamp,
-  };
-}
+import type { RefPointVisualizer } from '../visualization/ref-point-visualizer';
 
 /**
  * Wire the visualizer to the ref-points slice. Returns an unsubscribe
@@ -68,10 +46,11 @@ export function wireRefPointSubscribers(
 
     if (priorMarks !== lastPriorMarks) {
       lastPriorMarks = priorMarks;
-      const projected = priorMarks
-        .map(toVisualizerMark)
-        .filter((m): m is VisualizerRefPointMark => m !== null);
-      visualizer.displayPriorRefPoints(projected);
+      const withGps = priorMarks.filter(
+        (m): m is RefPointMark & { gpsPosition: NonNullable<RefPointMark['gpsPosition']> } =>
+          m.gpsPosition !== undefined
+      );
+      visualizer.displayPriorRefPoints(withGps);
     }
 
     if (currentMarks.length < lastCurrentMarksLen) {
@@ -82,9 +61,8 @@ export function wireRefPointSubscribers(
     while (lastCurrentMarksLen < currentMarks.length) {
       const next = currentMarks[lastCurrentMarksLen];
       lastCurrentMarksLen++;
-      if (!next) continue;
-      const projected = toVisualizerMark(next);
-      if (projected) visualizer.addCurrentRefPoint(projected);
+      if (!next || !next.gpsPosition) continue;
+      visualizer.addCurrentRefPoint(next);
     }
   };
 

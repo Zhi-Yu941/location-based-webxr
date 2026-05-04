@@ -1,12 +1,12 @@
-/**
+﻿/**
  * Tests for the recorder-side `scenarioReducer`.
  *
- * The slice owns `currentScenarioName` — formerly a field on the framework's
- * `recorder-slice`. It moved into the recorder app in Iter 1D of the
+ * The slice owns `currentScenarioName` â€” formerly a field on the framework's
+ * `recording-slice`. It moved into the recorder app in Iter 1D of the
  * AppFramework/RecorderApp boundary migration so the framework's recording
  * lifecycle slice has nothing scenario-specific in it.
  *
- * @see ../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-03-appframework-vs-recorderapp-boundary-analysis.md — Iter 1D
+ * @see ../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-03-appframework-vs-recorderapp-boundary-analysis.md â€” Iter 1D
  */
 
 import { describe, it, expect } from 'vitest';
@@ -37,12 +37,12 @@ describe('scenarioReducer', () => {
     expect(state.currentScenarioName).toBe('Park Walk');
   });
 
-  // Why: scenario name must NOT reset when a recording starts — the value
+  // Why: scenario name must NOT reset when a recording starts â€” the value
   // is what gets stamped into the session metadata's contextTag at start
   // time and again into the per-session ZIP at stop time.
   it('preserves currentScenarioName across unrelated actions', () => {
     let state = scenarioReducer(undefined, setCurrentScenarioName('Downtown'));
-    state = scenarioReducer(state, { type: 'recorder/startSession' });
+    state = scenarioReducer(state, { type: 'recording/startSession' });
     expect(state.currentScenarioName).toBe('Downtown');
   });
 

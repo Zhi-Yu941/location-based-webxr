@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Recording Migration
  *
  * Migrates recorded Redux actions from older coordinate conventions to the
@@ -7,28 +7,28 @@
  * Five recording eras:
  *
  * Era 1 (pre-2026-03-15, no odomCoordVersion):
- *   - Positions: raw WebXR [x, y, z] — already correct, no migration needed
+ *   - Positions: raw WebXR [x, y, z] â€” already correct, no migration needed
  *   - GPS payload: `gpsPoint` with derived fields + old ENU coordinates
- *     → rename to `rawGpsPoint`, strip derived fields
+ *     â†’ rename to `rawGpsPoint`, strip derived fields
  *
- * Era 2 (2026-03-15 → 2026-04, odomCoordVersion: 2):
- *   - Positions: NUE [-z, y, x] (converted at dispatch) — reverse to raw WebXR
+ * Era 2 (2026-03-15 â†’ 2026-04, odomCoordVersion: 2):
+ *   - Positions: NUE [-z, y, x] (converted at dispatch) â€” reverse to raw WebXR
  *   - GPS payload: `gpsPoint` with derived fields
- *     → rename to `rawGpsPoint`, strip derived fields
+ *     â†’ rename to `rawGpsPoint`, strip derived fields
  *
  * Era 3 (2026-04, odomCoordVersion: 3):
- *   - Positions: raw WebXR [x, y, z] — already correct, no migration needed
+ *   - Positions: raw WebXR [x, y, z] â€” already correct, no migration needed
  *   - GPS payload: `gpsPoint` with derived fields
- *     → rename to `rawGpsPoint`, strip derived fields
+ *     â†’ rename to `rawGpsPoint`, strip derived fields
  *
  * Era 4 (2026-04, odomCoordVersion: 4):
- *   - Positions: raw WebXR [x, y, z] — no migration needed
- *   - GPS payload: `rawGpsPoint` (raw sensor fields only) — no migration needed
+ *   - Positions: raw WebXR [x, y, z] â€” no migration needed
+ *   - GPS payload: `rawGpsPoint` (raw sensor fields only) â€” no migration needed
  *
  * Era 5 (current, odomCoordVersion: 5):
  *   - Same action format as era 4 (raw WebXR positions + rawGpsPoint)
  *   - State-side change only: reducer now also applies webxrQuaternionToNUE()
- *     to all quaternion fields. No migration needed — all eras store raw WebXR
+ *     to all quaternion fields. No migration needed â€” all eras store raw WebXR
  *     rotations in action payloads.
  *
  * The reducer applies webxrToNUE() to raw WebXR positions and
@@ -55,7 +55,7 @@ function isVec3(v: unknown): v is [number, number, number] {
   );
 }
 
-/** NUE [n, u, e] → raw WebXR [e, u, -n] = [v[2], v[1], -v[0]]. */
+/** NUE [n, u, e] â†’ raw WebXR [e, u, -n] = [v[2], v[1], -v[0]]. */
 function nueToWebxr(v: [number, number, number]): [number, number, number] {
   return [v[2], v[1], -v[0]];
 }
@@ -65,7 +65,7 @@ function nueToWebxr(v: [number, number, number]): [number, number, number] {
  *
  * Returns the original array unchanged (same reference) when no migration is
  * required (odomCoordVersion >= 3).  Returns a new array with migrated actions
- * when migration is needed — the original array is never mutated.
+ * when migration is needed â€” the original array is never mutated.
  *
  * @param actions - Recorded Redux actions from the zip file
  * @param metadata - Parsed session.json, or null if absent
@@ -80,7 +80,7 @@ export function migrateActionsIfNeeded(
     : undefined;
 
   if (version !== undefined && version >= 4) {
-    // Era 4+: raw WebXR positions, rawGpsPoint payloads — no migration needed.
+    // Era 4+: raw WebXR positions, rawGpsPoint payloads â€” no migration needed.
     // Era 5 is a state-side-only change (rotation convention in reducer), so
     // eras 4 and 5 have identical action formats and require no migration.
     return actions;
@@ -88,25 +88,25 @@ export function migrateActionsIfNeeded(
 
   if (version === 3) {
     // Era 3: positions are raw WebXR (correct).
-    // GPS payloads use old `gpsPoint` field with derived fields — rename + strip.
+    // GPS payloads use old `gpsPoint` field with derived fields â€” rename + strip.
     return actions.map((action) => migrateGpsPointField(action));
   }
 
   if (version === 2) {
     // Era 2: positions were converted to NUE at dispatch time.
     // Reverse them to raw WebXR so the reducer can apply webxrToNUE().
-    // GPS payloads also need gpsPoint→rawGpsPoint rename + strip.
+    // GPS payloads also need gpsPointâ†’rawGpsPoint rename + strip.
     return actions.map((action) => migrateGpsPointField(reverseEra2(action)));
   }
 
   // Era 1 (no version or version < 2): positions are raw WebXR (correct).
-  // GPS payloads use old `gpsPoint` with ENU coordinates — rename + strip
-  // (coordinates are stripped so no ENU→NUE swap needed).
+  // GPS payloads use old `gpsPoint` with ENU coordinates â€” rename + strip
+  // (coordinates are stripped so no ENUâ†’NUE swap needed).
   return actions.map((action) => migrateGpsPointField(action));
 }
 
 // ---------------------------------------------------------------------------
-// GPS payload migration: gpsPoint → rawGpsPoint (strip derived fields)
+// GPS payload migration: gpsPoint â†’ rawGpsPoint (strip derived fields)
 // Applied to eras 1, 2, and 3 actions.
 // ---------------------------------------------------------------------------
 
@@ -134,7 +134,7 @@ function stripDerivedFields(
 }
 
 /**
- * Migrate `gpsPoint` → `rawGpsPoint` in recordGpsEvent and markReferencePoint
+ * Migrate `gpsPoint` â†’ `rawGpsPoint` in recordGpsEvent and markReferencePoint
  * payloads. Strips derived fields (coordinates, weight, zeroRef, deviceRotation).
  */
 function migrateGpsPointField(action: RecordedAction): RecordedAction {
@@ -162,7 +162,7 @@ function migrateGpsPointField(action: RecordedAction): RecordedAction {
 }
 
 // ---------------------------------------------------------------------------
-// Era 2 migration: reverse NUE positions → raw WebXR
+// Era 2 migration: reverse NUE positions â†’ raw WebXR
 // ---------------------------------------------------------------------------
 
 function reverseEra2(action: RecordedAction): RecordedAction {
@@ -234,7 +234,7 @@ function reverseEra2(action: RecordedAction): RecordedAction {
     return { ...action, payload: migrated };
   }
 
-  if (action.type === 'recorder/recordDepthSample') {
+  if (action.type === 'recording/recordDepthSample') {
     const payload = action.payload as Record<string, unknown> | undefined;
     if (!payload || typeof payload !== 'object') return action;
 

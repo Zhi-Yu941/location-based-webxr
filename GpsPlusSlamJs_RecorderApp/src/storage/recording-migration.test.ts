@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Recording Migration Tests
  *
  * Why these tests matter:
@@ -6,15 +6,15 @@
  *
  * Era 1 (pre-2026-03-15, no odomCoordVersion): Positions are raw WebXR (already
  * correct for the current reducer which applies webxrToNUE). GPS payloads use
- * old `gpsPoint` with derived fields — rename to `rawGpsPoint` and strip.
+ * old `gpsPoint` with derived fields â€” rename to `rawGpsPoint` and strip.
  *
- * Era 2 (2026-03-15 → 2026-04, odomCoordVersion: 2): Positions were converted
+ * Era 2 (2026-03-15 â†’ 2026-04, odomCoordVersion: 2): Positions were converted
  * to NUE at dispatch time. They must be reversed back to raw WebXR so the
  * reducer's webxrToNUE() produces correct NUE state. GPS payloads also get
- * the gpsPoint→rawGpsPoint migration.
+ * the gpsPointâ†’rawGpsPoint migration.
  *
  * Era 3 (2026-04, odomCoordVersion: 3): Positions are raw WebXR (correct).
- * GPS payloads use old `gpsPoint` with derived fields — rename + strip.
+ * GPS payloads use old `gpsPoint` with derived fields â€” rename + strip.
  *
  * Era 4 (current, odomCoordVersion: 4): No migration needed.
  *
@@ -52,11 +52,11 @@ describe('recording-migration', () => {
     // Era 4: no migration needed (odomCoordVersion >= 4)
     // =======================================================================
 
-    describe('era 4 — no migration (odomCoordVersion >= 4)', () => {
+    describe('era 4 â€” no migration (odomCoordVersion >= 4)', () => {
       /**
        * Why this test matters:
        * Era-4 recordings store raw WebXR positions and rawGpsPoint payloads.
-       * No migration needed — the original array reference must be returned.
+       * No migration needed â€” the original array reference must be returned.
        */
       it('returns actions unchanged (same reference) for odomCoordVersion = 4', () => {
         const metadata: Era4Metadata = { odomCoordVersion: 4 };
@@ -82,7 +82,7 @@ describe('recording-migration', () => {
 
       /**
        * Why this test matters:
-       * Future versions (5, 6, …) must also skip migration.
+       * Future versions (5, 6, â€¦) must also skip migration.
        */
       it('returns actions unchanged for odomCoordVersion > 4', () => {
         const metadata = { odomCoordVersion: 5 };
@@ -98,10 +98,10 @@ describe('recording-migration', () => {
     });
 
     // =======================================================================
-    // Era 3: gpsPoint→rawGpsPoint migration only (positions already correct)
+    // Era 3: gpsPointâ†’rawGpsPoint migration only (positions already correct)
     // =======================================================================
 
-    describe('era 3 — gpsPoint→rawGpsPoint (odomCoordVersion = 3)', () => {
+    describe('era 3 â€” gpsPointâ†’rawGpsPoint (odomCoordVersion = 3)', () => {
       /**
        * Why this test matters:
        * Era-3 recordings have raw WebXR positions (correct) but use the old
@@ -154,7 +154,7 @@ describe('recording-migration', () => {
 
       /**
        * Why this test matters:
-       * markReferencePoint payloads also need gpsPoint→rawGpsPoint migration.
+       * markReferencePoint payloads also need gpsPointâ†’rawGpsPoint migration.
        */
       it('renames gpsPoint to rawGpsPoint in markReferencePoint payload', () => {
         const metadata: Era3Metadata = { odomCoordVersion: 3 };
@@ -193,15 +193,15 @@ describe('recording-migration', () => {
     });
 
     // =======================================================================
-    // Era 2: reverse NUE positions → raw WebXR
+    // Era 2: reverse NUE positions â†’ raw WebXR
     // =======================================================================
 
-    describe('era 2 — reverse NUE→WebXR (odomCoordVersion = 2)', () => {
+    describe('era 2 â€” reverse NUEâ†’WebXR (odomCoordVersion = 2)', () => {
       /**
        * Why this test matters:
        * Era-2 recordGpsEvent.odomPosition is already NUE [-z,y,x].
-       * Reverse: NUE [n,u,e] → WebXR [e,u,-n] = [v[2],v[1],-v[0]].
-       * Example: NUE [-3,2,1] → WebXR [1,2,3].
+       * Reverse: NUE [n,u,e] â†’ WebXR [e,u,-n] = [v[2],v[1],-v[0]].
+       * Example: NUE [-3,2,1] â†’ WebXR [1,2,3].
        */
       it('reverses recordGpsEvent.odomPosition from NUE to raw WebXR', () => {
         const metadata: Era2Metadata = { odomCoordVersion: 2 };
@@ -239,7 +239,7 @@ describe('recording-migration', () => {
 
       /**
        * Why this test matters:
-       * markReferencePoint.position in era-2 is NUE — must be reversed.
+       * markReferencePoint.position in era-2 is NUE â€” must be reversed.
        */
       it('reverses markReferencePoint.position from NUE to raw WebXR', () => {
         const metadata: Era2Metadata = { odomCoordVersion: 2 };
@@ -268,7 +268,7 @@ describe('recording-migration', () => {
         // non-position fields unchanged
         expect(payload['id']).toBe('bench');
         expect(payload['rotation']).toEqual([0, 0, 0, 1]);
-        // gpsPoint → rawGpsPoint
+        // gpsPoint â†’ rawGpsPoint
         expect(payload['gpsPoint']).toBeUndefined();
         expect(
           (payload['rawGpsPoint'] as Record<string, unknown>)['latitude']
@@ -277,7 +277,7 @@ describe('recording-migration', () => {
 
       /**
        * Why this test matters:
-       * add2dImage.position in era-2 is NUE — must be reversed.
+       * add2dImage.position in era-2 is NUE â€” must be reversed.
        */
       it('reverses add2dImage.position from NUE to raw WebXR', () => {
         const metadata: Era2Metadata = { odomCoordVersion: 2 };
@@ -303,7 +303,7 @@ describe('recording-migration', () => {
 
       /**
        * Why this test matters:
-       * odometryTrackingRestarted positions in era-2 are NUE — both
+       * odometryTrackingRestarted positions in era-2 are NUE â€” both
        * lastValidOdomPos and newOdomPos must be reversed.
        */
       it('reverses odometryTrackingRestarted positions from NUE to raw WebXR', () => {
@@ -366,7 +366,7 @@ describe('recording-migration', () => {
         const metadata: Era2Metadata = { odomCoordVersion: 2 };
         const actions: RecordedAction[] = [
           {
-            type: 'recorder/recordDepthSample',
+            type: 'recording/recordDepthSample',
             payload: {
               cameraPos: [-3, 2, 1], // NUE
               cameraRot: [0, 0, 0, 1],
@@ -415,8 +415,8 @@ describe('recording-migration', () => {
       it('leaves non-position actions untouched', () => {
         const metadata: Era2Metadata = { odomCoordVersion: 2 };
         const actions: RecordedAction[] = [
-          { type: 'recorder/startSession', payload: { scenarioName: 'test' } },
-          { type: 'recorder/stopSession', payload: undefined },
+          { type: 'recording/startSession', payload: { scenarioName: 'test' } },
+          { type: 'recording/stopSession', payload: undefined },
         ];
 
         const result = migrateActionsIfNeeded(actions, metadata);
@@ -430,11 +430,11 @@ describe('recording-migration', () => {
     // Era 1: GPS coord swap only (no position migration)
     // =======================================================================
 
-    describe('era 1 — gpsPoint→rawGpsPoint + strip derived fields (no odomCoordVersion)', () => {
+    describe('era 1 â€” gpsPointâ†’rawGpsPoint + strip derived fields (no odomCoordVersion)', () => {
       /**
        * Why this test matters:
-       * Era-1 odomPosition is raw WebXR — correct for the current reducer.
-       * GPS payload gets renamed from gpsPoint→rawGpsPoint with derived fields stripped.
+       * Era-1 odomPosition is raw WebXR â€” correct for the current reducer.
+       * GPS payload gets renamed from gpsPointâ†’rawGpsPoint with derived fields stripped.
        * The old ENU coordinates field is removed entirely (reducer recomputes).
        */
       it('renames gpsPoint to rawGpsPoint and strips derived fields, leaves odomPosition unchanged', () => {
@@ -443,12 +443,12 @@ describe('recording-migration', () => {
           {
             type: 'gpsData/recordGpsEvent',
             payload: {
-              odomPosition: [1, 2, 3], // raw WebXR — must stay as-is
+              odomPosition: [1, 2, 3], // raw WebXR â€” must stay as-is
               gpsPoint: {
                 id: 'gps-1',
                 latitude: 49,
                 longitude: 8,
-                coordinates: [5, 0, 10], // old ENU — should be stripped
+                coordinates: [5, 0, 10], // old ENU â€” should be stripped
                 weight: 0.2,
                 zeroRef: { lat: 49, lon: 8 },
                 timestamp: 1000,
@@ -462,7 +462,7 @@ describe('recording-migration', () => {
         const payload = result[0].payload as Record<string, unknown>;
         // odomPosition unchanged (already raw WebXR)
         expect(payload['odomPosition']).toEqual([1, 2, 3]);
-        // gpsPoint → rawGpsPoint, derived fields stripped
+        // gpsPoint â†’ rawGpsPoint, derived fields stripped
         expect(payload['gpsPoint']).toBeUndefined();
         const raw = payload['rawGpsPoint'] as Record<string, unknown>;
         expect(raw['id']).toBe('gps-1');
@@ -476,7 +476,7 @@ describe('recording-migration', () => {
 
       /**
        * Why this test matters:
-       * Walking north: position stays as-is. GPS gpsPoint→rawGpsPoint strip.
+       * Walking north: position stays as-is. GPS gpsPointâ†’rawGpsPoint strip.
        */
       it('keeps walking-north WebXR position unchanged, strips GPS derived fields', () => {
         const metadata: Era1Metadata = {};
@@ -508,7 +508,7 @@ describe('recording-migration', () => {
 
       /**
        * Why this test matters:
-       * Walking east: position stays as-is. GPS gpsPoint→rawGpsPoint strip.
+       * Walking east: position stays as-is. GPS gpsPointâ†’rawGpsPoint strip.
        */
       it('keeps walking-east WebXR position unchanged, strips GPS derived fields', () => {
         const metadata: Era1Metadata = {};
@@ -540,10 +540,10 @@ describe('recording-migration', () => {
 
       /**
        * Why this test matters:
-       * markReferencePoint.position is raw WebXR in era-1 — must NOT be
-       * converted (the reducer handles it). gpsPoint→rawGpsPoint rename applies.
+       * markReferencePoint.position is raw WebXR in era-1 â€” must NOT be
+       * converted (the reducer handles it). gpsPointâ†’rawGpsPoint rename applies.
        */
-      it('renames gpsPoint→rawGpsPoint in markReferencePoint, leaves position unchanged', () => {
+      it('renames gpsPointâ†’rawGpsPoint in markReferencePoint, leaves position unchanged', () => {
         const metadata: Era1Metadata = {};
         const actions: RecordedAction[] = [
           {
@@ -576,7 +576,7 @@ describe('recording-migration', () => {
 
       /**
        * Why this test matters:
-       * add2dImage.position is raw WebXR in era-1 — must NOT be converted.
+       * add2dImage.position is raw WebXR in era-1 â€” must NOT be converted.
        */
       it('leaves add2dImage.position unchanged in era-1', () => {
         const metadata: Era1Metadata = {};
@@ -601,7 +601,7 @@ describe('recording-migration', () => {
 
       /**
        * Why this test matters:
-       * odometryTrackingRestarted positions are raw WebXR in era-1 — unchanged.
+       * odometryTrackingRestarted positions are raw WebXR in era-1 â€” unchanged.
        */
       it('leaves odometryTrackingRestarted positions unchanged in era-1', () => {
         const metadata: Era1Metadata = {};
@@ -633,27 +633,27 @@ describe('recording-migration', () => {
       it('leaves non-position actions untouched (startSession, stopSession)', () => {
         const metadata: Era1Metadata = {};
         const actions: RecordedAction[] = [
-          { type: 'recorder/startSession', payload: { scenarioName: 'test' } },
-          { type: 'recorder/stopSession', payload: undefined },
+          { type: 'recording/startSession', payload: { scenarioName: 'test' } },
+          { type: 'recording/stopSession', payload: undefined },
         ];
 
         const result = migrateActionsIfNeeded(actions, metadata);
 
         expect(result[0]).toEqual({
-          type: 'recorder/startSession',
+          type: 'recording/startSession',
           payload: { scenarioName: 'test' },
         });
         expect(result[1]).toEqual({
-          type: 'recorder/stopSession',
+          type: 'recording/stopSession',
           payload: undefined,
         });
       });
 
       /**
        * Why this test matters:
-       * Multiple GPS events must all have gpsPoint→rawGpsPoint applied.
+       * Multiple GPS events must all have gpsPointâ†’rawGpsPoint applied.
        */
-      it('renames gpsPoint→rawGpsPoint for all recordGpsEvent actions in a multi-event recording', () => {
+      it('renames gpsPointâ†’rawGpsPoint for all recordGpsEvent actions in a multi-event recording', () => {
         const metadata: Era1Metadata = {};
         const actions: RecordedAction[] = [
           {
@@ -799,7 +799,7 @@ describe('recording-migration', () => {
 
       /**
        * Why this test matters:
-       * Era-1 recordGpsEvent missing gpsPoint skips gpsPoint→rawGpsPoint rename.
+       * Era-1 recordGpsEvent missing gpsPoint skips gpsPointâ†’rawGpsPoint rename.
        */
       it('returns recordGpsEvent unmodified when gpsPoint is missing (era 1)', () => {
         const actions: RecordedAction[] = [
@@ -811,16 +811,16 @@ describe('recording-migration', () => {
           },
         ];
         const result = migrateActionsIfNeeded(actions, null);
-        // No gpsPoint to rename — action passes through unchanged
+        // No gpsPoint to rename â€” action passes through unchanged
         expect(result[0]).toEqual(actions[0]);
       });
 
       /**
        * Why this test matters:
        * Era-2 recordGpsEvent with missing odomPosition skips position
-       * reversal, but gpsPoint→rawGpsPoint rename+strip still happens.
+       * reversal, but gpsPointâ†’rawGpsPoint rename+strip still happens.
        */
-      it('renames gpsPoint→rawGpsPoint even when odomPosition is missing (era 2)', () => {
+      it('renames gpsPointâ†’rawGpsPoint even when odomPosition is missing (era 2)', () => {
         const metadata: Era2Metadata = { odomCoordVersion: 2 };
         const actions: RecordedAction[] = [
           {
@@ -840,9 +840,9 @@ describe('recording-migration', () => {
 
       /**
        * Why this test matters:
-       * gpsPoint exists but has no coordinates — should still rename + strip.
+       * gpsPoint exists but has no coordinates â€” should still rename + strip.
        */
-      it('renames gpsPoint→rawGpsPoint even when gpsPoint.coordinates is missing', () => {
+      it('renames gpsPointâ†’rawGpsPoint even when gpsPoint.coordinates is missing', () => {
         const actions: RecordedAction[] = [
           {
             type: 'gpsData/recordGpsEvent',
@@ -868,7 +868,7 @@ describe('recording-migration', () => {
       /**
        * Why this test matters:
        * Non-numeric elements in odomPosition skip position reversal,
-       * but gpsPoint→rawGpsPoint rename+strip still applies.
+       * but gpsPointâ†’rawGpsPoint rename+strip still applies.
        */
       it('skips position reversal for non-numeric odomPosition but still renames gpsPoint (era 2)', () => {
         const metadata: Era2Metadata = { odomCoordVersion: 2 };
@@ -907,7 +907,7 @@ describe('recording-migration', () => {
 
       /**
        * Why this test matters:
-       * position is not an array — indexing would produce garbage.
+       * position is not an array â€” indexing would produce garbage.
        */
       it('returns markReferencePoint unmodified when position is not an array', () => {
         const metadata: Era2Metadata = { odomCoordVersion: 2 };
@@ -942,10 +942,10 @@ describe('recording-migration', () => {
 
       /**
        * Why this test matters:
-       * null metadata (zip has no session.json) is treated as era-1 —
+       * null metadata (zip has no session.json) is treated as era-1 â€”
        * only GPS coord swap is applied.
        */
-      it('treats null metadata as era-1 (renames gpsPoint→rawGpsPoint, keeps positions)', () => {
+      it('treats null metadata as era-1 (renames gpsPointâ†’rawGpsPoint, keeps positions)', () => {
         const actions: RecordedAction[] = [
           {
             type: 'gpsData/recordGpsEvent',

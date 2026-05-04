@@ -33,11 +33,11 @@ describe('replayRecording', () => {
 
   it('returns recorder metadata from startSession action', () => {
     // Why: the startSession action payload must be stored in recorder state
-    expect(state.recorder.sessionMetadata).not.toBeNull();
-    expect(state.recorder.sessionMetadata!.scenarioName).toBe(
+    expect(state.recording.sessionMetadata).not.toBeNull();
+    expect(state.recording.sessionMetadata!.scenarioName).toBe(
       testZip.scenarioName
     );
-    expect(state.recorder.sessionMetadata!.sessionName).toBe(
+    expect(state.recording.sessionMetadata!.sessionName).toBe(
       testZip.sessionName
     );
   });
@@ -74,7 +74,7 @@ describe('replayRecording', () => {
     // Why: replay uses NullStorageBackend, so no writes should occur;
     // failedWriteCount should remain 0
     expect(state.gpsData).not.toBeNull();
-    expect(state.recorder.failedWriteCount).toBe(0);
+    expect(state.recording.failedWriteCount).toBe(0);
   });
 
   it('throws on invalid zip data', async () => {
@@ -91,7 +91,7 @@ describe('replayRecording', () => {
     const emptyZipBytes = await zipWriter.close();
     const emptyState = await replayRecording(new Uint8Array(emptyZipBytes));
     expect(emptyState.gpsData).toBeNull();
-    expect(emptyState.recorder.isRecording).toBe(false);
+    expect(emptyState.recording.isRecording).toBe(false);
   });
 
   // ---------------------------------------------------------------------------

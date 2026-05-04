@@ -1,8 +1,8 @@
-# persistence-middleware.ts
+﻿# persistence-middleware.ts
 
 ## Purpose
 
-Redux middleware factory that persists qualifying actions to a `StorageBackend` during active recording sessions. Replaces the inline persistence logic previously embedded in the manual dispatch wrapper (§4 — `configureStore` migration).
+Redux middleware factory that persists qualifying actions to a `StorageBackend` during active recording sessions. Replaces the inline persistence logic previously embedded in the manual dispatch wrapper (Â§4 â€” `configureStore` migration).
 
 ## Public API
 
@@ -21,7 +21,7 @@ Redux middleware factory that persists qualifying actions to a `StorageBackend` 
 
 ## Invariants & Assumptions
 
-- **Per-instance action index** (Bug 10 fix): each middleware instance maintains its own `actionIndex` counter starting at 0. Pre-increment yields 1-based indices (`000001.json`, `000002.json`, …). This prevents cross-store index bleed.
+- **Per-instance action index** (Bug 10 fix): each middleware instance maintains its own `actionIndex` counter starting at 0. Pre-increment yields 1-based indices (`000001.json`, `000002.json`, â€¦). This prevents cross-store index bleed.
 - **Index reset on startSession:** `actionIndex` is reset to 0 when `recorder/startSession` is dispatched, ensuring each session starts at index 1.
 - **Write queue with concurrency limit:** `storageBackend.writeAction()` calls are enqueued in a `WriteQueue` with a maximum of 3 concurrent writes. This prevents unbounded memory growth when storage is slow (e.g., OPFS locked by another tab or GC pauses on mobile). Failures are caught and handled via `recordWriteFailure` dispatch + `onWriteFailure` callback.
 - **Error normalization:** non-`Error` rejections (e.g., `Promise.reject('string')`) are wrapped in `new Error(String(err))` before processing.
@@ -49,7 +49,7 @@ configureStore({
 
 ## Tests
 
-- `persistence-middleware.test.ts` — 16 tests covering:
+- `persistence-middleware.test.ts` â€” 16 tests covering:
   - No persistence when not recording
   - `startSession` persistence (recording gate checked after reduce)
   - `gpsData/*` and `recorder/*` persistence
@@ -68,6 +68,6 @@ configureStore({
 
 ## Related
 
-- [store.ts](store.ts.md) — factory that wires this middleware into `configureStore`
-- [recorder-slice.ts](recorder-slice.ts.md) — provides `recordWriteFailure` action creator
-- [storage-backend.ts](../storage/storage-backend.ts.md) — `StorageBackend` interface
+- [store.ts](store.ts.md) â€” factory that wires this middleware into `configureStore`
+- [recording-slice.ts](recording-slice.ts.md) â€” provides `recordWriteFailure` action creator
+- [storage-backend.ts](../storage/storage-backend.ts.md) â€” `StorageBackend` interface

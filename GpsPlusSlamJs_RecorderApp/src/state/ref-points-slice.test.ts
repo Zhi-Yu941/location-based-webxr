@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for refPointsSlice — Redux state for imported reference points
  * and session usage tracking.
  *
@@ -258,7 +258,7 @@ describe('refPointsSlice reducer', () => {
 
 describe('selectCachedKnownRefPoints', () => {
   /**
-   * Why: The selector derives KnownRefPoint[] (with H3 indices) from
+   * Why: The selector derives KnownGeoAnchor[] (with H3 indices) from
    * importedRefPoints. This replaces the closure-based recomputeKnownRefPoints
    * in ref-point-handlers.ts.
    */

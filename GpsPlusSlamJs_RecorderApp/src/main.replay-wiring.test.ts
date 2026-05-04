@@ -201,7 +201,7 @@ vi.mock('gps-plus-slam-app-framework/sensors/permission-checker', () => ({
   checkAllPermissions: vi.fn(),
   requestAllPermissions: vi.fn(),
 }));
-vi.mock('gps-plus-slam-app-framework/state/recording-coordinator', () => ({
+vi.mock('gps-plus-slam-app-framework/state/gps-event-coordinator', () => ({
   createGpsPositionHandler: vi.fn(),
   updateDeviceOrientation: vi.fn(),
   resetCoordinatorState: vi.fn(),

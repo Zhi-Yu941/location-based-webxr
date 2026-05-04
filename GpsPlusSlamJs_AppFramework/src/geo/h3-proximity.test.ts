@@ -1,4 +1,4 @@
-/**
+﻿/**
  * H3-Based Reference Point ID Tests
  *
  * Why these tests matter:
@@ -21,13 +21,13 @@ import { describe, it, expect } from 'vitest';
 import { latLngToCell, gridDisk, cellToLatLng } from 'h3-js';
 import {
   gpsToH3,
-  findNearbyRefPoint,
+  findNearbyGeoAnchor,
   approxDistanceMetres,
-  h3RefsMatch,
+  h3CellsMatch,
   isH3Index,
   H3_RESOLUTION,
-  type KnownRefPoint,
-} from './h3-ref-point';
+  type KnownGeoAnchor,
+} from './h3-proximity';
 
 // ============================================================================
 // 1. h3-js library integration — proves the dependency works
@@ -178,7 +178,7 @@ describe('gridDisk jitter absorption at resolution 11', () => {
 });
 
 // ============================================================================
-// 3. h3-ref-point.ts utility module
+// 3. h3-proximity.ts utility module
 // ============================================================================
 
 describe('gpsToH3', () => {
@@ -195,14 +195,14 @@ describe('gpsToH3', () => {
   });
 });
 
-describe('findNearbyRefPoint', () => {
-  const loc2: KnownRefPoint = {
+describe('findNearbyGeoAnchor', () => {
+  const loc2: KnownGeoAnchor = {
     h3Index: latLngToCell(50.7475, 6.4812, 11),
     displayName: 'Bank',
     lat: 50.7475,
     lon: 6.4812,
   };
-  const loc4: KnownRefPoint = {
+  const loc4: KnownGeoAnchor = {
     h3Index: latLngToCell(50.7451, 6.4804, 11),
     displayName: 'Eingang Pfad',
     lat: 50.7451,
@@ -211,26 +211,26 @@ describe('findNearbyRefPoint', () => {
 
   // Why: Empty list must return undefined (no match possible).
   it('returns undefined when no known ref points', () => {
-    expect(findNearbyRefPoint(50.7475, 6.4812, [])).toBeUndefined();
+    expect(findNearbyGeoAnchor(50.7475, 6.4812, [])).toBeUndefined();
   });
 
   // Why: A position at the exact same GPS as a known ref point must match.
   it('finds exact match', () => {
-    const match = findNearbyRefPoint(50.7475, 6.4812, [loc2, loc4]);
+    const match = findNearbyGeoAnchor(50.7475, 6.4812, [loc2, loc4]);
     expect(match).toBe(loc2);
   });
 
   // Why: A position with ~5m GPS jitter should still match via gridDisk.
   it('finds match within GPS jitter range', () => {
     // ~5m north of loc2
-    const match = findNearbyRefPoint(50.7475 + 0.000045, 6.4812, [loc2, loc4]);
+    const match = findNearbyGeoAnchor(50.7475 + 0.000045, 6.4812, [loc2, loc4]);
     expect(match).toBe(loc2);
   });
 
   // Why: A position far from all known ref points must return undefined.
   it('returns undefined when no ref point is nearby', () => {
     // ~1km away from any known point
-    const match = findNearbyRefPoint(50.76, 6.49, [loc2, loc4]);
+    const match = findNearbyGeoAnchor(50.76, 6.49, [loc2, loc4]);
     expect(match).toBeUndefined();
   });
 
@@ -240,7 +240,7 @@ describe('findNearbyRefPoint', () => {
     // Midpoint between loc2 and loc4 (~250m from each)
     const midLat = (50.7475 + 50.7451) / 2;
     const midLng = (6.4812 + 6.4804) / 2;
-    const match = findNearbyRefPoint(midLat, midLng, [loc2, loc4]);
+    const match = findNearbyGeoAnchor(midLat, midLng, [loc2, loc4]);
     expect(match).toBeUndefined();
   });
 
@@ -253,13 +253,13 @@ describe('findNearbyRefPoint', () => {
   it('returns the closest ref point when multiple are in range', () => {
     // rpA ("Bank") at 50.7475, 6.4812
     // rpB ("Fountain") at 50.74825, 6.4812 — ~83m north of rpA
-    const rpA: KnownRefPoint = {
+    const rpA: KnownGeoAnchor = {
       h3Index: latLngToCell(50.7475, 6.4812, 11),
       displayName: 'Bank',
       lat: 50.7475,
       lon: 6.4812,
     };
-    const rpB: KnownRefPoint = {
+    const rpB: KnownGeoAnchor = {
       h3Index: latLngToCell(50.74825, 6.4812, 11),
       displayName: 'Fountain',
       lat: 50.74825,
@@ -268,20 +268,20 @@ describe('findNearbyRefPoint', () => {
 
     // Query at 30% from A to B: ~25m from A, ~58m from B — both in gridDisk
     const queryLat = 50.7475 + (50.74825 - 50.7475) * 0.3;
-    const match = findNearbyRefPoint(queryLat, 6.4812, [rpA, rpB]);
+    const match = findNearbyGeoAnchor(queryLat, 6.4812, [rpA, rpB]);
     expect(match).toBe(rpA);
   });
 
   // Why: The result must not depend on which ref point appears first in the
   // array. Before the fix, Array.find() returned whichever appeared first.
   it('closest-match is independent of array order', () => {
-    const rpA: KnownRefPoint = {
+    const rpA: KnownGeoAnchor = {
       h3Index: latLngToCell(50.7475, 6.4812, 11),
       displayName: 'Bank',
       lat: 50.7475,
       lon: 6.4812,
     };
-    const rpB: KnownRefPoint = {
+    const rpB: KnownGeoAnchor = {
       h3Index: latLngToCell(50.74825, 6.4812, 11),
       displayName: 'Fountain',
       lat: 50.74825,
@@ -292,19 +292,19 @@ describe('findNearbyRefPoint', () => {
     const queryLat = 50.7475 + (50.74825 - 50.7475) * 0.3;
 
     // rpB first in array — must still return rpA (the closer one)
-    const match = findNearbyRefPoint(queryLat, 6.4812, [rpB, rpA]);
+    const match = findNearbyGeoAnchor(queryLat, 6.4812, [rpB, rpA]);
     expect(match).toBe(rpA);
   });
 
   // Why: When the query is closer to B, B must be returned — symmetric test.
   it('returns B when query is closer to B in overlap zone', () => {
-    const rpA: KnownRefPoint = {
+    const rpA: KnownGeoAnchor = {
       h3Index: latLngToCell(50.7475, 6.4812, 11),
       displayName: 'Bank',
       lat: 50.7475,
       lon: 6.4812,
     };
-    const rpB: KnownRefPoint = {
+    const rpB: KnownGeoAnchor = {
       h3Index: latLngToCell(50.74825, 6.4812, 11),
       displayName: 'Fountain',
       lat: 50.74825,
@@ -313,7 +313,7 @@ describe('findNearbyRefPoint', () => {
 
     // Query at 60% from A to B: ~50m from A, ~33m from B — both in gridDisk
     const queryLat = 50.7475 + (50.74825 - 50.7475) * 0.6;
-    const match = findNearbyRefPoint(queryLat, 6.4812, [rpA, rpB]);
+    const match = findNearbyGeoAnchor(queryLat, 6.4812, [rpA, rpB]);
     expect(match).toBe(rpB);
   });
 });
@@ -322,7 +322,7 @@ describe('approxDistanceMetres antimeridian handling', () => {
   // Why: The equirectangular formula using a naive lon2 - lon1 would compute
   // ~40,000 km for points 0.0002° apart across the ±180° seam. The function
   // must normalize the longitude delta so true neighbors near the antimeridian
-  // are ranked correctly — otherwise findNearbyRefPoint would pick the wrong
+  // are ranked correctly — otherwise findNearbyGeoAnchor would pick the wrong
   // ref point when its gridDisk straddles the seam.
   it('computes small distance for points straddling the antimeridian', () => {
     // Two points 0.001° apart in longitude at the equator ≈ 111 m.
@@ -352,14 +352,14 @@ describe('approxDistanceMetres antimeridian handling', () => {
   // seam), the seam-crossing candidate must be recognised as the closest.
   // Without wrap-around normalisation its naive distance is ~40,000 km, so
   // the same-side candidate wins and the wrong ref point is returned.
-  it('findNearbyRefPoint picks the seam-crossing candidate when it is closer', () => {
-    const rpSameSide: KnownRefPoint = {
+  it('findNearbyGeoAnchor picks the seam-crossing candidate when it is closer', () => {
+    const rpSameSide: KnownGeoAnchor = {
       h3Index: latLngToCell(0, 179.9995, H3_RESOLUTION),
       displayName: 'SameSide',
       lat: 0,
       lon: 179.9995,
     };
-    const rpAcrossSeam: KnownRefPoint = {
+    const rpAcrossSeam: KnownGeoAnchor = {
       h3Index: latLngToCell(0, -179.99995, H3_RESOLUTION),
       displayName: 'AcrossSeam',
       lat: 0,
@@ -381,7 +381,7 @@ describe('approxDistanceMetres antimeridian handling', () => {
     ) {
       return; // precondition not satisfied; covered by distance unit tests
     }
-    const match = findNearbyRefPoint(queryLat, queryLon, [
+    const match = findNearbyGeoAnchor(queryLat, queryLon, [
       rpSameSide,
       rpAcrossSeam,
     ]);
@@ -389,26 +389,26 @@ describe('approxDistanceMetres antimeridian handling', () => {
   });
 });
 
-describe('h3RefsMatch', () => {
+describe('h3CellsMatch', () => {
   const cellA = latLngToCell(50.7475, 6.4812, 11);
 
   // Why: Same index must always match.
   it('returns true for identical indices', () => {
-    expect(h3RefsMatch(cellA, cellA)).toBe(true);
+    expect(h3CellsMatch(cellA, cellA)).toBe(true);
   });
 
   // Why: Neighbor cells should match (GPS jitter can shift across boundaries).
   it('returns true for neighboring cells', () => {
     const neighbors = gridDisk(cellA, 1).filter((c) => c !== cellA);
     for (const neighbor of neighbors) {
-      expect(h3RefsMatch(cellA, neighbor)).toBe(true);
+      expect(h3CellsMatch(cellA, neighbor)).toBe(true);
     }
   });
 
   // Why: Cells >130m apart must not match.
   it('returns false for distant cells', () => {
     const cellFar = latLngToCell(50.7451, 6.4804, 11); // loc4
-    expect(h3RefsMatch(cellA, cellFar)).toBe(false);
+    expect(h3CellsMatch(cellA, cellFar)).toBe(false);
   });
 });
 

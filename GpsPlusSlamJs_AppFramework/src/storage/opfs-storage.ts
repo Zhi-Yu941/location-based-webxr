@@ -6,7 +6,7 @@
  * unlike showDirectoryPicker which has write restrictions on Android.
  *
  * Directory structure (flat sessions — no scenario hierarchy):
- * /gps-recorder/
+ * /gps-plus-slam/
  *   └── sessions/
  *       ├── recording-YYYY-MM-DD_HH-MM-SSutc/
  *       │   ├── session.json
@@ -103,7 +103,7 @@ export interface CreateSessionResult {
 // ============================================================================
 
 let opfsRoot: FileSystemDirectoryHandle | null = null;
-let gpsRecorderDir: FileSystemDirectoryHandle | null = null;
+let gpsPlusSlamDir: FileSystemDirectoryHandle | null = null;
 let sessionsDir: FileSystemDirectoryHandle | null = null;
 let currentSessionHandle: FileSystemDirectoryHandle | null = null;
 let actionsHandle: FileSystemDirectoryHandle | null = null;
@@ -115,7 +115,7 @@ let framesHandle: FileSystemDirectoryHandle | null = null;
  */
 export function resetOpfsStorage(): void {
   opfsRoot = null;
-  gpsRecorderDir = null;
+  gpsPlusSlamDir = null;
   sessionsDir = null;
   currentSessionHandle = null;
   actionsHandle = null;
@@ -125,7 +125,7 @@ export function resetOpfsStorage(): void {
 /**
  * Reset session-level handles only.
  *
- * Preserves opfsRoot/gpsRecorderDir/sessionsDir (OPFS stays initialized)
+ * Preserves opfsRoot/gpsPlusSlamDir/sessionsDir (OPFS stays initialized)
  * but clears current session/actions/frames handles so a new session can
  * be started fresh.
  */
@@ -143,8 +143,8 @@ export function resetSessionHandles(): void {
  * Initialize OPFS storage by creating the required directory structure.
  *
  * Creates:
- * - /gps-recorder/
- * - /gps-recorder/sessions/
+ * - /gps-plus-slam/
+ * - /gps-plus-slam/sessions/
  *
  * This is idempotent - calling multiple times is safe.
  *
@@ -165,10 +165,10 @@ export async function initOpfsStorage(): Promise<void> {
   opfsRoot = await navigator.storage.getDirectory();
   log.info('OPFS root obtained');
 
-  gpsRecorderDir = await opfsRoot.getDirectoryHandle('gps-recorder', {
+  gpsPlusSlamDir = await opfsRoot.getDirectoryHandle('gps-plus-slam', {
     create: true,
   });
-  sessionsDir = await gpsRecorderDir.getDirectoryHandle('sessions', {
+  sessionsDir = await gpsPlusSlamDir.getDirectoryHandle('sessions', {
     create: true,
   });
 
@@ -184,11 +184,11 @@ export function getSessionsRootHandle(): FileSystemDirectoryHandle | null {
 }
 
 /**
- * Get the app root directory handle (gps-recorder/).
+ * Get the app root directory handle (gps-plus-slam/).
  * Used by consumers that need to create additional directories alongside sessions/.
  */
 export function getAppRootHandle(): FileSystemDirectoryHandle | null {
-  return gpsRecorderDir;
+  return gpsPlusSlamDir;
 }
 
 // ============================================================================
@@ -199,9 +199,9 @@ export function getAppRootHandle(): FileSystemDirectoryHandle | null {
  * Create a new recording session.
  *
  * Creates the directory structure:
- * - /gps-recorder/sessions/recording-{timestamp}/
- * - /gps-recorder/sessions/recording-{timestamp}/actions/
- * - /gps-recorder/sessions/recording-{timestamp}/frames/
+ * - /gps-plus-slam/sessions/recording-{timestamp}/
+ * - /gps-plus-slam/sessions/recording-{timestamp}/actions/
+ * - /gps-plus-slam/sessions/recording-{timestamp}/frames/
  *
  * @param timestamp - Session start time (used for folder naming)
  * @param _contextTag - Opaque tag; not used by the flat layout but accepted

@@ -142,15 +142,15 @@ describe('Recording Replay Integration', () => {
     it('replays all actions into recorder store without errors', () => {
       // Why: the recorder store must handle all action types
       expect(recorderState.gpsData).not.toBeNull();
-      expect(recorderState.recorder).toBeDefined();
+      expect(recorderState.recording).toBeDefined();
     });
 
     it('replayRecording() produces equivalent state', () => {
       // Why: the convenience function should produce the same result
       // as manual store creation + dispatch
       expect(replayedState.gpsData).not.toBeNull();
-      expect(replayedState.recorder.sessionMetadata).toEqual(
-        recorderState.recorder.sessionMetadata
+      expect(replayedState.recording.sessionMetadata).toEqual(
+        recorderState.recording.sessionMetadata
       );
       expect(replayedState.gpsData!.gpsEvents.gpsPositions.length).toBe(
         recorderState.gpsData!.gpsEvents.gpsPositions.length
@@ -267,24 +267,24 @@ describe('Recording Replay Integration', () => {
 
     it('recorder store tracks session metadata', () => {
       // Why: startSession action payload must be correctly stored in recorder state
-      expect(recorderState.recorder.sessionMetadata).not.toBeNull();
-      expect(recorderState.recorder.sessionMetadata!.scenarioName).toBe(
+      expect(recorderState.recording.sessionMetadata).not.toBeNull();
+      expect(recorderState.recording.sessionMetadata!.scenarioName).toBe(
         testZip.scenarioName
       );
-      expect(recorderState.recorder.sessionMetadata!.sessionName).toBe(
+      expect(recorderState.recording.sessionMetadata!.sessionName).toBe(
         testZip.sessionName
       );
-      expect(recorderState.recorder.sessionMetadata!.startTime).toBe(
+      expect(recorderState.recording.sessionMetadata!.startTime).toBe(
         testZip.startTime
       );
-      expect(recorderState.recorder.sessionMetadata!.deviceInfo).toContain(
+      expect(recorderState.recording.sessionMetadata!.deviceInfo).toContain(
         'Android'
       );
     });
 
     it('action sequence is chronologically ordered', () => {
       // Why: startSession must come first, setZeroPos before GPS events
-      expect(actions[0].type).toBe('recorder/startSession');
+      expect(actions[0].type).toBe('recording/startSession');
 
       const setZeroIdx = actions.findIndex(
         (a) => a.type === 'gpsData/setZeroPos'

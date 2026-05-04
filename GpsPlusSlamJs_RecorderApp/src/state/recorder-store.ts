@@ -1,8 +1,8 @@
-/**
- * Recorder Store — composable store for the recorder app.
+﻿/**
+ * Recorder Store â€” composable store for the recorder app.
  *
  * Wraps the framework's `createSlamAppStore` factory and supplies the
- * recorder-specific extras (routing, refPoints — until refPoints moves
+ * recorder-specific extras (routing, refPoints â€” until refPoints moves
  * out in Iter 3, scenario in Iter 1D). The framework no longer ships a
  * `createRecorderStore`; that wrapper now lives in the consuming app.
  *
@@ -29,7 +29,7 @@ import {
   refPointsReducer,
   type RefPointsState,
 } from './ref-points-slice';
-import type { RecorderState } from 'gps-plus-slam-app-framework/state/recorder-slice';
+import type { RecordingState } from 'gps-plus-slam-app-framework/state/recording-slice';
 import type { StorageBackend } from 'gps-plus-slam-app-framework/storage/storage-backend';
 import { OpfsStorageBackend } from 'gps-plus-slam-app-framework/storage/opfs-storage-backend';
 import type { SessionMetadata as OpfsSessionMetadata } from 'gps-plus-slam-app-framework/storage/opfs-storage';
@@ -42,13 +42,13 @@ import { scenarioReducer, type ScenarioState } from './scenario-slice';
 // import surface stable while pieces migrate. ---
 
 export {
-  type RecorderState,
+  type RecordingState,
   type SessionMetadata,
   startSession,
   endSession,
   recordDepthSample,
   recordWriteFailure,
-} from 'gps-plus-slam-app-framework/state/recorder-slice';
+} from 'gps-plus-slam-app-framework/state/recording-slice';
 
 export {
   setCurrentScenarioName,
@@ -102,14 +102,14 @@ export type { SessionMetadata as OpfsSessionMetadata } from 'gps-plus-slam-app-f
  * routing). Composed by `createRecorderStore`.
  */
 export interface CombinedRootState extends LibraryRootState {
-  recorder: RecorderState;
+  recorder: RecordingState;
   refPoints: RefPointsState;
   routing: RoutingState;
   scenario: ScenarioState;
 }
 
 /**
- * Recorder store handle. Same shape as before the Iter 1 split — the
+ * Recorder store handle. Same shape as before the Iter 1 split â€” the
  * framework's `SlamAppStore` already provides this surface; we just narrow
  * the state type to `CombinedRootState` for recorder consumers.
  */
@@ -124,7 +124,7 @@ export interface RecorderStore {
 export interface RecorderStoreOptions {
   /** Show toast / surface errors on persistence failures. */
   onWriteFailure?: (error: Error) => void;
-  /** Override default OPFS backend (tests / replay → NullStorageBackend). */
+  /** Override default OPFS backend (tests / replay â†’ NullStorageBackend). */
   storageBackend?: StorageBackend;
   /** Disable RTK dev-only middleware in high-throughput replay scenarios. */
   enableDevChecks?: boolean;

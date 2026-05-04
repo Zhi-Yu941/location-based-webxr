@@ -104,8 +104,8 @@ export interface ExportSessionAsZipOptions {
  */
 async function getScenariosHandle(): Promise<FileSystemDirectoryHandle> {
   const opfsRoot = await navigator.storage.getDirectory();
-  const gpsRecorderDir = await opfsRoot.getDirectoryHandle('gps-recorder');
-  return gpsRecorderDir.getDirectoryHandle('scenarios', { create: true });
+  const gpsPlusSlamDir = await opfsRoot.getDirectoryHandle('gps-plus-slam');
+  return gpsPlusSlamDir.getDirectoryHandle('scenarios', { create: true });
 }
 
 /**
@@ -113,8 +113,8 @@ async function getScenariosHandle(): Promise<FileSystemDirectoryHandle> {
  */
 async function getSessionsHandle(): Promise<FileSystemDirectoryHandle> {
   const opfsRoot = await navigator.storage.getDirectory();
-  const gpsRecorderDir = await opfsRoot.getDirectoryHandle('gps-recorder');
-  return gpsRecorderDir.getDirectoryHandle('sessions');
+  const gpsPlusSlamDir = await opfsRoot.getDirectoryHandle('gps-plus-slam');
+  return gpsPlusSlamDir.getDirectoryHandle('sessions');
 }
 
 /**

@@ -51,7 +51,6 @@ export type {
 } from 'gps-plus-slam-js';
 export type { StorageBackend, OpfsSessionMetadata } from '../storage/types.js';
 
-
 // --- recording-coordinator ---
 export {
   type RecordingCoordinatorConfig,

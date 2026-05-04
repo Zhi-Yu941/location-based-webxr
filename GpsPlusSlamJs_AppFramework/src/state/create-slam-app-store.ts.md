@@ -44,7 +44,10 @@ thin `createRecorderStore` that calls this factory with its own extras.
 
 ```ts
 // Minimal generic AR+GPS app — no recorder slices.
-import { createSlamAppStore, NullStorageBackend } from 'gps-plus-slam-app-framework/state';
+import {
+  createSlamAppStore,
+  NullStorageBackend,
+} from 'gps-plus-slam-app-framework/state';
 
 const store = createSlamAppStore({ storageBackend: new NullStorageBackend() });
 store.getState().gpsData; // library state, ready to use
@@ -59,7 +62,11 @@ import { refPointsReducer } from 'gps-plus-slam-app-framework/state';
 
 const store = createSlamAppStore({
   storageBackend,
-  extraReducers: { routing: routingReducer, scenario: scenarioReducer, refPoints: refPointsReducer },
+  extraReducers: {
+    routing: routingReducer,
+    scenario: scenarioReducer,
+    refPoints: refPointsReducer,
+  },
 });
 ```
 

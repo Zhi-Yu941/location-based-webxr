@@ -7,7 +7,7 @@ the `gps-plus-slam-js` library once at the start of the test process so any
 public API (reducers, action creators, selectors, math helpers like
 `calcGpsCoords`, visualization helpers like `RefPointVisualizer`) is
 callable from framework tests without each test manually constructing a
-store via `createRecorderStore()` / `createGpsSlamStore({ licenseKey })`.
+store via `createSlamAppStore()` / `createGpsSlamStore({ licenseKey })`.
 
 ## Public API
 

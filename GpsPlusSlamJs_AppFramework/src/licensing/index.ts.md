@@ -12,7 +12,7 @@ though the constant itself now lives in the core library.
 - `COMMUNITY_LICENSE_KEY: string` — re-exported from
   `gps-plus-slam-js/community-license-key`. Same value, same opt-in
   semantics: it only takes effect if the consumer passes it (or relies
-  on `createRecorderStore`'s default) when activating the library.
+  on `createSlamAppStore`'s default) when activating the library.
 
 ## Invariants & assumptions
 
@@ -36,8 +36,8 @@ const store = createGpsSlamStore({ licenseKey: COMMUNITY_LICENSE_KEY });
 
 ## Tests
 
-- `src/state/store.license-key.test.ts` — exercises the default-license
-  path through `createRecorderStore`.
+- `src/state/create-slam-app-store.license-key.test.ts` — exercises the default-license
+  path through `createSlamAppStore`.
 - `src/test-setup.ts` — calls `validateLicenseKey(COMMUNITY_LICENSE_KEY)`
   at vitest setup, so any test importing from the framework implicitly
   proves this re-export resolves and the token is currently valid.

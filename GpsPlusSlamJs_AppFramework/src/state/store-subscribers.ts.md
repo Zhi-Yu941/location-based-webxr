@@ -78,7 +78,7 @@ unsubscribeStore();
 ```typescript
 import { wireStoreSubscribers } from './state/store-subscribers';
 
-const replayStore = createRecorderStore({
+const replayStore = createSlamAppStore({
   storageBackend: new NullStorageBackend(),
 });
 const unsub = wireStoreSubscribers(replayStore, {

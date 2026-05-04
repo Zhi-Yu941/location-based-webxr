@@ -34,10 +34,10 @@ All methods return `Promise<void>` and are expected to throw/reject on failure. 
 
 ```typescript
 import { NullStorageBackend } from './null-storage-backend';
-import { createRecorderStore } from '../state/store';
+import { createSlamAppStore } from '../state/create-slam-app-store';
 
 // Replay mode — no persistence
-const store = createRecorderStore({
+const store = createSlamAppStore({
   storageBackend: new NullStorageBackend(),
 });
 ```

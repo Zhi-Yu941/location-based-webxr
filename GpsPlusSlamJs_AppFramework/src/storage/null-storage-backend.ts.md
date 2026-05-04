@@ -25,9 +25,9 @@ All methods resolve immediately with `undefined`. No state is accumulated.
 
 ```typescript
 import { NullStorageBackend } from './null-storage-backend';
-import { createRecorderStore } from '../state/store';
+import { createSlamAppStore } from '../state/create-slam-app-store';
 
-const store = createRecorderStore({
+const store = createSlamAppStore({
   storageBackend: new NullStorageBackend(),
 });
 // Dispatch actions freely — nothing is written to disk

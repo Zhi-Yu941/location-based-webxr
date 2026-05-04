@@ -24,16 +24,16 @@ Each method delegates to the corresponding function in `file-system.ts`:
 
 - Requires OPFS session to be initialized via `startStorageSession()` before `writeAction`/`writeFrame` calls (same as direct usage).
 - Errors propagate to caller — not caught internally.
-- This is the **default** backend when no `storageBackend` option is passed to `createRecorderStore()`.
+- This is the **default** backend when no `storageBackend` option is passed to `createSlamAppStore()`.
 
 ## Examples
 
 ```typescript
 import { OpfsStorageBackend } from './opfs-storage-backend';
-import { createRecorderStore } from '../state/store';
+import { createSlamAppStore } from '../state/create-slam-app-store';
 
 // Production usage (this is also the default when omitted)
-const store = createRecorderStore({
+const store = createSlamAppStore({
   storageBackend: new OpfsStorageBackend(),
 });
 ```

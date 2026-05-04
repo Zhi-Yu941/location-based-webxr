@@ -68,11 +68,11 @@ Async controller with state machine: `idle → playing → paused → playing �
 
 ```typescript
 import { ReplayEngine, extractActionTimestamp } from './replay-engine';
-import { createRecorderStore } from './store';
+import { createSlamAppStore } from './create-slam-app-store';
 import { NullStorageBackend } from '../storage/null-storage-backend';
 
 // Create a replay store (no persistence)
-const store = createRecorderStore({ storageBackend: new NullStorageBackend() });
+const store = createSlamAppStore({ storageBackend: new NullStorageBackend() });
 
 // Load actions from zip (via loadActionsFromZip)
 const actions = await loadActionsFromZip(zipData);

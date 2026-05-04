@@ -36,16 +36,16 @@ import {
 import {
   selectCachedKnownRefPoints,
   type RefPointsState,
-} from 'gps-plus-slam-app-framework/state/ref-points-slice';
-import type { ImportedRefPoint } from 'gps-plus-slam-app-framework/storage/ref-point-importer';
+} from '../state/ref-points-slice';
+import type { ImportedRefPoint } from '../storage/ref-point-importer';
 import {
   gpsToH3,
   findNearbyRefPoint,
   h3RefsMatch,
   isH3Index,
 } from 'gps-plus-slam-app-framework/ref-points/h3-ref-point';
-import { averageGpsPerRefPoint } from 'gps-plus-slam-app-framework/storage/ref-point-loader';
-import type { RefPointDefinition } from 'gps-plus-slam-app-framework/storage/ref-point-loader';
+import { averageGpsPerRefPoint } from '../storage/ref-point-loader';
+import type { RefPointDefinition } from '../storage/ref-point-loader';
 
 // ---------------------------------------------------------------------------
 // Helpers

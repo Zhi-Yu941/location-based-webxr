@@ -17,7 +17,7 @@ import type { GpsPoint } from 'gps-plus-slam-js';
 import {
   MockFSDirectoryHandle,
   MockFSFileHandle,
-} from '../test-utils/browser-mocks';
+} from 'gps-plus-slam-app-framework/test-utils/browser-mocks';
 
 // Helper to create mock GPS point for tests
 const mockGpsPoint: GpsPoint = {

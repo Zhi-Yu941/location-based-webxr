@@ -1,4 +1,4 @@
-﻿/**
+/**
  * GpsPlusSlamJs Recorder App - Main Entry Point
  *
  * This module initializes the WebXR AR session, Three.js renderer,
@@ -86,7 +86,7 @@ import {
 import { createRecordingSessionHandlers } from './recording/recording-session-handlers';
 import { createFolderManager } from './storage/folder-manager';
 
-import { type ImportedRefPoint } from 'gps-plus-slam-app-framework/storage/ref-point-importer';
+import { type ImportedRefPoint } from './storage/ref-point-importer';
 
 import {
   showRefPointPicker,
@@ -158,7 +158,7 @@ const log = createLogger('Recorder');
  */
 function handleWriteFailure(error: Error): void {
   log.warn('Write failure detected:', error.message);
-  showToast('âš ï¸ Save failed - check folder permissions', {
+  showToast('⚠️ Save failed - check folder permissions', {
     severity: 'error',
     duration: TOAST_DURATION_ERROR,
   });
@@ -183,13 +183,13 @@ let recordingOptions: RecordingOptions;
 // Map overlay instance (created when AR session starts)
 let mapOverlay: LeafletMapOverlay | null = null;
 
-// Issue 8: Camera follower â€” GPS-aligned anchor for map and compass cubes
+// Issue 8: Camera follower — GPS-aligned anchor for map and compass cubes
 let cameraFollower: CameraFollower | null = null;
 
-// Issue 4: Alignment lerper â€” smooths alignment-matrix transitions
+// Issue 4: Alignment lerper — smooths alignment-matrix transitions
 let alignmentLerper: AlignmentLerper | null = null;
 
-// Replay mode handlers â€” encapsulates all replay state and event handlers
+// Replay mode handlers — encapsulates all replay state and event handlers
 // (Finding #7 decomposition: extracted from main.ts to replay/replay-handlers.ts)
 const replayHandlers = createReplayHandlers({
   setStore: (newStore) => {
@@ -197,7 +197,7 @@ const replayHandlers = createReplayHandlers({
   },
 });
 
-// Recording session handlers â€” encapsulates start/stop recording lifecycle
+// Recording session handlers — encapsulates start/stop recording lifecycle
 // (Finding #7 decomposition Step 3: extracted from main.ts to recording/recording-session-handlers.ts)
 const recordingSessionHandlers = createRecordingSessionHandlers({
   getStore: () => store,
@@ -222,14 +222,14 @@ const recordingSessionHandlers = createRecordingSessionHandlers({
   },
 });
 
-// Ref-point handlers â€” encapsulates all ref-point state and event handlers
+// Ref-point handlers — encapsulates all ref-point state and event handlers
 // (Finding #7 decomposition Step 2: extracted from main.ts to ref-points/ref-point-handlers.ts)
 const refPointHandlers = createRefPointHandlers({
   getStore: () => store,
   getCurrentSessionName: () => recordingSessionHandlers.getCurrentSessionName(),
 });
 
-// Folder manager â€” encapsulates folder selection, save location, scenario management
+// Folder manager — encapsulates folder selection, save location, scenario management
 // (Finding #7 decomposition Step 4: extracted from main.ts to storage/folder-manager.ts)
 const folderManager = createFolderManager({
   getStore: () => store,
@@ -405,10 +405,10 @@ export async function resetForNewRecording(): Promise<void> {
     const folderHandle = getReadFolderHandle();
     if (folderHandle) {
       const refPointCount = refPointHandlers.getImportedRefPoints().length;
-      updateFolderStatus(`âœ… ${folderHandle.name} (${refPointCount} ref pts)`);
+      updateFolderStatus(`✅ ${folderHandle.name} (${refPointCount} ref pts)`);
     }
   } else {
-    // Permission lost â€” clear imported ref points too since they came from that folder
+    // Permission lost — clear imported ref points too since they came from that folder
     refPointHandlers.setImportedRefPoints([]);
   }
 
@@ -537,10 +537,10 @@ async function main(): Promise<void> {
   }
 
   // Register browser back-button handler for modals + screens (Issue 7 Phase 1+2)
-  // - Modal: back while ref-point picker is open â†’ cancel picker
-  // - AR: back from AR_READY â†’ return to setup
+  // - Modal: back while ref-point picker is open → cancel picker
+  // - AR: back from AR_READY → return to setup
   // - Recording: back is consumed (prevented) to avoid data loss
-  // - Summary: back â†’ soft reset to setup
+  // - Summary: back → soft reset to setup
   initNavigation(
     {
       onCloseModal: () => {
@@ -550,10 +550,10 @@ async function main(): Promise<void> {
       },
       onBackToSetup: () => {
         showSetupModal();
-        log.info('Back from AR â€” returned to setup');
+        log.info('Back from AR — returned to setup');
       },
       onBackFromSummary: () => {
-        log.info('Back from summary â€” triggering soft reset');
+        log.info('Back from summary — triggering soft reset');
         void resetForNewRecording();
       },
       onBackDuringRecording: () => {
@@ -649,8 +649,8 @@ async function main(): Promise<void> {
       onMapZoomIn: () => replayHandlers.handleReplayMapZoomIn(),
       onMapZoomOut: () => replayHandlers.handleReplayMapZoomOut(),
     });
-    updateStatus('Replay Mode â€” Open a recordings folder');
-    log.info('WebXR not supported â€” entered replay mode');
+    updateStatus('Replay Mode — Open a recordings folder');
+    log.info('WebXR not supported — entered replay mode');
   } else if (initialPermissions.allMandatoryReady) {
     updateStatus('Ready - Configure scenario');
   } else {
@@ -664,7 +664,7 @@ async function main(): Promise<void> {
 function updateStorageStatus(text: string, success: boolean): void {
   const statusEl = document.getElementById('storage-status-text');
   if (statusEl) {
-    statusEl.textContent = success ? `âœ… ${text}` : `âŒ ${text}`;
+    statusEl.textContent = success ? `✅ ${text}` : `❌ ${text}`;
     statusEl.className = success
       ? 'text-sm text-green-400'
       : 'text-sm text-red-400';
@@ -710,7 +710,7 @@ async function handleRequestPermissions(): Promise<void> {
     // startGpsWatch is idempotent, so calling it again in handleStartRecording
     // with the real handler safely replaces this warm-up watch.
     if (result.geolocation.granted) {
-      log.info('Geolocation granted â€” starting GPS warm-up watch');
+      log.info('Geolocation granted — starting GPS warm-up watch');
       startGpsWatch(() => {
         /* warm-up: discard positions */
       });
@@ -747,13 +747,13 @@ async function handleEnterAR(): Promise<void> {
 
     // Set up tracking lost callback to warn user when AR tracking fails
     setTrackingLostCallback(() => {
-      updateArInfo('âš ï¸ LOST');
+      updateArInfo('⚠️ LOST');
       showError(
         'AR tracking lost. Try moving to a well-lit area with more visual features.'
       );
     });
 
-    // Wire tracking restart detection BEFORE initAR() â€” this enables the
+    // Wire tracking restart detection BEFORE initAR() — this enables the
     // TrackingStateManager and XRReferenceSpace reset event listener.
     // When tracking resumes after an origin reset (Case 2), the store's
     // odometryTrackingRestarted reducer clears stale data and accumulates
@@ -761,7 +761,7 @@ async function handleEnterAR(): Promise<void> {
     setTrackingCallbacks((payload) => {
       store.dispatch(odometryTrackingRestarted(payload));
       updateArInfo('');
-      log.info('AR tracking restarted â€” alignment correction dispatched');
+      log.info('AR tracking restarted — alignment correction dispatched');
     });
 
     // Wire seamless recovery callback (Case 1: same coordinate frame).
@@ -816,7 +816,7 @@ async function handleEnterAR(): Promise<void> {
       const dt = (now - lastFrameTime) / 1000;
       lastFrameTime = now;
 
-      // Update alignment lerper (Issue 4) â€” interpolate arWorldGroup.matrix
+      // Update alignment lerper (Issue 4) — interpolate arWorldGroup.matrix
       alignmentLerper?.update(dt);
 
       // Update follower position (lerp toward camera world position)
@@ -897,7 +897,7 @@ function handleImageCaptured(image: CapturedImage): void {
   const filename = `frame-${String(image.frameIndex).padStart(6, '0')}.jpg`;
 
   // Dispatch first to preserve chronological action order (see DESIGN NOTE above)
-  // Raw WebXR position â€” the reducer applies WebXRâ†’NUE conversion
+  // Raw WebXR position — the reducer applies WebXR→NUE conversion
   store.dispatch(
     add2dImage({
       imageFile: `frames/${filename}`,

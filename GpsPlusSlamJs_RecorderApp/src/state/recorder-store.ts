@@ -28,7 +28,7 @@ import {
 import {
   refPointsReducer,
   type RefPointsState,
-} from 'gps-plus-slam-app-framework/state';
+} from './ref-points-slice';
 import type { RecorderState } from 'gps-plus-slam-app-framework/state/recorder-slice';
 import type { StorageBackend } from 'gps-plus-slam-app-framework/storage/storage-backend';
 import { OpfsStorageBackend } from 'gps-plus-slam-app-framework/storage/opfs-storage-backend';
@@ -73,7 +73,7 @@ export type {
   MarkReferencePointPayload,
 } from 'gps-plus-slam-js';
 
-export { type RefPointMark } from 'gps-plus-slam-app-framework/storage/ref-point-loader';
+export { type RefPointMark } from '../storage/ref-point-loader';
 export type {
   DepthPoint,
   DepthSample,
@@ -89,7 +89,7 @@ export {
   resetRefPointsState,
   selectCachedKnownRefPoints,
   type RefPointsState,
-} from 'gps-plus-slam-app-framework/state';
+} from './ref-points-slice';
 
 export type { RecordingOptions } from 'gps-plus-slam-app-framework/state/recording-options';
 export type { StorageBackend } from 'gps-plus-slam-app-framework/storage/storage-backend';

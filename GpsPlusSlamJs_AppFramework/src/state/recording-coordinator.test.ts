@@ -30,14 +30,12 @@ import {
 import type { ReducersMapObject } from '@reduxjs/toolkit';
 import { createSlamAppStore, type SlamAppStore } from './create-slam-app-store';
 import { startSession } from './recorder-slice';
-import { refPointsReducer } from './ref-points-slice';
 import { NullStorageBackend } from '../storage/null-storage-backend';
 import type { StorageBackend } from '../storage/storage-backend';
 type RecorderStore = SlamAppStore<ReducersMapObject>;
 const createRecorderStore = (opts?: { storageBackend?: StorageBackend }) =>
   createSlamAppStore({
     storageBackend: opts?.storageBackend ?? new NullStorageBackend(),
-    extraReducers: { refPoints: refPointsReducer },
   });
 import type { ARPose } from '../ar/webxr-session';
 import type { GpsPosition, RawDeviceOrientation } from '../sensors/gps';

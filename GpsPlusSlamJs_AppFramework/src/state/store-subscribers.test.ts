@@ -1,5 +1,5 @@
-/**
- * Store Subscribers — Unit Tests
+﻿/**
+ * Store Subscribers â€” Unit Tests
  *
  * Tests for the extracted store subscriber logic (Iteration 4, Risk R2 fix).
  * This module decouples the subscriber wiring from main.ts so both the
@@ -9,7 +9,7 @@
  * - They verify that the extracted module behaves identically to the closures
  *   that were previously inlined in main.ts.
  * - They enable replay mode (Issue 2) by providing a reusable entry point for
- *   wiring store → visualizer subscriptions.
+ *   wiring store â†’ visualizer subscriptions.
  * - They serve as regression guardrails: the main.ts refactor must not change
  *   observable behavior.
  */
@@ -17,7 +17,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { LatLong, Matrix4, Vector3, Quaternion } from 'gps-plus-slam-js';
 import type { CombinedRootState } from './combined-root-state';
-import type { RefPointMark } from '../storage/ref-point-loader';
 import {
   wireStoreSubscribers,
   type StoreSubscriberDeps,
@@ -25,7 +24,7 @@ import {
 } from './store-subscribers';
 
 // ---------------------------------------------------------------------------
-// Helpers — minimal mock factories
+// Helpers â€” minimal mock factories
 // ---------------------------------------------------------------------------
 
 /** Build a minimal CombinedRootState with only the fields subscribers read. */
@@ -136,7 +135,7 @@ describe('wireStoreSubscribers', () => {
   });
 
   it('after unsubscribe, state changes do not trigger callbacks', () => {
-    // Why: prevents leak — after cleanup no deps should be called
+    // Why: prevents leak â€” after cleanup no deps should be called
     const mock = makeMockStore(makeState());
     const unsub = wireStoreSubscribers(mock.store, deps);
     unsub();
@@ -164,7 +163,7 @@ describe('wireStoreSubscribers', () => {
   // --- Alignment matrix ---
 
   it('applies alignment matrix when state has one', () => {
-    // Why: core responsibility — alignment matrix must reach webxr-session
+    // Why: core responsibility â€” alignment matrix must reach webxr-session
     const alignmentMatrix = [
       1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 5, 5, 5, 1,
     ] as [
@@ -251,14 +250,14 @@ describe('wireStoreSubscribers', () => {
 
     // applyAlignmentMatrix should still be called (it sets arWorldGroup.matrix)
     expect(deps.applyAlignmentMatrix).toHaveBeenCalledWith(alignmentMatrix);
-    // But no updateAlignment on the visualizer — scene-graph handles it
+    // But no updateAlignment on the visualizer â€” scene-graph handles it
     expect(
       (deps.gpsEventVisualizer as Record<string, unknown>).updateAlignment
     ).toBeUndefined();
   });
 
   it('does not apply alignment when gpsData is null', () => {
-    // Why: before setZeroPos, gpsData is null — must not crash
+    // Why: before setZeroPos, gpsData is null â€” must not crash
     const mock = makeMockStore(makeState({ gpsData: null }));
     wireStoreSubscribers(mock.store, deps);
 
@@ -323,7 +322,7 @@ describe('wireStoreSubscribers', () => {
   });
 
   it('adds GPS event markers incrementally for new events', () => {
-    // Why: core responsibility — new GPS events must produce visualization markers
+    // Why: core responsibility â€” new GPS events must produce visualization markers
     const gpsPoint1 = {
       id: 'gps-1',
       zeroRef: { lat: 50, lon: 8 },
@@ -371,7 +370,7 @@ describe('wireStoreSubscribers', () => {
       odom1
     );
 
-    // Second update: 2 GPS events — only the new one should be added
+    // Second update: 2 GPS events â€” only the new one should be added
     mock.setState(
       makeState({
         gpsData: {
@@ -395,7 +394,7 @@ describe('wireStoreSubscribers', () => {
   });
 
   it('skips GPS events where gpsPoint or odomPos is missing', () => {
-    // Why: defensive — incomplete data should be silently skipped, not crash
+    // Why: defensive â€” incomplete data should be silently skipped, not crash
     const mock = makeMockStore(makeState());
     wireStoreSubscribers(mock.store, deps);
 
@@ -716,7 +715,7 @@ describe('wireStoreSubscribers', () => {
   });
 
   it('does not call onNewGpsPosition when callback is not provided', () => {
-    // Why: The callback is optional — live recording mode does not pass it.
+    // Why: The callback is optional â€” live recording mode does not pass it.
     // Ensures backwards compatibility (no crash when undefined).
     const mock = makeMockStore(makeState());
     wireStoreSubscribers(mock.store, deps); // deps has no onNewGpsPosition
@@ -789,7 +788,7 @@ describe('wireStoreSubscribers', () => {
     // Reset mocks
     deps.gpsEventVisualizer.addGpsEvent.mockClear();
 
-    // Second subscription — counter should be fresh, so the same event is added again
+    // Second subscription â€” counter should be fresh, so the same event is added again
     const unsub2 = wireStoreSubscribers(mock.store, deps);
     mock.setState(stateWithOneEvent);
     expect(deps.gpsEventVisualizer.addGpsEvent).toHaveBeenCalledTimes(1);
@@ -899,7 +898,7 @@ describe('wireStoreSubscribers', () => {
     );
     expect(onNewOdomPose).toHaveBeenCalledTimes(1);
 
-    // Second update: 2 events — only the new one fires
+    // Second update: 2 events â€” only the new one fires
     mock.setState(
       makeState({
         gpsData: {
@@ -955,7 +954,7 @@ describe('wireStoreSubscribers', () => {
   });
 
   it('skips onNewOdomPose when odom rotation is missing for an event', () => {
-    // Why: Defensive — if odometryRotations array is shorter than
+    // Why: Defensive â€” if odometryRotations array is shorter than
     // odometryPositions, skip rather than pass undefined.
     const onNewOdomPose =
       vi.fn<(odomPosition: Vector3, odomRotation: Quaternion) => void>();
@@ -985,7 +984,7 @@ describe('wireStoreSubscribers', () => {
               },
             ],
             odometryPositions: [[0.5, 0, 0.5]],
-            // odometryRotations is empty — no matching rotation
+            // odometryRotations is empty â€” no matching rotation
             odometryRotations: [],
           },
           odometryPath: { positions: [], rotations: [] },
@@ -998,7 +997,7 @@ describe('wireStoreSubscribers', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Alignment snapshot collection (Issue #1 — feedback session 2026-03-21)
+  // Alignment snapshot collection (Issue #1 â€” feedback session 2026-03-21)
   // ---------------------------------------------------------------------------
   describe('alignment snapshot collection', () => {
     const identity = [
@@ -1042,7 +1041,7 @@ describe('wireStoreSubscribers', () => {
 
     it('calls addAlignmentSnapshot when alignment matrix first appears', () => {
       // Why: the first alignment update after the system starts is the first
-      // "best GPS estimate" — it must be captured as a snapshot.
+      // "best GPS estimate" â€” it must be captured as a snapshot.
       const mock = makeMockStore(makeGpsState());
       wireStoreSubscribers(mock.store, deps);
 
@@ -1067,7 +1066,7 @@ describe('wireStoreSubscribers', () => {
       expect(
         deps.gpsEventVisualizer.addAlignmentSnapshot
       ).toHaveBeenCalledTimes(1);
-      // identity × [1,2,3] = [1,2,3]
+      // identity Ã— [1,2,3] = [1,2,3]
       const callArg =
         deps.gpsEventVisualizer.addAlignmentSnapshot.mock.calls[0][0];
       expect(callArg[0]).toBeCloseTo(1);
@@ -1077,7 +1076,7 @@ describe('wireStoreSubscribers', () => {
 
     it('calls addAlignmentSnapshot when alignment matrix changes', () => {
       // Why: each alignment re-computation (after new GPS data) produces a
-      // better GPS estimate — the snapshot captures the estimate at that time.
+      // better GPS estimate â€” the snapshot captures the estimate at that time.
       const mock = makeMockStore(makeGpsState());
       wireStoreSubscribers(mock.store, deps);
 
@@ -1134,14 +1133,14 @@ describe('wireStoreSubscribers', () => {
         deps.gpsEventVisualizer.addAlignmentSnapshot
       ).toHaveBeenCalledTimes(2);
 
-      // Second snapshot uses translation10 × [2,0,0] = [12, 0, 0]
+      // Second snapshot uses translation10 Ã— [2,0,0] = [12, 0, 0]
       const call2 =
         deps.gpsEventVisualizer.addAlignmentSnapshot.mock.calls[1][0];
       expect(call2[0]).toBeCloseTo(12);
     });
 
     it('does NOT call addAlignmentSnapshot when alignment matrix is unchanged', () => {
-      // Why: same alignment matrix means no new GPS data — no new snapshot needed.
+      // Why: same alignment matrix means no new GPS data â€” no new snapshot needed.
       const mock = makeMockStore(makeGpsState());
       wireStoreSubscribers(mock.store, deps);
 
@@ -1165,7 +1164,7 @@ describe('wireStoreSubscribers', () => {
         deps.gpsEventVisualizer.addAlignmentSnapshot
       ).toHaveBeenCalledTimes(1);
 
-      // Same state again (alignment unchanged — same object reference)
+      // Same state again (alignment unchanged â€” same object reference)
       mock.setState(state);
       expect(
         deps.gpsEventVisualizer.addAlignmentSnapshot
@@ -1222,15 +1221,15 @@ describe('wireStoreSubscribers', () => {
         })
       );
 
-      // translation5 × [3,0,0] = [8, 0, 0] (uses last odom, not first)
+      // translation5 Ã— [3,0,0] = [8, 0, 0] (uses last odom, not first)
       const callArg =
         deps.gpsEventVisualizer.addAlignmentSnapshot.mock.calls[0][0];
       expect(callArg[0]).toBeCloseTo(8);
     });
 
     it('computes correct NUE position with a non-trivial alignment matrix', () => {
-      // Why: verifies the matrix×vector math is correct for arbitrary transforms
-      // This matrix translates by (10, 20, 30) — column-major
+      // Why: verifies the matrixÃ—vector math is correct for arbitrary transforms
+      // This matrix translates by (10, 20, 30) â€” column-major
       const translationMatrix = [
         1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 10, 20, 30, 1,
       ] as Matrix4;
@@ -1255,7 +1254,7 @@ describe('wireStoreSubscribers', () => {
         })
       );
 
-      // translation(10,20,30) × [5,0,0] = [15, 20, 30]
+      // translation(10,20,30) Ã— [5,0,0] = [15, 20, 30]
       const callArg =
         deps.gpsEventVisualizer.addAlignmentSnapshot.mock.calls[0][0];
       expect(callArg[0]).toBeCloseTo(15);
@@ -1265,7 +1264,7 @@ describe('wireStoreSubscribers', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // onAlignmentSnapshot callback (Issue #3 — feedback session 2026-03-21)
+  // onAlignmentSnapshot callback (Issue #3 â€” feedback session 2026-03-21)
   // ---------------------------------------------------------------------------
   describe('onAlignmentSnapshot callback', () => {
     const translation5 = [
@@ -1327,14 +1326,14 @@ describe('wireStoreSubscribers', () => {
       );
 
       expect(onAlignmentSnapshot).toHaveBeenCalledTimes(1);
-      // translation5 × [2,0,0] = [7, 0, 0]
+      // translation5 Ã— [2,0,0] = [7, 0, 0]
       const callArg = onAlignmentSnapshot.mock.calls[0][0] as number[];
       expect(callArg[0]).toBeCloseTo(7);
       expect(callArg[1]).toBeCloseTo(0);
       expect(callArg[2]).toBeCloseTo(0);
     });
 
-    it('is optional — no crash when omitted', () => {
+    it('is optional â€” no crash when omitted', () => {
       // Why: live recording mode does not need this callback
       const mock = makeMockStore(makeGpsState());
       wireStoreSubscribers(mock.store, deps); // deps has no onAlignmentSnapshot
@@ -1443,14 +1442,14 @@ describe('wireStoreSubscribers', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Phase 1b: Map overlay — fused path, alignment snapshots, reference points
+  // Phase 1b: Map overlay â€” fused path, alignment snapshots, reference points
   // ---------------------------------------------------------------------------
 
   describe('map overlay fused path (addFusedPoint)', () => {
     // Why these tests matter:
     // The Leaflet map overlay (Approach E) shows a cyan fused path polyline.
     // For each new GPS event, the subscriber must compute the fused GPS position
-    // (alignmentMatrix × odomPosition → calcGpsCoords) and feed it to the map.
+    // (alignmentMatrix Ã— odomPosition â†’ calcGpsCoords) and feed it to the map.
 
     it('calls addFusedPoint with fused GPS coordinates for each new event', () => {
       // Why: the fused path is the alignment-corrected trajectory and must
@@ -1467,9 +1466,9 @@ describe('wireStoreSubscribers', () => {
       const mock = makeMockStore(makeState());
       wireStoreSubscribers(mock.store, depsWithFused);
 
-      // Identity alignment matrix — fused = raw odom in NUE
+      // Identity alignment matrix â€” fused = raw odom in NUE
       // odom [10, 0, 0] in NUE (North=10m, Up=0, East=0)
-      // zero (50, 8) → fused lat ≈ 50 + 10/110989 ≈ 50.0000901
+      // zero (50, 8) â†’ fused lat â‰ˆ 50 + 10/110989 â‰ˆ 50.0000901
       mock.setState(
         makeState({
           gpsData: {
@@ -1499,13 +1498,13 @@ describe('wireStoreSubscribers', () => {
       const [lat, lon] = (
         depsWithFused.mapOverlay!.addFusedPoint as ReturnType<typeof vi.fn>
       ).mock.calls[0];
-      // 10m north from lat 50 → lat ≈ 50 + 10/110989
+      // 10m north from lat 50 â†’ lat â‰ˆ 50 + 10/110989
       expect(lat).toBeCloseTo(50 + 10 / 110989, 4);
       expect(lon).toBeCloseTo(8, 4);
     });
 
     it('does not call addFusedPoint when alignment matrix is missing', () => {
-      // Why: without alignment, the fused transform is undefined — skip.
+      // Why: without alignment, the fused transform is undefined â€” skip.
       const depsWithFused: StoreSubscriberDeps = {
         ...deps,
         mapOverlay: {
@@ -1547,7 +1546,7 @@ describe('wireStoreSubscribers', () => {
     });
 
     it('does not call addFusedPoint when zeroRef is missing', () => {
-      // Why: without the GPS origin, NUE→GPS conversion is impossible.
+      // Why: without the GPS origin, NUEâ†’GPS conversion is impossible.
       const depsWithFused: StoreSubscriberDeps = {
         ...deps,
         mapOverlay: {
@@ -1589,7 +1588,7 @@ describe('wireStoreSubscribers', () => {
     });
 
     it('handles mapOverlay without addFusedPoint gracefully', () => {
-      // Why: existing callers may not provide addFusedPoint — must not crash.
+      // Why: existing callers may not provide addFusedPoint â€” must not crash.
       const mock = makeMockStore(makeState());
       wireStoreSubscribers(mock.store, deps); // deps.mapOverlay has no addFusedPoint
 
@@ -1677,7 +1676,7 @@ describe('wireStoreSubscribers', () => {
       const mock = makeMockStore(makeGpsState());
       wireStoreSubscribers(mock.store, depsWithSnapshot);
 
-      // identity × [10, 0, 0] = [10, 0, 0] (NUE: north=10, up=0, east=0)
+      // identity Ã— [10, 0, 0] = [10, 0, 0] (NUE: north=10, up=0, east=0)
       mock.setState(
         makeGpsState({
           alignmentMatrix: identity,
@@ -1708,7 +1707,7 @@ describe('wireStoreSubscribers', () => {
     });
 
     it('does not call mapOverlay.addAlignmentSnapshot when zeroRef is missing', () => {
-      // Why: without GPS origin, NUE→GPS conversion is impossible.
+      // Why: without GPS origin, NUEâ†’GPS conversion is impossible.
       const depsWithSnapshot: StoreSubscriberDeps = {
         ...deps,
         mapOverlay: {
@@ -1766,7 +1765,7 @@ describe('wireStoreSubscribers', () => {
     });
 
     it('handles mapOverlay without addAlignmentSnapshot gracefully', () => {
-      // Why: existing callers may not provide addAlignmentSnapshot — must not crash.
+      // Why: existing callers may not provide addAlignmentSnapshot â€” must not crash.
       const mock = makeMockStore(makeGpsState());
       wireStoreSubscribers(mock.store, deps);
 
@@ -1851,7 +1850,7 @@ describe('wireStoreSubscribers', () => {
     });
 
     it('only calls addRefPoint for newly added reference points', () => {
-      // Why: incremental — only new ref points should be forwarded, not existing ones.
+      // Why: incremental â€” only new ref points should be forwarded, not existing ones.
       const depsWithRefPoint: StoreSubscriberDeps = {
         ...deps,
         mapOverlay: {
@@ -1913,7 +1912,7 @@ describe('wireStoreSubscribers', () => {
 
       expect(depsWithRefPoint.mapOverlay!.addRefPoint).toHaveBeenCalledTimes(1);
 
-      // Second update: 2 ref points — only the new one should be forwarded
+      // Second update: 2 ref points â€” only the new one should be forwarded
       mock.setState(
         makeState({
           gpsData: {
@@ -1938,7 +1937,7 @@ describe('wireStoreSubscribers', () => {
     });
 
     it('handles mapOverlay without addRefPoint gracefully', () => {
-      // Why: existing callers may not provide addRefPoint — must not crash.
+      // Why: existing callers may not provide addRefPoint â€” must not crash.
       const mock = makeMockStore(makeState());
       wireStoreSubscribers(mock.store, deps);
 
@@ -1979,176 +1978,7 @@ describe('wireStoreSubscribers', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // RefPoint visualizer subscription (Finding 5).
-  // Why these tests matter: the visualizer was inverted from imperative
-  // target to subscription consumer. Any code path that ends up dispatching
-  // a mark must drive 3D rendering via the slice — no caller should still
-  // be reaching into the visualizer directly. These tests lock in:
-  //   - prior marks → exactly one displayPriorRefPoints call per state change
-  //   - current marks → exactly one addCurrentRefPoint call per appended mark
-  //   - clear semantics: shrinking currentMarks resets the high-water mark
-  // See docs/2026-04-30-refpoint-marks-into-redux-plan.md.
-  // -------------------------------------------------------------------------
-  describe('refPointVisualizer subscription', () => {
-    function makeRefPointDeps() {
-      return {
-        ...makeMockDeps(),
-        refPointVisualizer: {
-          displayPriorRefPoints: vi.fn(),
-          addCurrentRefPoint: vi.fn(),
-        },
-      } as StoreSubscriberDeps & {
-        refPointVisualizer: {
-          displayPriorRefPoints: ReturnType<typeof vi.fn>;
-          addCurrentRefPoint: ReturnType<typeof vi.fn>;
-        };
-      };
-    }
-
-    function makeMark(id: string, timestamp = 0): RefPointMark {
-      return {
-        id,
-        odomPosition: [0, 0, 0],
-        odomRotation: [0, 0, 0, 1],
-        gpsPosition: { lat: 50, lon: 8, altitude: 245 },
-        timestamp,
-      };
-    }
-
-    it('renders prior marks once per priorMarks change', () => {
-      const refDeps = makeRefPointDeps();
-      const mock = makeMockStore(makeState());
-      wireStoreSubscribers(mock.store, refDeps);
-
-      const marks = [makeMark('a', 1), makeMark('b', 2)];
-      mock.setState(
-        makeState({
-          refPoints: {
-            importedRefPoints: [],
-            sessionRefPointUsage: {},
-            priorMarks: marks,
-            currentMarks: [],
-          },
-        })
-      );
-
-      expect(
-        refDeps.refPointVisualizer.displayPriorRefPoints
-      ).toHaveBeenCalledTimes(1);
-      expect(
-        refDeps.refPointVisualizer.displayPriorRefPoints
-      ).toHaveBeenCalledWith(marks);
-      expect(
-        refDeps.refPointVisualizer.addCurrentRefPoint
-      ).not.toHaveBeenCalled();
-    });
-
-    it('appends one currentMark per dispatch (subscription invariant)', () => {
-      const refDeps = makeRefPointDeps();
-      const mock = makeMockStore(makeState());
-      wireStoreSubscribers(mock.store, refDeps);
-
-      const m1 = makeMark('live-1', 1);
-      const m2 = makeMark('live-2', 2);
-
-      // First append
-      mock.setState(
-        makeState({
-          refPoints: {
-            importedRefPoints: [],
-            sessionRefPointUsage: {},
-            priorMarks: [],
-            currentMarks: [m1],
-          },
-        })
-      );
-      expect(
-        refDeps.refPointVisualizer.addCurrentRefPoint
-      ).toHaveBeenCalledTimes(1);
-      expect(
-        refDeps.refPointVisualizer.addCurrentRefPoint
-      ).toHaveBeenLastCalledWith(m1);
-
-      // Second append — must add exactly one new sphere
-      mock.setState(
-        makeState({
-          refPoints: {
-            importedRefPoints: [],
-            sessionRefPointUsage: {},
-            priorMarks: [],
-            currentMarks: [m1, m2],
-          },
-        })
-      );
-      expect(
-        refDeps.refPointVisualizer.addCurrentRefPoint
-      ).toHaveBeenCalledTimes(2);
-      expect(
-        refDeps.refPointVisualizer.addCurrentRefPoint
-      ).toHaveBeenLastCalledWith(m2);
-    });
-
-    it('resets the high-water mark when currentMarks is cleared', () => {
-      const refDeps = makeRefPointDeps();
-      const mock = makeMockStore(makeState());
-      wireStoreSubscribers(mock.store, refDeps);
-
-      const m1 = makeMark('live-1', 1);
-      const m2 = makeMark('live-2', 2);
-
-      mock.setState(
-        makeState({
-          refPoints: {
-            importedRefPoints: [],
-            sessionRefPointUsage: {},
-            priorMarks: [],
-            currentMarks: [m1, m2],
-          },
-        })
-      );
-      expect(
-        refDeps.refPointVisualizer.addCurrentRefPoint
-      ).toHaveBeenCalledTimes(2);
-
-      // Clear (e.g., scenario reset)
-      mock.setState(
-        makeState({
-          refPoints: {
-            importedRefPoints: [],
-            sessionRefPointUsage: {},
-            priorMarks: [],
-            currentMarks: [],
-          },
-        })
-      );
-
-      // After clear, dispatching the same first mark again must add a sphere
-      mock.setState(
-        makeState({
-          refPoints: {
-            importedRefPoints: [],
-            sessionRefPointUsage: {},
-            priorMarks: [],
-            currentMarks: [m1],
-          },
-        })
-      );
-      expect(
-        refDeps.refPointVisualizer.addCurrentRefPoint
-      ).toHaveBeenCalledTimes(3);
-      expect(
-        refDeps.refPointVisualizer.addCurrentRefPoint
-      ).toHaveBeenLastCalledWith(m1);
-    });
-
-    it('skips wiring when refPointVisualizer dep is omitted', () => {
-      // Why: backward compatibility for callers that have not yet adopted
-      // the subscription wiring (e.g., replay paths during migration).
-      const baseDeps = makeMockDeps();
-      const mock = makeMockStore(makeState());
-      // Should not throw / bind any extra subscriptions related to marks
-      expect(() => wireStoreSubscribers(mock.store, baseDeps)).not.toThrow();
-    });
-  });
+  // RefPoint visualizer subscriptions moved to RecorderApp in Iter 3 of the
+  // AppFramework / RecorderApp boundary migration. See
+  // gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-03-appframework-vs-recorderapp-boundary-analysis.md
 });

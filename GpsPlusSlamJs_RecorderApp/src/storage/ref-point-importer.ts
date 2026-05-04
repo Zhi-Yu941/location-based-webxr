@@ -15,8 +15,8 @@
 
 import { BlobReader, ZipReader, TextWriter } from '@zip.js/zip.js';
 import type { RefPointDefinition } from './ref-point-loader';
-import { createLogger } from '../utils/logger';
-import { h3RefsMatch, isH3Index } from '../ref-points/h3-ref-point';
+import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
+import { h3RefsMatch, isH3Index } from 'gps-plus-slam-app-framework/ref-points/h3-ref-point';
 
 const log = createLogger('RefPointImporter');
 

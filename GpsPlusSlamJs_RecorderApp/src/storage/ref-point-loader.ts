@@ -12,8 +12,8 @@ import type {
   Vector3,
   Quaternion,
 } from 'gps-plus-slam-js';
-import type { ArPoseTuples } from '../types/ar-types';
-import { createLogger } from '../utils/logger';
+import type { ArPoseTuples } from 'gps-plus-slam-app-framework/types/ar-types';
+import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
 
 const log = createLogger('RefPointLoader');
 

@@ -16,7 +16,6 @@
 import { loadActionsFromZip, type RecordedAction } from '../storage/zip-reader';
 import { NullStorageBackend } from '../storage/null-storage-backend';
 import { createSlamAppStore } from './create-slam-app-store';
-import { refPointsReducer } from './ref-points-slice';
 import type { CombinedRootState } from './combined-root-state';
 
 export type { CombinedRootState };
@@ -53,7 +52,6 @@ export async function replayRecording(
 ): Promise<CombinedRootState> {
   const store = createSlamAppStore({
     storageBackend: new NullStorageBackend(),
-    extraReducers: { refPoints: refPointsReducer },
   });
 
   const actionEntries = await loadActionsFromZip(zipData);

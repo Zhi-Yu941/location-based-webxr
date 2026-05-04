@@ -29,12 +29,9 @@ import {
   selectGpsPositions,
   selectOdometryPositions,
   selectOdometryRotations,
-  selectPriorRefPointMarks,
-  selectCurrentRefPointMarks,
   selectReferencePoints,
   selectZeroReference,
 } from './app-selectors';
-import type { RefPointMark } from '../storage/ref-point-loader';
 
 // Re-export SubscribableStore for backwards compatibility (it was
 // originally defined here and is part of the public API via index.ts).
@@ -63,18 +60,6 @@ export interface StoreSubscriberDeps {
     addFusedPoint?: (lat: number, lon: number) => void;
     addAlignmentSnapshot?: (lat: number, lon: number) => void;
     addRefPoint?: (lat: number, lon: number, name: string) => void;
-  } | null;
-
-  /**
-   * Reference-point visualizer — renders prior (green) and current (red)
-   * spheres in 3D space. Subscribes to `refPoints.priorMarks` and
-   * `refPoints.currentMarks` so any dispatch (loader, live marking, or
-   * replay) drives rendering through a single path.
-   * See docs/2026-04-30-refpoint-marks-into-redux-plan.md (Finding 5).
-   */
-  refPointVisualizer?: {
-    displayPriorRefPoints: (marks: readonly RefPointMark[]) => void;
-    addCurrentRefPoint: (mark: RefPointMark) => void;
   } | null;
 
   /**
@@ -258,35 +243,10 @@ export function wireStoreSubscribers(
     )
   );
 
-  // 4. Prior ref-point marks → 3D green sphere render (replace-all on change).
-  // 5. Current ref-point marks → 3D red sphere render (append-only).
-  // Finding 5: visualizer is now a subscription consumer, not an
-  // imperative target. Loader / live-marking code dispatches actions;
-  // rendering follows. See docs/2026-04-30-refpoint-marks-into-redux-plan.md.
-  if (deps.refPointVisualizer) {
-    const visualizer = deps.refPointVisualizer;
-
-    unsubs.push(
-      subscribeToSelector(store, selectPriorRefPointMarks, (priorMarks) => {
-        visualizer.displayPriorRefPoints(priorMarks);
-      })
-    );
-
-    let lastCurrentMarksLen = 0;
-    unsubs.push(
-      subscribeToSelector(store, selectCurrentRefPointMarks, (currentMarks) => {
-        // Cleared (e.g., scenario reset / store recreation) — drop the
-        // high-water mark so subsequent appends start from index 0.
-        if (currentMarks.length < lastCurrentMarksLen) {
-          lastCurrentMarksLen = 0;
-        }
-        for (let i = lastCurrentMarksLen; i < currentMarks.length; i++) {
-          visualizer.addCurrentRefPoint(currentMarks[i]!);
-        }
-        lastCurrentMarksLen = currentMarks.length;
-      })
-    );
-  }
+  // 4. Prior / current ref-point marks — the recorder app owns the
+  // ref-points slice and wires its own visualizer subscription on top of
+  // this function (see RecorderApp's wireRefPointSubscribers). Framework
+  // remains agnostic of ref points after Iter 3 of the boundary migration.
 
   return () => {
     for (const unsub of unsubs) unsub();

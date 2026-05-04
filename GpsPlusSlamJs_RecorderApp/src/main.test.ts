@@ -248,7 +248,7 @@ vi.mock('./ui/ref-point-picker', () => ({
   isRefPointPickerVisible: vi.fn().mockReturnValue(false),
 }));
 
-vi.mock('gps-plus-slam-app-framework/storage/ref-point-loader', () => ({
+vi.mock('./storage/ref-point-loader', () => ({
   loadAllRefPoints: vi.fn().mockResolvedValue([]),
   saveRefPointObservation: vi.fn().mockResolvedValue(undefined),
   flattenRefPointsToMarks: vi.fn().mockReturnValue([]),
@@ -315,7 +315,7 @@ vi.mock('./ui/session-browser', () => ({
 }));
 
 // Mock ref-point-importer for handleOpenFolder tests (Issue 1 â€” 2026-02-27)
-vi.mock('gps-plus-slam-app-framework/storage/ref-point-importer', () => ({
+vi.mock('./storage/ref-point-importer', () => ({
   importRefPointsFromFolder: vi.fn().mockResolvedValue({
     success: true,
     refPoints: [],
@@ -495,7 +495,7 @@ import {
   listSessionZipsInScenario,
   discoverScenariosFromZipMetadata,
 } from './ui/session-browser';
-import { importRefPointsFromFolder } from 'gps-plus-slam-app-framework/storage/ref-point-importer';
+import { importRefPointsFromFolder } from './storage/ref-point-importer';
 import { showConfirmDialog } from './ui/confirm-dialog';
 import { pushScreenState } from './ui/navigation';
 
@@ -2020,7 +2020,7 @@ describe('loadAndDisplayRefPoints', () => {
    */
   it('should load, flatten, and display ref points from a scenario handle', async () => {
     const { loadAllRefPoints, flattenRefPointsToMarks } =
-      await import('gps-plus-slam-app-framework/storage/ref-point-loader');
+      await import('./storage/ref-point-loader');
 
     const mockHandle = { name: 'TestScenario' } as FileSystemDirectoryHandle;
     const mockDefs = [{ id: 'pt-A' }, { id: 'pt-B' }];
@@ -2054,7 +2054,7 @@ describe('loadAndDisplayRefPoints', () => {
    */
   it('should return zero counts for empty scenario', async () => {
     const { loadAllRefPoints, flattenRefPointsToMarks } =
-      await import('gps-plus-slam-app-framework/storage/ref-point-loader');
+      await import('./storage/ref-point-loader');
 
     const mockHandle = { name: 'EmptyScenario' } as FileSystemDirectoryHandle;
 

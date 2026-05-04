@@ -336,3 +336,68 @@ export async function loadGpsPathFromBlob(
     }
   }
 }
+
+
+// ---------------------------------------------------------------------------
+// Extension contributor reader (Iter 2 of boundary cleanup)
+// ---------------------------------------------------------------------------
+
+/**
+ * A single file pulled out of a contributor-owned subdirectory inside a
+ * recording zip. Returned by {@link loadEntriesFromSubdir}.
+ *
+ * `getText()` is lazy: callers pay the decompression cost only for files they
+ * actually open, so iterating an entire `refPoints/` subdir to harvest a few
+ * entries stays cheap.
+ */
+export interface ZipSubdirEntry {
+  /** Filename relative to the subdir (e.g. `'42.json'`, not `'refPoints/42.json'`). */
+  readonly relativePath: string;
+  /** Original full filename inside the ZIP (`'refPoints/42.json'`). */
+  readonly fullPath: string;
+  /** Uncompressed size in bytes. */
+  readonly uncompressedSize: number;
+  /** Lazily decode the entry as UTF-8 text. */
+  getText(): Promise<string>;
+}
+
+/**
+ * Enumerate every file under a single top-level subdirectory of a recording
+ * zip. Mirrors the writer-side {@link ZipExportContributor} seam so consumers
+ * (typically the recorder) can read back what they wrote without
+ * re-implementing zip enumeration.
+ *
+ * Skips directory entries and files outside `subdir`. Sorts entries by
+ * `relativePath` for deterministic iteration. Returns an empty array when
+ * the subdir is absent (graceful degradation for older zips).
+ *
+ * @param data - The zip file content as a Uint8Array
+ * @param subdir - Top-level subdir to scan (no leading or trailing `/`)
+ */
+export async function loadEntriesFromSubdir(
+  data: Uint8Array,
+  subdir: string
+): Promise<ZipSubdirEntry[]> {
+  if (!subdir || subdir.includes('/') || subdir.startsWith('.')) {
+    throw new Error(
+      `subdir must be a non-empty single path segment, got: ${JSON.stringify(subdir)}`
+    );
+  }
+
+  const prefix = `${subdir}/`;
+  const entries = await readZipEntries(data);
+
+  const matching = entries
+    .filter(
+      (e): e is FileEntry =>
+        !e.directory && e.filename.startsWith(prefix) && e.filename !== prefix
+    )
+    .sort((a, b) => a.filename.localeCompare(b.filename));
+
+  return matching.map((entry) => ({
+    relativePath: entry.filename.slice(prefix.length),
+    fullPath: entry.filename,
+    uncompressedSize: entry.uncompressedSize,
+    getText: async () => entry.getData!(new TextWriter()),
+  }));
+}

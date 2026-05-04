@@ -14,20 +14,9 @@ export {
   recorderReducer,
 } from './recorder-slice.js';
 
-// --- ref-points-slice ---
-export {
-  refPointsReducer,
-  setImportedRefPoints,
-  incrementRefPointUsage,
-  clearSessionRefPointUsage,
-  setPriorRefPointMarks,
-  addCurrentRefPointMark,
-  clearCurrentRefPointMarks,
-  resetRefPointsState,
-  selectCachedKnownRefPoints,
-  type RefPointsState,
-} from './ref-points-slice.js';
-export type { RefPointMark } from '../storage/ref-point-loader.js';
+// --- ref-points-slice — moved to recorder app in Iter 3 of the
+//     AppFramework / RecorderApp boundary migration. Recorder consumers
+//     import these from their own local slice now. ---
 
 // --- library re-exports (kept here for backwards-compat with existing
 //     `gps-plus-slam-app-framework/state` imports). ---

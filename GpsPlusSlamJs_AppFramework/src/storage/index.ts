@@ -55,29 +55,16 @@ export {
   formatFrameFilename,
 } from './file-system-utils.js';
 
-// --- ref-point-importer ---
-export {
-  type ImportedRefPoint,
-  type RefPointImportResult,
-  importRefPointsFromFolder,
-} from './ref-point-importer.js';
-
-// --- ref-point-loader ---
-export {
-  type RefPointObservation,
-  type RefPointDefinition,
-  loadAllRefPoints,
-  loadRefPoint,
-  saveRefPointObservation,
-  listRefPointIds,
-  type RefPointMark,
-  flattenRefPointsToMarks,
-  averageGpsPerRefPoint,
-} from './ref-point-loader.js';
+// --- ref-point-importer / ref-point-loader / ref-point-recovery —
+//     moved to recorder app in Iter 3 of the AppFramework / RecorderApp
+//     boundary migration. Recorder consumers import locally now. ---
 
 // --- zip-export ---
 export {
   type ZipExportResult,
+  type ZipExportContributor,
+  type ZipContributorAddFile,
+  type ExportSessionAsZipOptions,
   exportSessionAsZip,
   syncToExternalZip,
   downloadZip,
@@ -96,4 +83,6 @@ export {
   loadSessionMetadataFromBlob,
   type GpsPathCoord,
   loadGpsPathFromBlob,
+  type ZipSubdirEntry,
+  loadEntriesFromSubdir,
 } from './zip-reader.js';

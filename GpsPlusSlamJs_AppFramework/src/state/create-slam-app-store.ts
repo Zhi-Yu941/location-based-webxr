@@ -101,7 +101,7 @@ export interface SlamAppStoreOptions<
  * extras. Generic so consumers get exact typing for the slices they add.
  */
 export type SlamAppCombinedState<
-  ExtraReducers extends ReducersMapObject = Record<string, never>,
+  ExtraReducers extends ReducersMapObject = Record<never, never>,
 > = SlamAppRootState & {
   [K in keyof ExtraReducers]: ExtraReducers[K] extends Reducer<infer S>
     ? S

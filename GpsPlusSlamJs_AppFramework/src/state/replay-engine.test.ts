@@ -21,14 +21,12 @@ import {
   DEFAULT_MAX_DELAY_MS,
 } from './replay-engine';
 import { createSlamAppStore } from './create-slam-app-store';
-import { refPointsReducer } from './ref-points-slice';
 import { NullStorageBackend } from '../storage/null-storage-backend';
 import type { StorageBackend } from '../storage/storage-backend';
 
 const createRecorderStore = (opts?: { storageBackend?: StorageBackend }) =>
   createSlamAppStore({
     storageBackend: opts?.storageBackend ?? new NullStorageBackend(),
-    extraReducers: { refPoints: refPointsReducer },
   });
 
 // ---------------------------------------------------------------------------

@@ -19,6 +19,7 @@ import {
 import { startSession, endSession } from '../state/recorder-store';
 import type { RecorderStore } from '../state/recorder-store';
 import { wireStoreSubscribers } from 'gps-plus-slam-app-framework/state/store-subscribers';
+import { wireRefPointSubscribers } from '../state/ref-point-subscribers';
 import type { RecordingOptions } from 'gps-plus-slam-app-framework/state/recording-options';
 import { formatTimestamp } from 'gps-plus-slam-app-framework/storage/file-system-utils';
 import {
@@ -36,6 +37,7 @@ import {
   exportSessionAsZip,
   type ZipExportResult,
 } from 'gps-plus-slam-app-framework/storage/zip-export';
+import { createRefPointsZipContributor } from '../storage/ref-points-zip-contributor';
 import {
   startGpsWatch,
   stopGpsWatch,
@@ -206,6 +208,7 @@ export function createRecordingSessionHandlers(
   let lastSyncResult: ZipExportResult | null = null;
   let backDuringRecordingInProgress = false;
   let unsubscribeStore: (() => void) | null = null;
+  let unsubscribeRefPoints: (() => void) | null = null;
 
   // --- Internal helpers ---
 
@@ -309,9 +312,9 @@ export function createRecordingSessionHandlers(
       applyAlignmentMatrix: deps.applyAlignmentMatrix,
       gpsEventVisualizer,
       mapOverlay: mapOverlayProxy,
-      refPointVisualizer,
       onNewGpsLatLng: deps.onNewGpsLatLng,
     });
+    unsubscribeRefPoints = wireRefPointSubscribers(store, refPointVisualizer);
 
     // Initialize failure trackers
     writeFailureTracker = createWriteFailureTracker({ onWarning: showError });
@@ -385,7 +388,15 @@ export function createRecordingSessionHandlers(
           lastSyncResult = await syncToExternalZip(
             saveFileHandle,
             scenarioName,
-            currentSessionName
+            currentSessionName,
+            {
+              contributors: [
+                createRefPointsZipContributor(
+                  getCurrentScenarioHandle(),
+                  currentSessionName
+                ),
+              ],
+            }
           );
         },
         {
@@ -494,6 +505,10 @@ export function createRecordingSessionHandlers(
       unsubscribeStore();
       unsubscribeStore = null;
     }
+    if (unsubscribeRefPoints) {
+      unsubscribeRefPoints();
+      unsubscribeRefPoints = null;
+    }
 
     // Collect tracker errors before resetting
     const errors: string[] = [];
@@ -526,7 +541,15 @@ export function createRecordingSessionHandlers(
           FALLBACK_SCENARIO;
         const result = await exportSessionAsZip(
           scenarioName,
-          currentSessionName
+          currentSessionName,
+          {
+            contributors: [
+              createRefPointsZipContributor(
+                getCurrentScenarioHandle(),
+                currentSessionName
+              ),
+            ],
+          }
         );
         lastSyncResult = result;
         log.info(
@@ -652,6 +675,10 @@ export function createRecordingSessionHandlers(
     if (unsubscribeStore) {
       unsubscribeStore();
       unsubscribeStore = null;
+    }
+    if (unsubscribeRefPoints) {
+      unsubscribeRefPoints();
+      unsubscribeRefPoints = null;
     }
 
     if (writeFailureTracker) {

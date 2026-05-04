@@ -1,8 +1,8 @@
-﻿/**
+/**
  * Folder Manager Tests
  *
  * Tests for the folder-manager module extracted from main.ts
- * (Finding #7 â€” main.ts decomposition, Step 4).
+ * (Finding #7 — main.ts decomposition, Step 4).
  *
  * Tests the factory function `createFolderManager(deps)` which encapsulates:
  * - handleOpenFolder: folder picker + ref point import + scenario discovery
@@ -12,7 +12,7 @@
  * - currentScenarioName: current scenario name state
  *
  * Status display functions (updateFolderStatus / updateSaveStatus) are injected
- * dependencies â€” no jsdom environment is required.
+ * dependencies — no jsdom environment is required.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -32,7 +32,7 @@ vi.mock('./external-file-storage', () => ({
   getReadFolderHandle: vi.fn(),
 }));
 
-vi.mock('gps-plus-slam-app-framework/storage/ref-point-importer', () => ({
+vi.mock('../storage/ref-point-importer', () => ({
   importRefPointsFromFolder: vi.fn(),
 }));
 
@@ -41,14 +41,14 @@ vi.mock('gps-plus-slam-app-framework/storage/file-system', () => ({
   ensureScenarioDirectory: vi.fn(),
 }));
 
-vi.mock('gps-plus-slam-app-framework/storage/ref-point-loader', () => ({
+vi.mock('../storage/ref-point-loader', () => ({
   loadAllRefPoints: vi.fn(() => []),
   flattenRefPointsToMarks: vi.fn(() => []),
   averageGpsPerRefPoint: vi.fn(() => []),
   writeRefPointDefinition: vi.fn(),
 }));
 
-vi.mock('gps-plus-slam-app-framework/storage/ref-point-recovery', () => ({
+vi.mock('../storage/ref-point-recovery', () => ({
   recoverRefPointDefinitionsFromZips: vi.fn(() =>
     Promise.resolve({ definitions: [], zipFilesScanned: 0, errors: [] })
   ),
@@ -231,10 +231,10 @@ describe('createFolderManager', () => {
   });
 
   // ========================================================================
-  // handleOpenFolder â€” recording mode
+  // handleOpenFolder — recording mode
   // ========================================================================
 
-  describe('handleOpenFolder â€” recording mode', () => {
+  describe('handleOpenFolder — recording mode', () => {
     beforeEach(() => {
       vi.mocked(selectReadFolder).mockResolvedValue({
         success: true,
@@ -257,7 +257,7 @@ describe('createFolderManager', () => {
     });
 
     it('should return early when user cancels folder picker', async () => {
-      // Why: User cancellation is not an error â€” no side effects expected
+      // Why: User cancellation is not an error — no side effects expected
       vi.mocked(selectReadFolder).mockResolvedValue({
         success: false,
         reason: 'cancelled',
@@ -291,14 +291,14 @@ describe('createFolderManager', () => {
       await manager.handleOpenFolder();
 
       expect(deps.updateFolderStatus).toHaveBeenCalledWith(
-        'âŒ Failed to access folder'
+        '❌ Failed to access folder'
       );
     });
 
     it('should NOT call importRefPointsFromFolder (ref point import is scenario-scoped)', async () => {
       // Why: Cross-scenario ZIP scan was removed; ref points are loaded per-scenario in loadAndDisplayRefPoints
       const { importRefPointsFromFolder } =
-        await import('gps-plus-slam-app-framework/storage/ref-point-importer');
+        await import('../storage/ref-point-importer');
       const { manager } = createFolderManagerWithDefaults();
 
       await manager.handleOpenFolder();
@@ -328,7 +328,7 @@ describe('createFolderManager', () => {
       );
     });
 
-    it('should merge OPFS, folder, and zip scenarios â€” deduplicated and sorted', async () => {
+    it('should merge OPFS, folder, and zip scenarios — deduplicated and sorted', async () => {
       // Why: Dropdown must show unified, sorted, deduplicated scenario list
       const listScenarios = vi
         .fn<FolderManagerDeps['listScenariosFromFolder']>()
@@ -388,16 +388,16 @@ describe('createFolderManager', () => {
       await manager.handleOpenFolder();
 
       expect(deps.updateFolderStatus).toHaveBeenCalledWith(
-        'âŒ Folder scan error - see logs'
+        '❌ Folder scan error - see logs'
       );
     });
   });
 
   // ========================================================================
-  // handleOpenFolder â€” replay mode
+  // handleOpenFolder — replay mode
   // ========================================================================
 
-  describe('handleOpenFolder â€” replay mode', () => {
+  describe('handleOpenFolder — replay mode', () => {
     beforeEach(() => {
       vi.mocked(selectReadFolder).mockResolvedValue({
         success: true,
@@ -515,14 +515,14 @@ describe('createFolderManager', () => {
       await manager.handleOpenFolder();
 
       expect(deps.updateFolderStatus).toHaveBeenCalledWith(
-        'âŒ Failed to read scenarios'
+        '❌ Failed to read scenarios'
       );
     });
 
     it('should NOT import ref points in replay mode', async () => {
       // Why: Replay mode only needs scenario discovery, not ref point import
       const { importRefPointsFromFolder } =
-        await import('gps-plus-slam-app-framework/storage/ref-point-importer');
+        await import('../storage/ref-point-importer');
       const { manager } = createFolderManagerWithDefaults({
         getIsReplayMode: vi.fn(() => true),
       });
@@ -588,7 +588,7 @@ describe('createFolderManager', () => {
 
       await manager.handleChooseSaveLocation();
 
-      expect(deps.updateSaveStatus).toHaveBeenCalledWith('âœ… recording.zip');
+      expect(deps.updateSaveStatus).toHaveBeenCalledWith('✅ recording.zip');
       expect(deps.setSaveLocationSelected).toHaveBeenCalledWith(true);
       expect(deps.validateEnterButton).toHaveBeenCalled();
     });
@@ -622,7 +622,7 @@ describe('createFolderManager', () => {
       // Why: Changing scenario must load its ref points for the AR view
       vi.mocked(setCurrentScenario).mockResolvedValue(mockFolderHandle);
       const { loadAllRefPoints } =
-        await import('gps-plus-slam-app-framework/storage/ref-point-loader');
+        await import('../storage/ref-point-loader');
       vi.mocked(loadAllRefPoints).mockResolvedValue([]);
       const { manager } = createFolderManagerWithDefaults();
 
@@ -635,7 +635,7 @@ describe('createFolderManager', () => {
       // Why: User needs feedback on what ref points are in this scenario
       vi.mocked(setCurrentScenario).mockResolvedValue(mockFolderHandle);
       const { loadAllRefPoints, flattenRefPointsToMarks } =
-        await import('gps-plus-slam-app-framework/storage/ref-point-loader');
+        await import('../storage/ref-point-loader');
       vi.mocked(loadAllRefPoints).mockResolvedValue([
         { name: 'pt1', observations: [] },
         { name: 'pt2', observations: [] },
@@ -685,12 +685,12 @@ describe('createFolderManager', () => {
 
   describe('loadAndDisplayRefPoints', () => {
     it('should load, flatten, and dispatch ref points to the store', async () => {
-      // Why: Finding 5 â€” visualizer is a subscription consumer; the call
+      // Why: Finding 5 — visualizer is a subscription consumer; the call
       // site dispatches setPriorRefPointMarks instead of calling the
       // visualizer directly. See
       // docs/2026-04-30-refpoint-marks-into-redux-plan.md.
       const { loadAllRefPoints, flattenRefPointsToMarks } =
-        await import('gps-plus-slam-app-framework/storage/ref-point-loader');
+        await import('../storage/ref-point-loader');
       const mockDefs = [
         { name: 'pt1', observations: [{ lat: 0, lng: 0, name: 'pt1' }] },
       ] as never;
@@ -715,7 +715,7 @@ describe('createFolderManager', () => {
     it('should call setImportedRefPoints with averaged GPS positions', async () => {
       // Why: H3 proximity cache must use averaged scenario-scoped ref points
       const { loadAllRefPoints, averageGpsPerRefPoint } =
-        await import('gps-plus-slam-app-framework/storage/ref-point-loader');
+        await import('../storage/ref-point-loader');
       vi.mocked(loadAllRefPoints).mockResolvedValue([
         { id: 'p1', name: 'P1', createdAt: 1000, observations: [] },
       ] as never);
@@ -741,7 +741,7 @@ describe('createFolderManager', () => {
     it('should forward averaged ref points to map overlay for 2D display', async () => {
       // Why: Prior ref points must appear on the 2D Leaflet map
       const { loadAllRefPoints, averageGpsPerRefPoint } =
-        await import('gps-plus-slam-app-framework/storage/ref-point-loader');
+        await import('../storage/ref-point-loader');
       vi.mocked(loadAllRefPoints).mockResolvedValue([] as never);
       vi.mocked(averageGpsPerRefPoint).mockReturnValue([
         { id: 'p1', name: 'P1', lat: 50.0, lon: 8.0 },
@@ -767,7 +767,7 @@ describe('createFolderManager', () => {
     it('should clear old prior ref points on scenario change before adding new ones', async () => {
       // Why: Switching scenarios must replace, not accumulate, prior ref points
       const { loadAllRefPoints, averageGpsPerRefPoint } =
-        await import('gps-plus-slam-app-framework/storage/ref-point-loader');
+        await import('../storage/ref-point-loader');
       vi.mocked(loadAllRefPoints).mockResolvedValue([] as never);
       vi.mocked(averageGpsPerRefPoint).mockReturnValue([]);
       const mockMapOverlay = {
@@ -791,7 +791,7 @@ describe('createFolderManager', () => {
     it('should work without mapOverlay (optional dep)', async () => {
       // Why: mapOverlay might not be set (e.g., in tests or before 3D scene init)
       const { loadAllRefPoints, flattenRefPointsToMarks } =
-        await import('gps-plus-slam-app-framework/storage/ref-point-loader');
+        await import('../storage/ref-point-loader');
       vi.mocked(loadAllRefPoints).mockResolvedValue([] as never);
       vi.mocked(flattenRefPointsToMarks).mockReturnValue([] as never);
       const { manager } = createFolderManagerWithDefaults();
@@ -802,13 +802,13 @@ describe('createFolderManager', () => {
     });
 
     it('should recover ref points from ZIPs when OPFS is empty and read folder available', async () => {
-      // Why: Problem 2 fix â€” when OPFS is cleared, ref points should be
+      // Why: Problem 2 fix — when OPFS is cleared, ref points should be
       // recovered from session ZIPs in the read folder, written to OPFS,
       // then loaded normally. This is the core OPFS recovery flow.
       const { loadAllRefPoints, writeRefPointDefinition } =
-        await import('gps-plus-slam-app-framework/storage/ref-point-loader');
+        await import('../storage/ref-point-loader');
       const { recoverRefPointDefinitionsFromZips } =
-        await import('gps-plus-slam-app-framework/storage/ref-point-recovery');
+        await import('../storage/ref-point-recovery');
 
       const recoveredDef = {
         id: 'h3-cell-a',
@@ -852,12 +852,12 @@ describe('createFolderManager', () => {
     });
 
     it('should NOT attempt recovery when OPFS has data', async () => {
-      // Why: Recovery should only run when OPFS is empty â€” unnecessary
+      // Why: Recovery should only run when OPFS is empty — unnecessary
       // ZIP scanning would slow down normal scenario changes.
       const { loadAllRefPoints } =
-        await import('gps-plus-slam-app-framework/storage/ref-point-loader');
+        await import('../storage/ref-point-loader');
       const { recoverRefPointDefinitionsFromZips } =
-        await import('gps-plus-slam-app-framework/storage/ref-point-recovery');
+        await import('../storage/ref-point-recovery');
 
       vi.mocked(loadAllRefPoints).mockResolvedValue([
         { id: 'p1', name: 'existing', createdAt: 1, observations: [] },
@@ -873,9 +873,9 @@ describe('createFolderManager', () => {
     it('should NOT attempt recovery when no read folder is available', async () => {
       // Why: Without a read folder, there are no ZIPs to recover from.
       const { loadAllRefPoints } =
-        await import('gps-plus-slam-app-framework/storage/ref-point-loader');
+        await import('../storage/ref-point-loader');
       const { recoverRefPointDefinitionsFromZips } =
-        await import('gps-plus-slam-app-framework/storage/ref-point-recovery');
+        await import('../storage/ref-point-recovery');
 
       vi.mocked(loadAllRefPoints).mockResolvedValue([]);
       vi.mocked(getReadFolderHandle).mockReturnValue(null);
@@ -888,12 +888,12 @@ describe('createFolderManager', () => {
     });
 
     it('should handle recovery errors gracefully', async () => {
-      // Why: Recovery failures should not crash scenario selection â€”
+      // Why: Recovery failures should not crash scenario selection —
       // user can still record, just without prior ref points.
       const { loadAllRefPoints } =
-        await import('gps-plus-slam-app-framework/storage/ref-point-loader');
+        await import('../storage/ref-point-loader');
       const { recoverRefPointDefinitionsFromZips } =
-        await import('gps-plus-slam-app-framework/storage/ref-point-recovery');
+        await import('../storage/ref-point-recovery');
 
       vi.mocked(loadAllRefPoints).mockResolvedValue([]);
       vi.mocked(recoverRefPointDefinitionsFromZips).mockRejectedValue(
@@ -909,10 +909,10 @@ describe('createFolderManager', () => {
   });
 
   // ========================================================================
-  // handleScenarioChange â€” OPFS recovery (Problem 2)
+  // handleScenarioChange — OPFS recovery (Problem 2)
   // ========================================================================
 
-  describe('handleScenarioChange â€” OPFS recovery', () => {
+  describe('handleScenarioChange — OPFS recovery', () => {
     it('should create scenario directory and proceed when OPFS scenario is missing but read folder available', async () => {
       // Why: After browser data clear, the scenario directory is gone.
       // When a read folder with ZIPs is available, we should create
@@ -921,7 +921,7 @@ describe('createFolderManager', () => {
       vi.mocked(ensureScenarioDirectory).mockResolvedValue(mockFolderHandle);
       vi.mocked(getReadFolderHandle).mockReturnValue(mockFolderHandle);
       const { loadAllRefPoints } =
-        await import('gps-plus-slam-app-framework/storage/ref-point-loader');
+        await import('../storage/ref-point-loader');
       vi.mocked(loadAllRefPoints).mockResolvedValue([]);
 
       const { manager, deps } = createFolderManagerWithDefaults();
@@ -933,7 +933,7 @@ describe('createFolderManager', () => {
     });
 
     it('should show error when OPFS scenario missing and no read folder', async () => {
-      // Why: Without a read folder, cannot create and recover â€” show error.
+      // Why: Without a read folder, cannot create and recover — show error.
       vi.mocked(setCurrentScenario).mockResolvedValue(null);
       vi.mocked(getReadFolderHandle).mockReturnValue(null);
 

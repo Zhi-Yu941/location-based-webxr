@@ -12,12 +12,29 @@
 
 import * as THREE from 'three';
 import { getScene } from '../ar/webxr-session';
-import type { RefPointMark } from '../storage/ref-point-loader';
-import type { LatLong } from 'gps-plus-slam-js';
+import type { LatLong, Quaternion, Vector3 } from 'gps-plus-slam-js';
 import { calcRelativeCoordsInMeters } from 'gps-plus-slam-js';
 import { createLogger } from '../utils/logger';
 import { disposeMeshArray } from './three-dispose';
 import { VIS_COLORS } from './vis-colors';
+
+/**
+ * Structural type for the marks consumed by this visualizer. Mirrors the
+ * shape of the recorder app's `RefPointMark` (Iter 3 of the AppFramework /
+ * RecorderApp boundary migration extracted the canonical type into the
+ * recorder package). The framework keeps a local structural alias so this
+ * generic GPS-anchored mesh manager does not depend on recorder modules.
+ *
+ * Iter 4 will rename this file to a generic `gps-anchored-mesh-manager`
+ * and lift the alias into a shared geo-types module.
+ */
+export interface RefPointMark {
+  readonly id: string;
+  readonly odomPosition: Vector3;
+  readonly odomRotation: Quaternion;
+  readonly gpsPosition: { readonly lat: number; readonly lon: number; readonly altitude?: number };
+  readonly timestamp: number;
+}
 
 const log = createLogger('RefPointVisualizer');
 

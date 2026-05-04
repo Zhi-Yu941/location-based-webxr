@@ -15,7 +15,6 @@
 
 import { createSelector } from '@reduxjs/toolkit';
 import type { CombinedRootState } from './combined-root-state';
-import type { RefPointMark } from '../storage/ref-point-loader';
 import type {
   GpsPoint,
   LatLong,
@@ -34,7 +33,6 @@ const EMPTY_GPS_POSITIONS: readonly GpsPoint[] = [];
 const EMPTY_ODOM_POSITIONS: readonly Vector3[] = [];
 const EMPTY_ODOM_ROTATIONS: readonly Quaternion[] = [];
 const EMPTY_REF_POINTS: readonly ReferencePoint[] = [];
-const EMPTY_REF_POINT_MARKS: readonly RefPointMark[] = [];
 
 // ---------------------------------------------------------------------------
 // Input selector — shared across all selectors for gpsData-derived values.
@@ -87,31 +85,3 @@ export const selectReferencePoints = createSelector(
   (gpsData): readonly ReferencePoint[] =>
     gpsData?.referencePoints ?? EMPTY_REF_POINTS
 );
-
-// ---------------------------------------------------------------------------
-// RefPoint marks — drive 3D sphere rendering via store subscription.
-// See docs/2026-04-30-refpoint-marks-into-redux-plan.md (Finding 5).
-// ---------------------------------------------------------------------------
-
-const selectRefPoints = (state: CombinedRootState) => state.refPoints;
-const selectPriorMarksRaw = (state: CombinedRootState) =>
-  state.refPoints?.priorMarks;
-const selectCurrentMarksRaw = (state: CombinedRootState) =>
-  state.refPoints?.currentMarks;
-
-/** Marks loaded from prior sessions (rendered as green spheres). */
-export const selectPriorRefPointMarks = createSelector(
-  [selectPriorMarksRaw],
-  (priorMarks): readonly RefPointMark[] => priorMarks ?? EMPTY_REF_POINT_MARKS
-);
-
-/** Marks added during the current session (rendered as red spheres). */
-export const selectCurrentRefPointMarks = createSelector(
-  [selectCurrentMarksRaw],
-  (currentMarks): readonly RefPointMark[] =>
-    currentMarks ?? EMPTY_REF_POINT_MARKS
-);
-
-// `selectRefPoints` is exported in case future selectors need to compose
-// across all slice fields without each becoming a sibling selector.
-export { selectRefPoints };

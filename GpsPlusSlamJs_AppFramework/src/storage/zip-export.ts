@@ -38,6 +38,61 @@ export interface ZipExportResult {
   readonly fileCount: number;
 }
 
+/**
+ * Helper passed to a {@link ZipExportContributor.contribute} callback for
+ * appending blobs to the ZIP under a stable, contributor-owned subdirectory.
+ *
+ * The framework prepends the contributor's `subdir` to the supplied
+ * `relativePath` automatically, so contributors only think in terms of paths
+ * relative to their own subdir (e.g. `'42.json'`, not `'refPoints/42.json'`).
+ */
+export type ZipContributorAddFile = (
+  relativePath: string,
+  blob: Blob
+) => Promise<void>;
+
+/**
+ * Extension contributor that lets a consumer (typically the recorder)
+ * append app-specific files to a session ZIP without forking the
+ * framework's ZIP writer.
+ *
+ * Each contributor declares a top-level subdirectory it owns inside the
+ * ZIP (e.g. the recorder uses `refPoints/`). The framework calls
+ * {@link contribute} after writing all framework-owned sections.
+ *
+ * Contributors must:
+ *  - Only write files under their declared `subdir` (the framework enforces
+ *    this by routing every `addFile` call through the prefix).
+ *  - Tolerate an empty source (e.g. a session with no ref points) by
+ *    returning `0` instead of throwing.
+ *
+ * @see 2026-05-03-appframework-vs-recorderapp-boundary-analysis.md — Iter 2.
+ */
+export interface ZipExportContributor {
+  /** Top-level subdirectory inside the ZIP (no leading or trailing `/`). */
+  readonly subdir: string;
+  /**
+   * Append files for this contributor. Implementations call `addFile`
+   * once per file with a path relative to {@link subdir}.
+   *
+   * @returns Number of files added so the framework's `fileCount` total
+   *   stays accurate for download summaries.
+   */
+  contribute(addFile: ZipContributorAddFile): Promise<number>;
+}
+
+/**
+ * Options for {@link exportSessionAsZip}.
+ */
+export interface ExportSessionAsZipOptions {
+  /**
+   * Optional list of {@link ZipExportContributor}s. Each is invoked after
+   * framework-owned sections have been written. Order is preserved in the
+   * resulting ZIP central directory but has no semantic effect.
+   */
+  readonly contributors?: readonly ZipExportContributor[];
+}
+
 // ============================================================================
 // Internal Helpers
 // ============================================================================
@@ -97,63 +152,10 @@ async function streamDirectoryToZip(
   return count;
 }
 
-/**
- * Filter and stream per-session ref point observations into a ZipWriter.
- *
- * Reads each ref point JSON from the scenario-level refPoints/ directory,
- * keeps only observations where `sessionId` matches `sessionName`, and writes
- * the filtered definition into the ZIP under `refPoints/{h3}.json`.
- *
- * Ref points with no observations for the current session are skipped entirely.
- * If the refPoints/ directory doesn't exist yet (new scenario), returns 0.
- *
- * @returns Number of ref point files added
- */
-async function streamSessionRefPointsToZip(
-  scenarioHandle: FileSystemDirectoryHandle,
-  sessionName: string,
-  zipWriter: ZipWriter<Blob>
-): Promise<number> {
-  let count = 0;
-
-  let refPointsHandle: FileSystemDirectoryHandle;
-  try {
-    refPointsHandle = await scenarioHandle.getDirectoryHandle('refPoints');
-  } catch {
-    // No refPoints directory yet — nothing to include
-    return 0;
-  }
-
-  for await (const [name, handle] of refPointsHandle.entries()) {
-    if (handle.kind !== 'file' || !name.endsWith('.json')) continue;
-
-    try {
-      const file = await (handle as FileSystemFileHandle).getFile();
-      const text = await file.text();
-      const def = JSON.parse(text) as {
-        observations?: Array<{ sessionId?: string }>;
-      };
-
-      if (!Array.isArray(def.observations)) continue;
-
-      const sessionObs = def.observations.filter(
-        (o) => o.sessionId === sessionName
-      );
-      if (sessionObs.length === 0) continue;
-
-      const filtered = { ...def, observations: sessionObs };
-      const blob = new Blob([JSON.stringify(filtered, null, 2)], {
-        type: 'application/json',
-      });
-      await zipWriter.add(`refPoints/${name}`, new BlobReader(blob));
-      count++;
-    } catch (err) {
-      log.warn(`Failed to process ref point ${name}:`, err);
-    }
-  }
-
-  return count;
-}
+// Per-session ref-point ZIP filtering moved to the recorder app in Iter 3 of
+// the AppFramework / RecorderApp boundary cleanup. Recorder consumers now
+// register a `ZipExportContributor` via `exportSessionAsZip({ contributors })`.
+// See gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-03-appframework-vs-recorderapp-boundary-analysis.md
 
 // ============================================================================
 // Public API
@@ -179,11 +181,11 @@ async function streamSessionRefPointsToZip(
  */
 export async function exportSessionAsZip(
   scenarioNameOrSessionName: string,
-  sessionName?: string
+  sessionName?: string,
+  options?: ExportSessionAsZipOptions
 ): Promise<ZipExportResult> {
   let sessionHandle: FileSystemDirectoryHandle;
   let scenarioHandle: FileSystemDirectoryHandle | null = null;
-  const effectiveSessionName = sessionName ?? scenarioNameOrSessionName;
 
   if (sessionName) {
     // Scenario-based layout: scenarios/{scenarioName}/{sessionName}
@@ -225,13 +227,39 @@ export async function exportSessionAsZip(
 
   let fileCount = await streamDirectoryToZip(sessionHandle, zipWriter);
 
-  // Include per-session ref point observations (scenario layout only)
-  if (scenarioHandle) {
-    fileCount += await streamSessionRefPointsToZip(
-      scenarioHandle,
-      effectiveSessionName,
-      zipWriter
-    );
+  // Caller-supplied extension contributors. Each owns a single top-level
+  // subdir; the framework prepends that subdir to every file path so the
+  // contributor cannot accidentally write outside its own namespace.
+  const contributors = options?.contributors ?? [];
+  const seenSubdirs = new Set<string>();
+  for (const contributor of contributors) {
+    const subdir = contributor.subdir;
+    if (!subdir || subdir.includes('/') || subdir.startsWith('.')) {
+      throw new Error(
+        `ZipExportContributor.subdir must be a non-empty single path segment, got: ${JSON.stringify(
+          subdir
+        )}`
+      );
+    }
+    if (seenSubdirs.has(subdir)) {
+      throw new Error(
+        `Duplicate ZipExportContributor.subdir registered: ${subdir}`
+      );
+    }
+    seenSubdirs.add(subdir);
+
+    const addFile: ZipContributorAddFile = async (relativePath, blob) => {
+      if (relativePath.startsWith('/')) {
+        throw new Error(
+          `ZipExportContributor relative path must not start with '/' (got ${relativePath})`
+        );
+      }
+      await zipWriter.add(
+        `${subdir}/${relativePath}`,
+        new BlobReader(blob)
+      );
+    };
+    fileCount += await contributor.contribute(addFile);
   }
 
   const blob = await zipWriter.close();
@@ -261,12 +289,13 @@ export async function exportSessionAsZip(
 export async function syncToExternalZip(
   fileHandle: FileSystemFileHandle,
   scenarioName: string,
-  sessionName: string
+  sessionName: string,
+  options?: ExportSessionAsZipOptions
 ): Promise<ZipExportResult> {
   log.info(`Syncing to external ZIP: ${scenarioName}/${sessionName}`);
 
   // Export session as blob
-  const result = await exportSessionAsZip(scenarioName, sessionName);
+  const result = await exportSessionAsZip(scenarioName, sessionName, options);
 
   // Write to external file handle
   const writable = await fileHandle.createWritable();

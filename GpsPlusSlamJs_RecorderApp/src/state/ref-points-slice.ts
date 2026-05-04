@@ -15,7 +15,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { ImportedRefPoint } from '../storage/ref-point-importer';
 import type { RefPointMark } from '../storage/ref-point-loader';
-import { gpsToH3, type KnownRefPoint } from '../ref-points/h3-ref-point';
+import { gpsToH3, type KnownRefPoint } from 'gps-plus-slam-app-framework';
 
 // ---------------------------------------------------------------------------
 // State shape

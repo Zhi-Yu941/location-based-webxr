@@ -1,20 +1,16 @@
 /**
- * `CombinedRootState` — back-compat type alias for "library + recorder + refPoints".
+ * `CombinedRootState` — back-compat type alias for the framework root state.
  *
- * This was previously exported from `state/store.ts`. Now that the recorder
- * store has moved into `GpsPlusSlamJs_RecorderApp`, framework modules that
- * still need a structural root-state type for selectors / replay use this
- * alias, which composes the public `createSlamAppStore` factory with the
- * `refPoints` slice that ships in the framework.
+ * Previously composed `refPoints` into the framework root state; that slice
+ * now lives in the recorder app (Iter 3 of the AppFramework / RecorderApp
+ * boundary migration), so the framework root only carries what
+ * `createSlamAppStore` ships by default.
  *
- * @see ./create-slam-app-store.ts
- * @see ./ref-points-slice.ts
+ * Consumers that own additional slices should compose their own root type
+ * via `SlamAppCombinedState<{ extraReducers }>` and pass that as the
+ * structural state argument to framework selectors / subscribers.
  */
 
-import type { Reducer } from '@reduxjs/toolkit';
 import type { SlamAppCombinedState } from './create-slam-app-store';
-import type { RefPointsState } from './ref-points-slice';
 
-export type CombinedRootState = SlamAppCombinedState<{
-  refPoints: Reducer<RefPointsState>;
-}>;
+export type CombinedRootState = SlamAppCombinedState;

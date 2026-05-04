@@ -3,13 +3,17 @@
 ## Purpose
 
 Entry script for the minimal example. Glue only — wires
-`createRecorderStore()` to a tiny Three.js scene and a
-status panel rendered by [status.ts](status.ts).
+`createSlamAppStore()` (with `NullStorageBackend`) to a tiny
+Three.js scene and a status panel rendered by [status.ts](status.ts).
+
+Intentionally does **not** depend on any recorder-only slices
+(routing, scenarios, ref-points). It is the smoke test that the
+framework's composable store factory is consumable from a fresh app.
 
 ## Behavior
 
-- Boots `createRecorderStore()` with default options (uses the
-  bundled community license key from AppFramework).
+- Boots `createSlamAppStore({ storageBackend: new NullStorageBackend() })`
+  with default options (uses the bundled community license key).
 - Creates a Three.js scene with a single rotating cube and basic
   lighting; resizes to the window.
 - Subscribes to the store; on each change, re-derives a small

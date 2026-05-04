@@ -102,8 +102,8 @@ importers:
   GpsPlusSlamJs_MinimalExample:
     dependencies:
       gps-plus-slam-app-framework:
-        specifier: ^1.0.0
-        version: 1.0.0(@sentry/browser@10.50.0)(@zip.js/zip.js@2.8.26)(h3-js@4.4.0)(leaflet@1.9.4)(three@0.184.0)
+        specifier: workspace:*
+        version: link:../GpsPlusSlamJs_AppFramework
       three:
         specifier: ^0.184.0
         version: 0.184.0
@@ -1830,21 +1830,6 @@ packages:
   gopd@1.2.0:
     resolution: {integrity: sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==}
     engines: {node: '>= 0.4'}
-
-  gps-plus-slam-app-framework@1.0.0:
-    resolution: {integrity: sha512-0UgmEnCinGvNWgjbkTMxwcG+8WuDgsYjzYp5BGQ7RC1LJway1H9AM3RVL1UgvRVSzr312OW6hH2BrX27e/7KCQ==}
-    engines: {node: '>=20.19.0'}
-    peerDependencies:
-      '@sentry/browser': '>=10.0.0'
-      '@zip.js/zip.js': '>=2.7.0'
-      h3-js: '>=4.0.0'
-      leaflet: '>=1.9.0'
-      three: '>=0.170.0'
-    peerDependenciesMeta:
-      '@sentry/browser':
-        optional: true
-      leaflet:
-        optional: true
 
   gps-plus-slam-js@1.0.4:
     resolution: {integrity: sha512-Vd0xyqcWjmeBVSRZ+tOoracn8ApYZefIVKHMu8148SpIaj+D6uepndU6YDD9rXdivA/OswK4TVfU/0iFvuLRuA==}
@@ -4680,21 +4665,6 @@ snapshots:
   globjoin@0.1.4: {}
 
   gopd@1.2.0: {}
-
-  gps-plus-slam-app-framework@1.0.0(@sentry/browser@10.50.0)(@zip.js/zip.js@2.8.26)(h3-js@4.4.0)(leaflet@1.9.4)(three@0.184.0):
-    dependencies:
-      '@reduxjs/toolkit': 2.11.2
-      '@zip.js/zip.js': 2.8.26
-      gl-matrix: 3.4.4
-      gps-plus-slam-js: 1.0.4
-      h3-js: 4.4.0
-      three: 0.184.0
-    optionalDependencies:
-      '@sentry/browser': 10.50.0
-      leaflet: 1.9.4
-    transitivePeerDependencies:
-      - react
-      - react-redux
 
   gps-plus-slam-js@1.0.4:
     dependencies:

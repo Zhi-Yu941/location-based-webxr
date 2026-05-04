@@ -2,7 +2,7 @@
   "name": "gps-plus-slam-minimal-example",
   "version": "0.1.0",
   "private": true,
-  "description": "Minimal getting-started example consuming gps-plus-slam-app-framework: Three.js scene driven by createRecorderStore().",
+  "description": "Minimal getting-started example consuming gps-plus-slam-app-framework: Three.js scene driven by createSlamAppStore() with NullStorageBackend.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,7 +16,7 @@
     "node": ">=20.19.0"
   },
   "dependencies": {
-    "gps-plus-slam-app-framework": "^1.0.0",
+    "gps-plus-slam-app-framework": "workspace:*",
     "three": "^0.184.0"
   },
   "devDependencies": {

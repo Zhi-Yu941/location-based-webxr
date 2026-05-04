@@ -1,10 +1,12 @@
 /**
  * Minimal getting-started example for gps-plus-slam-app-framework.
  *
- * Wires `createRecorderStore()` to a tiny Three.js scene + status panel.
- * No WebXR, no AR session, no map UI — the goal is to show the smallest
- * end-to-end integration that proves the framework + closed-source core
- * resolve and run in a real browser.
+ * Wires `createSlamAppStore()` (with the no-op `NullStorageBackend`) to
+ * a tiny Three.js scene + status panel. No WebXR, no AR session, no map
+ * UI — the goal is to show the smallest end-to-end integration that
+ * proves the framework + closed-source core resolve and run in a real
+ * browser without depending on any recorder-only slices (routing,
+ * scenarios, ref-points).
  *
  * See ./status.ts for the (testable) status formatter; everything else
  * here is glue and is verified manually via `pnpm dev` + the bundle's
@@ -21,9 +23,10 @@ import {
   WebGLRenderer,
 } from 'three';
 import {
-  createRecorderStore,
+  createSlamAppStore,
   selectGpsPositions,
 } from 'gps-plus-slam-app-framework/state';
+import { NullStorageBackend } from 'gps-plus-slam-app-framework/storage';
 
 import { formatStatus } from './status.js';
 
@@ -81,16 +84,22 @@ function main(): void {
   const canvas = getElement<HTMLCanvasElement>('scene');
   const statusEl = getElement<HTMLPreElement>('status');
 
-  const store = createRecorderStore();
+  const store = createSlamAppStore({ storageBackend: new NullStorageBackend() });
   const { render } = setupScene(canvas);
 
   function refreshStatus(): void {
-    const state = store.getState();
+    // selectGpsPositions is currently typed against the framework's internal
+    // CombinedRootState (which includes a refPoints slice that this minimal
+    // app does not mount). Only `gpsData` is read at runtime, so a structural
+    // cast through `unknown` is safe. The selector typing is scheduled to be
+    // relaxed in Iter 3 of the AppFramework / RecorderApp boundary cleanup
+    // (see GpsPlusSlamJs_Docs/docs/2026-05-03-appframework-vs-recorderapp-boundary-analysis.md).
+    const state = store.getState() as unknown as Parameters<typeof selectGpsPositions>[0];
     statusEl.textContent = formatStatus({
-      isRecording: state.recorder.isRecording,
-      actionCount: state.recorder.actionCount,
+      isRecording: store.getState().recorder.isRecording,
+      actionCount: store.getState().recorder.actionCount,
       gpsPositionCount: selectGpsPositions(state).length,
-      failedWriteCount: state.recorder.failedWriteCount,
+      failedWriteCount: store.getState().recorder.failedWriteCount,
     });
   }
 

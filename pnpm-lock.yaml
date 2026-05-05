@@ -29,8 +29,8 @@ importers:
         specifier: 3.4.4
         version: 3.4.4
       gps-plus-slam-js:
-        specifier: ^1.0.4
-        version: 1.0.4
+        specifier: ^1.0.5
+        version: 1.0.5
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1
@@ -1833,6 +1833,10 @@ packages:
 
   gps-plus-slam-js@1.0.4:
     resolution: {integrity: sha512-Vd0xyqcWjmeBVSRZ+tOoracn8ApYZefIVKHMu8148SpIaj+D6uepndU6YDD9rXdivA/OswK4TVfU/0iFvuLRuA==}
+    engines: {node: '>=20.19.0'}
+
+  gps-plus-slam-js@1.0.5:
+    resolution: {integrity: sha512-3eeJaoHlkDxr1aRyD8NEnDi+D4ouiGaSz+kuWI/YMXgpVFri3e+WfA2n1Isf3RsmRm2KewSaiTwcGsFYpT6Bvg==}
     engines: {node: '>=20.19.0'}
 
   graceful-fs@4.2.11:
@@ -4667,6 +4671,18 @@ snapshots:
   gopd@1.2.0: {}
 
   gps-plus-slam-js@1.0.4:
+    dependencies:
+      '@noble/curves': 2.2.0
+      '@reduxjs/toolkit': 2.11.2
+      gl-matrix: 3.4.4
+      immer: 11.1.4
+      redux: 5.0.1
+      redux-thunk: 3.1.0(redux@5.0.1)
+    transitivePeerDependencies:
+      - react
+      - react-redux
+
+  gps-plus-slam-js@1.0.5:
     dependencies:
       '@noble/curves': 2.2.0
       '@reduxjs/toolkit': 2.11.2

@@ -17,7 +17,7 @@ call sites only changed their import path, not the imported names.
 All core-library symbols are routed through `gps-plus-slam-app-framework`
 (no direct `gps-plus-slam-js` import). The `RawDeviceOrientation`
 re-export deliberately uses the `/state` subpath rather than the
-framework root barrel because the root barrel exposes a *different*,
+framework root barrel because the root barrel exposes a _different_,
 nullable variant from `sensors/gps.ts`. See
 [`2026-05-05-recorder-app-drop-direct-core-dep-plan.md`](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-05-recorder-app-drop-direct-core-dep-plan.md)
 §2.2.1 for the type-identity rationale.

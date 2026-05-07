@@ -21,6 +21,7 @@ import type {
   RefPointMarker,
 } from 'gps-plus-slam-app-framework/types/geo-types';
 import { VIS_COLORS } from 'gps-plus-slam-app-framework/visualization/vis-colors';
+import { addAccuracyCircles } from './accuracy-circles';
 
 const log = createLogger('SummaryMap');
 
@@ -82,16 +83,6 @@ const RESIZE_DELAY_MS = 300;
 const POLYLINE_WEIGHT = 3;
 const POLYLINE_OPACITY = 0.8;
 
-/**
- * Style for per-event GPS accuracy circles (drawn under the polyline).
- * Radius comes from the GPS event's `accuracy` (meters); larger circles
- * mean lower-quality fixes. Filled and stroked with the raw-GPS color but
- * highly transparent so they don't drown out the path or the basemap.
- */
-const ACCURACY_CIRCLE_FILL_OPACITY = 0.12;
-const ACCURACY_CIRCLE_STROKE_OPACITY = 0.5;
-const ACCURACY_CIRCLE_WEIGHT = 1;
-
 // ============================================================================
 // Implementation
 // ============================================================================
@@ -150,25 +141,9 @@ export function createSummaryMap(
 
       // Per-event accuracy circles (transparent, sized by horizontal accuracy
       // in meters). Drawn BEFORE the polyline so the line stays visually on
-      // top. Skipped for events without a usable accuracy value.
-      for (const sample of data.rawGpsPath) {
-        if (
-          typeof sample.accuracy !== 'number' ||
-          !Number.isFinite(sample.accuracy) ||
-          sample.accuracy <= 0
-        ) {
-          continue;
-        }
-        const circle = L.circle([sample.lat, sample.lng], {
-          radius: sample.accuracy,
-          color: RAW_GPS_COLOR,
-          weight: ACCURACY_CIRCLE_WEIGHT,
-          opacity: ACCURACY_CIRCLE_STROKE_OPACITY,
-          fillColor: RAW_GPS_COLOR,
-          fillOpacity: ACCURACY_CIRCLE_FILL_OPACITY,
-        }).addTo(map);
-        layers.push(circle);
-      }
+      // top. Shared with `preview-map.ts` via `accuracy-circles.ts`.
+      const circles = addAccuracyCircles(map, data.rawGpsPath, RAW_GPS_COLOR);
+      layers.push(...circles);
 
       const rawPolyline = L.polyline(rawLatLngs, {
         color: RAW_GPS_COLOR,

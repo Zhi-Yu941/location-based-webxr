@@ -15,6 +15,7 @@ import L from 'leaflet';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
 import { VIS_COLORS } from 'gps-plus-slam-app-framework/visualization/vis-colors';
 import type { GpsPathCoord } from 'gps-plus-slam-app-framework/storage/zip-reader';
+import { addAccuracyCircles } from './accuracy-circles';
 
 const log = createLogger('PreviewMap');
 
@@ -40,16 +41,6 @@ const OSM_ATTRIBUTION =
 const POLYLINE_WEIGHT = 3;
 const POLYLINE_OPACITY = 0.8;
 const RESIZE_DELAY_MS = 200;
-
-/**
- * Style for per-event GPS accuracy circles. Radius = `latLongAccuracy`
- * (meters); larger circles mean lower-quality fixes. The fill is highly
- * transparent so circles overlap legibly without obscuring the basemap or
- * the polyline drawn on top.
- */
-const ACCURACY_CIRCLE_FILL_OPACITY = 0.12;
-const ACCURACY_CIRCLE_STROKE_OPACITY = 0.5;
-const ACCURACY_CIRCLE_WEIGHT = 1;
 
 // ============================================================================
 // Implementation
@@ -88,24 +79,8 @@ export function createPreviewMap(
     const latLngs = gpsPath.map((p) => [p.lat, p.lng] as L.LatLngTuple);
 
     // Per-event accuracy circles, drawn BEFORE the polyline so the line stays
-    // visually on top. Skipped for events without a usable accuracy value.
-    for (const sample of gpsPath) {
-      if (
-        typeof sample.accuracy !== 'number' ||
-        !Number.isFinite(sample.accuracy) ||
-        sample.accuracy <= 0
-      ) {
-        continue;
-      }
-      L.circle([sample.lat, sample.lng], {
-        radius: sample.accuracy,
-        color: RAW_GPS_COLOR,
-        weight: ACCURACY_CIRCLE_WEIGHT,
-        opacity: ACCURACY_CIRCLE_STROKE_OPACITY,
-        fillColor: RAW_GPS_COLOR,
-        fillOpacity: ACCURACY_CIRCLE_FILL_OPACITY,
-      }).addTo(map);
-    }
+    // visually on top. Shared with `summary-map.ts` via `accuracy-circles.ts`.
+    addAccuracyCircles(map, gpsPath, RAW_GPS_COLOR);
 
     L.polyline(latLngs, {
       color: RAW_GPS_COLOR,

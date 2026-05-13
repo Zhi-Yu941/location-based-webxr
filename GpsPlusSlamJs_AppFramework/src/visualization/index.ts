@@ -57,13 +57,6 @@ export {
   MapOverlay,
 } from './map-overlay.js';
 
-// --- gps-anchored-mesh-manager ---
-export {
-  GpsAnchoredMeshManager,
-  type GpsAnchoredItem,
-  type GpsAnchoredMeshManagerOptions,
-} from './gps-anchored-mesh-manager.js';
-
 // --- three-dispose ---
 export {
   type DisposeOptions,

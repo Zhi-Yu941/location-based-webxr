@@ -19,7 +19,8 @@ import L from 'leaflet';
 // ============================================================================
 
 /** OSM raster tile URL template (subdomains a/b/c). */
-export const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+export const OSM_TILE_URL =
+  'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 /** Attribution required by the OSM tile policy. */
 export const OSM_ATTRIBUTION =

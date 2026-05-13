@@ -642,9 +642,7 @@ describe('handleStartReplay', () => {
 
     await handlers.handleStartReplay(1);
 
-    expect(showError).toHaveBeenCalledWith(
-      'Failed to start replay — see logs'
-    );
+    expect(showError).toHaveBeenCalledWith('Failed to start replay — see logs');
   });
 });
 

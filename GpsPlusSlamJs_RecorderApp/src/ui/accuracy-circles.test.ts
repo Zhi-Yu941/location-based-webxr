@@ -56,11 +56,7 @@ describe('addAccuracyCircles', () => {
       { lat: 50.5, lng: 8.5, accuracy: 7 },
     ];
 
-    const created = addAccuracyCircles(
-      mapStub as L.Map,
-      samples,
-      '#ffffff'
-    );
+    const created = addAccuracyCircles(mapStub as L.Map, samples, '#ffffff');
 
     expect(circleCalls).toHaveLength(1);
     expect(created).toHaveLength(1);

@@ -30,6 +30,7 @@ export {
   // Coordinate transforms
   webxrToNUE,
   calcGpsCoords,
+  calcRelativeCoordsInMeters,
   isIdentityMatrix4,
 
   // Actions

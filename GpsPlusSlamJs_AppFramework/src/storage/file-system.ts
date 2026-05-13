@@ -421,7 +421,9 @@ export async function clearRefPointsCacheForAllScenarios(): Promise<ClearRefPoin
       } catch (err) {
         // NotFoundError is fine — scenario simply has no cached ref points yet.
         const name =
-          err instanceof Error ? err.name : String((err as { name?: string })?.name);
+          err instanceof Error
+            ? err.name
+            : String((err as { name?: string })?.name);
         if (name === 'NotFoundError') continue;
         errors.push({
           scenarioName,

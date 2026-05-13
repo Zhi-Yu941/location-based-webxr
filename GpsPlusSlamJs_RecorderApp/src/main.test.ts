@@ -2117,10 +2117,8 @@ describe('handleClearRefPointCache', () => {
    */
   it('clears stale imported ref points when re-import after cache clear fails', async () => {
     const { handleClearRefPointCache } = await import('./main');
-    const {
-      getCurrentScenarioHandle,
-      clearRefPointsCacheForAllScenarios,
-    } = await import('gps-plus-slam-app-framework/storage/file-system');
+    const { getCurrentScenarioHandle, clearRefPointsCacheForAllScenarios } =
+      await import('gps-plus-slam-app-framework/storage/file-system');
     const { loadAllRefPoints } = await import('./storage/ref-point-loader');
 
     setImportedRefPointsForTesting([
@@ -2136,6 +2134,7 @@ describe('handleClearRefPointCache', () => {
     vi.mocked(getCurrentScenarioHandle).mockReturnValue(mockHandle);
     vi.mocked(clearRefPointsCacheForAllScenarios).mockResolvedValue({
       scenariosCleared: 1,
+      scenariosScanned: 1,
       errors: [],
     });
     vi.mocked(loadAllRefPoints).mockRejectedValue(
@@ -2162,10 +2161,8 @@ describe('handleClearRefPointCache', () => {
    */
   it('clears in-memory imported ref points when no scenario is currently selected', async () => {
     const { handleClearRefPointCache } = await import('./main');
-    const {
-      getCurrentScenarioHandle,
-      clearRefPointsCacheForAllScenarios,
-    } = await import('gps-plus-slam-app-framework/storage/file-system');
+    const { getCurrentScenarioHandle, clearRefPointsCacheForAllScenarios } =
+      await import('gps-plus-slam-app-framework/storage/file-system');
 
     setImportedRefPointsForTesting([
       {
@@ -2179,6 +2176,7 @@ describe('handleClearRefPointCache', () => {
     vi.mocked(getCurrentScenarioHandle).mockReturnValue(null);
     vi.mocked(clearRefPointsCacheForAllScenarios).mockResolvedValue({
       scenariosCleared: 0,
+      scenariosScanned: 0,
       errors: [],
     });
 
@@ -2202,9 +2200,8 @@ describe('handleClearRefPointCache', () => {
    */
   it('shows an error when the cache-clear operation itself fails', async () => {
     const { handleClearRefPointCache } = await import('./main');
-    const { clearRefPointsCacheForAllScenarios } = await import(
-      'gps-plus-slam-app-framework/storage/file-system'
-    );
+    const { clearRefPointsCacheForAllScenarios } =
+      await import('gps-plus-slam-app-framework/storage/file-system');
     const { showError } = await import('./ui/hud');
 
     vi.mocked(clearRefPointsCacheForAllScenarios).mockRejectedValue(
@@ -2227,23 +2224,19 @@ describe('handleClearRefPointCache', () => {
    */
   it('re-imports ref points for the active scenario after a successful clear', async () => {
     const { handleClearRefPointCache } = await import('./main');
-    const {
-      getCurrentScenarioHandle,
-      clearRefPointsCacheForAllScenarios,
-    } = await import('gps-plus-slam-app-framework/storage/file-system');
-    const { loadAllRefPoints, flattenRefPointsToMarks } = await import(
-      './storage/ref-point-loader'
-    );
+    const { getCurrentScenarioHandle, clearRefPointsCacheForAllScenarios } =
+      await import('gps-plus-slam-app-framework/storage/file-system');
+    const { loadAllRefPoints, flattenRefPointsToMarks } =
+      await import('./storage/ref-point-loader');
 
     const mockHandle = { name: 'TestScenario' } as FileSystemDirectoryHandle;
     vi.mocked(getCurrentScenarioHandle).mockReturnValue(mockHandle);
     vi.mocked(clearRefPointsCacheForAllScenarios).mockResolvedValue({
       scenariosCleared: 2,
+      scenariosScanned: 2,
       errors: [],
     });
-    vi.mocked(loadAllRefPoints).mockResolvedValue([
-      { id: 'pt-A' } as never,
-    ]);
+    vi.mocked(loadAllRefPoints).mockResolvedValue([{ id: 'pt-A' } as never]);
     vi.mocked(flattenRefPointsToMarks).mockReturnValue([
       { id: 'pt-A' } as never,
     ]);

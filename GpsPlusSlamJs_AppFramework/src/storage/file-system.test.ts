@@ -74,9 +74,8 @@ describe('File System Storage', () => {
      * Throwing surfaces the real failure to the existing showError channel.
      */
     it('clearRefPointsCacheForAllScenarios throws when storage not initialized', async () => {
-      const { clearRefPointsCacheForAllScenarios } = await import(
-        './file-system'
-      );
+      const { clearRefPointsCacheForAllScenarios } =
+        await import('./file-system');
       await expect(clearRefPointsCacheForAllScenarios()).rejects.toThrow(
         /OPFS scenarios directory is unavailable/i
       );
@@ -330,9 +329,8 @@ describe('File System Storage - Integration with Mocks', () => {
     });
 
     it('reports zero scenarios when none exist', async () => {
-      const { clearRefPointsCacheForAllScenarios } = await import(
-        './file-system'
-      );
+      const { clearRefPointsCacheForAllScenarios } =
+        await import('./file-system');
 
       const result = await clearRefPointsCacheForAllScenarios();
 
@@ -342,9 +340,8 @@ describe('File System Storage - Integration with Mocks', () => {
     });
 
     it('removes refPoints/ directory from every scenario that has one', async () => {
-      const { clearRefPointsCacheForAllScenarios } = await import(
-        './file-system'
-      );
+      const { clearRefPointsCacheForAllScenarios } =
+        await import('./file-system');
 
       // Seed two scenarios with cached ref points
       const scenarioA = await startSession('ScenarioA');

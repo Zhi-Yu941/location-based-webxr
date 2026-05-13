@@ -11,7 +11,7 @@ import type { LatLong } from 'gps-plus-slam-app-framework/core';
 import * as THREE from 'three';
 
 // Activate the gps-plus-slam-js license once for this suite so calls into
-// `calcRelativeCoordsInMeters` from `GpsAnchoredMeshManager` succeed without
+// `calcRelativeCoordsInMeters` from `syncGpsAnchoredMeshes` succeed without
 // a store being constructed first.
 validateLicenseKey(COMMUNITY_LICENSE_KEY);
 

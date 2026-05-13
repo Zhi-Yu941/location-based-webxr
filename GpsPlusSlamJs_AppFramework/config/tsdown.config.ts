@@ -100,7 +100,6 @@ const entryFiles = [
   'src/visualization/leaflet-map-overlay.ts',
   'src/visualization/lerp-utils.ts',
   'src/visualization/map-overlay.ts',
-  'src/visualization/gps-anchored-mesh-manager.ts',
   'src/visualization/three-dispose.ts',
   'src/visualization/vis-colors.ts',
 ];

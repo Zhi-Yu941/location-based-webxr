@@ -22,7 +22,7 @@ export interface GpsPosition {
 /**
  * Raw device orientation from the browser's DeviceOrientationEvent API.
  * Fields are nullable because sensors may be unavailable on some devices.
- * See also: DeviceOrientation in ar/tracking-state.ts (resolved, non-nullable).
+ * See also: DeviceOrientation in state/tracking-slice.ts (resolved, non-nullable).
  */
 export interface RawDeviceOrientation {
   alpha: number | null; // compass direction (0-360)

@@ -1057,7 +1057,7 @@ describe('AR Tracking Restart Callbacks (Phase 1+2)', () => {
   /**
    * Why this test matters:
    * Phase 1 — setTrackingCallbacks must be wired before initAR() so that
-   * when TrackingStateManager detects an origin-reset recovery (Case 2),
+   * when the tracking slice detects an origin-reset recovery (Case 2),
    * the store receives the odometryTrackingRestarted action to correct
    * accumulated offsets and clear stale trajectory data.
    */

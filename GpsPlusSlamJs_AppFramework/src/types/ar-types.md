@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Shared type definitions for AR-related modules. These types are extracted to a separate file to avoid circular dependencies between `webxr-session.ts`, `tracking-state.ts`, and `depth-sampler.ts`.
+Shared type definitions for AR-related modules. These types are extracted to a separate file to avoid circular dependencies between `webxr-session.ts` and `depth-sampler.ts`.
 
 ## Public API
 
@@ -69,7 +69,7 @@ interface DepthPoint {
 }
 ```
 
-This is the **canonical definition** — the single source of truth used throughout the codebase. Consumers include `webxr-session.ts`, `depth-sampler.ts`, `tracking-state.ts`, `image-capture.ts`, `gps-event-coordinator.ts`, and `store.ts`. Some modules (e.g., `webxr-session.ts`) also re-export it.
+This is the **canonical definition** — the single source of truth used throughout the codebase. Consumers include `webxr-session.ts`, `depth-sampler.ts`, `image-capture.ts`, `gps-event-coordinator.ts`, and `store.ts`. Some modules (e.g., `webxr-session.ts`) also re-export it.
 
 ### `DepthSample`
 

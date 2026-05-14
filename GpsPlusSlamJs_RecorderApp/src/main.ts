@@ -809,7 +809,7 @@ async function handleEnterAR(): Promise<void> {
     });
 
     // Wire tracking restart detection BEFORE initAR() — this enables the
-    // TrackingStateManager and XRReferenceSpace reset event listener.
+    // tracking slice and XRReferenceSpace reset event listener.
     // When tracking resumes after an origin reset (Case 2), the store's
     // odometryTrackingRestarted reducer clears stale data and accumulates
     // offsets so alignment continues correctly across resets.

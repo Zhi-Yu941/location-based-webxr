@@ -26,7 +26,6 @@ import {
   type ImageCaptureConfig,
   DEFAULT_CAPTURE_CONFIG,
 } from './image-capture';
-import type { ResetTransformData } from './tracking-state';
 import {
   poseReceived as poseReceivedAction,
   poseLost as poseLostAction,
@@ -37,6 +36,7 @@ import {
   selectLastRestartedPayload,
   type TrackingPhase,
   type TrackingSliceState,
+  type ResetTransformData,
 } from '../state/tracking-slice';
 
 /**
@@ -274,15 +274,13 @@ let getScreenRotation: (() => number) | null = null;
 
 /**
  * Redux store injected by the host (`setTrackingStore`). When present
- * together with `onTrackingRestarted`, the tracking-slice replaces the
- * former `TrackingStateManager` class: `onXRFrame` dispatches
+ * together with `onTrackingRestarted`, `onXRFrame` dispatches
  * `poseReceived`/`poseLost`, the XR reference-space reset listener
  * dispatches `originReset`, and a `subscribeToSelector` translation
  * surface translates phase transitions back into the existing
  * `onTrackingLost` / `onTrackingRestarted` / `onTrackingRecovered`
  * callbacks. When the store is absent the tracking pipeline simply
- * no-ops, matching the prior behaviour where the manager was never
- * constructed.
+ * no-ops.
  */
 let trackingStore: TrackingSubscribableStore | null = null;
 
@@ -773,8 +771,8 @@ function snapshotDeviceOrientation(): {
 
 /**
  * Wire the tracking-slice → host-callbacks translation. The subscriber
- * runs synchronously inside each `dispatch`, so callback ordering matches
- * the legacy `TrackingStateManager` (which invoked callbacks directly).
+ * runs synchronously inside each `dispatch`, so the host callbacks fire
+ * in the same order as a direct invocation would.
  *
  * Translation rules (locked in by tracking-slice tests):
  *   - `tracking → lost`: clear `latestArPose` (drops in-flight GPS events)
@@ -822,7 +820,7 @@ function subscribeToTrackingPhase(
 /**
  * Dispatch the per-frame `poseReceived` / `poseLost` action into the
  * tracking slice. No-op when no store is bound or when tracking wiring
- * was not requested (matches legacy `if (!trackingStateManager) return`).
+ * was not requested.
  */
 function updateTrackingState(arPose: ARPose | null): void {
   if (!trackingStore || !onTrackingRestarted) {
@@ -1317,8 +1315,7 @@ export function getImageCaptureFrameCount(): number {
  *
  * MUST be called before `initAR()` whenever the host also wires tracking
  * callbacks via `setTrackingCallbacks`. Without a store the tracking
- * pipeline silently no-ops (matching the prior behaviour where
- * `TrackingStateManager` was never constructed).
+ * pipeline silently no-ops.
  *
  * @param store — any store satisfying {@link TrackingSubscribableStore}.
  *   `null` clears the binding (useful for teardown in tests).

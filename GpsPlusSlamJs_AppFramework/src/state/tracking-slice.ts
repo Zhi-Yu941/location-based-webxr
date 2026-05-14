@@ -1,21 +1,17 @@
 /**
  * Redux slice for AR tracking state.
  *
- * Port of `TrackingStateManager` (`ar/tracking-state.ts`) — see
+ * Replaces the original `TrackingStateManager` class (formerly
+ * `ar/tracking-state.ts`) — see
  * docs/2026-05-13-tracking-state-slice-port-plan.md and the
  * P2 step 2 entry of docs/2026-05-07-csharp-features-not-yet-ported.md.
  *
  * Every field of the manager class was pure logical state (Bucket A in the
- * survey), so the manager is being replaced with reducer + selectors. This
- * file ships sub-step 2 of the plan: the slice + selectors only. The old
- * `TrackingStateManager` class stays in place; host migration is sub-step 3
- * and class deletion is sub-step 4.
- *
- * Transitions mirror the manager 1:1. The transient `lastRestartedPayload`
- * field captures the LOST → TRACKING-with-reset payload that the host fires
- * as `onTrackingRestarted`; the host clears it via `clearLastRestartedPayload`
- * after consuming the value (so consecutive transitions never silently
- * overwrite an unread payload).
+ * survey), so it is modelled as a reducer + selectors. The transient
+ * `lastRestartedPayload` field captures the LOST → TRACKING-with-reset
+ * payload that the host fires as `onTrackingRestarted`; the host clears it
+ * via `clearLastRestartedPayload` after consuming the value (so consecutive
+ * transitions never silently overwrite an unread payload).
  */
 
 import type { PayloadAction } from '@reduxjs/toolkit';
@@ -36,9 +32,9 @@ export type TrackingPhase = 'initializing' | 'tracking' | 'lost';
 /**
  * Raw `DeviceOrientationEvent` snapshot captured alongside an AR pose.
  *
- * Identical shape to `RawDeviceOrientation` from `gps-plus-slam-js`; re-declared
- * here so deleting the legacy `tracking-state.ts` module in sub-step 4 doesn't
- * leave a dangling type re-export.
+ * Identical shape to `RawDeviceOrientation` from `gps-plus-slam-js`, but
+ * with non-nullable fields — sensors are required to have resolved for the
+ * AR math that consumes this snapshot.
  */
 export interface DeviceOrientation {
   /** Compass heading (0–360). */

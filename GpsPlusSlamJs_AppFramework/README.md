@@ -204,7 +204,6 @@ WebXR session lifecycle, Three.js renderer setup, image/depth capture, replay sc
 | `ImageCaptureManager`                        | Configurable camera frame capture pipeline       |
 | `DepthSampler`                               | Depth buffer sampling with configurable grids    |
 | `CameraBlitCapture`                          | GPU blit-based camera capture                    |
-| `TrackingStateManager`                       | AR tracking state monitoring                     |
 | `initReplayScene(container)`                 | Create a 3D replay scene with orbit/FPS controls |
 | `applyChromiumProjectionLayerWorkaround`     | Workaround for Chromium camera-access edge cases |
 

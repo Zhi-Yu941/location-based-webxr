@@ -63,14 +63,6 @@ export {
 // --- scene-node-names ---
 export { SCENE_NODE } from './scene-node-names.js';
 
-// --- tracking-state ---
-export {
-  TrackingState,
-  type DeviceOrientation,
-  type TrackingStateCallbacks,
-  TrackingStateManager,
-} from './tracking-state.js';
-
 // --- webxr-session ---
 export {
   initAR,

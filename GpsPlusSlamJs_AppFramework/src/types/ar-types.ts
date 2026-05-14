@@ -3,7 +3,7 @@
  *
  * Common type definitions for AR-related modules.
  * These are extracted to a separate file to avoid circular dependencies
- * between webxr-session.ts, tracking-state.ts, and depth-sampler.ts.
+ * between webxr-session.ts and depth-sampler.ts.
  */
 
 import type { Vector3, Quaternion } from 'gps-plus-slam-js';

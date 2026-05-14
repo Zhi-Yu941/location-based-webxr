@@ -4,14 +4,13 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
 
 permissions:
   contents: read
 
 jobs:
-  deadcode:
-    name: Dead-code (knip)
+  test:
+    name: Test (all workspaces)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,84 +19,27 @@ jobs:
         with:
           node-version: "20"
           cache: "pnpm"
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Run knip across all workspaces
-        run: pnpm run check:deadcode
 
-  repo-config-tests:
-    name: Repo-config Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "pnpm"
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Run repo-meta tests (CLA artifact consistency)
-        run: pnpm run test:repo-config
 
-  framework-tests:
-    name: Framework Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "pnpm"
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Run tests (format, lint, typecheck, unit)
-        working-directory: GpsPlusSlamJs_AppFramework
-        run: pnpm run test:core
-
-  recorder-unit-tests:
-    name: Recorder Unit Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "pnpm"
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      # Recorder + example resolve `gps-plus-slam-app-framework` via the
+      # package's `exports` -> `./dist/...`, so the framework must be built
+      # before its consumers run their tests.
       - name: Build AppFramework
-        working-directory: GpsPlusSlamJs_AppFramework
-        run: pnpm run build
-      - name: Run tests (format, lint, typecheck, unit)
-        working-directory: GpsPlusSlamJs_RecorderApp
-        run: pnpm run test:core
+        run: pnpm run build:framework
 
-  recorder-e2e-tests:
-    name: Recorder E2E Tests
-    runs-on: ubuntu-latest
-    needs: recorder-unit-tests
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "pnpm"
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Build AppFramework
-        working-directory: GpsPlusSlamJs_AppFramework
-        run: pnpm run build
       - name: Install Playwright browsers
         working-directory: GpsPlusSlamJs_RecorderApp
         run: pnpm exec playwright install --with-deps chromium
-      - name: Run E2E tests
-        working-directory: GpsPlusSlamJs_RecorderApp
-        run: pnpm run test:e2e
-      - name: Upload test results
+
+      # Root `pnpm test` runs: repo-config + framework + recorder (core + e2e)
+      # + minimal example. This is the single source of truth, matching the
+      # command developers run locally.
+      - name: Run full test suite
+        run: pnpm test
+
+      - name: Upload Playwright report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:

@@ -290,7 +290,6 @@ let trackingStore: TrackingSubscribableStore | null = null;
  */
 let trackingPhaseUnsubscribe: (() => void) | null = null;
 
-
 /**
  * Callback for when tracking restarts (set via setTrackingCallbacks)
  */

@@ -36,12 +36,7 @@
 import type { Action, PayloadAction, Middleware } from '@reduxjs/toolkit';
 import { createSlice, createListenerMiddleware } from '@reduxjs/toolkit';
 import { mat4, quat, vec3 } from 'gl-matrix';
-import type {
-  GpsPoint,
-  LatLong,
-  Matrix4,
-  Vector3,
-} from 'gps-plus-slam-js';
+import type { GpsPoint, LatLong, Matrix4, Vector3 } from 'gps-plus-slam-js';
 import { calcGpsCoords, distanceInMeters } from 'gps-plus-slam-js';
 import type { CombinedRootState } from './combined-root-state';
 import {
@@ -62,11 +57,7 @@ import type { ARPose } from '../types/ar-types';
 // Public types
 // ===========================================================================
 
-export type TrackingQualityState =
-  | 'warming-up'
-  | 'ar-lost'
-  | 'degraded'
-  | 'ok';
+export type TrackingQualityState = 'warming-up' | 'ar-lost' | 'degraded' | 'ok';
 
 export interface TrackingQualityReport {
   state: TrackingQualityState;
@@ -310,16 +301,40 @@ export function matrixDelta(
     return { rotationDeltaDeg: 0, translationDeltaM: 0 };
   }
   const prevMat = mat4.fromValues(
-    prev[0], prev[1], prev[2], prev[3],
-    prev[4], prev[5], prev[6], prev[7],
-    prev[8], prev[9], prev[10], prev[11],
-    prev[12], prev[13], prev[14], prev[15],
+    prev[0],
+    prev[1],
+    prev[2],
+    prev[3],
+    prev[4],
+    prev[5],
+    prev[6],
+    prev[7],
+    prev[8],
+    prev[9],
+    prev[10],
+    prev[11],
+    prev[12],
+    prev[13],
+    prev[14],
+    prev[15]
   );
   const currMat = mat4.fromValues(
-    curr[0], curr[1], curr[2], curr[3],
-    curr[4], curr[5], curr[6], curr[7],
-    curr[8], curr[9], curr[10], curr[11],
-    curr[12], curr[13], curr[14], curr[15],
+    curr[0],
+    curr[1],
+    curr[2],
+    curr[3],
+    curr[4],
+    curr[5],
+    curr[6],
+    curr[7],
+    curr[8],
+    curr[9],
+    curr[10],
+    curr[11],
+    curr[12],
+    curr[13],
+    curr[14],
+    curr[15]
   );
   const prevQuat = quat.create();
   const currQuat = quat.create();
@@ -330,7 +345,9 @@ export function matrixDelta(
   // quat.getAngle can return NaN when the quaternions are nearly identical
   // (dot product slightly > 1.0 due to float precision → acos(>1) = NaN).
   const angleRad = quat.getAngle(prevQuat, currQuat);
-  const rotationDeltaDeg = Number.isNaN(angleRad) ? 0 : (angleRad * 180) / Math.PI;
+  const rotationDeltaDeg = Number.isNaN(angleRad)
+    ? 0
+    : (angleRad * 180) / Math.PI;
   const prevT = vec3.create();
   const currT = vec3.create();
   mat4.getTranslation(prevT, prevMat);
@@ -380,7 +397,11 @@ export function computeResidualConsensus(
   if (n < 2) return { score: 0, medianResidualM: 0, count: 0 };
 
   const start = Math.max(0, n - options.residualWindowSize);
-  const glMat = mat4.fromValues(...(alignmentMatrix as unknown as number[] as Parameters<typeof mat4.fromValues>));
+  const glMat = mat4.fromValues(
+    ...(alignmentMatrix as unknown as number[] as Parameters<
+      typeof mat4.fromValues
+    >)
+  );
   const tmp = vec3.create();
 
   const normalised: number[] = [];
@@ -443,10 +464,15 @@ export interface GpsAccuracyResult {
  */
 export function computeGpsAccuracy(
   gpsPositions: readonly GpsPoint[],
-  options: { windowSize?: number; goodMedianM?: number; badMedianM?: number } = {}
+  options: {
+    windowSize?: number;
+    goodMedianM?: number;
+    badMedianM?: number;
+  } = {}
 ): GpsAccuracyResult {
   const windowSize =
-    options.windowSize ?? DEFAULT_TRACKING_QUALITY_OPTIONS.gpsAccuracyWindowSize;
+    options.windowSize ??
+    DEFAULT_TRACKING_QUALITY_OPTIONS.gpsAccuracyWindowSize;
   const goodMedianM = options.goodMedianM ?? 3;
   const badMedianM = options.badMedianM ?? 25;
   if (gpsPositions.length === 0) {
@@ -573,8 +599,10 @@ export function computeCompassAgreement(
   arPose: ARPose | null,
   options: { warnDeg?: number; failDeg?: number } = {}
 ): CompassAgreementResult {
-  const warn = options.warnDeg ?? DEFAULT_TRACKING_QUALITY_OPTIONS.compassWarnDeg;
-  const fail = options.failDeg ?? DEFAULT_TRACKING_QUALITY_OPTIONS.compassFailDeg;
+  const warn =
+    options.warnDeg ?? DEFAULT_TRACKING_QUALITY_OPTIONS.compassWarnDeg;
+  const fail =
+    options.failDeg ?? DEFAULT_TRACKING_QUALITY_OPTIONS.compassFailDeg;
   if (!alignmentMatrix || !sensorOrientation || !arPose) {
     return { score: null, headingDeltaDeg: null };
   }
@@ -589,7 +617,10 @@ export function computeCompassAgreement(
   const fy = 0;
   const fz = -1;
   // v' = q * v * q^-1, with q = (x, y, z, w).
-  const x = q.x, y = q.y, z = q.z, w = q.w;
+  const x = q.x,
+    y = q.y,
+    z = q.z,
+    w = q.w;
   const tx = 2 * (y * fz - z * fy);
   const ty = 2 * (z * fx - x * fz);
   const tz = 2 * (x * fy - y * fx);
@@ -602,11 +633,17 @@ export function computeCompassAgreement(
   // Transform by alignment rotation only (drop translation).
   const m = alignmentMatrix;
   const enuN =
-    m[0] * arForwardLocal[0] + m[4] * arForwardLocal[1] + m[8] * arForwardLocal[2];
+    m[0] * arForwardLocal[0] +
+    m[4] * arForwardLocal[1] +
+    m[8] * arForwardLocal[2];
   const enuU =
-    m[1] * arForwardLocal[0] + m[5] * arForwardLocal[1] + m[9] * arForwardLocal[2];
+    m[1] * arForwardLocal[0] +
+    m[5] * arForwardLocal[1] +
+    m[9] * arForwardLocal[2];
   const enuE =
-    m[2] * arForwardLocal[0] + m[6] * arForwardLocal[1] + m[10] * arForwardLocal[2];
+    m[2] * arForwardLocal[0] +
+    m[6] * arForwardLocal[1] +
+    m[10] * arForwardLocal[2];
   void enuU;
   const horiz = Math.hypot(enuN, enuE);
   if (horiz < 1e-6) {
@@ -645,7 +682,11 @@ export function computeGpsVsFusedDivergence(
   const n = Math.min(gpsPositions.length, odometryPositions.length);
   if (n < 2) return 0;
   const start = Math.max(0, n - windowSize);
-  const glMat = mat4.fromValues(...(alignmentMatrix as unknown as number[] as Parameters<typeof mat4.fromValues>));
+  const glMat = mat4.fromValues(
+    ...(alignmentMatrix as unknown as number[] as Parameters<
+      typeof mat4.fromValues
+    >)
+  );
   const tmp = vec3.create();
   let maxDiv = 0;
   for (let i = start; i < n; i++) {
@@ -689,10 +730,7 @@ const trackingQualitySlice = createSlice({
         state.recentAlignments.shift();
       }
     },
-    reportUpdated(
-      state,
-      action: PayloadAction<TrackingQualityReport | null>
-    ) {
+    reportUpdated(state, action: PayloadAction<TrackingQualityReport | null>) {
       state.report = action.payload;
     },
     firstAgreementReached(state, action: PayloadAction<number>) {
@@ -1023,9 +1061,7 @@ export function createTrackingQualityListenerMiddleware(
                 matrix: [...newMatrix],
               })
             );
-            api.dispatch(
-              snapshotsTrimmed({ size: opts.matrixHistorySize })
-            );
+            api.dispatch(snapshotsTrimmed({ size: opts.matrixHistorySize }));
           }
         }
       }

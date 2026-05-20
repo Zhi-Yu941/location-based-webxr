@@ -834,10 +834,12 @@ describe('permission-checker', () => {
           }),
         },
       });
-      (globalThis as unknown as Record<string, unknown>).DeviceOrientationEvent =
-        class {};
+      (
+        globalThis as unknown as Record<string, unknown>
+      ).DeviceOrientationEvent = class {};
 
-      const { subscribePermissionChanges } = await import('./permission-checker');
+      const { subscribePermissionChanges } =
+        await import('./permission-checker');
       const callback = vi.fn();
       const sub = subscribePermissionChanges(callback);
       // Wait for the initial query promises to resolve so onchange is wired.
@@ -876,10 +878,12 @@ describe('permission-checker', () => {
           }),
         },
       });
-      (globalThis as unknown as Record<string, unknown>).DeviceOrientationEvent =
-        class {};
+      (
+        globalThis as unknown as Record<string, unknown>
+      ).DeviceOrientationEvent = class {};
 
-      const { subscribePermissionChanges } = await import('./permission-checker');
+      const { subscribePermissionChanges } =
+        await import('./permission-checker');
       const callback = vi.fn();
       const sub = subscribePermissionChanges(callback);
       await new Promise((r) => setTimeout(r, 0));
@@ -919,10 +923,12 @@ describe('permission-checker', () => {
           }),
         },
       });
-      (globalThis as unknown as Record<string, unknown>).DeviceOrientationEvent =
-        class {};
+      (
+        globalThis as unknown as Record<string, unknown>
+      ).DeviceOrientationEvent = class {};
 
-      const { subscribePermissionChanges } = await import('./permission-checker');
+      const { subscribePermissionChanges } =
+        await import('./permission-checker');
       const callback = vi.fn();
       const sub = subscribePermissionChanges(callback);
       await new Promise((r) => setTimeout(r, 0));
@@ -959,10 +965,12 @@ describe('permission-checker', () => {
           }),
         },
       });
-      (globalThis as unknown as Record<string, unknown>).DeviceOrientationEvent =
-        class {};
+      (
+        globalThis as unknown as Record<string, unknown>
+      ).DeviceOrientationEvent = class {};
 
-      const { subscribePermissionChanges } = await import('./permission-checker');
+      const { subscribePermissionChanges } =
+        await import('./permission-checker');
       const callback = vi.fn();
       const sub = subscribePermissionChanges(callback);
       await new Promise((r) => setTimeout(r, 0));
@@ -993,10 +1001,12 @@ describe('permission-checker', () => {
         storage: { getDirectory: vi.fn() },
         // No `permissions` property.
       });
-      (globalThis as unknown as Record<string, unknown>).DeviceOrientationEvent =
-        class {};
+      (
+        globalThis as unknown as Record<string, unknown>
+      ).DeviceOrientationEvent = class {};
 
-      const { subscribePermissionChanges } = await import('./permission-checker');
+      const { subscribePermissionChanges } =
+        await import('./permission-checker');
       const callback = vi.fn();
       const sub = subscribePermissionChanges(callback);
       await new Promise((r) => setTimeout(r, 0));

@@ -84,7 +84,14 @@ function makeMockDeps() {
     gpsEventVisualizer: {
       getZeroRef: vi.fn<() => LatLong | null>().mockReturnValue(null),
       setZeroRef: vi.fn<(zero: LatLong) => void>(),
-      addGpsEvent: vi.fn<(gpsCoords: Vector3, odomPosition: Vector3) => void>(),
+      addGpsEvent:
+        vi.fn<
+          (
+            gpsCoords: Vector3,
+            odomPosition: Vector3,
+            accuracy?: { horizontal?: number; vertical?: number }
+          ) => void
+        >(),
       addAlignmentSnapshot: vi.fn<(nuePosition: Vector3) => void>(),
     },
     mapOverlay: {

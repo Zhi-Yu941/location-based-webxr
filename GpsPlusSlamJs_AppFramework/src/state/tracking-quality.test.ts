@@ -40,10 +40,22 @@ import type { ARPose } from '../types/ar-types';
 // ---------------------------------------------------------------------------
 
 const IDENTITY: Matrix4 = [
-  1, 0, 0, 0, // col 0
-  0, 1, 0, 0, // col 1
-  0, 0, 1, 0, // col 2
-  0, 0, 0, 1, // col 3 (translation)
+  1,
+  0,
+  0,
+  0, // col 0
+  0,
+  1,
+  0,
+  0, // col 1
+  0,
+  0,
+  1,
+  0, // col 2
+  0,
+  0,
+  0,
+  1, // col 3 (translation)
 ];
 
 function shifted(dx: number, dy: number, dz: number): Matrix4 {
@@ -68,7 +80,8 @@ function gps(
   // Approx 1 m ≈ 9e-6° lat at this latitude.
   const lat = ZERO_REF.lat + latOffsetM / 111_320;
   const lon =
-    ZERO_REF.lon + lonOffsetM / (111_320 * Math.cos((ZERO_REF.lat * Math.PI) / 180));
+    ZERO_REF.lon +
+    lonOffsetM / (111_320 * Math.cos((ZERO_REF.lat * Math.PI) / 180));
   return {
     id: `g${i}`,
     latitude: lat,
@@ -99,7 +112,10 @@ const DEFAULT_POSE: ARPose = {
 
 describe('matrixDelta', () => {
   it('returns zero deltas for identical matrices', () => {
-    const { rotationDeltaDeg, translationDeltaM } = matrixDelta(IDENTITY, IDENTITY);
+    const { rotationDeltaDeg, translationDeltaM } = matrixDelta(
+      IDENTITY,
+      IDENTITY
+    );
     expect(rotationDeltaDeg).toBeCloseTo(0, 5);
     expect(translationDeltaM).toBeCloseTo(0, 5);
   });
@@ -146,8 +162,12 @@ describe('matrixDelta', () => {
       prev: Matrix4,
       curr: Matrix4
     ): { rotationDeltaDeg: number; translationDeltaM: number } {
-      const prevMat = mat4.fromValues(...(prev as unknown as Parameters<typeof mat4.fromValues>));
-      const currMat = mat4.fromValues(...(curr as unknown as Parameters<typeof mat4.fromValues>));
+      const prevMat = mat4.fromValues(
+        ...(prev as unknown as Parameters<typeof mat4.fromValues>)
+      );
+      const currMat = mat4.fromValues(
+        ...(curr as unknown as Parameters<typeof mat4.fromValues>)
+      );
       const prevQuat = quat.create();
       const currQuat = quat.create();
       mat4.getRotation(prevQuat, prevMat);
@@ -155,12 +175,17 @@ describe('matrixDelta', () => {
       quat.normalize(prevQuat, prevQuat);
       quat.normalize(currQuat, currQuat);
       const angleRad = quat.getAngle(prevQuat, currQuat);
-      const rotationDeltaDeg = Number.isNaN(angleRad) ? 0 : angleRad * RAD_TO_DEG;
+      const rotationDeltaDeg = Number.isNaN(angleRad)
+        ? 0
+        : angleRad * RAD_TO_DEG;
       const prevT = vec3.create();
       const currT = vec3.create();
       mat4.getTranslation(prevT, prevMat);
       mat4.getTranslation(currT, currMat);
-      return { rotationDeltaDeg, translationDeltaM: vec3.distance(prevT, currT) };
+      return {
+        rotationDeltaDeg,
+        translationDeltaM: vec3.distance(prevT, currT),
+      };
     }
 
     // Compose: rotate 17° about Y then 11° about X, then translate (1.2, -0.4, 2.7).
@@ -238,16 +263,22 @@ describe('computeConvergence', () => {
 describe('computeResidualConsensus', () => {
   it('returns score 0 when alignment or zeroRef missing', () => {
     expect(
-      computeResidualConsensus(null, [gps(0, 0, 0)], [[0, 0, 0]], ZERO_REF).score
+      computeResidualConsensus(null, [gps(0, 0, 0)], [[0, 0, 0]], ZERO_REF)
+        .score
     ).toBe(0);
     expect(
-      computeResidualConsensus(IDENTITY, [gps(0, 0, 0)], [[0, 0, 0]], null).score
+      computeResidualConsensus(IDENTITY, [gps(0, 0, 0)], [[0, 0, 0]], null)
+        .score
     ).toBe(0);
   });
 
   it('returns high score when odom→GPS prediction is exact', () => {
     const odom: Vector3[] = [
-      [0, 0, 0], [1, 0, 0], [2, 0, 0], [3, 0, 0], [4, 0, 0],
+      [0, 0, 0],
+      [1, 0, 0],
+      [2, 0, 0],
+      [3, 0, 0],
+      [4, 0, 0],
     ];
     const gpsPts: GpsPoint[] = odom.map((p, i) => gps(i, p[0], p[2]));
     const r = computeResidualConsensus(IDENTITY, gpsPts, odom, ZERO_REF);
@@ -257,12 +288,14 @@ describe('computeResidualConsensus', () => {
 
   it('drops score when predictions are 10 m off', () => {
     const odom: Vector3[] = [
-      [0, 0, 0], [1, 0, 0], [2, 0, 0], [3, 0, 0], [4, 0, 0],
+      [0, 0, 0],
+      [1, 0, 0],
+      [2, 0, 0],
+      [3, 0, 0],
+      [4, 0, 0],
     ];
     // GPS positions are 10 m north of where the alignment predicts.
-    const gpsPts: GpsPoint[] = odom.map((p, i) =>
-      gps(i, p[0] + 10, p[2])
-    );
+    const gpsPts: GpsPoint[] = odom.map((p, i) => gps(i, p[0] + 10, p[2]));
     const r = computeResidualConsensus(IDENTITY, gpsPts, odom, ZERO_REF);
     expect(r.score).toBeLessThan(0.5);
     expect(r.medianResidualM).toBeGreaterThan(5);
@@ -341,7 +374,11 @@ describe('computeCoverage', () => {
 
 describe('computeCompassAgreement', () => {
   it('returns null when sensor is not absolute', () => {
-    const r = computeCompassAgreement(IDENTITY, DEFAULT_ORIENTATION, DEFAULT_POSE);
+    const r = computeCompassAgreement(
+      IDENTITY,
+      DEFAULT_ORIENTATION,
+      DEFAULT_POSE
+    );
     expect(r.score).toBeNull();
     expect(r.headingDeltaDeg).toBeNull();
   });
@@ -388,7 +425,10 @@ describe('computeGpsVsFusedDivergence', () => {
 
   it('reports the worst residual in the window', () => {
     const odom: Vector3[] = [
-      [0, 0, 0], [1, 0, 0], [2, 0, 0], [3, 0, 0],
+      [0, 0, 0],
+      [1, 0, 0],
+      [2, 0, 0],
+      [3, 0, 0],
     ];
     const gpsPts: GpsPoint[] = [
       gps(0, 0, 0),
@@ -498,10 +538,13 @@ describe('computeTrackingQualityReport', () => {
     for (let i = 0; i <= 20; i++) odom.push([i, 0, 0]);
     for (let i = 1; i <= 20; i++) odom.push([20, 0, i]);
     const gpsPts = odom.map((p, i) => gps(i, p[0], p[2], 2));
-    const snapshots: AlignmentSnapshot[] = Array.from({ length: 8 }, (_, i) => ({
-      observationIndex: i + 30,
-      matrix: [...IDENTITY],
-    }));
+    const snapshots: AlignmentSnapshot[] = Array.from(
+      { length: 8 },
+      (_, i) => ({
+        observationIndex: i + 30,
+        matrix: [...IDENTITY],
+      })
+    );
     const root = buildRootState({
       alignmentMatrix: IDENTITY,
       gpsPositions: gpsPts,
@@ -525,10 +568,13 @@ describe('computeTrackingQualityReport', () => {
     for (let i = 0; i <= 20; i++) odom.push([i, 0, 0]);
     for (let i = 1; i <= 20; i++) odom.push([20, 0, i]);
     const gpsPts = odom.map((p, i) => gps(i, p[0], p[2], 40));
-    const snapshots: AlignmentSnapshot[] = Array.from({ length: 8 }, (_, i) => ({
-      observationIndex: i + 30,
-      matrix: [...IDENTITY],
-    }));
+    const snapshots: AlignmentSnapshot[] = Array.from(
+      { length: 8 },
+      (_, i) => ({
+        observationIndex: i + 30,
+        matrix: [...IDENTITY],
+      })
+    );
     const root = buildRootState({
       alignmentMatrix: IDENTITY,
       gpsPositions: gpsPts,
@@ -563,10 +609,13 @@ describe('computeTrackingQualityReport', () => {
     for (let i = 0; i <= 20; i++) odom.push([i, 0, 0]);
     for (let i = 1; i <= 20; i++) odom.push([20, 0, i]);
     const gpsPts = odom.map((p, i) => gps(i, p[0], p[2], 2));
-    const snapshots: AlignmentSnapshot[] = Array.from({ length: 8 }, (_, i) => ({
-      observationIndex: i + 30,
-      matrix: [...IDENTITY],
-    }));
+    const snapshots: AlignmentSnapshot[] = Array.from(
+      { length: 8 },
+      (_, i) => ({
+        observationIndex: i + 30,
+        matrix: [...IDENTITY],
+      })
+    );
     // Identity alignment + AR-forward (0,0,-1) puts heading at 270°;
     // a compass reporting 90° (the 180° flip) should fail.
     const root = buildRootState({
@@ -660,9 +709,7 @@ interface ListenerHarnessState {
   trackingQuality: MinimalRoot['trackingQuality'];
 }
 
-function makeListenerStore(
-  initialGps: ListenerHarnessState['gpsData']
-) {
+function makeListenerStore(initialGps: ListenerHarnessState['gpsData']) {
   // Minimal gpsData reducer that lets us push alignment changes via
   // synthetic actions matching the library's action types.
   const gpsDataReducer = (
@@ -755,11 +802,7 @@ describe('createTrackingQualityListenerMiddleware', () => {
       const matrix = shifted(i, 0, 0);
       store.dispatch({
         type: 'gpsData/recordGpsEvent',
-        payload: snapshotGpsAfter(
-          matrix,
-          [gps(i, i, 0)],
-          [[i, 0, 0]]
-        ),
+        payload: snapshotGpsAfter(matrix, [gps(i, i, 0)], [[i, 0, 0]]),
       });
     }
     const buf = selectRecentAlignments(store.getState());

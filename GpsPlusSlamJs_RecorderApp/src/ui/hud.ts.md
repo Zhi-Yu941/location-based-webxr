@@ -26,6 +26,8 @@ Manages the HTML overlay elements: status display, buttons, modals. Provides a c
 | `updateFrameCount(count)`          | `(number) => void`         | Update the frame counter display during recording. Shows the `frame-count-info` container. Color is yellow when 0, green when > 0.                                                                                                              |
 | `hideFrameCount()`                 | `() => void`               | Hide the frame counter display (called when recording stops).                                                                                                                                                                                   |
 | `updateRefPointButtonLabel(name?)` | `(string?) => void`        | Update ref point button text for proximity detection. Pass a name to show `"📍 Capture '<name>'"`, or undefined to reset to `"📍 Mark Point"`. No-op before `initUI()`.                                                                         |
+| `updateTrackingQuality(report)`    | `(TrackingQualityReport) => void` | Show/update the tracking quality badge during recording. Unhides `#tracking-quality`, sets state label + confidence %, applies color class, populates sub-scores and diagnostics in the details panel. Re-attaches the tap-to-expand listener when the badge DOM element changes (e.g. DOM rebuild). Does not require `initUI()` — reads elements by ID. |
+| `hideTrackingQuality()`            | `() => void`               | Hide the tracking quality container and collapse the details panel. Called when recording stops.                                                                                                                                                  |
 
 ### Types (Issue 4)
 
@@ -90,6 +92,12 @@ Expects these IDs in `index.html`:
 - `gps-info`, `ar-info` - Sensor status displays
 - `frame-count-info` - Container for frame counter (hidden by default)
 - `frame-count` - Span showing the current frame count number
+- `tracking-quality` - Container for tracking quality indicator (hidden by default)
+- `tracking-quality-badge` - Compact badge with state label + confidence (tap to expand)
+- `tq-state`, `tq-confidence` - State label and confidence percentage spans
+- `tracking-quality-details` - Expandable detail panel (hidden by default)
+- `tq-convergence`, `tq-residual`, `tq-compass`, `tq-gps-accuracy`, `tq-coverage` - Sub-score divs
+- `tq-obs-count`, `tq-walked`, `tq-heading-delta`, `tq-compass-drift` - Diagnostic divs
 
 ## Invariants & Assumptions
 
@@ -125,6 +133,9 @@ Expects these IDs in `index.html`:
     - Zero-duration transition detection and immediate hiding
     - Timeout fallback when `transitionend` never fires
     - Timeout cleanup when `transitionend` fires normally
+  - `updateTrackingQuality`: state labels, color classes, confidence %, sub-scores, diagnostics, compass drift, null sub-score handling, no-op on missing container, DOM rebuild listener re-attach
+  - Tracking quality badge tap to expand/collapse: toggle details visibility, multiple toggle cycles
+  - `hideTrackingQuality`: hides container, collapses details, no-op on missing elements
 - E2E tests in `playwright-tests/enter-ar-flow.spec.js` cover:
   - Enter AR button hint display when disabled
   - New scenario creation flow

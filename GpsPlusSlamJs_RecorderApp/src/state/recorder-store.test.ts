@@ -223,11 +223,15 @@ describe('Recorder Store', () => {
       const listener = vi.fn();
       store.subscribe(listener);
 
-      // Set zero position - this SHOULD trigger notification
+      // Set zero position - this SHOULD trigger notification.
+      // The tracking-quality listener middleware also fires follow-up
+      // dispatches (snapshotPushed, reportUpdated, etc.), so the
+      // subscriber is called more than once per user dispatch.
       store.dispatch(setZeroPos({ lat: 48.8566, lon: 2.3522 }));
-      expect(listener).toHaveBeenCalledTimes(1);
+      const afterZero = listener.mock.calls.length;
+      expect(afterZero).toBeGreaterThanOrEqual(1);
 
-      // Record GPS event - this SHOULD trigger notification
+      // Record GPS event - this SHOULD trigger additional notifications
       store.dispatch(
         recordGpsEvent({
           odomPosition: [1, 2, 3],
@@ -242,7 +246,7 @@ describe('Recorder Store', () => {
           },
         })
       );
-      expect(listener).toHaveBeenCalledTimes(2);
+      expect(listener.mock.calls.length).toBeGreaterThan(afterZero);
     });
 
     it('should allow multiple subscribers and unsubscribe correctly', () => {
@@ -252,10 +256,12 @@ describe('Recorder Store', () => {
       const unsubscribe1 = store.subscribe(listener1);
       store.subscribe(listener2);
 
-      // Both should be called
+      // Both should be called (middleware may add extra dispatches)
       store.dispatch(setZeroPos({ lat: 48.8566, lon: 2.3522 }));
-      expect(listener1).toHaveBeenCalledTimes(1);
-      expect(listener2).toHaveBeenCalledTimes(1);
+      const l1AfterZero = listener1.mock.calls.length;
+      const l2AfterZero = listener2.mock.calls.length;
+      expect(l1AfterZero).toBeGreaterThanOrEqual(1);
+      expect(l2AfterZero).toBeGreaterThanOrEqual(1);
 
       // Unsubscribe listener1
       unsubscribe1();
@@ -268,8 +274,8 @@ describe('Recorder Store', () => {
           startTime: Date.now(),
         })
       );
-      expect(listener1).toHaveBeenCalledTimes(1); // Still 1
-      expect(listener2).toHaveBeenCalledTimes(2); // Now 2
+      expect(listener1.mock.calls.length).toBe(l1AfterZero); // Unchanged
+      expect(listener2.mock.calls.length).toBeGreaterThan(l2AfterZero);
     });
   });
 

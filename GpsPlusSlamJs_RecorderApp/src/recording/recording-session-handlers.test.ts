@@ -265,6 +265,7 @@ vi.mock('../ui/hud', () => ({
   showError: mockShowError,
   updateStatus: mockUpdateStatus,
   hideFrameCount: mockHideFrameCount,
+  hideTrackingQuality: vi.fn(),
   updateRefPointButtonLabel: vi.fn(),
   setNewRefPointButtonVisible: vi.fn(),
 }));

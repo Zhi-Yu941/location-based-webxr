@@ -43,6 +43,7 @@ import {
   showSetupModal,
   updateRefPointButtonLabel,
   setNewRefPointButtonVisible,
+  updateTrackingQuality,
 } from './ui/hud';
 import {
   initSessionSummary,
@@ -123,6 +124,7 @@ import {
 
 import type { LatLong } from 'gps-plus-slam-app-framework/core';
 import { odometryTrackingRestarted } from 'gps-plus-slam-app-framework/core';
+import { selectTrackingQuality } from 'gps-plus-slam-app-framework';
 import { gpsEventVisualizer } from 'gps-plus-slam-app-framework/visualization/gps-event-markers';
 import { LeafletMapOverlay } from 'gps-plus-slam-app-framework/visualization/leaflet-map-overlay';
 import {
@@ -904,6 +906,16 @@ async function handleEnterAR(): Promise<void> {
     // Issue #2 fix: Update status to match AR_READY state per Application State Machine
     updateStatus('AR active - Tap Start to record');
 
+    // Subscribe to tracking quality changes so the HUD reflects alignment health.
+    let lastReport = selectTrackingQuality(store.getState());
+    store.subscribe(() => {
+      const report = selectTrackingQuality(store.getState());
+      if (report && report !== lastReport) {
+        lastReport = report;
+        updateTrackingQuality(report);
+      }
+    });
+
     // Issue 7 Phase 2: Push AR screen state for back-button navigation
     pushScreenState('ar');
   } catch (err) {
@@ -1190,6 +1202,8 @@ if (
     },
     getRawGpsMarkerWorldSizes: () =>
       gpsEventVisualizer.getRawMarkerWorldSizes(),
+    // Tracking quality indicator hook
+    updateTrackingQuality,
     // Mandatory storage selection hooks (Task 1a-fix)
     setFolderSelected,
     setSaveLocationSelected,

@@ -31,6 +31,7 @@ import {
 import { refPointsReducer, type RefPointsState } from './ref-points-slice';
 import type { RecordingState } from 'gps-plus-slam-app-framework/state/recording-slice';
 import type { TrackingSliceState } from 'gps-plus-slam-app-framework/state/tracking-slice';
+import type { TrackingQualitySliceState } from 'gps-plus-slam-app-framework';
 import type { StorageBackend } from 'gps-plus-slam-app-framework/storage/storage-backend';
 import { OpfsStorageBackend } from 'gps-plus-slam-app-framework/storage/opfs-storage-backend';
 import type { SessionMetadata as OpfsSessionMetadata } from 'gps-plus-slam-app-framework/storage/opfs-storage';
@@ -105,6 +106,7 @@ export type { SessionMetadata as OpfsSessionMetadata } from 'gps-plus-slam-app-f
 export interface CombinedRootState extends LibraryRootState {
   recording: RecordingState;
   tracking: TrackingSliceState;
+  trackingQuality: TrackingQualitySliceState;
   refPoints: RefPointsState;
   routing: RoutingState;
   scenario: ScenarioState;

@@ -115,6 +115,8 @@ vi.mock('./ui/hud', () => ({
   showSetupModal: vi.fn(),
   updateRefPointButtonLabel: vi.fn(),
   setNewRefPointButtonVisible: vi.fn(),
+  updateTrackingQuality: vi.fn(),
+  hideTrackingQuality: vi.fn(),
 }));
 vi.mock('./ui/toast', () => ({
   initToast: vi.fn(),
@@ -316,6 +318,9 @@ vi.mock('./storage/write-failure-tracker', () => ({
 }));
 vi.mock('gps-plus-slam-app-framework/ar/capture-failure-tracker', () => ({
   createCaptureFailureTracker: vi.fn(),
+}));
+vi.mock('gps-plus-slam-app-framework', () => ({
+  selectTrackingQuality: vi.fn().mockReturnValue(null),
 }));
 vi.mock('./replay/replay-handlers', () => ({
   createReplayHandlers: vi.fn().mockReturnValue({

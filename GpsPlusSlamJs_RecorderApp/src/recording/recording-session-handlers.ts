@@ -68,6 +68,7 @@ import {
   showError,
   updateStatus,
   hideFrameCount,
+  hideTrackingQuality,
   updateSyncStatus,
 } from '../ui/hud';
 import {
@@ -434,6 +435,7 @@ export function createRecordingSessionHandlers(
 
     stopImageCapture();
     hideFrameCount();
+    hideTrackingQuality();
     stopDepthCapture();
     stopGpsWatch();
     stopOrientationWatch();

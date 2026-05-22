@@ -312,6 +312,8 @@ vi.mock('./ui/hud', () => ({
   hideFrameCount: vi.fn(),
   updateRefPointButtonLabel: vi.fn(),
   setNewRefPointButtonVisible: vi.fn(),
+  updateTrackingQuality: vi.fn(),
+  hideTrackingQuality: vi.fn(),
 }));
 
 // Mock session-browser for handleOpenFolder tests (Issue 1 — 2026-02-27 + 2026-03-01)
@@ -469,6 +471,10 @@ vi.mock('gps-plus-slam-app-framework/ar/webxr-session', () => ({
 // `gps-plus-slam-app-framework/core` rather than directly from `gps-plus-slam-js`.)
 vi.mock('gps-plus-slam-app-framework/core', () => ({
   odometryTrackingRestarted: mockOdometryTrackingRestarted,
+}));
+
+vi.mock('gps-plus-slam-app-framework', () => ({
+  selectTrackingQuality: vi.fn().mockReturnValue(null),
 }));
 
 import {

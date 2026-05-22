@@ -5,6 +5,7 @@
  */
 
 import type { PermissionCheckResult } from 'gps-plus-slam-app-framework/sensors/permission-checker';
+import type { TrackingQualityReport, TrackingQualityState } from 'gps-plus-slam-app-framework';
 import { listFormatter } from 'gps-plus-slam-app-framework/utils/list-formatter';
 import { getRequiredElement } from '../utils/dom-helpers';
 import { DEFAULT_SCENARIO } from './session-browser';
@@ -350,6 +351,98 @@ export function hideFrameCount(): void {
   if (frameCountInfo) {
     frameCountInfo.classList.add('hidden');
   }
+}
+
+// ---------------------------------------------------------------------------
+// Tracking Quality indicator
+// ---------------------------------------------------------------------------
+
+const STATE_COLOR: Record<TrackingQualityState, string> = {
+  ok: 'text-green-400',
+  degraded: 'text-yellow-400',
+  'warming-up': 'text-gray-400',
+  'ar-lost': 'text-red-400',
+};
+
+const STATE_LABEL: Record<TrackingQualityState, string> = {
+  ok: 'OK',
+  degraded: 'DEGRADED',
+  'warming-up': 'WARMING UP',
+  'ar-lost': 'AR LOST',
+};
+
+let tqDetailsExpanded = false;
+let tqBadgeWithListener: HTMLElement | null = null;
+
+function pct(v: number | null): string {
+  if (v === null) return 'n/a';
+  return `${Math.round(v * 100)}%`;
+}
+
+export function updateTrackingQuality(report: TrackingQualityReport): void {
+  const container = document.getElementById('tracking-quality');
+  if (!container) return;
+
+  container.classList.remove('hidden');
+
+  const badge = document.getElementById('tracking-quality-badge');
+  const stateEl = document.getElementById('tq-state');
+  const confEl = document.getElementById('tq-confidence');
+  if (badge && stateEl && confEl) {
+    stateEl.textContent = STATE_LABEL[report.state];
+    confEl.textContent = pct(report.confidence);
+    badge.className = `${STATE_COLOR[report.state]} cursor-pointer`;
+  }
+
+  // Sub-scores (detail panel)
+  const { subScores, diagnostics } = report;
+  setDetail('tq-convergence', `Conv: ${pct(subScores.convergence)}`);
+  setDetail('tq-residual', `Resid: ${pct(subScores.residualConsensus)}`);
+  setDetail('tq-compass', `Compass: ${pct(subScores.compassAgreement)}`);
+  setDetail('tq-gps-accuracy', `GPS Acc: ${pct(subScores.gpsAccuracy)}`);
+  setDetail('tq-coverage', `Coverage: ${pct(subScores.coverage)}`);
+
+  // Diagnostics
+  setDetail('tq-obs-count', `Obs: ${diagnostics.observationsSeen}`);
+  setDetail('tq-walked', `Walked: ${Math.round(diagnostics.walkedDistanceM)}m`);
+  setDetail(
+    'tq-heading-delta',
+    diagnostics.headingDeltaDeg !== null
+      ? `Heading Δ: ${diagnostics.headingDeltaDeg.toFixed(1)}°`
+      : 'Heading Δ: n/a'
+  );
+  setDetail(
+    'tq-compass-drift',
+    diagnostics.compassDriftDetected ? 'COMPASS DRIFT' : ''
+  );
+
+  // Wire toggle listener — re-attach if badge element changed (DOM rebuild)
+  if (badge && badge !== tqBadgeWithListener) {
+    tqDetailsExpanded = false;
+    badge.addEventListener('click', toggleTrackingQualityDetails);
+    tqBadgeWithListener = badge;
+  }
+}
+
+export function hideTrackingQuality(): void {
+  const container = document.getElementById('tracking-quality');
+  if (container) container.classList.add('hidden');
+
+  tqDetailsExpanded = false;
+  const details = document.getElementById('tracking-quality-details');
+  if (details) details.classList.add('hidden');
+}
+
+function toggleTrackingQualityDetails(): void {
+  const details = document.getElementById('tracking-quality-details');
+  if (!details) return;
+  tqDetailsExpanded = !tqDetailsExpanded;
+  details.classList.toggle('hidden', !tqDetailsExpanded);
+}
+
+function setDetail(id: string, text: string): void {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
 }
 
 /**

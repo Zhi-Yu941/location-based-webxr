@@ -13,6 +13,7 @@
 
 import type { RefPointPickerResult } from './ui/ref-point-picker';
 import type { PermissionCheckResult } from 'gps-plus-slam-app-framework/sensors/permission-checker';
+import type { TrackingQualityReport } from 'gps-plus-slam-app-framework';
 import type { SessionSummaryData } from './ui/session-summary';
 
 declare global {
@@ -68,6 +69,8 @@ declare global {
         y: number;
         z: number;
       }>;
+      // Tracking quality indicator hook
+      updateTrackingQuality: (report: TrackingQualityReport) => void;
       // Mandatory storage selection hooks (Task 1a-fix)
       setFolderSelected: (selected: boolean) => void;
       setSaveLocationSelected: (selected: boolean) => void;

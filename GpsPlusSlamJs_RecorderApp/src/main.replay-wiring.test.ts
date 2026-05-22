@@ -77,6 +77,8 @@ vi.mock('./ui/hud', () => ({
   showSetupModal: vi.fn(),
   updateRefPointButtonLabel: vi.fn(),
   setNewRefPointButtonVisible: vi.fn(),
+  updateTrackingQuality: vi.fn(),
+  hideTrackingQuality: vi.fn(),
 }));
 vi.mock('./ui/toast', () => ({
   initToast: vi.fn(),
@@ -265,6 +267,9 @@ vi.mock('gps-plus-slam-app-framework/ar/capture-failure-tracker', () => ({
 }));
 vi.mock('gps-plus-slam-app-framework/utils/list-formatter', () => ({
   listFormatter: { format: vi.fn() },
+}));
+vi.mock('gps-plus-slam-app-framework', () => ({
+  selectTrackingQuality: vi.fn().mockReturnValue(null),
 }));
 
 // Import after all mocks are set up

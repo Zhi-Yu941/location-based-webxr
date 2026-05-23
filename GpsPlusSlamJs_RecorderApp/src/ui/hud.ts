@@ -397,27 +397,16 @@ export function updateTrackingQuality(report: TrackingQualityReport): void {
     badge.className = `${STATE_COLOR[report.state]} cursor-pointer`;
   }
 
-  // Sub-scores (detail panel)
-  const { subScores, diagnostics } = report;
+  // Sub-scores (detail panel). Compass / Heading Δ / drift, Obs count, and
+  // walked distance were removed in Findings 2 & 3 (2026-05-23 field test):
+  // compass is unobservable on the iPhone hardware in use, and Obs/Walked
+  // are diagnostic noise the user cannot act on. The fields remain on the
+  // report so background metrics and tests can still consume them.
+  const { subScores } = report;
   setDetail('tq-convergence', `Conv: ${pct(subScores.convergence)}`);
   setDetail('tq-residual', `Resid: ${pct(subScores.residualConsensus)}`);
-  setDetail('tq-compass', `Compass: ${pct(subScores.compassAgreement)}`);
   setDetail('tq-gps-accuracy', `GPS Acc: ${pct(subScores.gpsAccuracy)}`);
   setDetail('tq-coverage', `Coverage: ${pct(subScores.coverage)}`);
-
-  // Diagnostics
-  setDetail('tq-obs-count', `Obs: ${diagnostics.observationsSeen}`);
-  setDetail('tq-walked', `Walked: ${Math.round(diagnostics.walkedDistanceM)}m`);
-  setDetail(
-    'tq-heading-delta',
-    diagnostics.headingDeltaDeg !== null
-      ? `Heading Δ: ${diagnostics.headingDeltaDeg.toFixed(1)}°`
-      : 'Heading Δ: n/a'
-  );
-  setDetail(
-    'tq-compass-drift',
-    diagnostics.compassDriftDetected ? 'COMPASS DRIFT' : ''
-  );
 
   // Wire toggle listener — re-attach if badge element changed (DOM rebuild)
   if (badge && badge !== tqBadgeWithListener) {

@@ -96,8 +96,7 @@ Expects these IDs in `index.html`:
 - `tracking-quality-badge` - Compact badge with state label + confidence (tap to expand)
 - `tq-state`, `tq-confidence` - State label and confidence percentage spans
 - `tracking-quality-details` - Expandable detail panel (hidden by default)
-- `tq-convergence`, `tq-residual`, `tq-compass`, `tq-gps-accuracy`, `tq-coverage` - Sub-score divs
-- `tq-obs-count`, `tq-walked`, `tq-heading-delta`, `tq-compass-drift` - Diagnostic divs
+- `tq-convergence`, `tq-residual`, `tq-gps-accuracy`, `tq-coverage` - Sub-score divs (the four surviving the 2026-05-23 field-test pruning, Findings 2/3/5). Compass / Heading Δ / drift, Obs and Walked were removed from the HUD — the underlying fields remain on the `TrackingQualityReport` for background metrics + tests.
 
 ## Invariants & Assumptions
 

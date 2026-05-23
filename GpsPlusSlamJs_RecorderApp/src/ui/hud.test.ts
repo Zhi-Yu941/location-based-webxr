@@ -59,13 +59,8 @@ function setupMinimalDOM(): void {
       <div id="tracking-quality-details" class="hidden">
         <div id="tq-convergence"></div>
         <div id="tq-residual"></div>
-        <div id="tq-compass"></div>
         <div id="tq-gps-accuracy"></div>
         <div id="tq-coverage"></div>
-        <div id="tq-obs-count"></div>
-        <div id="tq-walked"></div>
-        <div id="tq-heading-delta"></div>
-        <div id="tq-compass-drift"></div>
       </div>
     </div>
     <textarea id="session-notes" disabled></textarea>
@@ -2478,6 +2473,11 @@ describe('updateTrackingQuality', () => {
 
   // Why: sub-scores must be visible in the expanded detail view.
   it('populates sub-score values in detail panel', () => {
+    // Why: confirms the four sub-scores that survived the 2026-05-23
+    // field-test pruning (Findings 2, 3, 5) still render. compass /
+    // headingDelta / obs / walked were intentionally removed from the
+    // HUD; they remain on the report for background metrics + tests but
+    // are no longer in the detail panel.
     updateTrackingQuality(
       makeReport({
         subScores: {
@@ -2496,7 +2496,6 @@ describe('updateTrackingQuality', () => {
     expect(document.getElementById('tq-residual')!.textContent).toContain(
       '72%'
     );
-    expect(document.getElementById('tq-compass')!.textContent).toContain('88%');
     expect(document.getElementById('tq-gps-accuracy')!.textContent).toContain(
       '65%'
     );
@@ -2505,74 +2504,15 @@ describe('updateTrackingQuality', () => {
     );
   });
 
-  // Why: compass sub-score is null when device lacks absolute orientation.
-  it('shows n/a for null compass agreement', () => {
-    updateTrackingQuality(
-      makeReport({
-        subScores: {
-          convergence: 0.9,
-          residualConsensus: 0.85,
-          compassAgreement: null,
-          gpsAccuracy: 0.88,
-          coverage: 1.0,
-        },
-      })
-    );
-    expect(document.getElementById('tq-compass')!.textContent).toContain('n/a');
-  });
-
-  // Why: diagnostics give advanced users actionable debugging info.
-  it('populates observation count and walked distance', () => {
-    updateTrackingQuality(
-      makeReport({
-        diagnostics: {
-          recentMaxRotationDeltaDeg: 1.0,
-          recentMaxTranslationDeltaM: 0.3,
-          medianResidualM: 2.0,
-          medianRecentGpsAccuracyM: 5.0,
-          walkedDistanceM: 55,
-          directionSpreadDeg: 150,
-          headingDeltaDeg: 8.0,
-          compassDriftDetected: false,
-          observationsSeen: 30,
-          gpsVsFusedMaxDivergenceM: 2.5,
-        },
-      })
-    );
-    expect(document.getElementById('tq-obs-count')!.textContent).toContain(
-      '30'
-    );
-    expect(document.getElementById('tq-walked')!.textContent).toContain('55');
-  });
-
-  // Why: compass drift is a critical field-visible warning.
-  it('shows compass drift warning when detected', () => {
-    updateTrackingQuality(
-      makeReport({
-        diagnostics: {
-          recentMaxRotationDeltaDeg: 1.0,
-          recentMaxTranslationDeltaM: 0.3,
-          medianResidualM: 2.0,
-          medianRecentGpsAccuracyM: 5.0,
-          walkedDistanceM: 55,
-          directionSpreadDeg: 150,
-          headingDeltaDeg: 25.0,
-          compassDriftDetected: true,
-          observationsSeen: 30,
-          gpsVsFusedMaxDivergenceM: 2.5,
-        },
-      })
-    );
-    expect(document.getElementById('tq-compass-drift')!.textContent).toContain(
-      'DRIFT'
-    );
-  });
-
-  // Why: no false alarm when compass is stable.
-  it('hides compass drift warning when not detected', () => {
+  // Why: Findings 2 & 3 removed compass / heading / obs / walked from the
+  // HUD. Guard the deletion so a careless re-add is caught.
+  it('does not render compass, heading, obs, or walked elements', () => {
     updateTrackingQuality(makeReport());
-    const el = document.getElementById('tq-compass-drift')!;
-    expect(el.textContent).not.toContain('DRIFT');
+    expect(document.getElementById('tq-compass')).toBeNull();
+    expect(document.getElementById('tq-heading-delta')).toBeNull();
+    expect(document.getElementById('tq-compass-drift')).toBeNull();
+    expect(document.getElementById('tq-obs-count')).toBeNull();
+    expect(document.getElementById('tq-walked')).toBeNull();
   });
 });
 

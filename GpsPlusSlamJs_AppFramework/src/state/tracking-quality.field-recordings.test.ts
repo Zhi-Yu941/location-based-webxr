@@ -279,9 +279,7 @@ describe.runIf(fixturesAvailable)(
         // here means either the thresholds drifted or the outdoor
         // recording started behaving differently (in which case
         // re-run the diagnostic dump in the F6 §5 item 1 doc).
-        const samples = outdoorResult.snapshots.filter(
-          (s) => s.atGpsObs >= 60
-        );
+        const samples = outdoorResult.snapshots.filter((s) => s.atGpsObs >= 60);
         expect(samples.length).toBeGreaterThanOrEqual(3);
         for (const s of samples) {
           expect(
@@ -300,9 +298,9 @@ describe.runIf(fixturesAvailable)(
           (s) => s.atGpsObs >= 120
         );
         for (const s of lateSamples) {
-          expect(
-            s.report.diagnostics.recentSumTranslationDeltaM
-          ).toBeLessThan(8);
+          expect(s.report.diagnostics.recentSumTranslationDeltaM).toBeLessThan(
+            8
+          );
         }
       });
 
@@ -316,9 +314,9 @@ describe.runIf(fixturesAvailable)(
         expect(
           indoorResult.finalReport!.diagnostics.recentSumRotationDeltaDeg
         ).toBeGreaterThan(50);
-        expect(
-          indoorResult.finalReport!.subScores.convergence
-        ).toBeLessThan(0.2);
+        expect(indoorResult.finalReport!.subScores.convergence).toBeLessThan(
+          0.2
+        );
       });
     });
 

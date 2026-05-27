@@ -188,41 +188,80 @@ function createMockStore(
 }
 
 /**
- * Extract the RefPointMark from the most recent
- * `refPoints/addCurrentRefPointMark` action dispatched on the given store.
+ * Synthesize the RefPointMark that the production listener middleware
+ * (`createRefPointMarkListenerMiddleware`, F2) would build for the most
+ * recent `gpsData/markReferencePoint` action.
  *
- * Why: Finding 5 (2026-04-30 plan) moves visualization through Redux. The
- * call site dispatches the mark instead of calling refPointVisualizer
- * directly; tests that previously asserted on the visualizer's
- * `addCurrentRefPoint` mock now assert on the dispatched action payload.
+ * Why: these tests run against a mock store that does not install the real
+ * listener middleware. To keep the existing call-site contract assertions
+ * meaningful, we reconstruct the mark deterministically from the action
+ * payload plus the current store state — the same inputs the listener uses.
+ * Production correctness of the listener itself is covered by
+ * `src/state/ref-point-mark-listener.test.ts`.
  */
+function resolveSynthGpsPosition(
+  store: RecorderStore,
+  rawGpsPoint: { latitude: number; longitude: number; altitude?: number }
+): { lat: number; lon: number; altitude?: number } {
+  const state = store.getState() as unknown as {
+    gpsData?: {
+      zero?: unknown;
+      gpsEvents?: { alignmentMatrix?: number[] | null };
+    };
+  };
+  const alignmentMatrix = state.gpsData?.gpsEvents?.alignmentMatrix;
+  const zeroRef = state.gpsData?.zero;
+  if (alignmentMatrix && zeroRef) {
+    const fused = mockFusedGpsFromOdom.mock.results.at(-1)?.value as
+      | { lat: number; lon: number; altitude?: number }
+      | undefined;
+    return {
+      lat: fused?.lat ?? rawGpsPoint.latitude,
+      lon: fused?.lon ?? rawGpsPoint.longitude,
+      altitude: fused?.altitude ?? rawGpsPoint.altitude,
+    };
+  }
+  return {
+    lat: rawGpsPoint.latitude,
+    lon: rawGpsPoint.longitude,
+    altitude: rawGpsPoint.altitude,
+  };
+}
+
 function getDispatchedCurrentMark(store: RecorderStore): RefPointMark {
-  const dispatch = store.dispatch as unknown as ReturnType<typeof vi.fn>;
-  const calls = dispatch.mock.calls as Array<
-    [{ type: string; payload: unknown }]
+  const calls = mockMarkReferencePoint.mock.calls as Array<
+    [
+      {
+        id: string;
+        position: Vector3;
+        rotation: Quaternion;
+        rawGpsPoint: { latitude: number; longitude: number; altitude?: number };
+        timestamp?: number;
+      },
+    ]
   >;
-  const match = [...calls]
-    .reverse()
-    .find(([a]) => a?.type === 'refPoints/addCurrentRefPointMark');
-  if (!match) {
+  const payload = calls[calls.length - 1]?.[0];
+  if (!payload) {
     throw new Error(
-      'Expected a refPoints/addCurrentRefPointMark action to have been dispatched'
+      'Expected a gpsData/markReferencePoint action to have been dispatched'
     );
   }
-  return match[0].payload as RefPointMark;
+  return {
+    id: payload.id,
+    odomPosition: payload.position,
+    odomRotation: payload.rotation,
+    gpsPosition: resolveSynthGpsPosition(store, payload.rawGpsPoint),
+    timestamp: payload.timestamp ?? Date.now(),
+  };
 }
 
 /**
- * Assert that at least one `refPoints/addCurrentRefPointMark` action was
- * dispatched on the given store. Replacement for the legacy assertion
- * `expect(mockRefPointVisualizer.addCurrentRefPoint).toHaveBeenCalled()`.
+ * Assert that at least one `gpsData/markReferencePoint` action was
+ * dispatched (the production trigger that drives the listener's
+ * `addCurrentRefPointMark` synthesis in F2).
  */
-function expectCurrentRefPointDispatched(store: RecorderStore): void {
-  const dispatch = store.dispatch as unknown as ReturnType<typeof vi.fn>;
-  const calls = dispatch.mock.calls as Array<[{ type: string }]>;
-  expect(
-    calls.some(([a]) => a?.type === 'refPoints/addCurrentRefPointMark')
-  ).toBe(true);
+function expectCurrentRefPointDispatched(_store: RecorderStore): void {
+  expect(mockMarkReferencePoint).toHaveBeenCalled();
 }
 
 function createMockGpsPoint(overrides?: Partial<GpsPoint>): GpsPoint {

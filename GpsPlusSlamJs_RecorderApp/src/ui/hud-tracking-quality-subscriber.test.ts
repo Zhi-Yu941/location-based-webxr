@@ -31,7 +31,7 @@ function dispatchSyntheticPose(
         position: { x: index * 0.1, y: 0, z: 0 },
         orientation: { x: 0, y: 0, z: 0, w: 1 },
       },
-      sensorOrientation: { alpha: index, beta: 0, gamma: 0 },
+      sensorOrientation: { alpha: index, beta: 0, gamma: 0, absolute: true },
     })
   );
 }

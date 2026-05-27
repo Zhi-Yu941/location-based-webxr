@@ -19,7 +19,7 @@ closure and silently regressing — the F1 failure mode documented in
     reference is `===` the old one in tests).
   - `subscribe(listener: (value: T) => void): () => void` — registers a
     listener and returns an unsubscribe function. Listeners are
-    invoked *after* the internal value has been updated, so
+    invoked _after_ the internal value has been updated, so
     `ref.get()` inside the listener returns the new value.
 
 ## Invariants

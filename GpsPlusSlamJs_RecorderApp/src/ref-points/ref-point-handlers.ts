@@ -16,7 +16,6 @@ import { getCurrentScenarioHandle } from 'gps-plus-slam-app-framework/storage/fi
 import {
   saveRefPointObservation,
   type RefPointObservation,
-  type RefPointMark,
 } from '../storage/ref-point-loader';
 import type { ImportedRefPoint } from '../storage/ref-point-importer';
 import {
@@ -35,7 +34,6 @@ import {
   incrementRefPointUsage,
   clearSessionRefPointUsage as clearSessionRefPointUsageAction,
   resetRefPointsState,
-  addCurrentRefPointMark,
   selectCachedKnownRefPoints,
   type GpsPoint,
 } from '../state/recorder-store';
@@ -201,39 +199,20 @@ export function createRefPointHandlers(
   }
 
   function visualizeRefPoint(
-    refPointId: string,
-    odomPosition: Vector3,
-    odomRotation: Quaternion,
-    lastGpsPoint: GpsPoint,
-    timestamp: number,
-    fusedGpsPoint?: { latitude: number; longitude: number; altitude?: number }
+    _refPointId: string,
+    _odomPosition: Vector3,
+    _odomRotation: Quaternion,
+    _lastGpsPoint: GpsPoint,
+    _timestamp: number,
+    _fusedGpsPoint?: { latitude: number; longitude: number; altitude?: number }
   ): void {
-    // Prefer fused GPS so the red current-session sphere sits where the
-    // next session's green sphere will appear (loader also prefers fused —
-    // see 2026-04-24-refpoint-positioning-investigation.md §7).
-    //
-    // Per-field fallback (Option B, 2026-04-29 user-feedback Finding 1):
-    // mirrors `flattenRefPointsToMarks` in the loader. Fused altitude may
-    // be undefined on legacy recordings (calcGpsCoords altitude-discard
-    // bug); falling back to raw altitude recovers the value the recorder
-    // originally intended. New recordings (post-fix) populate fused
-    // altitude themselves, so the fallback only fires for legacy data.
-    const gpsPosition = {
-      lat: fusedGpsPoint?.latitude ?? lastGpsPoint.latitude,
-      lon: fusedGpsPoint?.longitude ?? lastGpsPoint.longitude,
-      altitude: fusedGpsPoint?.altitude ?? lastGpsPoint.altitude,
-    };
-    const refPointMark: RefPointMark = {
-      id: refPointId,
-      odomPosition,
-      odomRotation,
-      gpsPosition,
-      timestamp,
-    };
-    // Finding 5: dispatch into the slice; the visualizer subscribes via
-    // wireStoreSubscribers and renders the red sphere from there.
-    // See docs/2026-04-30-refpoint-marks-into-redux-plan.md.
-    deps.getStore().dispatch(addCurrentRefPointMark(refPointMark));
+    // No-op as of F2 (2026-05-26 user feedback): the red current-session
+    // sphere is now driven exclusively by the `ref-point-mark-listener`
+    // middleware, which intercepts every `gpsData/markReferencePoint`
+    // action (live and replay) and dispatches `addCurrentRefPointMark`.
+    // Keeping the function as a documented seam in case future visual
+    // side effects (e.g., animation, audio cue) need to attach to the
+    // live-mark flow only.
   }
 
   // --- Main handler ---

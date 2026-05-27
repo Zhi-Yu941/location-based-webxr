@@ -37,6 +37,7 @@ import { OpfsStorageBackend } from 'gps-plus-slam-app-framework/storage/opfs-sto
 import type { SessionMetadata as OpfsSessionMetadata } from 'gps-plus-slam-app-framework/storage/opfs-storage';
 import { routingReducer, type RoutingState } from './routing-slice';
 import { scenarioReducer, type ScenarioState } from './scenario-slice';
+import { createRefPointMarkListenerMiddleware } from './ref-point-mark-listener';
 
 // --- Re-exports for backwards compatibility with consumers that previously
 // imported these from `gps-plus-slam-app-framework/state/store`. The framework
@@ -156,6 +157,7 @@ export function createRecorderStore(
       routing: routingReducer,
       scenario: scenarioReducer,
     },
+    extraMiddleware: [createRefPointMarkListenerMiddleware()],
   });
 
   return {

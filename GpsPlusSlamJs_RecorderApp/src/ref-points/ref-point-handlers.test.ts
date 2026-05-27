@@ -754,6 +754,39 @@ describe('handleMarkRefPoint — full flow', () => {
     expect(mockStore.dispatch).toHaveBeenCalled();
     expectCurrentRefPointDispatched(mockStore);
   });
+
+  // Why (Step 2 of 2026-05-27 slice-collapse plan): the dispatched
+  // `markReferencePoint` action must carry the live alignment matrix so the
+  // library reducer can derive the fused-at-mark-time `gpsPoint` snapshot
+  // itself. When the recorder has no alignment yet, the payload omits the
+  // field (the reducer falls back to raw-projection in that case).
+  it('should pass alignmentMatrix on the dispatched markReferencePoint payload when present', async () => {
+    const matrix = new Array(16).fill(0) as number[];
+    matrix[0] = matrix[5] = matrix[10] = matrix[15] = 1;
+    const storeWithMatrix = createMockStore([createMockGpsPoint()], {
+      alignmentMatrix: matrix,
+    });
+    const localHandlers = createRefPointHandlers(
+      createDefaultDeps({ getStore: () => storeWithMatrix })
+    );
+
+    await localHandlers.handleMarkRefPoint();
+
+    const payload = mockMarkReferencePoint.mock.calls.at(-1)?.[0] as {
+      alignmentMatrix?: number[];
+    };
+    expect(payload.alignmentMatrix).toEqual(matrix);
+  });
+
+  it('should omit alignmentMatrix when none is in state', async () => {
+    // mockStore created in beforeEach has alignmentMatrix=null.
+    await handlers.handleMarkRefPoint();
+
+    const payload = mockMarkReferencePoint.mock.calls.at(-1)?.[0] as {
+      alignmentMatrix?: number[];
+    };
+    expect(payload.alignmentMatrix).toBeUndefined();
+  });
 });
 
 // ============================================================================

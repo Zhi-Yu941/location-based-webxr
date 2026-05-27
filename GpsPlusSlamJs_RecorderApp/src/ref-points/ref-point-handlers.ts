@@ -36,6 +36,7 @@ import {
   resetRefPointsState,
   selectCachedKnownRefPoints,
   type GpsPoint,
+  type MarkReferencePointPayload,
 } from '../state/recorder-store';
 import { fusedGpsFromOdom } from 'gps-plus-slam-app-framework/utils/fused-path';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
@@ -44,7 +45,11 @@ import {
   findNearbyGeoAnchor,
 } from 'gps-plus-slam-app-framework/geo/h3-proximity';
 import { webxrToNUE } from 'gps-plus-slam-app-framework/core';
-import type { Vector3, Quaternion } from 'gps-plus-slam-app-framework/core';
+import type {
+  Vector3,
+  Quaternion,
+  Matrix4,
+} from 'gps-plus-slam-app-framework/core';
 import type { RecorderStore } from '../state/recorder-store';
 
 const log = createLogger('RefPointHandlers');
@@ -153,7 +158,8 @@ export function createRefPointHandlers(
     odomPosition: Vector3,
     odomRotation: Quaternion,
     gpsPoint: GpsPoint,
-    timestamp: number
+    timestamp: number,
+    alignmentMatrix: Matrix4 | null | undefined
   ): void {
     // Extract raw sensor fields from state-side GpsPoint for the action payload.
     // Derived fields (coordinates, weight, zeroRef, deviceRotation) are
@@ -165,15 +171,22 @@ export function createRefPointHandlers(
       deviceRotation: _d,
       ...rawGpsPoint
     } = gpsPoint;
-    deps.getStore().dispatch(
-      markReferencePoint({
-        id: refPointId,
-        position: odomPosition,
-        rotation: odomRotation,
-        rawGpsPoint,
-        timestamp,
-      })
-    );
+    // Pass the live alignment matrix on the payload when one is available so
+    // the library reducer can derive the fused-at-mark-time `gpsPoint`
+    // snapshot itself (step 2 of the 2026-05-27 slice-collapse plan).
+    // Omit the field entirely when no matrix is known so the reducer falls
+    // back to the raw-projection path.
+    const payload: MarkReferencePointPayload = {
+      id: refPointId,
+      position: odomPosition,
+      rotation: odomRotation,
+      rawGpsPoint,
+      timestamp,
+    };
+    if (alignmentMatrix) {
+      payload.alignmentMatrix = alignmentMatrix;
+    }
+    deps.getStore().dispatch(markReferencePoint(payload));
   }
 
   async function persistRefPointObservation(
@@ -337,7 +350,8 @@ export function createRefPointHandlers(
         odomPosition,
         odomRotation,
         lastGpsPoint,
-        timestamp
+        timestamp,
+        alignmentMatrix
       );
 
       // Persist to disk

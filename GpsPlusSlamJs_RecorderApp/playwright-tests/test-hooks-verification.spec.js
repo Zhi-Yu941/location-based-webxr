@@ -234,6 +234,11 @@ test.describe('Test Hooks Match Real Behavior', () => {
       'getGpsEventVisualizerCounts',
       'setGpsEventVisualizerZeroRef',
       'clearGpsEventVisualizer',
+      // GPS accuracy ellipsoid hooks (§3c)
+      'addGpsEventForTest',
+      'getRawGpsMarkerWorldSizes',
+      // Tracking quality indicator hook (F1)
+      'updateTrackingQuality',
       // Mandatory storage selection hooks (Task 1a-fix)
       'setFolderSelected',
       'setSaveLocationSelected',

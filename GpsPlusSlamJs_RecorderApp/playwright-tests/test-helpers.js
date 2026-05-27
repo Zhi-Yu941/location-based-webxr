@@ -146,6 +146,11 @@ export async function waitForTestHooks(page) {
       window.testHooks?.getGpsEventVisualizerCounts &&
       window.testHooks?.setGpsEventVisualizerZeroRef &&
       window.testHooks?.clearGpsEventVisualizer &&
+      // GPS accuracy ellipsoid hooks (§3c)
+      window.testHooks?.addGpsEventForTest &&
+      window.testHooks?.getRawGpsMarkerWorldSizes &&
+      // Tracking quality indicator hook (F1)
+      window.testHooks?.updateTrackingQuality &&
       // Mandatory storage selection hooks (Task 1a-fix)
       window.testHooks?.setFolderSelected &&
       window.testHooks?.setSaveLocationSelected,

@@ -2,14 +2,28 @@
 
 F3.4 of the [tracking-quality regression & replay-gaps feedback](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-26-tracking-quality-regression-and-replay-gaps-user-feedback.md).
 
-Connects the `framesInScene` slice (F3.1) to the `FrameTileVisualizer` (F3.3).
+Connects frame-tile data to the `FrameTileVisualizer` (F3.3).
+
+## Data source
+
+As of Step 3 of the [2026-05-27 collapse-refPoint-and-frame-slices plan](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-27-collapse-refpoint-and-frame-slices-plan.md)
+the wirer reads from the framework selector
+`selectFrameTilesInWebXR(state)` instead of the recorder-local
+`state.framesInScene.frames` mirror. The selector pulls
+`state.gpsData.odometryPath.points` (the library's NUE-stored frames)
+and converts them back to WebXR coordinates. The legacy
+`framesInScene` slice and its listener are kept temporarily as a
+dead-writer mirror; both are removed in Step 5 of the same plan.
 
 ## Responsibilities
 
-- Subscribe to `state.framesInScene.frames` via the active store in
-  `StoreRef<RecorderStore>`. On every dispatch the wirer diffs the
-  frames array tail and processes each newly observed entry.
-- For each new `FrameInScene`:
+- Subscribe to the active store in `StoreRef<RecorderStore>` and run
+  `selectFrameTilesInWebXR` on every dispatch. The selector is
+  reselect-memoised over `state.gpsData`, so the subscribe handler is
+  cheap when no frame was added.
+- Diff the returned `readonly ArImageCapture[]` (aliased as
+  `FrameTile` for callers) tail and process each newly observed entry.
+- For each new `FrameTile`:
   1. fetch the JPEG blob via the injected `blobSource(imageFile)`,
   2. apply `minFrameBytes` (default `DEFAULT_MIN_FRAME_BYTES = 2000`)
      to reject broken / empty frames,

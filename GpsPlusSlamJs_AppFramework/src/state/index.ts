@@ -153,6 +153,7 @@ export {
   selectOdometryRotations,
   selectZeroReference,
   selectReferencePoints,
+  selectFrameTilesInWebXR,
 } from './app-selectors.js';
 
 // --- tracking-quality (Phase A of

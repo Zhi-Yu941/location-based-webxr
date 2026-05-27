@@ -7,16 +7,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 
+import { add2dImage, setZeroPos } from 'gps-plus-slam-app-framework/state';
 import { NullStorageBackend } from 'gps-plus-slam-app-framework/storage/null-storage-backend';
 import { createRecorderStore } from '../state/recorder-store';
-import {
-  addFrameInScene,
-  type FrameInScene,
-} from '../state/frames-in-scene-slice';
 import { createStoreRef } from '../state/store-ref';
-import { wireFrameTileSubscribers } from './wire-frame-tile-subscribers';
+import {
+  wireFrameTileSubscribers,
+  type FrameTile,
+} from './wire-frame-tile-subscribers';
 
-function makeFrame(overrides: Partial<FrameInScene> = {}): FrameInScene {
+/**
+ * Build an `add2dImage` payload (WebXR coords). Round-tripping through
+ * the library's NUE conversion + the selector's NUE→WebXR conversion
+ * yields the same WebXR coords (modulo floating-point), so tests can
+ * inspect `frame.position`/`frame.rotation` with `toBeCloseTo` if
+ * exact equality is needed.
+ */
+function makeFrame(overrides: Partial<FrameTile> = {}): FrameTile {
   return {
     imageFile: 'img/0001.jpg',
     position: [1, 2, 3],
@@ -33,7 +40,7 @@ function makeBlobOfSize(size: number): Blob {
 
 function makeVisualizerSpy() {
   return {
-    addTile: vi.fn<(frame: FrameInScene, texture: THREE.Texture) => void>(),
+    addTile: vi.fn<(frame: FrameTile, texture: THREE.Texture) => void>(),
     clear: vi.fn<() => void>(),
   };
 }
@@ -55,6 +62,10 @@ describe('wireFrameTileSubscribers', () => {
     const store = createRecorderStore({
       storageBackend: new NullStorageBackend(),
     });
+    // gpsData starts as null; setZeroPos initialises the model so
+    // subsequent add2dImage dispatches actually populate the
+    // odometryPath.points list (selectFrameTilesInWebXR reads from there).
+    store.dispatch(setZeroPos({ lat: 50, lon: 8 }));
     storeRef = createStoreRef(store);
   });
 
@@ -73,7 +84,7 @@ describe('wireFrameTileSubscribers', () => {
     });
 
     const frame = makeFrame();
-    storeRef.get().dispatch(addFrameInScene(frame));
+    storeRef.get().dispatch(add2dImage(frame));
     await flushMicrotasks();
 
     expect(blobSource).toHaveBeenCalledWith('img/0001.jpg');
@@ -97,7 +108,7 @@ describe('wireFrameTileSubscribers', () => {
       minFrameBytes: 2000,
     });
 
-    storeRef.get().dispatch(addFrameInScene(makeFrame()));
+    storeRef.get().dispatch(add2dImage(makeFrame()));
     await flushMicrotasks();
 
     expect(decodeTexture).not.toHaveBeenCalled();
@@ -118,7 +129,7 @@ describe('wireFrameTileSubscribers', () => {
       decodeTexture,
     });
 
-    storeRef.get().dispatch(addFrameInScene(makeFrame()));
+    storeRef.get().dispatch(add2dImage(makeFrame()));
     await flushMicrotasks();
 
     expect(decodeTexture).not.toHaveBeenCalled();
@@ -139,7 +150,7 @@ describe('wireFrameTileSubscribers', () => {
       decodeTexture,
     });
 
-    storeRef.get().dispatch(addFrameInScene(makeFrame()));
+    storeRef.get().dispatch(add2dImage(makeFrame()));
     await flushMicrotasks();
 
     expect(visualizer.addTile).not.toHaveBeenCalled();
@@ -160,9 +171,9 @@ describe('wireFrameTileSubscribers', () => {
     });
 
     const frame = makeFrame();
-    storeRef.get().dispatch(addFrameInScene(frame));
+    storeRef.get().dispatch(add2dImage(frame));
     await flushMicrotasks();
-    storeRef.get().dispatch(addFrameInScene(frame));
+    storeRef.get().dispatch(add2dImage(frame));
     await flushMicrotasks();
 
     expect(blobSource).toHaveBeenCalledTimes(1);
@@ -183,19 +194,20 @@ describe('wireFrameTileSubscribers', () => {
       decodeTexture,
     });
 
-    storeRef.get().dispatch(addFrameInScene(makeFrame({ imageFile: 'a.jpg' })));
+    storeRef.get().dispatch(add2dImage(makeFrame({ imageFile: 'a.jpg' })));
     await flushMicrotasks();
     expect(visualizer.addTile).toHaveBeenCalledTimes(1);
 
     const nextStore = createRecorderStore({
       storageBackend: new NullStorageBackend(),
     });
+    nextStore.dispatch(setZeroPos({ lat: 50, lon: 8 }));
     storeRef.set(nextStore);
     expect(visualizer.clear).toHaveBeenCalledTimes(1);
 
     // The new store's processed-set is reset, so the same imageFile is
     // accepted again on the new store.
-    nextStore.dispatch(addFrameInScene(makeFrame({ imageFile: 'a.jpg' })));
+    nextStore.dispatch(add2dImage(makeFrame({ imageFile: 'a.jpg' })));
     await flushMicrotasks();
     expect(visualizer.addTile).toHaveBeenCalledTimes(2);
 
@@ -216,7 +228,7 @@ describe('wireFrameTileSubscribers', () => {
 
     dispose();
 
-    storeRef.get().dispatch(addFrameInScene(makeFrame()));
+    storeRef.get().dispatch(add2dImage(makeFrame()));
     await flushMicrotasks();
 
     expect(blobSource).not.toHaveBeenCalled();
@@ -237,7 +249,7 @@ describe('wireFrameTileSubscribers', () => {
       onError,
     });
 
-    storeRef.get().dispatch(addFrameInScene(makeFrame()));
+    storeRef.get().dispatch(add2dImage(makeFrame()));
     await flushMicrotasks();
 
     expect(onError).toHaveBeenCalledTimes(1);

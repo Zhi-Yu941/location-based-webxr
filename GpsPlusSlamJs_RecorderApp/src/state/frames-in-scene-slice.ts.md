@@ -1,5 +1,15 @@
 # `frames-in-scene-slice.ts`
 
+> **Status (2026-05-27):** Dead-writer mirror, scheduled for removal in
+> Step 5 of the
+> [collapse-refPoint-and-frame-slices plan](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-27-collapse-refpoint-and-frame-slices-plan.md).
+> Since Step 3 of that plan, the frame-tile visualizer subscribes to
+> the framework selector `selectFrameTilesInWebXR(state)`, which reads
+> `state.gpsData.odometryPath.points` directly. The slice and its
+> `add-2d-image-listener.ts` middleware are still wired in
+> `createRecorderStore` but no consumer reads `state.framesInScene`
+> anymore.
+
 ## Purpose
 
 Tiny Redux slice that holds the list of captured frames (`gpsData/add2dImage`

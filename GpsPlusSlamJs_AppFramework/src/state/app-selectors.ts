@@ -16,6 +16,7 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { CombinedRootState } from './combined-root-state';
 import type {
+  ArImageCapture,
   GpsPoint,
   LatLong,
   Matrix4,
@@ -23,6 +24,7 @@ import type {
   ReferencePoint,
   Vector3,
 } from 'gps-plus-slam-js';
+import { nueToWebXR, nueQuaternionToWebXR } from 'gps-plus-slam-js';
 
 // ---------------------------------------------------------------------------
 // Stable fallback constants — must be module-level to maintain referential
@@ -33,6 +35,7 @@ const EMPTY_GPS_POSITIONS: readonly GpsPoint[] = [];
 const EMPTY_ODOM_POSITIONS: readonly Vector3[] = [];
 const EMPTY_ODOM_ROTATIONS: readonly Quaternion[] = [];
 const EMPTY_REF_POINTS: readonly ReferencePoint[] = [];
+const EMPTY_FRAME_TILES: readonly ArImageCapture[] = [];
 
 // ---------------------------------------------------------------------------
 // Input selector — shared across all selectors for gpsData-derived values.
@@ -84,4 +87,35 @@ export const selectReferencePoints = createSelector(
   [selectGpsData],
   (gpsData): readonly ReferencePoint[] =>
     gpsData?.referencePoints ?? EMPTY_REF_POINTS
+);
+
+/**
+ * Captured AR image frames in WebXR coordinate space.
+ *
+ * Reads `state.gpsData.odometryPath.points` (which the library reducer
+ * stores in NUE convention — see `gpsDataSlice.ts` `add2dImage`) and
+ * converts each entry back to WebXR so the live AR scene visualizer can
+ * apply the pose directly. This is the source of truth for the
+ * frame-tile visualizer; the legacy `framesInScene` slice is a dead
+ * mirror scheduled for removal (Step 5 of the 2026-05-27
+ * slice-collapse plan).
+ *
+ * Memoized via createSelector: same `gpsData` reference → cached output.
+ * Per-entry conversion only re-runs when the input changes.
+ */
+export const selectFrameTilesInWebXR = createSelector(
+  [selectGpsData],
+  (gpsData): readonly ArImageCapture[] => {
+    const points = gpsData?.odometryPath?.points;
+    if (!points || points.length === 0) return EMPTY_FRAME_TILES;
+    return points.map(
+      (p): ArImageCapture => ({
+        imageFile: p.imageFile,
+        position: nueToWebXR(p.position),
+        rotation: nueQuaternionToWebXR(p.rotation),
+        screenRotation: p.screenRotation,
+        capturedAt: p.capturedAt,
+      })
+    );
+  }
 );

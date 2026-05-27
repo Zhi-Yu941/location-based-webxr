@@ -54,6 +54,10 @@ export type {
   LatLongAlt,
   GpsPoint,
 
+  // Frame-tile payload (used by the recorder's frame-tile visualizer
+  // subscriber; see 2026-05-27 collapse-refpoint-and-frame-slices plan).
+  ArImageCapture,
+
   // Library root state (renamed to avoid collision with framework RootState)
   RootState as LibraryRootState,
 } from 'gps-plus-slam-js';

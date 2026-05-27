@@ -3,11 +3,16 @@
  *
  * Background — F3.4 from
  * [2026-05-26-tracking-quality-regression-and-replay-gaps-user-feedback.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-26-tracking-quality-regression-and-replay-gaps-user-feedback.md):
- * subscribes to `state.framesInScene.frames`; for every newly observed
- * `imageFile`, fetches its blob from the injected `blobSource`,
- * applies a minimum-size threshold to skip broken/empty frames,
- * decodes the blob into a `THREE.Texture` via the injected
+ * subscribes to the captured frames in the recorder store; for every
+ * newly observed `imageFile`, fetches its blob from the injected
+ * `blobSource`, applies a minimum-size threshold to skip broken/empty
+ * frames, decodes the blob into a `THREE.Texture` via the injected
  * `decodeTexture`, and hands it to `visualizer.addTile`.
+ *
+ * Per Step 3 of the 2026-05-27 slice-collapse plan the data source is
+ * the framework's memoized `selectFrameTilesInWebXR` selector over
+ * `state.gpsData.odometryPath.points`, not the legacy `framesInScene`
+ * slice (which is a dead mirror to be removed in Step 5).
  *
  * Following the F1 store-swap pattern, the wirer uses a {@link StoreRef}
  * so it can re-attach to the new store after the recorder swaps stores
@@ -22,7 +27,8 @@
 
 import type * as THREE from 'three';
 
-import type { FrameInScene } from '../state/frames-in-scene-slice';
+import { selectFrameTilesInWebXR } from 'gps-plus-slam-app-framework/state';
+import type { ArImageCapture } from 'gps-plus-slam-app-framework/core';
 import type { RecorderStore } from '../state/recorder-store';
 import type { StoreRef } from '../state/store-ref';
 
@@ -39,8 +45,11 @@ import type { StoreRef } from '../state/store-ref';
  */
 const DEFAULT_MIN_FRAME_BYTES = 2000;
 
+/** Shape passed to the visualizer — same fields as `ArImageCapture`. */
+export type FrameTile = ArImageCapture;
+
 interface FrameTileVisualizerLike {
-  addTile(frame: FrameInScene, texture: THREE.Texture): void;
+  addTile(frame: FrameTile, texture: THREE.Texture): void;
   clear(): void;
 }
 
@@ -74,10 +83,11 @@ export function wireFrameTileSubscribers(
 
   const attach = (store: RecorderStore): (() => void) => {
     const processed = new Set<string>();
-    let lastFrames: readonly FrameInScene[] =
-      store.getState().framesInScene.frames;
+    let lastFrames: readonly FrameTile[] = selectFrameTilesInWebXR(
+      store.getState()
+    );
 
-    const handleFrame = (frame: FrameInScene): void => {
+    const handleFrame = (frame: FrameTile): void => {
       if (disposed) return;
       if (processed.has(frame.imageFile)) return;
       processed.add(frame.imageFile);
@@ -99,10 +109,10 @@ export function wireFrameTileSubscribers(
     for (const frame of lastFrames) handleFrame(frame);
 
     return store.subscribe(() => {
-      const next = store.getState().framesInScene.frames;
+      const next = selectFrameTilesInWebXR(store.getState());
       if (next === lastFrames) return;
-      // Append-only slice: any new entries are at the tail past
-      // `lastFrames.length`. Defensive bound in case the slice is
+      // Append-only source: any new entries are at the tail past
+      // `lastFrames.length`. Defensive bound in case the source is
       // reset (length shrinks) — we just rebase and skip nothing
       // because `processed` already covers the prior set.
       const startIndex =

@@ -22,7 +22,9 @@ import {
   recordWriteFailure,
   setCurrentScenarioName,
   type RecorderStore,
+  type RawGpsPoint,
 } from './recorder-store';
+import { addRefPointEntry, type RefPointEntry } from './ref-points-slice';
 import { navigateTo } from './routing-slice';
 import { NullStorageBackend } from 'gps-plus-slam-app-framework/storage/null-storage-backend';
 
@@ -314,6 +316,59 @@ describe('Recorder Store', () => {
 
       expect(writeAction).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'gpsData/setZeroPos' }),
+        expect.any(Number)
+      );
+    });
+
+    /**
+     * Why this test matters (regression guard for the F1 class of bugs):
+     * Live "Capture" marks are dispatched as `refPoints/addRefPointEntry`
+     * (the production slice name, see ref-points-slice.ts). Replay-mode
+     * hydrates marks from the persisted ACTION STREAM, not the OPFS sidecar
+     * — so if the framework's persistence middleware does not persist this
+     * action, freshly recorded sessions silently lose their ref-point marks
+     * on replay.
+     *
+     * This test wires the REAL `refPoints` slice and the REAL persistence
+     * middleware together via `createRecorderStore`, so a future rename of
+     * the slice (or a stale prefix in the middleware filter) cannot pass
+     * unnoticed. A middleware-only unit test that builds its own local
+     * slice cannot catch this drift because it never observes the
+     * production action type.
+     */
+    it('should persist refPoints/ mark actions when recording', async () => {
+      const { writeAction } =
+        await import('gps-plus-slam-app-framework/storage/file-system');
+
+      store.dispatch(
+        startSession({
+          scenarioName: 'Test',
+          sessionName: 'test-session',
+          startTime: Date.now(),
+        })
+      );
+      vi.mocked(writeAction).mockClear();
+
+      const rawGpsPoint: RawGpsPoint = {
+        id: 'gps-1',
+        latitude: 50.123,
+        longitude: 6.789,
+        altitude: 200,
+        latLongAccuracy: 4,
+        altitudeAccuracy: 3,
+        compassAbsolute: false,
+        timestamp: 1_700_000_000_000,
+      };
+      const entry: RefPointEntry = {
+        id: '8a1fb46622dffff',
+        timestamp: 1_700_000_000_000,
+        rawGpsPoint,
+      };
+
+      store.dispatch(addRefPointEntry(entry));
+
+      expect(writeAction).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'refPoints/addRefPointEntry' }),
         expect.any(Number)
       );
     });

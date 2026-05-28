@@ -2,9 +2,9 @@
  * Redux middleware for action persistence during recording sessions.
  *
  * Replaces the inline persistence logic previously embedded in the manual
- * dispatch wrapper. Actions matching gpsData/* or recording/* (except
- * recording/recordWriteFailure) are written to the StorageBackend when
- * the recording slice is in recording state.
+ * dispatch wrapper. Actions matching gpsData/*, refPoints/* or recording/*
+ * (except recording/recordWriteFailure) are written to the StorageBackend
+ * when the recording slice is in recording state.
  *
  * @see docs/2026-04-07-architecture-observations-consolidated.md §4
  */
@@ -76,7 +76,7 @@ export interface PersistenceMiddlewareOptions {
  * Persistence rules:
  * - Only persists when `state.recording.isRecording` is true (checked AFTER
  *   the action is reduced, so `startSession` itself is included).
- * - Persists `gpsData/*`, `refPointsV2/*`, and `recording/*` actions.
+ * - Persists `gpsData/*`, `refPoints/*`, and `recording/*` actions.
  * - Excludes `recording/recordWriteFailure` to prevent recursive persistence.
  * - Excludes `routing/*` and any other non-recording actions.
  * - Uses 1-based indexing for action files (000001.json, 000002.json, …).
@@ -132,11 +132,11 @@ export function createPersistenceMiddleware(
       return result;
     }
 
-    // Only persist gpsData/, refPointsV2/, and recording/ actions
+    // Only persist gpsData/, refPoints/, and recording/ actions
     // (excluding recordWriteFailure)
     const shouldPersistAction =
       actionType.startsWith('gpsData/') ||
-      actionType.startsWith('refPointsV2/') ||
+      actionType.startsWith('refPoints/') ||
       (actionType.startsWith('recording/') &&
         actionType !== 'recording/recordWriteFailure');
 

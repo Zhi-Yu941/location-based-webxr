@@ -120,12 +120,20 @@ describe('Persistence Middleware', () => {
     );
   });
 
-  // Why: refPointsV2/ actions are the canonical mark log after the
-  // 2026-05-27 slice-collapse plan (Step 5.7-prep). The persistence layer
+  // Why: refPoints/ actions are the canonical mark log after the
+  // 2026-05-27 slice-collapse plan (Step 5.7a-3). The persistence layer
   // must include them so live recordings replay marks correctly.
-  it('should persist refPointsV2/ actions during recording', () => {
-    const refPointsV2Slice = createSlice({
-      name: 'refPointsV2',
+  //
+  // NOTE: the production `refPoints` slice lives in the consuming
+  // RecorderApp, which depends on this framework — so this framework-side
+  // test cannot import it without inverting the dependency. It therefore
+  // asserts on the literal production action-type prefix (`refPoints/`).
+  // The end-to-end drift guard that wires the REAL slice and REAL
+  // middleware together lives in the recorder
+  // (`recorder-store.test.ts` → "should persist refPoints/ mark actions").
+  it('should persist refPoints/ actions during recording', () => {
+    const refPointsSlice = createSlice({
+      name: 'refPoints',
       initialState: { entries: [] as unknown[] },
       reducers: {
         addRefPointEntry(state, action: PayloadAction<unknown>) {
@@ -138,7 +146,7 @@ describe('Persistence Middleware', () => {
       reducer: {
         recording: testRecorderSlice.reducer,
         gpsData: testGpsDataSlice.reducer,
-        refPointsV2: refPointsV2Slice.reducer,
+        refPoints: refPointsSlice.reducer,
       },
       middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware({
@@ -151,13 +159,13 @@ describe('Persistence Middleware', () => {
     mockBackend.writeAction.mockClear();
 
     store.dispatch(
-      refPointsV2Slice.actions.addRefPointEntry({
+      refPointsSlice.actions.addRefPointEntry({
         id: 'cell-1',
         timestamp: 123,
       })
     );
     expect(mockBackend.writeAction).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'refPointsV2/addRefPointEntry' }),
+      expect.objectContaining({ type: 'refPoints/addRefPointEntry' }),
       2
     );
   });

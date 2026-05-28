@@ -24,7 +24,6 @@ import {
   selectOdometryPositions,
   selectOdometryRotations,
   selectZeroReference,
-  selectReferencePoints,
   selectFrameTilesInWebXR,
 } from './app-selectors';
 import {
@@ -76,7 +75,6 @@ function makeGpsData(
       currentGpsPosGeoHash: null,
     },
     odometryPath: { positions: [], rotations: [] },
-    referencePoints: [],
     ...overrides,
   } as CombinedRootState['gpsData'];
 }
@@ -109,10 +107,6 @@ describe('app-level selectors', () => {
 
     it('selectZeroReference returns null', () => {
       expect(selectZeroReference(state)).toBeNull();
-    });
-
-    it('selectReferencePoints returns empty array', () => {
-      expect(selectReferencePoints(state)).toEqual([]);
     });
   });
 
@@ -151,29 +145,6 @@ describe('app-level selectors', () => {
       const gpsData = makeGpsData({ zero });
       const state = makeState(gpsData);
       expect(selectZeroReference(state)).toBe(zero);
-    });
-
-    it('selectReferencePoints returns reference points', () => {
-      const refPoints = [
-        {
-          id: 'rp1',
-          gpsPoint: {
-            id: 'rp1',
-            latitude: 50,
-            longitude: 8,
-            zeroRef: { lat: 50, lon: 8 },
-            coordinates: [0, 0, 0] as [number, number, number],
-            weight: 1,
-            timestamp: 1000,
-          },
-          position: [0, 0, 0] as [number, number, number],
-          rotation: [0, 0, 0, 1] as [number, number, number, number],
-          timestamp: 1000,
-        },
-      ];
-      const gpsData = makeGpsData({ referencePoints: refPoints });
-      const state = makeState(gpsData);
-      expect(selectReferencePoints(state)).toBe(refPoints);
     });
   });
 

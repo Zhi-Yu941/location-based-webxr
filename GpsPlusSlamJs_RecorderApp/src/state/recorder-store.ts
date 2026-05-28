@@ -65,7 +65,6 @@ export {
   setZeroPos,
   recordGpsEvent,
   add2dImage,
-  markReferencePoint,
   calcRelativeCoordsInMeters,
 } from 'gps-plus-slam-app-framework/state';
 
@@ -75,7 +74,6 @@ export type {
   RawGpsPoint,
   RawDeviceOrientation,
   RecordGpsEventPayload,
-  MarkReferencePointPayload,
 } from 'gps-plus-slam-app-framework/state';
 
 export { type RefPointMark } from '../storage/ref-point-loader';

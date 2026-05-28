@@ -2,8 +2,8 @@
  * Recorder Store — type-identity regression tests.
  *
  * Why these tests matter: `recorder-store.ts` re-exports library types
- * (`RawDeviceOrientation`, `RawGpsPoint`, `RecordGpsEventPayload`,
- * `MarkReferencePointPayload`) for downstream recorder modules. As part
+ * (`RawDeviceOrientation`, `RawGpsPoint`, `RecordGpsEventPayload`)
+ * for downstream recorder modules. As part
  * of dropping the recorder app's direct `gps-plus-slam-js` dependency
  * (see `2026-05-05-recorder-app-drop-direct-core-dep-plan.md` §2.2.1),
  * those re-exports now route through `gps-plus-slam-app-framework/state`.
@@ -24,7 +24,6 @@ import type {
   RawDeviceOrientation,
   RawGpsPoint,
   RecordGpsEventPayload,
-  MarkReferencePointPayload,
 } from './recorder-store';
 
 describe('recorder-store re-exported library types', () => {
@@ -45,10 +44,5 @@ describe('recorder-store re-exported library types', () => {
 
   it('RecordGpsEventPayload carries a RawGpsPoint', () => {
     expectTypeOf<RecordGpsEventPayload>().toHaveProperty('rawGpsPoint');
-  });
-
-  it('MarkReferencePointPayload is exported (smoke test)', () => {
-    // Just ensure the type alias is present at the recorder-store surface.
-    expectTypeOf<MarkReferencePointPayload>().not.toBeAny();
   });
 });

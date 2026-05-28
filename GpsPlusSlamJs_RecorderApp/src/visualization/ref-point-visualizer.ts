@@ -180,8 +180,8 @@ export class RefPointVisualizer {
   }
 
   /**
-   * Unified entry point that mirrors the canonical
-   * `selectReferencePoints` selector from gps-plus-slam-js. Renders all
+   * Unified entry point that mirrors the recorder's local
+   * `selectAllRefPoints` selector from the `refPoints` slice. Renders all
    * marks in a single colour and animates newly-inserted ids with a brief
    * scale-up. Subscribers should call this with the full selector result
    * on every change; an id-based diff inside the visualizer keeps the

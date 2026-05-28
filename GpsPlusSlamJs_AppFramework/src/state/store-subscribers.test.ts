@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Store Subscribers — Unit Tests
  *
  * Tests for the extracted store subscriber logic (Iteration 4, Risk R2 fix).
@@ -200,7 +200,6 @@ describe('wireStoreSubscribers', () => {
             odometryPositions: [],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       })
     );
@@ -245,7 +244,6 @@ describe('wireStoreSubscribers', () => {
             odometryPositions: [],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       })
     );
@@ -289,7 +287,6 @@ describe('wireStoreSubscribers', () => {
             odometryPositions: [],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       })
     );
@@ -315,7 +312,6 @@ describe('wireStoreSubscribers', () => {
             odometryPositions: [],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       })
     );
@@ -361,7 +357,6 @@ describe('wireStoreSubscribers', () => {
             odometryPositions: [odom1],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       })
     );
@@ -384,7 +379,6 @@ describe('wireStoreSubscribers', () => {
             odometryPositions: [odom1, odom2],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       })
     );
@@ -423,7 +417,6 @@ describe('wireStoreSubscribers', () => {
             odometryPositions: [],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       })
     );
@@ -464,7 +457,6 @@ describe('wireStoreSubscribers', () => {
             odometryPositions: [odom],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       })
     );
@@ -505,7 +497,6 @@ describe('wireStoreSubscribers', () => {
             odometryPositions: [odom],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       })
     );
@@ -550,7 +541,6 @@ describe('wireStoreSubscribers', () => {
             odometryPositions: [odom],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       })
     );
@@ -589,7 +579,6 @@ describe('wireStoreSubscribers', () => {
             odometryPositions: [[0.5, 0, 0.5]],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       })
     );
@@ -629,7 +618,6 @@ describe('wireStoreSubscribers', () => {
               odometryPositions: [[0.5, 0, 0.5]],
             },
             odometryPath: { positions: [], rotations: [] },
-            referencePoints: [],
           } as unknown as CombinedRootState['gpsData'],
         })
       );
@@ -651,7 +639,6 @@ describe('wireStoreSubscribers', () => {
             odometryPositions: [],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       })
     );
@@ -698,7 +685,6 @@ describe('wireStoreSubscribers', () => {
             ],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       })
     );
@@ -743,7 +729,6 @@ describe('wireStoreSubscribers', () => {
               odometryPositions: [[0.5, 0, 0.5]],
             },
             odometryPath: { positions: [], rotations: [] },
-            referencePoints: [],
           } as unknown as CombinedRootState['gpsData'],
         })
       );
@@ -786,7 +771,6 @@ describe('wireStoreSubscribers', () => {
             odometryPositions: [odom],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       })
     );
@@ -838,7 +822,6 @@ describe('wireStoreSubscribers', () => {
             odometryPositions: [odom1, odom2],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       })
     );
@@ -876,7 +859,6 @@ describe('wireStoreSubscribers', () => {
               odometryPositions: [[0.5, 0, 0.5]],
             },
             odometryPath: { positions: [], rotations: [] },
-            referencePoints: [],
           } as unknown as CombinedRootState['gpsData'],
         })
       );
@@ -909,7 +891,6 @@ describe('wireStoreSubscribers', () => {
           odometryPositions: [odom1],
         },
         odometryPath: { positions: [], rotations: [] },
-        referencePoints: [],
       } as unknown as CombinedRootState['gpsData'],
     });
 
@@ -970,7 +951,6 @@ describe('wireStoreSubscribers', () => {
             odometryRotations: [odomRot],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       })
     );
@@ -1027,7 +1007,6 @@ describe('wireStoreSubscribers', () => {
             odometryRotations: [odomRot1],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       })
     );
@@ -1045,7 +1024,6 @@ describe('wireStoreSubscribers', () => {
             odometryRotations: [odomRot1, odomRot2],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       })
     );
@@ -1081,7 +1059,6 @@ describe('wireStoreSubscribers', () => {
               odometryRotations: [[0, 0, 0, 1]],
             },
             odometryPath: { positions: [], rotations: [] },
-            referencePoints: [],
           } as unknown as CombinedRootState['gpsData'],
         })
       );
@@ -1123,7 +1100,6 @@ describe('wireStoreSubscribers', () => {
             odometryRotations: [],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       })
     );
@@ -1169,7 +1145,6 @@ describe('wireStoreSubscribers', () => {
             odometryRotations: [],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       });
     }
@@ -1430,7 +1405,6 @@ describe('wireStoreSubscribers', () => {
             odometryRotations: [],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       });
     }
@@ -1535,7 +1509,6 @@ describe('wireStoreSubscribers', () => {
             odometryPositions: [odom],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       })
     );
@@ -1569,7 +1542,6 @@ describe('wireStoreSubscribers', () => {
               odometryPositions: [[0.5, 0, 0.5]],
             },
             odometryPath: { positions: [], rotations: [] },
-            referencePoints: [],
           } as unknown as CombinedRootState['gpsData'],
         })
       );
@@ -1624,7 +1596,6 @@ describe('wireStoreSubscribers', () => {
               odometryPositions: [[10, 0, 0] as Vector3],
             },
             odometryPath: { positions: [], rotations: [] },
-            referencePoints: [],
           } as unknown as CombinedRootState['gpsData'],
         })
       );
@@ -1672,7 +1643,6 @@ describe('wireStoreSubscribers', () => {
               odometryPositions: [[10, 0, 0] as Vector3],
             },
             odometryPath: { positions: [], rotations: [] },
-            referencePoints: [],
           } as unknown as CombinedRootState['gpsData'],
         })
       );
@@ -1714,7 +1684,6 @@ describe('wireStoreSubscribers', () => {
               odometryPositions: [[10, 0, 0] as Vector3],
             },
             odometryPath: { positions: [], rotations: [] },
-            referencePoints: [],
           } as unknown as CombinedRootState['gpsData'],
         })
       );
@@ -1750,7 +1719,6 @@ describe('wireStoreSubscribers', () => {
                 odometryPositions: [[0.5, 0, 0.5]],
               },
               odometryPath: { positions: [], rotations: [] },
-              referencePoints: [],
             } as unknown as CombinedRootState['gpsData'],
           })
         );
@@ -1792,7 +1760,6 @@ describe('wireStoreSubscribers', () => {
             odometryRotations: [],
           },
           odometryPath: { positions: [], rotations: [] },
-          referencePoints: [],
         } as unknown as CombinedRootState['gpsData'],
       });
     }
@@ -1863,7 +1830,6 @@ describe('wireStoreSubscribers', () => {
               odometryRotations: [],
             },
             odometryPath: { positions: [], rotations: [] },
-            referencePoints: [],
           } as unknown as CombinedRootState['gpsData'],
         })
       );
@@ -1889,7 +1855,6 @@ describe('wireStoreSubscribers', () => {
               odometryRotations: [],
             },
             odometryPath: { positions: [], rotations: [] },
-            referencePoints: [],
           } as unknown as CombinedRootState['gpsData'],
         })
       );

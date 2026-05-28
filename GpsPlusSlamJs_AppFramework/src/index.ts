@@ -31,7 +31,6 @@ export {
   setZeroPos,
   recordGpsEvent,
   add2dImage,
-  markReferencePoint,
   calcRelativeCoordsInMeters,
   type RecordingCoordinatorConfig,
   updateDeviceOrientation,

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Unit tests for tracking-quality.ts.
  *
  * Phase A of docs/2026-05-16-tracking-quality-metrics-plan.md. Focus
@@ -457,7 +457,6 @@ interface MinimalRoot {
       odometryRotations: readonly unknown[];
     };
     zero: LatLong | null;
-    referencePoints: readonly unknown[];
   };
   tracking: ReturnType<typeof trackingReducer>;
   trackingQuality: ReturnType<typeof trackingQualityReducer>;
@@ -484,7 +483,6 @@ function buildRootState(input: {
         odometryRotations: [],
       },
       zero: input.zeroRef ?? null,
-      referencePoints: [],
     },
     tracking: {
       phase: input.trackingPhase ?? 'tracking',
@@ -870,7 +868,6 @@ describe('createTrackingQualityListenerMiddleware', () => {
         odometryRotations: [],
       },
       zero: ZERO_REF,
-      referencePoints: [],
     };
   }
 
@@ -1092,7 +1089,6 @@ describe('first-agreement detector in listener middleware', () => {
           odometryRotations: [],
         },
         zero: ZERO_REF,
-        referencePoints: [],
       },
       action: Action
     ): ListenerHarnessState['gpsData'] => {
@@ -1150,7 +1146,6 @@ describe('first-agreement detector in listener middleware', () => {
             odometryRotations: [],
           },
           zero: ZERO_REF,
-          referencePoints: [],
         },
       });
     }
@@ -1215,7 +1210,6 @@ describe('Â§4.8 hysteresis (degradedHoldoff)', () => {
           odometryRotations: [],
         },
         zero: ZERO_REF,
-        referencePoints: [],
       },
       action: Action
     ): ListenerHarnessState['gpsData'] => {
@@ -1282,7 +1276,6 @@ describe('Â§4.8 hysteresis (degradedHoldoff)', () => {
             odometryRotations: [],
           },
           zero: ZERO_REF,
-          referencePoints: [],
         },
       });
     }

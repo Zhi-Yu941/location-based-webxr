@@ -58,11 +58,6 @@ export type {
   // subscriber; see 2026-05-27 collapse-refpoint-and-frame-slices plan).
   ArImageCapture,
 
-  // Reference point payload (used by the recorder's 3D ref-point
-  // visualizer subscribing via `selectReferencePoints`; see Step 4 of
-  // the 2026-05-27 collapse-refpoint-and-frame-slices plan).
-  ReferencePoint,
-
   // Library root state (renamed to avoid collision with framework RootState)
   RootState as LibraryRootState,
 } from 'gps-plus-slam-js';

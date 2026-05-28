@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Action Schema Tests
  *
  * Verifies that the Redux actions have the correct structure for replay.
@@ -21,13 +21,11 @@ import {
   startSession,
   setZeroPos,
   recordGpsEvent,
-  markReferencePoint,
   recordDepthSample,
   type RecordGpsEventPayload,
   type SessionMetadata,
   type RecorderStore,
   type DepthSample,
-  type MarkReferencePointPayload,
 } from './recorder-store';
 
 // Mock file-system to capture what would be written
@@ -195,96 +193,6 @@ describe('Action Schema Validation', () => {
 
       // Accuracy preserved for the reducer to compute weight
       expect(action.payload.rawGpsPoint.latLongAccuracy).toBeCloseTo(5.0);
-    });
-  });
-
-  describe('markReferencePoint action', () => {
-    it('should have correct structure with AR pose and GPS data', async () => {
-      store.dispatch(
-        startSession({
-          scenarioName: 'Test',
-          sessionName: 'test',
-          startTime: Date.now(),
-        })
-      );
-
-      // First set zero position (required for GPS model initialization)
-      store.dispatch(setZeroPos({ lat: 50.0, lon: 8.0 }));
-
-      const refPointPayload: MarkReferencePointPayload = {
-        id: 'benchCorner',
-        position: [10.0, 0.0, 5.0],
-        rotation: [0, 0, 0, 1],
-        rawGpsPoint: {
-          id: 'gps-refpoint-1',
-          latitude: 50.001,
-          longitude: 8.001,
-          altitude: 100,
-          latLongAccuracy: 5,
-          timestamp: Date.now(),
-        },
-        timestamp: Date.now(),
-      };
-
-      store.dispatch(markReferencePoint(refPointPayload));
-      await flushWrites();
-
-      const refAction = writtenActions.find(
-        (a) => (a as RecordedAction).type === 'gpsData/markReferencePoint'
-      ) as {
-        type: string;
-        payload: MarkReferencePointPayload;
-      };
-
-      expect(refAction).toBeDefined();
-      expect(refAction.payload.id).toBe('benchCorner');
-      expect(refAction.payload.position).toHaveLength(3);
-      expect(refAction.payload.rotation).toHaveLength(4);
-      expect(refAction.payload.rawGpsPoint).toBeDefined();
-      expect(refAction.payload.rawGpsPoint.latitude).toBe(50.001);
-      expect(refAction.payload.rawGpsPoint.longitude).toBe(8.001);
-      expect(refAction.payload.rawGpsPoint).not.toHaveProperty('coordinates');
-    });
-
-    it('should be JSON-serializable for replay', async () => {
-      store.dispatch(
-        startSession({
-          scenarioName: 'Test',
-          sessionName: 'test',
-          startTime: Date.now(),
-        })
-      );
-
-      store.dispatch(setZeroPos({ lat: 50.0, lon: 8.0 }));
-
-      store.dispatch(
-        markReferencePoint({
-          id: 'pointA',
-          position: [1, 2, 3],
-          rotation: [0, 0, 0, 1],
-          rawGpsPoint: {
-            id: 'gps-1',
-            latitude: 50.0,
-            longitude: 8.0,
-            timestamp: Date.now(),
-          },
-        })
-      );
-      await flushWrites();
-
-      const refAction = writtenActions.find(
-        (a) => (a as RecordedAction).type === 'gpsData/markReferencePoint'
-      );
-
-      // Verify the action can be serialized and deserialized
-      expect(() => JSON.stringify(refAction)).not.toThrow();
-      const serialized = JSON.stringify(refAction);
-      const deserialized = JSON.parse(serialized) as {
-        type: string;
-        payload: { id: string };
-      };
-      expect(deserialized.type).toBe('gpsData/markReferencePoint');
-      expect(deserialized.payload.id).toBe('pointA');
     });
   });
 

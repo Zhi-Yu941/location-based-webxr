@@ -57,8 +57,8 @@ store.dispatch(navigateTo('ar'));
   validation). Migrated from the framework's now-removed `store.test.ts`.
 - [recorder-store-types.test.ts](recorder-store-types.test.ts) —
   type-identity regression tests asserting the re-exported library
-  types (`RawDeviceOrientation`, `RawGpsPoint`, `RecordGpsEventPayload`,
-  `MarkReferencePointPayload`) keep their library shape after routing
+  types (`RawDeviceOrientation`, `RawGpsPoint`, `RecordGpsEventPayload`)
+  keep their library shape after routing
   through the framework. Locks in §2.2.1 of the
   [drop-direct-core-dep plan](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-05-recorder-app-drop-direct-core-dep-plan.md).
 

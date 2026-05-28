@@ -21,7 +21,6 @@ import type {
   LatLong,
   Matrix4,
   Quaternion,
-  ReferencePoint,
   Vector3,
 } from 'gps-plus-slam-js';
 import { nueToWebXR, nueQuaternionToWebXR } from 'gps-plus-slam-js';
@@ -34,7 +33,6 @@ import { nueToWebXR, nueQuaternionToWebXR } from 'gps-plus-slam-js';
 const EMPTY_GPS_POSITIONS: readonly GpsPoint[] = [];
 const EMPTY_ODOM_POSITIONS: readonly Vector3[] = [];
 const EMPTY_ODOM_ROTATIONS: readonly Quaternion[] = [];
-const EMPTY_REF_POINTS: readonly ReferencePoint[] = [];
 const EMPTY_FRAME_TILES: readonly ArImageCapture[] = [];
 
 // ---------------------------------------------------------------------------
@@ -83,11 +81,9 @@ export const selectZeroReference = createSelector(
 );
 
 /** User-defined reference points for ground truth validation. */
-export const selectReferencePoints = createSelector(
-  [selectGpsData],
-  (gpsData): readonly ReferencePoint[] =>
-    gpsData?.referencePoints ?? EMPTY_REF_POINTS
-);
+// `selectReferencePoints` removed in 5.7a-3 (Option C); see
+// `2026-05-27-collapse-refpoint-and-frame-slices-plan.md`. The recorder now
+// owns the flat `refPoints` slice as the single source of truth.
 
 /**
  * Captured AR image frames in WebXR coordinate space.

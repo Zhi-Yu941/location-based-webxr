@@ -46,7 +46,6 @@ export {
   setZeroPos,
   recordGpsEvent,
   add2dImage,
-  markReferencePoint,
   calcRelativeCoordsInMeters,
 } from 'gps-plus-slam-js';
 export type {
@@ -55,7 +54,6 @@ export type {
   RawGpsPoint,
   RawDeviceOrientation,
   RecordGpsEventPayload,
-  MarkReferencePointPayload,
   Add2dImagePayload,
 } from 'gps-plus-slam-js';
 export type { DepthPoint, DepthSample } from '../types/ar-types.js';
@@ -152,7 +150,6 @@ export {
   selectOdometryPositions,
   selectOdometryRotations,
   selectZeroReference,
-  selectReferencePoints,
   selectFrameTilesInWebXR,
 } from './app-selectors.js';
 

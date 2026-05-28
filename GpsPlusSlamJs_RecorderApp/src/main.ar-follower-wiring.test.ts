@@ -232,7 +232,6 @@ vi.mock('./state/recorder-store', () => ({
   }),
   startSession: vi.fn(),
   endSession: vi.fn(),
-  markReferencePoint: vi.fn(),
   add2dImage: vi.fn(),
   recordDepthSample: vi.fn(),
 }));

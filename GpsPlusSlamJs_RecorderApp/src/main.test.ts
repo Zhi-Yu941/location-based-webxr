@@ -165,10 +165,6 @@ vi.mock('./state/recorder-store', async () => {
       type: 'recording/recordDepthSample',
       payload,
     })),
-    markReferencePoint: vi.fn((payload: unknown) => ({
-      type: 'recording/markReferencePoint',
-      payload,
-    })),
     setCurrentScenarioName: actual.setCurrentScenarioName,
   };
 });

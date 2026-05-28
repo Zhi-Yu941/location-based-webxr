@@ -21,11 +21,7 @@ Factory that creates ref-point handlers with injected dependencies.
 | --------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `handleMarkRefPoint`        | `() => Promise<void>`                     | Full mark-ref-point flow: validate → picker → build → persist → visualize.                |
 | `checkNearbyRefPoint`       | `(lat, lng) => string \| undefined`       | Check if (lat,lng) is near a known imported ref point. Returns display name or undefined. |
-| `getImportedRefPoints`      | `() => ImportedRefPoint[]`                | Returns the current imported ref-points array.                                            |
-| `setImportedRefPoints`      | `(refPoints: ImportedRefPoint[]) => void` | Replaces the imported ref-points array.                                                   |
-| `getSessionRefPointUsage`   | `() => Map<string, number>`               | Returns the per-session ref-point usage counter map.                                      |
-| `clearSessionRefPointUsage` | `() => void`                              | Clears the usage map (called at recording start).                                         |
-| `reset`                     | `() => void`                              | Clears all state (ref-points, guard flag, usage map).                                     |
+| `reset`                     | `() => void`                              | Clears the concurrent-call guard and re-observation cooldown map, and dispatches `resetRefPoints` into the V2 slice. |
 
 ## Invariants & Assumptions
 
@@ -58,16 +54,17 @@ const refPointHandlers = createRefPointHandlers({
 initUI({ onMarkRefPoint: () => refPointHandlers.handleMarkRefPoint() });
 
 // On new recording
-refPointHandlers.clearSessionRefPointUsage();
+// (per-session usage tracking was removed in 5.7a-3 Option C.)
 
 // On folder open with ref-points
-refPointHandlers.setImportedRefPoints(importResult.refPoints);
+// (sidecar imports now dispatch `setImportedRefPointEntries` directly
+//  into the `refPointsV2` slice; folder-manager owns this wiring.)
 
 // On app reset
 refPointHandlers.reset();
 ```
 
-- **Matcher source (Step 5.4)**: both `handleMarkRefPoint` (re-observation bypass) and `checkNearbyRefPoint` (label hint) read known anchors via `selectKnownAnchorsByCell(state.refPointsV2)` from the flat `refPointsV2` slice. The legacy `selectCachedKnownRefPoints(state.refPoints)` selector and the `importedRefPoints` field stay alive as orphans until Step 5.7 of the [2026-05-27 slice-collapse plan](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-27-collapse-refpoint-and-frame-slices-plan.md). The legacy in-handler `_importedRefPoints` cache (returned by `getImportedRefPoints` / written by `setImportedRefPoints`) is unaffected and still backs UI/import code paths.
+- **Single source of truth (5.7a-3 Option C of the [2026-05-27 slice-collapse plan](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-27-collapse-refpoint-and-frame-slices-plan.md))**: known anchors live exclusively in the flat `refPointsV2` slice. `handleMarkRefPoint` and `checkNearbyRefPoint` read via `selectKnownAnchorsByCell(state.refPointsV2)`. The legacy `refPoints` slice is no longer written by production code; per-session usage tracking and `incrementRefPointUsage` were dropped because the picker is now always called with an empty `existingIds` list (H3 IDs are meaningless to users) so no usage column is rendered.
 
 ## Tests
 

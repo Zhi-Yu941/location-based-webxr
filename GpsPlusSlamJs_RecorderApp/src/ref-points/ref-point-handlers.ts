@@ -17,7 +17,6 @@ import {
   saveRefPointObservation,
   type RefPointObservation,
 } from '../storage/ref-point-loader';
-import type { ImportedRefPoint } from '../storage/ref-point-importer';
 import {
   showRefPointPicker,
   isRefPointPickerVisible,
@@ -28,16 +27,10 @@ import {
 } from 'gps-plus-slam-app-framework/state/gps-event-coordinator';
 import { showError, updateStatus } from '../ui/hud';
 import { showToast } from '../ui/toast';
-import {
-  setImportedRefPoints as setImportedRefPointsAction,
-  incrementRefPointUsage,
-  clearSessionRefPointUsage as clearSessionRefPointUsageAction,
-  resetRefPointsState,
-  type GpsPoint,
-  type RawGpsPoint,
-} from '../state/recorder-store';
+import type { GpsPoint, RawGpsPoint } from '../state/recorder-store';
 import {
   addRefPointEntry,
+  resetRefPoints,
   selectKnownAnchorsByCell,
 } from '../state/ref-points-v2-slice';
 import { fusedGpsFromOdom } from 'gps-plus-slam-app-framework/utils/fused-path';
@@ -83,12 +76,6 @@ export interface RefPointHandlers {
   // Proximity check for live button label + neighbor-cell detection
   checkNearbyRefPoint(lat: number, lng: number): NearbyRefPointInfo | undefined;
 
-  // State accessors
-  getImportedRefPoints(): ImportedRefPoint[];
-  setImportedRefPoints(refPoints: ImportedRefPoint[]): void;
-  getSessionRefPointUsage(): Map<string, number>;
-  clearSessionRefPointUsage(): void;
-
   // Lifecycle
   reset(): void;
 }
@@ -102,8 +89,8 @@ export function createRefPointHandlers(
 ): RefPointHandlers {
   // --- State ---
   // Only markRefPointInProgress remains as closure state (transient concurrency guard).
-  // importedRefPoints, cachedKnownRefPoints, sessionRefPointUsage are now in Redux
-  // (refPointsSlice) and accessed via deps.getStore().getState().refPoints.
+  // Ref-point entries live in the `refPointsV2` slice (the single source of
+  // truth after 5.7a-3 Option C of the 2026-05-27 slice-collapse plan).
   let markRefPointInProgress = false;
 
   /** Per-H3-cell cooldown to prevent accidental duplicate re-observations (Aachen audit Issue 3). */
@@ -321,10 +308,7 @@ export function createRefPointHandlers(
         // New ref point: show picker for optional display name only.
         // No suggestion list — scenario IDs are H3 hex strings (meaningless to users)
         // and imported names refer to distant locations (no nearby match).
-        const sessionUsage = deps.getStore().getState()
-          .refPoints.sessionRefPointUsage;
-        const usageMap = new Map(Object.entries(sessionUsage));
-        const pickerResult = await showRefPointPicker([], usageMap);
+        const pickerResult = await showRefPointPicker([]);
         if (!pickerResult) {
           log.info('Reference point marking cancelled');
           return;
@@ -413,9 +397,6 @@ export function createRefPointHandlers(
         showToast(`Re-observed "${refPointName}"`, { severity: 'info' });
       }
 
-      // Track usage in current session (Issue 6) via Redux
-      deps.getStore().dispatch(incrementRefPointUsage(refPointId));
-
       // Record re-observation timestamp for cooldown (Aachen audit Issue 3)
       if (nearbyMatch) {
         lastReObservationTimestamp.set(nearbyMatch.h3Index, Date.now());
@@ -447,21 +428,8 @@ export function createRefPointHandlers(
       };
     },
 
-    getImportedRefPoints: () =>
-      deps.getStore().getState().refPoints.importedRefPoints,
-    setImportedRefPoints: (refPoints: ImportedRefPoint[]) => {
-      deps.getStore().dispatch(setImportedRefPointsAction(refPoints));
-    },
-    getSessionRefPointUsage: () => {
-      const record = deps.getStore().getState().refPoints.sessionRefPointUsage;
-      return new Map(Object.entries(record));
-    },
-    clearSessionRefPointUsage: () => {
-      deps.getStore().dispatch(clearSessionRefPointUsageAction());
-    },
-
     reset: () => {
-      deps.getStore().dispatch(resetRefPointsState());
+      deps.getStore().dispatch(resetRefPoints());
       markRefPointInProgress = false;
       lastReObservationTimestamp.clear();
     },

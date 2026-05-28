@@ -129,7 +129,6 @@ function createDefaultDeps(
     getStore: () => mockStore,
     getIsReplayMode: vi.fn(() => false),
     setReplayZipScenariosCache: vi.fn(),
-    setImportedRefPoints: vi.fn(),
     showError: vi.fn(),
     updateStatus: vi.fn(),
     populateScenarios: vi.fn(),
@@ -683,11 +682,11 @@ describe('createFolderManager', () => {
   // ========================================================================
 
   describe('loadAndDisplayRefPoints', () => {
-    it('should load, flatten, and dispatch ref points to the store', async () => {
-      // Why: Finding 5 — visualizer is a subscription consumer; the call
-      // site dispatches setPriorRefPointMarks instead of calling the
-      // visualizer directly. See
-      // docs/2026-04-30-refpoint-marks-into-redux-plan.md.
+    it('should load and flatten ref points from a scenario handle', async () => {
+      // Why: loadAllRefPoints + flattenRefPointsToMarks are the entry
+      // points for sidecar-imported ref points. The result counts must
+      // reflect both the number of definitions and the total observation
+      // count.
       const { loadAllRefPoints, flattenRefPointsToMarks } =
         await import('../storage/ref-point-loader');
       const mockDefs = [
@@ -696,45 +695,13 @@ describe('createFolderManager', () => {
       const mockMarks = [{ lat: 0, lng: 0, name: 'pt1' }] as never;
       vi.mocked(loadAllRefPoints).mockResolvedValue(mockDefs);
       vi.mocked(flattenRefPointsToMarks).mockReturnValue(mockMarks);
-      const { manager, store } = createFolderManagerWithDefaults();
+      const { manager } = createFolderManagerWithDefaults();
 
       const result = await manager.loadAndDisplayRefPoints(mockFolderHandle);
 
       expect(loadAllRefPoints).toHaveBeenCalledWith(mockFolderHandle);
       expect(flattenRefPointsToMarks).toHaveBeenCalledWith(mockDefs);
-      expect(store.dispatch).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'refPoints/setPriorRefPointMarks',
-          payload: mockMarks,
-        })
-      );
       expect(result).toEqual({ refPointCount: 1, observationCount: 1 });
-    });
-
-    it('should call setImportedRefPoints with averaged GPS positions', async () => {
-      // Why: H3 proximity cache must use averaged scenario-scoped ref points
-      const { loadAllRefPoints, averageGpsPerRefPoint } =
-        await import('../storage/ref-point-loader');
-      vi.mocked(loadAllRefPoints).mockResolvedValue([
-        { id: 'p1', name: 'P1', createdAt: 1000, observations: [] },
-      ] as never);
-      vi.mocked(averageGpsPerRefPoint).mockReturnValue([
-        { id: 'p1', name: 'P1', lat: 50.0, lon: 8.0, alt: 100 },
-      ]);
-      const { manager, deps } = createFolderManagerWithDefaults();
-
-      await manager.loadAndDisplayRefPoints(mockFolderHandle);
-
-      expect(deps.setImportedRefPoints).toHaveBeenCalledWith([
-        {
-          id: 'p1',
-          name: 'P1',
-          lat: 50.0,
-          lon: 8.0,
-          alt: 100,
-          sourceZipName: '',
-        },
-      ]);
     });
 
     it('should dispatch setImportedRefPointEntries into refPointsV2 (Step 5.5)', async () => {

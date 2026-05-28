@@ -47,16 +47,6 @@ const {
     scenario?: {
       currentScenarioName?: string;
     };
-    refPoints?: {
-      importedRefPoints?: Array<{
-        id: string;
-        lat: number;
-        lon: number;
-        alt?: number;
-        sourceZipName?: string;
-      }>;
-      sessionRefPointUsage?: Record<string, number>;
-    };
     refPointsV2?: {
       entries: ReadonlyArray<{
         id: string;
@@ -76,10 +66,6 @@ const {
     },
     scenario: {
       currentScenarioName: '',
-    },
-    refPoints: {
-      importedRefPoints: [],
-      sessionRefPointUsage: {},
     },
     refPointsV2: { entries: [] },
   };
@@ -101,28 +87,18 @@ const {
       };
     },
     dispatch: (action?: { type?: string; payload?: unknown }) => {
-      // Handle refPoints/ actions by updating mockState inline
-      if (action?.type === 'refPoints/setImportedRefPoints') {
-        mockState.refPoints = {
-          ...mockState.refPoints,
-          sessionRefPointUsage: mockState.refPoints?.sessionRefPointUsage ?? {},
-          importedRefPoints: action.payload as NonNullable<
-            typeof mockState.refPoints
-          >['importedRefPoints'],
+      // Translate the V2 sidecar-import action into mockState so
+      // selectors (and exports like `getImportedRefPoints`) observe
+      // the write. Legacy `refPoints/*` actions were removed in
+      // 5.7a-3 Option C.
+      if (action?.type === 'refPointsV2/setImportedRefPointEntries') {
+        mockState.refPointsV2 = {
+          entries: action.payload as NonNullable<
+            typeof mockState.refPointsV2
+          >['entries'],
         };
-      } else if (action?.type === 'refPoints/resetRefPointsState') {
-        mockState.refPoints = {
-          importedRefPoints: [],
-          sessionRefPointUsage: {},
-        };
+      } else if (action?.type === 'refPointsV2/resetRefPoints') {
         mockState.refPointsV2 = { entries: [] };
-      } else if (action?.type === 'refPoints/clearSessionRefPointUsage') {
-        if (mockState.refPoints) {
-          mockState.refPoints = {
-            ...mockState.refPoints,
-            sessionRefPointUsage: {},
-          };
-        }
       } else if (action?.type === 'scenario/setCurrentScenarioName') {
         mockState.scenario = {
           ...mockState.scenario,
@@ -193,14 +169,6 @@ vi.mock('./state/recorder-store', async () => {
       type: 'recording/markReferencePoint',
       payload,
     })),
-    setImportedRefPoints: actual.setImportedRefPoints,
-    setPriorRefPointMarks: actual.setPriorRefPointMarks,
-    addCurrentRefPointMark: actual.addCurrentRefPointMark,
-    clearCurrentRefPointMarks: actual.clearCurrentRefPointMarks,
-    clearSessionRefPointUsage: actual.clearSessionRefPointUsage,
-    resetRefPointsState: actual.resetRefPointsState,
-    selectCachedKnownRefPoints: actual.selectCachedKnownRefPoints,
-    incrementRefPointUsage: actual.incrementRefPointUsage,
     setCurrentScenarioName: actual.setCurrentScenarioName,
   };
 });
@@ -2087,13 +2055,12 @@ describe('loadAndDisplayRefPoints', () => {
 
     expect(loadAllRefPoints).toHaveBeenCalledWith(mockHandle);
     expect(flattenRefPointsToMarks).toHaveBeenCalledWith(mockDefs);
-    // Finding 5 (2026-04-30 plan): visualizer is now driven by Redux. Assert
-    // that the marks are dispatched into the slice instead of calling the
-    // visualizer directly.
+    // 5.7a-3 Option C: visualizer is driven by `refPointsV2` (see
+    // ref-point-subscribers Step 5.3). The call site dispatches the
+    // averaged sidecar entries instead of the legacy prior-marks action.
     expect(dispatchSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        type: 'refPoints/setPriorRefPointMarks',
-        payload: mockMarks,
+        type: 'refPointsV2/setImportedRefPointEntries',
       })
     );
     expect(result).toEqual({ refPointCount: 2, observationCount: 3 });
@@ -2102,8 +2069,8 @@ describe('loadAndDisplayRefPoints', () => {
   /**
    * Why this test matters:
    * When a scenario has no ref points, the helper should return zeros
-   * and still dispatch setPriorRefPointMarks (with []) so the visualizer
-   * subscription clears any previously rendered markers.
+   * and still dispatch the V2 sidecar-import action (with []) so the
+   * visualizer subscription clears any previously rendered markers.
    */
   it('should return zero counts for empty scenario', async () => {
     const { loadAllRefPoints, flattenRefPointsToMarks } =
@@ -2119,7 +2086,7 @@ describe('loadAndDisplayRefPoints', () => {
 
     expect(dispatchSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        type: 'refPoints/setPriorRefPointMarks',
+        type: 'refPointsV2/setImportedRefPointEntries',
         payload: [],
       })
     );
@@ -2188,7 +2155,7 @@ describe('handleClearRefPointCache', () => {
 
     expect(dispatchSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        type: 'refPoints/setImportedRefPoints',
+        type: 'refPointsV2/setImportedRefPointEntries',
         payload: [],
       })
     );
@@ -2227,7 +2194,7 @@ describe('handleClearRefPointCache', () => {
 
     expect(dispatchSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        type: 'refPoints/setImportedRefPoints',
+        type: 'refPointsV2/setImportedRefPointEntries',
         payload: [],
       })
     );
@@ -2289,8 +2256,7 @@ describe('handleClearRefPointCache', () => {
     expect(loadAllRefPoints).toHaveBeenCalledWith(mockHandle);
     expect(dispatchSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        type: 'refPoints/setPriorRefPointMarks',
-        payload: [{ id: 'pt-A' }],
+        type: 'refPointsV2/setImportedRefPointEntries',
       })
     );
   });

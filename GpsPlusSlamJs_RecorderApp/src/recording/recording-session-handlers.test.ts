@@ -373,7 +373,6 @@ function createMockDeps(
     createNewStore: vi.fn().mockReturnValue(createMockStore()),
     getRecordingOptions: () => defaultOptions,
     getMapOverlay: () => null,
-    clearRefPointUsage: vi.fn(),
     getSessionNotes: () => '',
     waitForZeroReference: vi.fn().mockResolvedValue(null),
     loadAndDisplayRefPoints: vi
@@ -450,12 +449,6 @@ describe('handleStartRecording', () => {
     // Why: Previous recording markers must be cleared
     await handlers.handleStartRecording();
     expect(mockGpsEventVisualizer.clearAll).toHaveBeenCalled();
-  });
-
-  it('should clear ref point usage tracking', async () => {
-    // Why: Session-level ref point usage resets per recording
-    await handlers.handleStartRecording();
-    expect(deps.clearRefPointUsage).toHaveBeenCalled();
   });
 
   it('should create a new store via deps', async () => {

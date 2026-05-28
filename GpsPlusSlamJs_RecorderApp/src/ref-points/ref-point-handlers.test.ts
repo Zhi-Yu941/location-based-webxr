@@ -158,6 +158,27 @@ import { gpsToH3 } from 'gps-plus-slam-app-framework/geo/h3-proximity';
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
+/**
+ * Module-level reference to the store created by the most recent
+ * `createMockStore()` call. Lets `seedImportedRefPoints` dispatch the
+ * V2 sidecar action without each test having to thread the store
+ * through. Set as a side effect of `createMockStore` below.
+ */
+let lastTestStore: RecorderStore | null = null;
+
+/**
+ * Test-only helper: seed the `refPointsV2` slice with sidecar-imported
+ * known anchors. Replaces the removed `handlers.setImportedRefPoints`
+ * convenience after 5.7a-3 Option C collapsed the legacy slice.
+ */
+function seedImportedRefPoints(refPoints: ImportedRefPoint[]): void {
+  if (!lastTestStore) {
+    throw new Error('seedImportedRefPoints: no test store has been created yet');
+  }
+  const entries = refPoints.map((rp) => importedToEntry(rp, Date.now()));
+  lastTestStore.dispatch(setImportedRefPointEntries(entries));
+}
+
 function importedToEntry(rp: ImportedRefPoint, ts: number): RefPointEntry {
   return {
     id: gpsToH3(rp.lat, rp.lon),
@@ -223,6 +244,7 @@ function createMockStore(
     writeFrame: vi.fn(),
     writeSessionMetadata: vi.fn(),
   } as unknown as RecorderStore;
+  lastTestStore = store;
   return store;
 }
 
@@ -391,8 +413,13 @@ function createMockArPose(): ARPose {
 function createDefaultDeps(
   overrides?: Partial<RefPointHandlersDeps>
 ): RefPointHandlersDeps {
-  const gpsPoint = createMockGpsPoint();
-  const store = createMockStore([gpsPoint]);
+  // If the caller supplies a `getStore`, reuse it so `lastTestStore`
+  // (set by `createMockStore`) reflects the store the handlers will
+  // actually dispatch into. Otherwise create a fresh mock store.
+  const store = overrides?.getStore
+    ? overrides.getStore()
+    : createMockStore([createMockGpsPoint()]);
+  lastTestStore = store;
   return {
     getStore: () => store,
     getCurrentSessionName: () => 'recording-test-session',
@@ -416,100 +443,13 @@ describe('createRefPointHandlers', () => {
     handlers = createRefPointHandlers(createDefaultDeps());
   });
 
-  // Why: The factory must return an object with all required handler functions
-  // and state accessors, matching the contract used by main.ts.
-  it('should return all handler functions and state accessors', () => {
+  // Why: The factory must return an object with the public handler functions.
+  // Imported-ref-point reads/writes and session usage now live in the
+  // `refPointsV2` slice (Step 5.7a-3 Option C); the factory no longer
+  // exposes those accessors.
+  it('should return all handler functions', () => {
     expect(handlers.handleMarkRefPoint).toBeTypeOf('function');
-    expect(handlers.getImportedRefPoints).toBeTypeOf('function');
-    expect(handlers.setImportedRefPoints).toBeTypeOf('function');
-    expect(handlers.getSessionRefPointUsage).toBeTypeOf('function');
-    expect(handlers.clearSessionRefPointUsage).toBeTypeOf('function');
     expect(handlers.reset).toBeTypeOf('function');
-  });
-
-  // Why: Default state must match the original module-level initialization.
-  it('should initialize with default state', () => {
-    expect(handlers.getImportedRefPoints()).toEqual([]);
-    expect(handlers.getSessionRefPointUsage().size).toBe(0);
-  });
-});
-
-// ============================================================================
-// State management
-// ============================================================================
-
-describe('ref-point state management', () => {
-  let handlers: RefPointHandlers;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    handlers = createRefPointHandlers(createDefaultDeps());
-  });
-
-  // Why: Imported ref points must be settable (e.g., from folder import) and gettable
-  it('should set and get imported ref points', () => {
-    const refPoints: ImportedRefPoint[] = [
-      {
-        id: 'pointA',
-        name: 'Point A',
-        lat: 49.1,
-        lon: 8.1,
-        sourceZipName: 'session1.zip',
-      },
-      {
-        id: 'pointB',
-        name: 'Point B',
-        lat: 49.2,
-        lon: 8.2,
-        sourceZipName: 'session2.zip',
-      },
-    ];
-    handlers.setImportedRefPoints(refPoints);
-    expect(handlers.getImportedRefPoints()).toEqual(refPoints);
-  });
-
-  // Why: Session usage tracking should be clearable between recordings.
-  // We populate the map via handleMarkRefPoint, then verify clear empties it.
-  it('should track and clear session ref point usage', async () => {
-    mockIsRefPointPickerVisible.mockReturnValue(false);
-    mockGetCurrentArPose.mockReturnValue(createMockArPose());
-    mockGetCurrentScenarioHandle.mockReturnValue(createMockScenarioHandle());
-    mockListRefPointIds.mockResolvedValue([]);
-    mockShowRefPointPicker.mockResolvedValue({ id: 'bench', isNew: true });
-
-    await handlers.handleMarkRefPoint();
-    expect(handlers.getSessionRefPointUsage().size).toBeGreaterThan(0);
-    // Usage is now keyed by H3 index (not picker name 'bench')
-    const [h3Key] = [...handlers.getSessionRefPointUsage().keys()];
-    expect(h3Key).toMatch(/^[0-9a-f]{15}$/);
-    expect(handlers.getSessionRefPointUsage().get(h3Key)).toBe(1);
-
-    handlers.clearSessionRefPointUsage();
-    expect(handlers.getSessionRefPointUsage().size).toBe(0);
-  });
-
-  // Why: reset() must clear all state back to initial values, including
-  // sessionRefPointUsage populated via handleMarkRefPoint (not just the
-  // trivially-empty default).
-  it('should reset all state', async () => {
-    // Populate importedRefPoints
-    handlers.setImportedRefPoints([
-      { id: 'x', name: 'x', lat: 0, lon: 0, sourceZipName: 'z.zip' },
-    ]);
-
-    // Populate sessionRefPointUsage via a full handleMarkRefPoint flow
-    mockIsRefPointPickerVisible.mockReturnValue(false);
-    mockGetCurrentArPose.mockReturnValue(createMockArPose());
-    mockGetCurrentScenarioHandle.mockReturnValue(createMockScenarioHandle());
-    mockListRefPointIds.mockResolvedValue([]);
-    mockShowRefPointPicker.mockResolvedValue({ id: 'bench', isNew: true });
-
-    await handlers.handleMarkRefPoint();
-    expect(handlers.getSessionRefPointUsage().size).toBe(1);
-
-    handlers.reset();
-    expect(handlers.getImportedRefPoints()).toEqual([]);
-    expect(handlers.getSessionRefPointUsage().size).toBe(0);
   });
 });
 
@@ -606,7 +546,7 @@ describe('handleMarkRefPoint — picker integration', () => {
     mockShowRefPointPicker.mockResolvedValue({ id: 'MyNew', isNew: true });
 
     // Imported refs are far from GPS (49, 8) — won't match as re-observation
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'importedA',
         name: 'Imported A',
@@ -635,7 +575,7 @@ describe('handleMarkRefPoint — picker integration', () => {
   it('should show picker with empty suggestions when no scenario handle and no nearby match', async () => {
     mockGetCurrentScenarioHandle.mockReturnValue(null);
     mockShowRefPointPicker.mockResolvedValue({ id: 'NewRef', isNew: true });
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'importedOnly',
         name: 'importedOnly',
@@ -659,7 +599,7 @@ describe('handleMarkRefPoint — picker integration', () => {
     mockGetCurrentScenarioHandle.mockReturnValue(handle);
 
     // Imported ref at same coords as GPS position (49, 8)
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'Bank',
         name: 'Bank',
@@ -685,7 +625,7 @@ describe('handleMarkRefPoint — picker integration', () => {
     const handle = createMockScenarioHandle();
     mockGetCurrentScenarioHandle.mockReturnValue(handle);
 
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'Bank',
         name: 'Bank',
@@ -723,7 +663,7 @@ describe('handleMarkRefPoint — picker integration', () => {
     mockShowRefPointPicker.mockResolvedValue({ id: 'My Point', isNew: true });
 
     // Imported refs far away — no nearby match, new ref point flow
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'FarAway',
         name: 'Far Away',
@@ -901,28 +841,6 @@ describe('handleMarkRefPoint — full flow', () => {
     );
   });
 
-  // Why: Session usage count must be tracked for the picker's usage column.
-  it('should track session ref point usage', async () => {
-    await handlers.handleMarkRefPoint();
-
-    const usage = handlers.getSessionRefPointUsage();
-    // Usage is keyed by H3 index, not picker name
-    expect(usage.size).toBe(1);
-    const [h3Key] = [...usage.keys()];
-    expect(h3Key).toMatch(/^[0-9a-f]{15}$/);
-    expect(usage.get(h3Key)).toBe(1);
-  });
-
-  // Why: Multiple markings of the same ref point should increment the count.
-  it('should increment usage count on repeated marking', async () => {
-    await handlers.handleMarkRefPoint();
-    await handlers.handleMarkRefPoint();
-
-    const usage = handlers.getSessionRefPointUsage();
-    const [h3Key] = [...usage.keys()];
-    expect(usage.get(h3Key)).toBe(2);
-  });
-
   // Why: If no scenario handle, persist should be skipped but dispatch/visualize still happen.
   it('should skip persist when no scenario handle', async () => {
     mockGetCurrentScenarioHandle.mockReturnValue(null);
@@ -1060,7 +978,7 @@ describe('handleMarkRefPoint — re-observation cooldown', () => {
     );
 
     // Import a ref point at the GPS position (49, 8) → re-observation path
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'Bank',
         name: 'Bank',
@@ -1096,7 +1014,7 @@ describe('handleMarkRefPoint — re-observation cooldown', () => {
       createDefaultDeps({ getStore: () => store })
     );
 
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'Bank',
         name: 'Bank',
@@ -1170,7 +1088,7 @@ describe('handleMarkRefPoint — re-observation cooldown', () => {
     );
 
     // Import a ref point at the GPS position → re-observation path
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'Bank',
         name: 'Bank',
@@ -1192,7 +1110,7 @@ describe('handleMarkRefPoint — re-observation cooldown', () => {
     handlers.reset();
 
     // Re-import ref points (reset clears them)
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'Bank',
         name: 'Bank',
@@ -1341,18 +1259,6 @@ describe('handleMarkRefPoint — H3-based ID', () => {
     expect(mark.id).not.toBe('MyRef');
   });
 
-  it('should track session usage by H3 index, not picker name', async () => {
-    mockShowRefPointPicker.mockResolvedValue({ id: 'Bank', isNew: true });
-
-    await handlers.handleMarkRefPoint();
-
-    const usage = handlers.getSessionRefPointUsage();
-    expect(usage.has('Bank')).toBe(false);
-    // Should have exactly one entry keyed by the H3 index
-    expect(usage.size).toBe(1);
-    const [key] = [...usage.keys()];
-    expect(key).toMatch(/^[0-9a-f]{15}$/);
-  });
 });
 
 /**
@@ -1380,7 +1286,7 @@ describe('checkNearbyRefPoint', () => {
    */
   it('returns display name when within gridDisk of an imported ref point', () => {
     // Set imported ref points at a known location
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'Bank',
         name: 'Bank',
@@ -1401,7 +1307,7 @@ describe('checkNearbyRefPoint', () => {
    * return undefined so the button reverts to the default label.
    */
   it('returns undefined when far from any imported ref point', () => {
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'Bank',
         name: 'Bank',
@@ -1432,7 +1338,7 @@ describe('checkNearbyRefPoint', () => {
    * checks should return undefined.
    */
   it('returns undefined after reset', () => {
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'Bank',
         name: 'Bank',
@@ -1458,7 +1364,7 @@ describe('checkNearbyRefPoint', () => {
    */
   it('reflects updated ref points after a second setImportedRefPoints call', () => {
     // Initial set: "Bank" at (49.0, 8.0)
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'Bank',
         name: 'Bank',
@@ -1470,7 +1376,7 @@ describe('checkNearbyRefPoint', () => {
     expect(handlers.checkNearbyRefPoint(49.0, 8.0)?.displayName).toBe('Bank');
 
     // Replace with "Library" at a completely different location
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'Library',
         name: 'Library',
@@ -1500,7 +1406,7 @@ describe('checkNearbyRefPoint', () => {
    * still passes behaviorally but documents the expected invariant.
    */
   it('returns consistent results across many rapid calls', () => {
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'Bank',
         name: 'Bank',
@@ -1779,7 +1685,7 @@ describe('checkNearbyRefPoint — isNeighborCell', () => {
   // Why: When the user is in the exact same H3 cell as the ref point,
   // isNeighborCell should be false (no need to add a new ref point here).
   it('returns isNeighborCell=false when in the same center cell', () => {
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'Bank',
         name: 'Bank',
@@ -1798,7 +1704,7 @@ describe('checkNearbyRefPoint — isNeighborCell', () => {
   // center cell), isNeighborCell should be true. At H3 res-11, a shift of
   // ~0.0003Â° (~33m) should land in a neighbor cell while still in the gridDisk.
   it('returns isNeighborCell=true when in a neighbor gridDisk cell', () => {
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'Bank',
         name: 'Bank',
@@ -1818,7 +1724,7 @@ describe('checkNearbyRefPoint — isNeighborCell', () => {
   // Why: When the user is far away (no match), undefined should be returned,
   // even with the new return type.
   it('returns undefined when outside all gridDisk zones', () => {
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'Bank',
         name: 'Bank',
@@ -1861,7 +1767,7 @@ describe('handleMarkRefPoint — forceNew', () => {
     });
 
     // Import a ref point at the user's location — normally would trigger re-observation
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'Bank',
         name: 'Bank',
@@ -1893,7 +1799,7 @@ describe('handleMarkRefPoint — forceNew', () => {
       getCurrentSessionName: () => 'test-session',
     });
 
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'Bank',
         name: 'Bank',
@@ -1943,7 +1849,7 @@ describe('handleMarkRefPoint — re-observation toast feedback', () => {
     const handlers = createRefPointHandlers(
       createDefaultDeps({ getStore: () => store })
     );
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'Bank',
         name: 'Bank',
@@ -2149,7 +2055,7 @@ describe('handleMarkRefPoint — refPointsV2 dispatch (Step 5.2 / 5.7)', () => {
     );
     // Imported ref point at the GPS position → re-observation path,
     // picker is bypassed, name comes from the matched anchor.
-    handlers.setImportedRefPoints([
+    seedImportedRefPoints([
       {
         id: 'Bank',
         name: 'Bank',

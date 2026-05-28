@@ -153,8 +153,6 @@ export interface RecordingSessionDeps {
   getRecordingOptions: () => RecordingOptions;
   /** Access the map overlay (may be null if AR not started). */
   getMapOverlay: () => LeafletMapOverlay | null;
-  /** Clear ref-point usage tracking for new session. */
-  clearRefPointUsage: () => void;
   /** Read session notes from UI. */
   getSessionNotes: () => string;
   /** Wait for GPS zero reference (polling store, owned by main.ts). */
@@ -265,7 +263,6 @@ export function createRecordingSessionHandlers(
     log.info('Start recording');
 
     resetCoordinatorState();
-    deps.clearRefPointUsage();
     gpsEventVisualizer.clearAll();
 
     // Cleanup previous store subscription if any

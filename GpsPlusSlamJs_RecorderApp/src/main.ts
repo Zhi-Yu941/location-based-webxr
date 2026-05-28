@@ -93,7 +93,11 @@ import {
 import { createRecordingSessionHandlers } from './recording/recording-session-handlers';
 import { createFolderManager } from './storage/folder-manager';
 
-import { type ImportedRefPoint } from './storage/ref-point-importer';
+import {
+  setImportedRefPointEntries,
+  selectImportedKnownAnchors,
+  type RefPointEntry,
+} from './state/ref-points-v2-slice';
 
 import {
   showRefPointPicker,
@@ -240,7 +244,6 @@ const recordingSessionHandlers = createRecordingSessionHandlers({
   createNewStore,
   getRecordingOptions: () => recordingOptions,
   getMapOverlay: () => mapOverlay,
-  clearRefPointUsage: () => refPointHandlers.clearSessionRefPointUsage(),
   getSessionNotes,
   waitForZeroReference,
   loadAndDisplayRefPoints: (handle) =>
@@ -269,8 +272,6 @@ const folderManager = createFolderManager({
   getIsReplayMode: () => replayHandlers.getIsReplayMode(),
   setReplayZipScenariosCache: (cache) =>
     replayHandlers.setReplayZipScenariosCache(cache),
-  setImportedRefPoints: (refPoints) =>
-    refPointHandlers.setImportedRefPoints(refPoints),
   showError,
   updateStatus,
   populateScenarios,
@@ -291,22 +292,41 @@ const folderManager = createFolderManager({
 // --- Exported for testing ---
 
 /**
- * Get imported reference points from previous session ZIPs.
- * Used by the ref point picker to suggest existing ref points.
- * Exported for testing purposes.
+ * Get imported reference points from the V2 slice.
+ * Returns one entry per sidecar-imported known anchor (timestamp === 0).
+ * Exported for testing.
  */
-export function getImportedRefPoints(): ImportedRefPoint[] {
-  return refPointHandlers.getImportedRefPoints();
+export function getImportedRefPoints() {
+  return selectImportedKnownAnchors(store.getState().refPointsV2);
 }
 
 /**
- * Set imported reference points (for testing purposes).
- * Delegates to refPointHandlers.
+ * Replace the imported ref-point set wholesale (for testing).
+ * Dispatches `setImportedRefPointEntries` into the V2 slice. Each input
+ * becomes a `RefPointEntry` with `timestamp: 0` (sidecar marker).
  */
 export function setImportedRefPointsForTesting(
-  refPoints: ImportedRefPoint[]
+  refPoints: ReadonlyArray<{
+    id: string;
+    name?: string;
+    lat: number;
+    lon: number;
+    alt?: number;
+  }>
 ): void {
-  refPointHandlers.setImportedRefPoints(refPoints);
+  const entries: RefPointEntry[] = refPoints.map((rp) => ({
+    id: rp.id,
+    timestamp: 0,
+    name: rp.name,
+    rawGpsPoint: {
+      id: `imported-${rp.id}`,
+      latitude: rp.lat,
+      longitude: rp.lon,
+      ...(rp.alt !== undefined ? { altitude: rp.alt } : {}),
+      timestamp: 0,
+    },
+  }));
+  store.dispatch(setImportedRefPointEntries(entries));
 }
 
 /**
@@ -405,12 +425,12 @@ export async function handleClearRefPointCache(): Promise<void> {
         // Re-import failed — clear in-memory imported ref points so proximity
         // checks don't keep referring to stale entries from before the cache
         // was cleared.
-        refPointHandlers.setImportedRefPoints([]);
+        store.dispatch(setImportedRefPointEntries([]));
       }
     } else {
       // No active scenario — clear in-memory imported ref points so any
       // proximity checks don't keep referring to stale entries.
-      refPointHandlers.setImportedRefPoints([]);
+      store.dispatch(setImportedRefPointEntries([]));
     }
 
     const cleared = result.scenariosCleared;
@@ -498,12 +518,14 @@ export async function resetForNewRecording(): Promise<void> {
     // is true, but we guard to satisfy TypeScript and tolerate future refactors.
     const folderHandle = getReadFolderHandle();
     if (folderHandle) {
-      const refPointCount = refPointHandlers.getImportedRefPoints().length;
+      const refPointCount = selectImportedKnownAnchors(
+        store.getState().refPointsV2
+      ).length;
       updateFolderStatus(`✅ ${folderHandle.name} (${refPointCount} ref pts)`);
     }
   } else {
     // Permission lost — clear imported ref points too since they came from that folder
-    refPointHandlers.setImportedRefPoints([]);
+    store.dispatch(setImportedRefPointEntries([]));
   }
 
   log.info(

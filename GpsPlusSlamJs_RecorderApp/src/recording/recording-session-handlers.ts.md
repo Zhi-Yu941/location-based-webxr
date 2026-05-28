@@ -60,7 +60,7 @@ const handlers = createRecordingSessionHandlers({
   createNewStore: () => createRecorderStore(),
   getRecordingOptions: () => recordingOptions,
   getMapOverlay: () => mapOverlay,
-  clearRefPointUsage: () => refPointUsage.clear(),
+  // (5.7a-3 Option C) clearRefPointUsage dep dropped; per-session usage tracking removed.
   getSessionNotes: () => notesInput.value,
   waitForZeroReference: (ms) => waitForGpsZero(ms),
   loadAndDisplayRefPoints: (h) => loadRefPoints(h),

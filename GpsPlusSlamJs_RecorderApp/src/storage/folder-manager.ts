@@ -18,7 +18,6 @@ import {
   selectSaveFile,
   getReadFolderHandle,
 } from './external-file-storage';
-import type { ImportedRefPoint } from '../storage/ref-point-importer';
 import {
   setCurrentScenario,
   ensureScenarioDirectory,
@@ -32,10 +31,7 @@ import {
 } from '../storage/ref-point-loader';
 import { recoverRefPointDefinitionsFromZips } from '../storage/ref-point-recovery';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
-import {
-  setCurrentScenarioName,
-  setPriorRefPointMarks,
-} from '../state/recorder-store';
+import { setCurrentScenarioName } from '../state/recorder-store';
 import { setImportedRefPointEntries } from '../state/ref-points-v2-slice';
 import type { RecorderStore } from '../state/recorder-store';
 
@@ -57,8 +53,6 @@ export interface FolderManagerDeps {
   getIsReplayMode: () => boolean;
   /** Cache zip→scenario mapping for replay (owned by replayHandlers). */
   setReplayZipScenariosCache: (cache: Map<string, SessionEntryLike[]>) => void;
-  /** Set imported ref points (owned by refPointHandlers). */
-  setImportedRefPoints: (refPoints: ImportedRefPoint[]) => void;
   /** Access the current store instance (may change between recordings). */
   getStore: () => RecorderStore;
   /** UI: show error toast/banner. */
@@ -319,32 +313,16 @@ export function createFolderManager(deps: FolderManagerDeps): FolderManager {
 
     const allObservations = flattenRefPointsToMarks(refPointDefs);
 
-    // 3D display (all individual observations as green spheres) — driven by
-    // store subscription (Finding 5; see
-    // 2026-04-30-refpoint-marks-into-redux-plan.md). The visualizer was
-    // previously called directly here; it is now a subscription consumer
-    // bound via wireStoreSubscribers in the recording / replay paths.
-    deps.getStore().dispatch(setPriorRefPointMarks(allObservations));
-
     // Compute averaged GPS per ref point ID for H3 + 2D map
     const averaged = averageGpsPerRefPoint(refPointDefs);
 
-    // H3 proximity cache (scenario-scoped, replaces old cross-scenario ZIP scan)
-    deps.setImportedRefPoints(
-      averaged.map((rp) => ({
-        id: rp.id,
-        name: rp.name,
-        lat: rp.lat,
-        lon: rp.lon,
-        alt: rp.alt,
-        sourceZipName: '',
-      }))
-    );
-
-    // Step 5.5: also populate the flat `refPointsV2` slice — the matcher
-    // (`selectKnownAnchorsByCell`) has read from there since Step 5.4.
-    // Each averaged ref point becomes a single sidecar `RefPointEntry`
-    // with `timestamp: 0` (these are not live observations).
+    // Populate the flat `refPointsV2` slice — the single source of truth
+    // since 5.7a-3 Option C of the 2026-05-27 slice-collapse plan. Each
+    // averaged ref point becomes a single sidecar `RefPointEntry` with
+    // `timestamp: 0` (sidecar imports are not live observations). The 3D
+    // visualizer subscribes to `selectRefPointEntries` (Step 5.3) and
+    // renders one sphere per cell; the proximity matcher uses
+    // `selectKnownAnchorsByCell` (Step 5.4) over the same slice.
     deps.getStore().dispatch(
       setImportedRefPointEntries(
         averaged.map((rp) => ({

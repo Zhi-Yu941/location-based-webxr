@@ -29,6 +29,10 @@ import {
   type SlamAppStore,
 } from 'gps-plus-slam-app-framework/state/create-slam-app-store';
 import { refPointsReducer, type RefPointsState } from './ref-points-slice';
+import {
+  refPointsV2Reducer,
+  type RefPointsV2State,
+} from './ref-points-v2-slice';
 import type { RecordingState } from 'gps-plus-slam-app-framework/state/recording-slice';
 import type { TrackingSliceState } from 'gps-plus-slam-app-framework/state/tracking-slice';
 import type { TrackingQualitySliceState } from 'gps-plus-slam-app-framework';
@@ -114,6 +118,7 @@ export interface CombinedRootState extends LibraryRootState {
   tracking: TrackingSliceState;
   trackingQuality: TrackingQualitySliceState;
   refPoints: RefPointsState;
+  refPointsV2: RefPointsV2State;
   routing: RoutingState;
   scenario: ScenarioState;
   framesInScene: FramesInSceneState;
@@ -160,6 +165,7 @@ export function createRecorderStore(
     licenseKey: options.licenseKey,
     extraReducers: {
       refPoints: refPointsReducer,
+      refPointsV2: refPointsV2Reducer,
       routing: routingReducer,
       scenario: scenarioReducer,
       framesInScene: framesInSceneReducer,

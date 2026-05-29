@@ -61,19 +61,21 @@ export interface GpsEventAccuracy {
 /**
  * Validate a {@link GpsEventAccuracy} hint and return the concrete
  * {horizontal, vertical} scale when both axes are usable, or `null` to signal
- * "fall back to the legacy fixed 8 cm sphere". A half-populated or
- * non-positive accuracy must NOT produce an ellipsoid (degenerate axis).
+ * "fall back to the legacy fixed 8 cm sphere". A half-populated, non-positive,
+ * or non-finite (`NaN`/`Infinity`) accuracy must NOT produce an ellipsoid:
+ * a degenerate or infinite axis would corrupt the mesh transform and can
+ * crash Three.js rendering.
  */
 function resolveEllipsoidScale(
   accuracy: GpsEventAccuracy | undefined
 ): { horizontal: number; vertical: number } | null {
   if (accuracy === undefined) return null;
   const { horizontal, vertical } = accuracy;
-  if (typeof horizontal !== 'number' || typeof vertical !== 'number') {
+  if (!Number.isFinite(horizontal) || !Number.isFinite(vertical)) {
     return null;
   }
-  if (!(horizontal > 0) || !(vertical > 0)) return null;
-  return { horizontal, vertical };
+  if (!(horizontal! > 0) || !(vertical! > 0)) return null;
+  return { horizontal: horizontal!, vertical: vertical! };
 }
 
 /**

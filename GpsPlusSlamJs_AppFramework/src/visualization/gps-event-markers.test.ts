@@ -271,6 +271,42 @@ describe('GpsEventVisualizer', () => {
       expect(raw.scale.x).toBeCloseTo(1);
     });
 
+    // A non-finite accuracy (Infinity/NaN) must fall back to the fixed sphere:
+    // scaling a Three.js mesh by Infinity corrupts its world matrix and can
+    // crash rendering. `Infinity > 0` is true, so the positive-value guard
+    // alone would let it through — this asserts the Number.isFinite guard.
+    it('treats Infinity accuracy as missing (no scale applied)', () => {
+      setupZero();
+
+      visualizer.addGpsEvent([10, 5, 20], [1, 2, 3], {
+        horizontal: Infinity,
+        vertical: 12,
+      });
+
+      const raw = findRaw();
+      expect(
+        (raw.geometry as THREE.SphereGeometry).parameters.radius
+      ).toBeCloseTo(0.08);
+      expect(raw.scale.x).toBeCloseTo(1);
+      expect(raw.scale.y).toBeCloseTo(1);
+      expect(raw.scale.z).toBeCloseTo(1);
+    });
+
+    it('treats NaN accuracy as missing (no scale applied)', () => {
+      setupZero();
+
+      visualizer.addGpsEvent([10, 5, 20], [1, 2, 3], {
+        horizontal: 4.5,
+        vertical: NaN,
+      });
+
+      const raw = findRaw();
+      expect(
+        (raw.geometry as THREE.SphereGeometry).parameters.radius
+      ).toBeCloseTo(0.08);
+      expect(raw.scale.x).toBeCloseTo(1);
+    });
+
     it('lowers raw-GPS opacity when ellipsoid mode is active (so cyan/red stay visible inside)', () => {
       setupZero();
 

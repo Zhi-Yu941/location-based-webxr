@@ -25,9 +25,19 @@ import { fileURLToPath } from 'node:url';
 import { loadActionsFromZip, type ZipActionEntry } from '../storage/zip-reader';
 import { createSlamAppStore, type SlamAppStore } from './create-slam-app-store';
 import { NullStorageBackend } from '../storage/null-storage-backend';
-import { selectTrackingQuality } from './tracking-quality';
+import {
+  selectTrackingQuality,
+  DEFAULT_TRACKING_QUALITY_OPTIONS,
+} from './tracking-quality';
 import { poseReceived } from './tracking-slice';
 import type { TrackingQualityReport } from './tracking-quality';
+
+// Convergence fail threshold for translation is derived as `warn × 4`
+// (see `transFail = transWarn * 4` in computeConvergence). Deriving it here
+// keeps this test in sync with the default if `convergenceTranslationWarnM`
+// is ever re-tuned, instead of silently drifting from a hardcoded literal.
+const TRANSLATION_FAIL_M =
+  DEFAULT_TRACKING_QUALITY_OPTIONS.convergenceTranslationWarnM * 4;
 
 // ---------------------------------------------------------------------------
 // Fixtures — resolved relative to the workspace root, where both
@@ -291,7 +301,8 @@ describe.runIf(fixturesAvailable)(
 
       it('outdoor: steady-state translation sum stays ≤ translationFailM', () => {
         // Why: pins the empirical fact that outdoor steady walking
-        // keeps ΣΔpos comfortably under the fail threshold (8 m).
+        // keeps ΣΔpos comfortably under the fail threshold
+        // (TRANSLATION_FAIL_M = convergenceTranslationWarnM × 4 = 8 m today).
         // If this fires, normal walking is being misclassified as a
         // failure — i.e. the threshold is too tight, not too loose.
         const lateSamples = outdoorResult.snapshots.filter(
@@ -299,7 +310,7 @@ describe.runIf(fixturesAvailable)(
         );
         for (const s of lateSamples) {
           expect(s.report.diagnostics.recentSumTranslationDeltaM).toBeLessThan(
-            8
+            TRANSLATION_FAIL_M
           );
         }
       });

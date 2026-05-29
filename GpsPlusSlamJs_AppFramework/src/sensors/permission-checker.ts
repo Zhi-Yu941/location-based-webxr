@@ -485,11 +485,11 @@ export interface PermissionSubscription {
  * This subscription wires three signals:
  * 1. `navigator.permissions.query(...)` returns a live `PermissionStatus`
  *    for `'geolocation'` and `'camera'`; we keep those references and
- *    attach `onchange` so we react immediately when the browser updates
- *    the underlying state.
+ *    attach a `'change'` listener via `addEventListener` so we react
+ *    immediately when the browser updates the underlying state.
  * 2. `document.visibilitychange` (only when `visibilityState === 'visible'`)
  *    covers the "user tabbed out to settings, toggled, tabbed back" case
- *    on browsers where `onchange` does not fire reliably.
+ *    on browsers where the `'change'` event does not fire reliably.
  * 3. `window.focus` covers the same scenario for browsers/standalone
  *    windows where `visibilitychange` is not dispatched on focus return.
  *
@@ -523,7 +523,7 @@ export function subscribePermissionChanges(
       });
   };
 
-  // Signal 1: PermissionStatus.onchange for geolocation + camera.
+  // Signal 1: PermissionStatus 'change' event for geolocation + camera.
   // navigator.permissions is unavailable on some browsers (Safari < 16
   // for camera, etc.); we tolerate failures silently and fall back to
   // signals 2 + 3.
@@ -537,24 +537,18 @@ export function subscribePermissionChanges(
         navigator.permissions.query({ name }).then(
           (status) => {
             if (disposed) return;
+            // `PermissionStatus` extends `EventTarget`, so `addEventListener`
+            // is always available wherever `navigator.permissions.query`
+            // resolves. We deliberately do NOT fall back to the legacy
+            // `onchange` property: monkey-patching it is unsafe when multiple
+            // subscriptions coexist (later subscribers overwrite earlier
+            // handlers, and restoring the captured `prev` on unsubscribe can
+            // clobber another live subscriber's handler).
             const handler = (): void => notify();
-            try {
-              status.addEventListener('change', handler);
-              cleanups.push(() =>
-                status.removeEventListener('change', handler)
-              );
-            } catch {
-              // Fall back to the legacy onchange property if
-              // addEventListener is unavailable.
-              const prev = status.onchange;
-              status.onchange = (ev: Event): unknown => {
-                handler();
-                return prev?.call(status, ev);
-              };
-              cleanups.push(() => {
-                status.onchange = prev;
-              });
-            }
+            status.addEventListener('change', handler);
+            cleanups.push(() =>
+              status.removeEventListener('change', handler)
+            );
           },
           () => {
             /* permissions.query rejected — ignore, fallbacks remain wired */

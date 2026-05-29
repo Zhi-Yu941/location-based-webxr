@@ -799,25 +799,43 @@ describe('permission-checker', () => {
    * about out-of-band permission flips (user toggling location in browser
    * settings) without a page reload. See
    * docs/2026-05-03-setup-screen-defaults-and-permission-rerequest.md
-   * (Issue 2). The subscription wires `PermissionStatus.onchange` plus
-   * `document.visibilitychange` / `window.focus` fallbacks.
+   * (Issue 2). The subscription wires the PermissionStatus `'change'` event
+   * plus `document.visibilitychange` / `window.focus` fallbacks.
    */
   describe('subscribePermissionChanges', () => {
+    // A minimal `PermissionStatus` fake. The production code attaches a
+    // `'change'` listener via `addEventListener` (PermissionStatus extends
+    // EventTarget), so the fake records change listeners and exposes
+    // `fireChange()` to simulate the browser dispatching the event.
     interface FakePermissionStatus {
       state: 'granted' | 'denied' | 'prompt';
-      onchange: ((this: FakePermissionStatus, ev: Event) => unknown) | null;
+      addEventListener(type: string, handler: () => void): void;
+      removeEventListener(type: string, handler: () => void): void;
+      fireChange(): void;
     }
 
     function makeFakeStatus(
       initial: 'granted' | 'denied' | 'prompt'
     ): FakePermissionStatus {
-      return { state: initial, onchange: null };
+      const handlers = new Set<() => void>();
+      return {
+        state: initial,
+        addEventListener(type, handler): void {
+          if (type === 'change') handlers.add(handler);
+        },
+        removeEventListener(type, handler): void {
+          if (type === 'change') handlers.delete(handler);
+        },
+        fireChange(): void {
+          for (const h of handlers) h();
+        },
+      };
     }
 
     // Why: The primary signal for in-page detection of permission flips is
-    // `PermissionStatus.onchange`. Firing it must trigger the callback with
-    // a freshly computed `PermissionCheckResult`.
-    it('invokes callback when geolocation PermissionStatus.onchange fires', async () => {
+    // the PermissionStatus `'change'` event. Firing it must trigger the
+    // callback with a freshly computed `PermissionCheckResult`.
+    it('invokes callback when geolocation PermissionStatus change event fires', async () => {
       const geoStatus = makeFakeStatus('denied');
       const camStatus = makeFakeStatus('granted');
       vi.stubGlobal('navigator', {
@@ -843,13 +861,14 @@ describe('permission-checker', () => {
         await import('./permission-checker');
       const callback = vi.fn();
       const sub = subscribePermissionChanges(callback);
-      // Wait for the initial query promises to resolve so onchange is wired.
+      // Wait for the initial query promises to resolve so the change
+      // listener is wired.
       await new Promise((r) => setTimeout(r, 0));
 
       callback.mockClear();
       // Simulate the user flipping location to granted via browser settings.
       geoStatus.state = 'granted';
-      geoStatus.onchange?.call(geoStatus, new Event('change'));
+      geoStatus.fireChange();
       await new Promise((r) => setTimeout(r, 0));
 
       expect(callback).toHaveBeenCalled();
@@ -861,8 +880,8 @@ describe('permission-checker', () => {
       sub.unsubscribe();
     });
 
-    // Why: Some browsers don't fire `PermissionStatus.onchange` reliably
-    // (e.g. when the tab was backgrounded during the change). The
+    // Why: Some browsers don't fire the PermissionStatus `'change'` event
+    // reliably (e.g. when the tab was backgrounded during the change). The
     // `visibilitychange` fallback covers the "user tabbed out to settings,
     // toggled, tabbed back" scenario.
     it('re-checks on document visibilitychange (visible)', async () => {
@@ -984,7 +1003,7 @@ describe('permission-checker', () => {
       callback.mockClear();
 
       geoStatus.state = 'granted';
-      geoStatus.onchange?.call(geoStatus, new Event('change'));
+      geoStatus.fireChange();
       Object.defineProperty(document, 'visibilityState', {
         configurable: true,
         get: () => 'visible',

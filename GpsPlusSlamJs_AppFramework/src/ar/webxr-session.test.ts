@@ -1009,6 +1009,44 @@ describe('image capture functions', () => {
 
   /**
    * Why this test matters:
+   * Calling startImageCapture() again while a capture session is already
+   * running (e.g. toggling capture settings mid-session) must dispose the
+   * previous CameraBlitCapture (and its WebGLRenderTarget GPU memory) and
+   * stop the previous ImageCaptureManager — otherwise the module-level
+   * `blitCapture`/`imageCaptureManager` references are overwritten, leaking
+   * GPU memory and leaving two managers competing over the same callbacks
+   * plus a dangling safety timeout.
+   *
+   * initAR() (which sets the private `renderer`) can't run in jsdom, so we
+   * assert on the source of startImageCapture that it stops any in-flight
+   * session before allocating new resources — matching the source-inspection
+   * pattern used for the resetWebXRState/endARSession cleanup tests above.
+   */
+  it('startImageCapture stops any in-flight capture before starting a new one', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/ar/webxr-session.ts'),
+      'utf-8'
+    );
+    const startBlock = source.slice(
+      source.indexOf('function startImageCapture'),
+      source.indexOf('function stopImageCapture')
+    );
+    // The guard must check for an existing session and call stopImageCapture()
+    // before the new CameraBlitCapture / ImageCaptureManager are constructed.
+    const guardIndex = startBlock.indexOf('stopImageCapture()');
+    const blitIndex = startBlock.indexOf('new CameraBlitCapture()');
+    const managerIndex = startBlock.indexOf('new ImageCaptureManager(');
+    expect(guardIndex).toBeGreaterThan(-1);
+    expect(blitIndex).toBeGreaterThan(-1);
+    expect(managerIndex).toBeGreaterThan(-1);
+    expect(guardIndex).toBeLessThan(blitIndex);
+    expect(guardIndex).toBeLessThan(managerIndex);
+  });
+
+  /**
+   * Why this test matters:
    * getImageCaptureFrameCount should return 0 when not capturing
    */
   it('getImageCaptureFrameCount returns 0 when not capturing', () => {

@@ -1236,6 +1236,17 @@ export function startImageCapture(
     return;
   }
 
+  // Stop any in-flight capture session before starting a new one. Without
+  // this, a second startImageCapture() (e.g. toggling capture settings
+  // mid-session) would overwrite `blitCapture` — leaking the previous
+  // CameraBlitCapture and its WebGLRenderTarget GPU memory — and orphan the
+  // previous ImageCaptureManager, leaving two managers competing over the
+  // same callbacks and a dangling safety timeout running.
+  if (imageCaptureManager || blitCapture) {
+    log.warn('Image capture already running - stopping previous session');
+    stopImageCapture();
+  }
+
   const callbacks: ImageCaptureCallbacks = {
     getCurrentPose: getCurrentArPose,
     getScreenRotation: getScreenRotation,

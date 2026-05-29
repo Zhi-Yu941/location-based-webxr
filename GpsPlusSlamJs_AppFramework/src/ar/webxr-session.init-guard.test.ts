@@ -17,7 +17,7 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import * as THREE from 'three';
+import type * as THREE from 'three';
 
 // Mock only WebGLRenderer (jsdom has no WebGL context). Spreading `...actual`
 // keeps every other THREE export real so the scene hierarchy built by

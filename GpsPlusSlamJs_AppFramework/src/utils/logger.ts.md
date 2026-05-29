@@ -93,7 +93,14 @@ unsubscribe();
    - `log.warn()` calls `Sentry.captureMessage(message, { level: 'warning', fingerprint: [...] })`.
    - `log.error()` with one or more `Error` arguments calls `Sentry.captureException()` for each `Error` (full stack trace).
    - `log.error()` with **no** `Error` argument (string-only) falls back to `Sentry.captureMessage(message, { level: 'error', fingerprint: [...] })`. The fallback is mutually exclusive with `captureException`, so an error carrying an `Error` never also produces a message Issue.
-   - **Template-based fingerprint grouping:** the fingerprint is `['log', level, tag, template]`, where `template` is the message with its dynamic tokens normalized (numbers → `{n}`, UUIDs → `{uuid}`, quoted strings → `"{str}"`). This means dynamic values (frame indices, byte sizes, filenames, session ids) collapse into a single Issue **per message kind**, while two genuinely different messages that happen to share a `tag` stay as separate Issues. The `tag` identifies the source module, not the kind of message, so it is intentionally *not* the sole grouping key. `debug`/`info` remain breadcrumb-only.
+   - **Template-based fingerprint grouping:** the fingerprint is `['log', level, tag, template]`, where `template` is the message with its dynamic tokens normalized. This collapses dynamic values into a single Issue **per message kind**, while two genuinely different messages that share a `tag` stay as separate Issues. The `tag` identifies the source module, not the kind of message, so it is intentionally *not* the sole grouping key. `debug`/`info` remain breadcrumb-only.
+     - **Normalized (replaced with placeholders) by `toFingerprintTemplate`:**
+       - UUIDs → `{uuid}` (matched first, before numbers, so digit groups inside a UUID are not shredded).
+       - Numbers → `{n}`: signed, decimal, and exponent forms (`-3.5`, `1e3`, `100`). Because numbers run before the quoted-string rule, a quoted path with an embedded index (`"actions/000001.json"`) collapses entirely to `"{str}"`. ISO timestamps fold into a stable (if lossy) numeric template via this rule — no dedicated date rule exists.
+       - Quoted strings → `"{str}"` / `'{str}'` (both quote styles).
+     - **Deliberately NOT normalized** (verified against real call sites — over-normalizing these would merge distinct problems, which is worse than mild fragmentation):
+       - Free-form appended `error.message` text — it carries the actual diagnosis and must keep distinct errors as distinct Issues.
+       - Bare (unquoted, non-UUID) identifiers/paths such as `${pointId}`, `${name}`, `${entry.fullPath}` — a rule broad enough to catch these would also swallow ordinary English words (e.g. hex-only words). Wrap such values in quotes at the call site if you want them grouped.
 
 ## Examples
 
@@ -144,3 +151,11 @@ Unit tests in [logger.test.ts](logger.test.ts) cover:
   - `captureMessage` NOT called for debug/info logs
   - Non-Error arguments don't trigger `captureException`
   - `log.debug/info/warn` with Error objects don't trigger `captureException`
+- **Fingerprint template normalization** (`toFingerprintTemplate`, derived from a review of real call sites):
+  - Signed / decimal / exponent numbers all normalize to `{n}`
+  - ISO 8601 timestamps group via the number rule (stable, if lossy, template)
+  - A double-quoted path with an embedded number fully collapses to `"{str}"` (number rule runs before the quote rule)
+  - Single-quoted strings normalize the same as double-quoted
+  - A message mixing several token kinds (numbers + quoted filename) groups across differing concrete values
+  - Free-form `error.message` text is NOT normalized (distinct errors stay distinct — deliberate boundary)
+  - Bare unquoted non-UUID identifiers are NOT normalized (deliberate boundary)

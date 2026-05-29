@@ -787,6 +787,147 @@ describe('Logger', () => {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
+  // Fingerprint template normalization (toFingerprintTemplate)
+  //
+  // These tests were added after a code-review of the real `log.warn`/
+  // `log.error` call sites across both apps (RecorderApp + AppFramework). They
+  // pin the dynamic-token categories that DO occur in practice (numbers, ISO
+  // timestamps, quoted filenames/paths, signed/decimal/exponent values) and
+  // explicitly document the deliberate NON-normalization of free-form error
+  // text and bare identifiers — over-normalizing those would merge genuinely
+  // distinct problems into one Issue, which is worse than mild fragmentation.
+  // ──────────────────────────────────────────────────────────────────────────
+
+  describe('fingerprint template normalization', () => {
+    beforeEach(() => {
+      clearLogBuffer();
+      mockCaptureMessage.mockClear();
+    });
+
+    /** Extract the fingerprint array from the Nth captureMessage call. */
+    const fingerprintOf = (callIndex: number): string[] =>
+      (mockCaptureMessage.mock.calls[callIndex]?.[1] as { fingerprint: string[] })
+        .fingerprint;
+
+    it('should normalize signed, decimal, and exponent numbers to the same template', () => {
+      // Why: drift / coordinate / size values appear as negative, fractional,
+      // and exponent forms; all are the same KIND of message and must group.
+      const logger = createLogger('Pose');
+
+      logger.warn('Drift detected: -3.5 m');
+      logger.warn('Drift detected: 12.75 m');
+      logger.warn('Drift detected: 1e3 m');
+
+      const expected = ['log', 'warning', 'Pose', 'Drift detected: {n} m'];
+      expect(fingerprintOf(0)).toEqual(expected);
+      expect(fingerprintOf(1)).toEqual(expected);
+      expect(fingerprintOf(2)).toEqual(expected);
+    });
+
+    it('should group ISO 8601 timestamps via the number rule', () => {
+      // Why: timestamps are entirely numeric components, so the {n} rule
+      // collapses them without a dedicated date rule. Note the `-?` in the
+      // number pattern also consumes the date separators and the fractional
+      // seconds fold into the preceding number — the exact template is a bit
+      // lossy, but it is STABLE across timestamps, which is all grouping needs.
+      // This is non-obvious and easy to regress, so pin it.
+      const logger = createLogger('Session');
+
+      logger.warn('Session started at 2026-05-29T09:43:48.123Z');
+      logger.warn('Session started at 2026-05-30T11:02:05.000Z');
+
+      expect(fingerprintOf(0)).toEqual(fingerprintOf(1));
+      expect(fingerprintOf(0)).toEqual([
+        'log',
+        'warning',
+        'Session',
+        'Session started at {n}{n}{n}T{n}:{n}:{n}Z',
+      ]);
+    });
+
+    it('should fully collapse a double-quoted path even when it embeds a number', () => {
+      // Why: real call sites log `Skipping "actions/000001.json"`. The number
+      // rule runs before the quoted-string rule, so the digits are replaced
+      // first and the whole quoted token then collapses to "{str}". Two
+      // different action files must therefore share one fingerprint.
+      const logger = createLogger('ZipReader');
+
+      logger.warn('Skipping "actions/000001.json": parse failed');
+      logger.warn('Skipping "actions/000999.json": parse failed');
+
+      expect(fingerprintOf(0)).toEqual(fingerprintOf(1));
+      expect(fingerprintOf(0)).toEqual([
+        'log',
+        'warning',
+        'ZipReader',
+        'Skipping "{str}": parse failed',
+      ]);
+    });
+
+    it('should normalize single-quoted strings the same way as double-quoted', () => {
+      // Why: messages use both quote styles; both must collapse so e.g.
+      // `Unexpected token 'foo'` and `Unexpected token 'bar'` group together.
+      const logger = createLogger('Parser');
+
+      logger.warn("Unexpected token 'foo'");
+      logger.warn("Unexpected token 'bar'");
+
+      expect(fingerprintOf(0)).toEqual(fingerprintOf(1));
+      expect(fingerprintOf(0)).toEqual([
+        'log',
+        'warning',
+        'Parser',
+        "Unexpected token '{str}'",
+      ]);
+    });
+
+    it('should group a message mixing several dynamic token kinds at once', () => {
+      // Why: the worst real case (the "Suspicious image" log and friends) mixes
+      // numbers and quoted filenames in one line; the combined template must be
+      // stable across differing concrete values.
+      const logger = createLogger('Capture');
+
+      logger.error('Frame 12 ("tiles/000012.webp") failed after 3 retries');
+      logger.error('Frame 87 ("tiles/000087.webp") failed after 9 retries');
+
+      expect(fingerprintOf(0)).toEqual(fingerprintOf(1));
+      expect(fingerprintOf(0)).toEqual([
+        'log',
+        'error',
+        'Capture',
+        'Frame {n} ("{str}") failed after {n} retries',
+      ]);
+    });
+
+    it('should NOT normalize free-form error message text (kept distinct on purpose)', () => {
+      // Why (deliberate boundary): appended `error.message` strings carry the
+      // actual diagnosis (e.g. permission-checker logs `error.message`). Two
+      // different underlying errors are different problems and MUST stay as
+      // separate Issues, so their differing prose yields differing templates.
+      const logger = createLogger('Geo');
+
+      logger.warn('Geolocation error:', 'User denied Geolocation');
+      logger.warn('Geolocation error:', 'Timeout expired');
+
+      expect(fingerprintOf(0)).not.toEqual(fingerprintOf(1));
+    });
+
+    it('should NOT normalize bare (unquoted, non-numeric) identifiers', () => {
+      // Why (deliberate boundary): bare ids/names like `${name}` or `${pointId}`
+      // are not wrapped in quotes and are not UUID-shaped, so they are NOT
+      // normalized. This keeps distinct named entities distinct rather than
+      // risking an over-broad rule that swallows ordinary words. UUID-shaped
+      // ids ARE normalized (covered by a separate test above).
+      const logger = createLogger('RefPoints');
+
+      logger.warn('Failed to process ref point alpha');
+      logger.warn('Failed to process ref point bravo');
+
+      expect(fingerprintOf(0)).not.toEqual(fingerprintOf(1));
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
   // Readonly guards — Finding #6 (2026-03-05 code review)
   // ──────────────────────────────────────────────────────────────────────────
 

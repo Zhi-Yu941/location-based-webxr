@@ -960,7 +960,7 @@ async function handleEnterAR(): Promise<void> {
             Promise.resolve(liveFrameBlobs.get(imageFile) ?? null),
           decodeTexture: decodeFrameTexture,
           onError: (err, imageFile) => {
-            log.warn(`Frame tile decode failed for ${imageFile}`, err);
+            log.warn(`Frame tile decode failed for "${imageFile}"`, err);
           },
         });
       } catch (err) {

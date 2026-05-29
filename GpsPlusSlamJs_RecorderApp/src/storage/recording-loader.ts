@@ -160,11 +160,11 @@ async function readSidecarRefPoints(
         defs.push(parsed);
       } else {
         log.warn(
-          `Skipping ${entry.fullPath}: invalid RefPointDefinition shape`
+          `Skipping "${entry.fullPath}": invalid RefPointDefinition shape`
         );
       }
     } catch (err) {
-      log.warn(`Skipping ${entry.fullPath}: parse error`, err);
+      log.warn(`Skipping "${entry.fullPath}": parse error`, err);
     }
   }
   return defs;

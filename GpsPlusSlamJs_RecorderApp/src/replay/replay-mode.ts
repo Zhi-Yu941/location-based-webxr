@@ -153,7 +153,7 @@ export async function startReplayMode(
       blobSource,
       decodeTexture: decodeFrameTexture,
       onError: (err, imageFile) => {
-        log.warn(`Frame tile decode failed for ${imageFile}`, err);
+        log.warn(`Frame tile decode failed for "${imageFile}"`, err);
       },
     });
   } catch (err) {

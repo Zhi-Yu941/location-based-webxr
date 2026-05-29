@@ -192,27 +192,27 @@ describe('ref-point-loader', () => {
       expect(warnSpy).toHaveBeenCalledTimes(6);
       expect(warnSpy).toHaveBeenCalledWith(
         '[RefPointLoader]',
-        'Invalid schema in missingId.json'
+        'Invalid schema in "missingId.json"'
       );
       expect(warnSpy).toHaveBeenCalledWith(
         '[RefPointLoader]',
-        'Invalid schema in missingName.json'
+        'Invalid schema in "missingName.json"'
       );
       expect(warnSpy).toHaveBeenCalledWith(
         '[RefPointLoader]',
-        'Invalid schema in missingCreatedAt.json'
+        'Invalid schema in "missingCreatedAt.json"'
       );
       expect(warnSpy).toHaveBeenCalledWith(
         '[RefPointLoader]',
-        'Invalid schema in missingObservations.json'
+        'Invalid schema in "missingObservations.json"'
       );
       expect(warnSpy).toHaveBeenCalledWith(
         '[RefPointLoader]',
-        'Invalid schema in wrongIdType.json'
+        'Invalid schema in "wrongIdType.json"'
       );
       expect(warnSpy).toHaveBeenCalledWith(
         '[RefPointLoader]',
-        'Invalid schema in wrongObservationsType.json'
+        'Invalid schema in "wrongObservationsType.json"'
       );
 
       warnSpy.mockRestore();
@@ -359,27 +359,27 @@ describe('ref-point-loader', () => {
       // Should have logged warnings for each invalid schema
       expect(warnSpy).toHaveBeenCalledWith(
         '[RefPointLoader]',
-        'Invalid schema in missingArPose.json'
+        'Invalid schema in "missingArPose.json"'
       );
       expect(warnSpy).toHaveBeenCalledWith(
         '[RefPointLoader]',
-        'Invalid schema in missingGpsPoint.json'
+        'Invalid schema in "missingGpsPoint.json"'
       );
       expect(warnSpy).toHaveBeenCalledWith(
         '[RefPointLoader]',
-        'Invalid schema in nullObservation.json'
+        'Invalid schema in "nullObservation.json"'
       );
       expect(warnSpy).toHaveBeenCalledWith(
         '[RefPointLoader]',
-        'Invalid schema in primitiveObservation.json'
+        'Invalid schema in "primitiveObservation.json"'
       );
       expect(warnSpy).toHaveBeenCalledWith(
         '[RefPointLoader]',
-        'Invalid schema in arPoseMissingPosition.json'
+        'Invalid schema in "arPoseMissingPosition.json"'
       );
       expect(warnSpy).toHaveBeenCalledWith(
         '[RefPointLoader]',
-        'Invalid schema in gpsPointMissingLat.json'
+        'Invalid schema in "gpsPointMissingLat.json"'
       );
 
       warnSpy.mockRestore();
@@ -428,7 +428,7 @@ describe('ref-point-loader', () => {
       expect(result).toBeNull();
       expect(warnSpy).toHaveBeenCalledWith(
         '[RefPointLoader]',
-        'Invalid schema for invalidSchema'
+        'Invalid schema for "invalidSchema"'
       );
 
       warnSpy.mockRestore();
@@ -447,7 +447,7 @@ describe('ref-point-loader', () => {
       expect(result).toBeNull();
       expect(warnSpy).toHaveBeenCalledWith(
         '[RefPointLoader]',
-        'Invalid schema for nullPoint'
+        'Invalid schema for "nullPoint"'
       );
 
       warnSpy.mockRestore();
@@ -475,7 +475,7 @@ describe('ref-point-loader', () => {
       expect(result).toBeNull();
       expect(warnSpy).toHaveBeenCalledWith(
         '[RefPointLoader]',
-        'Invalid schema for wrongTypes'
+        'Invalid schema for "wrongTypes"'
       );
 
       warnSpy.mockRestore();

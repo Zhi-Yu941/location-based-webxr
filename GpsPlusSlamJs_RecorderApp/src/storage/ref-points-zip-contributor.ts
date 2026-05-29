@@ -68,7 +68,7 @@ export function createRefPointsZipContributor(
           await addFile(name, blob);
           count++;
         } catch (err) {
-          log.warn(`Failed to process ref point ${name}:`, err);
+          log.warn(`Failed to process ref point "${name}":`, err);
         }
       }
 

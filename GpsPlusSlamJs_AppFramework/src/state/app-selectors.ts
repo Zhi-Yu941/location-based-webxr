@@ -96,13 +96,20 @@ export const selectZeroReference = createSelector(
  * mirror scheduled for removal (Step 5 of the 2026-05-27
  * slice-collapse plan).
  *
- * Memoized via createSelector: same `gpsData` reference → cached output.
- * Per-entry conversion only re-runs when the input changes.
+ * Memoized via createSelector keyed on `odometryPath.points` (NOT the whole
+ * `gpsData`). The library reducer uses Immer, so unrelated updates (GPS
+ * observations, VIO offsets) produce a new `gpsData` reference while
+ * `odometryPath.points` keeps its reference via structural sharing. Keying on
+ * the points array therefore preserves referential stability of the output
+ * across those dispatches — subscribers like `wireFrameTileSubscribers` only
+ * re-run when frames actually change.
  */
+const selectOdometryPathPoints = (state: CombinedRootState) =>
+  state.gpsData?.odometryPath?.points;
+
 export const selectFrameTilesInWebXR = createSelector(
-  [selectGpsData],
-  (gpsData): readonly ArImageCapture[] => {
-    const points = gpsData?.odometryPath?.points;
+  [selectOdometryPathPoints],
+  (points): readonly ArImageCapture[] => {
     if (!points || points.length === 0) return EMPTY_FRAME_TILES;
     return points.map(
       (p): ArImageCapture => ({

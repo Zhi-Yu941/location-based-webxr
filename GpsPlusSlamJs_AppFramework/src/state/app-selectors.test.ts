@@ -309,5 +309,37 @@ describe('app-level selectors', () => {
       expect(result1).not.toBe(result2);
       expect(result2).toHaveLength(2);
     });
+
+    it('returns the same reference when gpsData changes but points are unchanged', () => {
+      // Why: the library reducer uses Immer, so unrelated updates (GPS
+      // observations, VIO offsets) produce a NEW gpsData reference while
+      // odometryPath.points keeps its reference via structural sharing.
+      // Keying the selector on points (not the whole gpsData) preserves
+      // referential stability across those dispatches — otherwise
+      // wireFrameTileSubscribers would re-run on every GPS/VIO dispatch.
+      const points: ArImageCapture[] = [
+        {
+          imageFile: 'a.jpg',
+          position: webxrToNUE([1, 0, 0]),
+          rotation: normalizeQuaternion(webxrQuaternionToNUE([0, 0, 0, 1])),
+          screenRotation: 0,
+        },
+      ];
+      const state1 = makeStateWithPoints(points);
+      const result1 = selectFrameTilesInWebXR(state1);
+
+      // Simulate a GPS/VIO update: brand-new gpsData object reference, but the
+      // SAME points array reference (structural sharing).
+      const gpsData2 = makeGpsData();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access -- test-only override of opaque state
+      (gpsData2 as any).odometryPath = { points };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access -- mutate an unrelated branch
+      (gpsData2 as any).gpsEvents.gpsPositions = [{ id: 'new' }];
+      const state2 = makeState(gpsData2);
+
+      expect(state2.gpsData).not.toBe(state1.gpsData);
+      const result2 = selectFrameTilesInWebXR(state2);
+      expect(result2).toBe(result1);
+    });
   });
 });

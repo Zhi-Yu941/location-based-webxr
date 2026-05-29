@@ -14,11 +14,13 @@ App-level memoized selectors wrapping library getter functions with `createSelec
 | `selectOdometryRotations` | `(state: CombinedRootState) => readonly Quaternion[]` | Odometry rotations (AR-local space)  |
 | `selectZeroReference`     | `(state: CombinedRootState) => LatLong \| null`       | GPS origin for coordinate conversion |
 
-All selectors use `state.gpsData` as the input dependency for `createSelector` memoization. If `gpsData` reference hasn't changed between calls, the cached result is returned without re-evaluating.
+Most selectors use `state.gpsData` as the input dependency for `createSelector` memoization. If `gpsData` reference hasn't changed between calls, the cached result is returned without re-evaluating.
+
+`selectFrameTilesInWebXR` is the exception: it keys on `state.gpsData?.odometryPath?.points` (not the whole `gpsData`). Because the library reducer uses Immer, unrelated updates (GPS observations, VIO offsets) yield a new `gpsData` reference while `odometryPath.points` keeps its reference via structural sharing. Keying on the points array preserves referential stability of the output across those dispatches, so `wireFrameTileSubscribers` only re-runs when frames actually change.
 
 ## Invariants & Assumptions
 
-- Selectors return module-level empty array constants when `gpsData` is null, ensuring stable references for `subscribeToSelector` change detection.
+- Selectors return module-level empty array constants when `gpsData` (or `odometryPath.points`) is null, ensuring stable references for `subscribeToSelector` change detection.
 - All selectors replicate the same property access as the library's getter functions (`getAlignmentMatrix`, `getGpsPositions`, etc.) but with `CombinedRootState` typing and `createSelector` memoization.
 - The `gpsData` property path is part of the library's public `GpsSlamState` interface.
 

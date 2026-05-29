@@ -661,7 +661,12 @@ describe('Logger', () => {
         '[ZipReader] Unexpected filename: "actions/my-notes.json"',
         {
           level: 'warning',
-          fingerprint: ['log', 'warning', 'ZipReader', 'Unexpected filename: "{str}"'],
+          fingerprint: [
+            'log',
+            'warning',
+            'ZipReader',
+            'Unexpected filename: "{str}"',
+          ],
         }
       );
     });
@@ -806,8 +811,11 @@ describe('Logger', () => {
 
     /** Extract the fingerprint array from the Nth captureMessage call. */
     const fingerprintOf = (callIndex: number): string[] =>
-      (mockCaptureMessage.mock.calls[callIndex]?.[1] as { fingerprint: string[] })
-        .fingerprint;
+      (
+        mockCaptureMessage.mock.calls[callIndex]?.[1] as {
+          fingerprint: string[];
+        }
+      ).fingerprint;
 
     it('should normalize signed, decimal, and exponent numbers to the same template', () => {
       // Why: drift / coordinate / size values appear as negative, fractional,

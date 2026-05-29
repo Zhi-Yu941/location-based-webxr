@@ -122,8 +122,6 @@ describe('initAR re-entry guard', () => {
     await initAR(container, MINIMAL_ISOLATION);
     resetWebXRState();
 
-    await expect(
-      initAR(container, MINIMAL_ISOLATION)
-    ).resolves.toBeUndefined();
+    await expect(initAR(container, MINIMAL_ISOLATION)).resolves.toBeUndefined();
   });
 });

@@ -82,7 +82,7 @@ receive — copies are taken before sorting or sliding-window operations.
   diagnostics `1 mm`. `tracking/poseReceived` fires every XR frame and the
   §4.3 compass cross-check reads the live pose/heading, so without tolerances
   imperceptible per-frame jitter would dispatch `reportUpdated` (and re-render
-  the HUD) at frame rate. The gate compares against the last *dispatched*
+  the HUD) at frame rate. The gate compares against the last _dispatched_
   report, so slow real drift still triggers an update once it crosses a
   tolerance — it cannot accumulate indefinitely.
 - Reset triggers (`recording/startSession`, `tracking/resetTracking`) clear

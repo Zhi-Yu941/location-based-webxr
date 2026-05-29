@@ -1113,7 +1113,12 @@ describe('createTrackingQualityListenerMiddleware', () => {
         poseReceived({
           pose: {
             position: { x: frame * 1e-7, y: 0, z: 0 },
-            orientation: { x: 0, y: Math.sin(theta / 2), z: 0, w: Math.cos(theta / 2) },
+            orientation: {
+              x: 0,
+              y: Math.sin(theta / 2),
+              z: 0,
+              w: Math.cos(theta / 2),
+            },
           },
           sensorOrientation: absolute,
         })

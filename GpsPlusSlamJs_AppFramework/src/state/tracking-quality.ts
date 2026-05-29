@@ -1030,11 +1030,7 @@ const REPORT_METRE_EPSILON_M = 1e-3;
  * strict identity so e.g. `NaN`/`Infinity` transitions are never
  * silently swallowed.
  */
-function nearlyEqual(
-  a: number | null,
-  b: number | null,
-  eps: number
-): boolean {
+function nearlyEqual(a: number | null, b: number | null, eps: number): boolean {
   if (a === null || b === null) return a === b;
   if (!Number.isFinite(a) || !Number.isFinite(b)) return a === b;
   return Math.abs(a - b) <= eps;
@@ -1095,19 +1091,31 @@ function reportsEqual(
       db.directionSpreadDeg,
       REPORT_ANGLE_EPSILON_DEG
     ) &&
-    nearlyEqual(da.headingDeltaDeg, db.headingDeltaDeg, REPORT_ANGLE_EPSILON_DEG) &&
+    nearlyEqual(
+      da.headingDeltaDeg,
+      db.headingDeltaDeg,
+      REPORT_ANGLE_EPSILON_DEG
+    ) &&
     nearlyEqual(
       da.recentSumTranslationDeltaM,
       db.recentSumTranslationDeltaM,
       REPORT_METRE_EPSILON_M
     ) &&
-    nearlyEqual(da.medianResidualM, db.medianResidualM, REPORT_METRE_EPSILON_M) &&
+    nearlyEqual(
+      da.medianResidualM,
+      db.medianResidualM,
+      REPORT_METRE_EPSILON_M
+    ) &&
     nearlyEqual(
       da.medianRecentGpsAccuracyM,
       db.medianRecentGpsAccuracyM,
       REPORT_METRE_EPSILON_M
     ) &&
-    nearlyEqual(da.walkedDistanceM, db.walkedDistanceM, REPORT_METRE_EPSILON_M) &&
+    nearlyEqual(
+      da.walkedDistanceM,
+      db.walkedDistanceM,
+      REPORT_METRE_EPSILON_M
+    ) &&
     nearlyEqual(
       da.gpsVsFusedMaxDivergenceM,
       db.gpsVsFusedMaxDivergenceM,

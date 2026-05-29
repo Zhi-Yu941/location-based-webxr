@@ -546,9 +546,7 @@ export function subscribePermissionChanges(
             // clobber another live subscriber's handler).
             const handler = (): void => notify();
             status.addEventListener('change', handler);
-            cleanups.push(() =>
-              status.removeEventListener('change', handler)
-            );
+            cleanups.push(() => status.removeEventListener('change', handler));
           },
           () => {
             /* permissions.query rejected — ignore, fallbacks remain wired */

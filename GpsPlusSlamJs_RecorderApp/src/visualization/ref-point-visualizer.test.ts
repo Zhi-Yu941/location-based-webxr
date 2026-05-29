@@ -429,6 +429,88 @@ describe('RefPointVisualizer', () => {
       expect(mesh1.scale.x).toBeCloseTo(1); // untouched
       expect(mesh2.scale.x).toBeCloseTo(0.2); // animating
     });
+
+    /**
+     * Why this test matters: when the user re-captures an already-known
+     * H3 cell during a live session, `addRefPointEntry` appends a second
+     * `RefPointEntry` that shares the cell `id` (the first being the
+     * imported sidecar centroid, the second the fresh live tap). The
+     * reconciler keys meshes by `id`, so the cell stays a single sphere —
+     * but *which* GPS position wins is a deliberate product decision:
+     * the **latest live observation supersedes the historical centroid**
+     * (last-occurrence-wins), because the fresh fused fix is the better
+     * estimate. This test pins that rule for the same-id-within-one-list
+     * case; without it the behaviour was implicit and untested
+     * (2026-05-29-refpoint-single-sphere-vs-multi-sphere-review.md §3.3).
+     */
+    it('renders one sphere at the LAST entry position when entries share an id', async () => {
+      const { calcRelativeCoordsInMeters } = await import(
+        'gps-plus-slam-app-framework/core'
+      );
+      const zeroRef: LatLong = { lat: 48.8566, lon: 2.3522 };
+      visualizer.setZeroRef(zeroRef);
+
+      // Imported centroid entry, then a live re-observation a few metres
+      // away — both for the same H3 cell id 'cellX'.
+      const imported = createMockReferencePoint('cellX', 48.85670, 2.35230);
+      const liveTap = createMockReferencePoint('cellX', 48.85675, 2.35240);
+      visualizer.syncRefPoints([imported, liveTap]);
+
+      // Single sphere for the cell.
+      expect(visualizer.getRefPointCount()).toBe(1);
+      expect(mockScene.children).toHaveLength(1);
+
+      // Positioned at the LAST (live) entry's coords, not the first.
+      const mesh = mockScene.children[0] as THREE.Mesh;
+      const expected = calcRelativeCoordsInMeters(
+        zeroRef,
+        { lat: 48.85675, lon: 2.35240 },
+        100,
+        0
+      );
+      expect(mesh.position.x).toBeCloseTo(expected[0], 5);
+      expect(mesh.position.y).toBeCloseTo(expected[1], 5);
+      expect(mesh.position.z).toBeCloseTo(expected[2], 5);
+    });
+
+    /**
+     * Why this test matters: the same last-write-wins rule must also hold
+     * across successive `syncRefPoints` calls (the real subscriber path —
+     * each store mutation triggers a fresh call). Re-observing a cell
+     * moves its existing sphere to the latest position in place; the mesh
+     * instance is preserved (no insert animation re-fires) but its
+     * coordinates track the newest live tap. Pins
+     * 2026-05-29-refpoint-single-sphere-vs-multi-sphere-review.md §3.3.
+     */
+    it('moves an existing sphere to the latest position on re-observation', async () => {
+      const { calcRelativeCoordsInMeters } = await import(
+        'gps-plus-slam-app-framework/core'
+      );
+      const zeroRef: LatLong = { lat: 48.8566, lon: 2.3522 };
+      visualizer.setZeroRef(zeroRef);
+
+      const first = createMockReferencePoint('cellX', 48.85670, 2.35230);
+      visualizer.syncRefPoints([first]);
+      const mesh = mockScene.children[0] as THREE.Mesh;
+
+      // Re-observe the same cell at a new position.
+      const reobserved = createMockReferencePoint('cellX', 48.85680, 2.35250);
+      visualizer.syncRefPoints([reobserved]);
+
+      // Same mesh instance reused (still one sphere), moved to new coords.
+      expect(visualizer.getRefPointCount()).toBe(1);
+      expect(mockScene.children).toHaveLength(1);
+      expect(mockScene.children[0]).toBe(mesh);
+      const expected = calcRelativeCoordsInMeters(
+        zeroRef,
+        { lat: 48.85680, lon: 2.35250 },
+        100,
+        0
+      );
+      expect(mesh.position.x).toBeCloseTo(expected[0], 5);
+      expect(mesh.position.y).toBeCloseTo(expected[1], 5);
+      expect(mesh.position.z).toBeCloseTo(expected[2], 5);
+    });
   });
 });
 

@@ -206,6 +206,13 @@ export class RefPointVisualizer {
    *
    * Tolerates missing zero ref or scene by no-op'ing — the next call once
    * the AR session is up will reconcile.
+   *
+   * Position rule for shared ids: multiple entries can carry the same H3
+   * cell `id` (the imported sidecar centroid plus one entry per live
+   * re-capture). They collapse to a single mesh; the position follows
+   * last-occurrence / last-write-wins, so the most recent live tap
+   * supersedes the historical centroid. See
+   * 2026-05-29-refpoint-single-sphere-vs-multi-sphere-review.md §3.3.
    */
   syncRefPoints(refPoints: readonly RefPointEntry[]): void {
     // Cache first so `setZeroRef` can replay these even when we bail out

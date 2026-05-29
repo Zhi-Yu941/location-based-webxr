@@ -51,6 +51,21 @@ between calls plus a single `zeroRef` field; no other state.
   `current-ref-${id}` (legacy, removed in Step 5).
 - The insert animation fires **exactly once per id** — a re-render with
   the same id leaves the existing mesh untouched.
+- **One sphere per H3 cell id; latest live observation wins the position.**
+  Multiple `RefPointEntry`s can share the same cell `id` (the imported
+  sidecar centroid plus one entry per live re-capture). They collapse to a
+  single mesh keyed by `id`, and the position follows **last-occurrence /
+  last-write-wins**: the most recent live tap supersedes the historical
+  centroid, because the fresh fused fix is the better estimate. This holds
+  both within one `syncRefPoints` call (last element wins) and across
+  successive calls (the existing mesh is moved in place, the instance is
+  preserved, and the insert animation does not re-fire). Pinned by
+  `renders one sphere at the LAST entry position when entries share an id`
+  and `moves an existing sphere to the latest position on re-observation`
+  in [ref-point-visualizer.test.ts](ref-point-visualizer.test.ts). Design
+  rationale: see
+  [2026-05-29-refpoint-single-sphere-vs-multi-sphere-review.md](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-29-refpoint-single-sphere-vs-multi-sphere-review.md)
+  §3.3.
 - Shared geometry/material lifecycle is owned by the module-level cache
   inside `syncGpsAnchoredMeshes`; the visualizer never disposes GPU
   resources directly.

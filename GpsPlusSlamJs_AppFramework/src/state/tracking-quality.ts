@@ -110,6 +110,10 @@ export interface TrackingQualityOptions {
   coverageWalkedDistanceM?: number;
   /** §4.5 direction-spread threshold for coverage = 1.0. */
   coverageDirectionSpreadDeg?: number;
+  /** §4.1 ΣΔrotation (deg) at/below which convergence scores 1.0. Fail ramp ends at 4×. */
+  convergenceRotationWarnDeg?: number;
+  /** §4.1 ΣΔtranslation (m) at/below which convergence scores 1.0. Fail ramp ends at 4×. */
+  convergenceTranslationWarnM?: number;
   /** §4.3 EMA threshold (deg) below which compass scores 1.0. */
   compassWarnDeg?: number;
   /** §4.3 EMA threshold (deg) above which compass scores 0.0. */
@@ -143,6 +147,8 @@ export const DEFAULT_TRACKING_QUALITY_OPTIONS: Required<TrackingQualityOptions> 
     gpsAccuracyWindowSize: 30, // §4.4 — most volatile signal, absorbs ~15 s spikes
     coverageWalkedDistanceM: 15,
     coverageDirectionSpreadDeg: 90,
+    convergenceRotationWarnDeg: 6, // §4.1 — calibrated 2026-05-23, see computeConvergence
+    convergenceTranslationWarnM: 2, // §4.1 — calibrated 2026-05-23, see computeConvergence
     compassWarnDeg: 15,
     compassFailDeg: 35,
     warmupMinObservations: 10,
@@ -316,8 +322,18 @@ export function computeConvergence(
   //  ΣΔpos right up to 1 m which used to chip away at the score during
   //  normal use; 2 m puts steady walking firmly at score=1.0.
   //  translationFailM=8 m still catches the 12 m warm-up transition.
-  const rotWarn = options.rotationWarnDeg ?? 6;
-  const transWarn = options.translationWarnM ?? 2;
+  //
+  // These seed defaults live in DEFAULT_TRACKING_QUALITY_OPTIONS
+  // (convergenceRotationWarnDeg / convergenceTranslationWarnM) so the
+  // store/aggregator can override them; the literals below are the
+  // single-arg fallback when this helper is called directly (e.g. the
+  // Investigation harness).
+  const rotWarn =
+    options.rotationWarnDeg ??
+    DEFAULT_TRACKING_QUALITY_OPTIONS.convergenceRotationWarnDeg;
+  const transWarn =
+    options.translationWarnM ??
+    DEFAULT_TRACKING_QUALITY_OPTIONS.convergenceTranslationWarnM;
   const rotFail = rotWarn * 4;
   const transFail = transWarn * 4;
 
@@ -896,11 +912,15 @@ export function computeTrackingQualityReport(
       gpsAccuracyFloorM: opts.gpsAccuracyFloorM,
     }
   );
-  const convergence = computeConvergence(snapshots);
+  const convergence = computeConvergence(snapshots, {
+    rotationWarnDeg: opts.convergenceRotationWarnDeg,
+    translationWarnM: opts.convergenceTranslationWarnM,
+  });
   const compass = computeCompassAgreement(
     alignmentMatrix,
     sensorOrientation,
-    lastPose
+    lastPose,
+    { warnDeg: opts.compassWarnDeg, failDeg: opts.compassFailDeg }
   );
   const gpsVsFusedMaxDivergenceM = computeGpsVsFusedDivergence(
     alignmentMatrix,
@@ -1225,11 +1245,17 @@ export function createTrackingQualityListenerMiddleware(
       if (midTq && midTq.firstAgreementObservationIndex === null) {
         const snapshots = selectRecentAlignments(midState);
         if (snapshots.length >= 2) {
-          const conv = computeConvergence(snapshots);
+          const conv = computeConvergence(snapshots, {
+            rotationWarnDeg: opts.convergenceRotationWarnDeg,
+            translationWarnM: opts.convergenceTranslationWarnM,
+          });
           const sensorOr = selectLastSensorOrientation(midState);
           const pose = selectLastValidPose(midState);
           const alignment = selectAlignmentMatrix(midState);
-          const compass = computeCompassAgreement(alignment, sensorOr, pose);
+          const compass = computeCompassAgreement(alignment, sensorOr, pose, {
+            warnDeg: opts.compassWarnDeg,
+            failDeg: opts.compassFailDeg,
+          });
           if (
             conv.score >= 0.7 &&
             compass.headingDeltaDeg !== null &&

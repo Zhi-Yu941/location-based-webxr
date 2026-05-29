@@ -639,6 +639,99 @@ describe('computeTrackingQualityReport', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Option forwarding from the aggregator to the §4.1 / §4.3 helpers
+// ---------------------------------------------------------------------------
+
+describe('computeTrackingQualityReport — threshold forwarding', () => {
+  // Why these tests matter: convergenceRotationWarnDeg / convergenceTranslationWarnM
+  // and compassWarnDeg / compassFailDeg were defined (or settable) but never
+  // forwarded from the aggregator to computeConvergence / computeCompassAgreement,
+  // so callers configuring the store/aggregator silently got the hardcoded
+  // defaults. These tests pin the wiring so a regression cannot reintroduce it.
+
+  /** Identity → Y-axis rotation snapshot pair producing ΣΔrot = angleDeg. */
+  function rotationSnapshots(angleDeg: number): AlignmentSnapshot[] {
+    const rad = (angleDeg * Math.PI) / 180;
+    const c = Math.cos(rad);
+    const s = Math.sin(rad);
+    const rotated = [c, 0, s, 0, 0, 1, 0, 0, -s, 0, c, 0, 0, 0, 0, 1];
+    return [
+      { observationIndex: 0, matrix: [...IDENTITY] },
+      { observationIndex: 1, matrix: rotated },
+    ];
+  }
+
+  it('forwards convergenceRotationWarnDeg to computeConvergence', () => {
+    // ΣΔrot = 9°. Default warn=6/fail=24 → rampDown(9,6,24) ≈ 0.833.
+    // A tight warn=1/fail=4 → 9 ≥ 4 ⇒ score 0. convergenceEmaAlpha:1
+    // disables smoothing so subScores.convergence === the raw score.
+    const base = {
+      alignmentMatrix: IDENTITY,
+      gpsPositions: [gps(0, 0, 0, 2)],
+      odometryPositions: [[0, 0, 0] as Vector3],
+      zeroRef: ZERO_REF,
+      snapshots: rotationSnapshots(9),
+    };
+    const def = computeTrackingQualityReport(buildRootState(base) as never, {
+      convergenceEmaAlpha: 1,
+    });
+    expect(def.subScores.convergence).toBeGreaterThan(0.8);
+
+    const tight = computeTrackingQualityReport(buildRootState(base) as never, {
+      convergenceEmaAlpha: 1,
+      convergenceRotationWarnDeg: 1,
+    });
+    expect(tight.subScores.convergence).toBe(0);
+  });
+
+  it('forwards convergenceTranslationWarnM to computeConvergence', () => {
+    // ΣΔpos = 1 m. Default transWarn=2/fail=8 → rampDown(1,2,8) = 1.
+    // A tight transWarn=0.1/fail=0.4 → 1 ≥ 0.4 ⇒ score 0.
+    const base = {
+      alignmentMatrix: IDENTITY,
+      gpsPositions: [gps(0, 0, 0, 2)],
+      odometryPositions: [[0, 0, 0] as Vector3],
+      zeroRef: ZERO_REF,
+      snapshots: [
+        { observationIndex: 0, matrix: [...IDENTITY] },
+        { observationIndex: 1, matrix: [...shifted(1, 0, 0)] },
+      ] as AlignmentSnapshot[],
+    };
+    const def = computeTrackingQualityReport(buildRootState(base) as never, {
+      convergenceEmaAlpha: 1,
+    });
+    expect(def.subScores.convergence).toBe(1);
+
+    const tight = computeTrackingQualityReport(buildRootState(base) as never, {
+      convergenceEmaAlpha: 1,
+      convergenceTranslationWarnM: 0.1,
+    });
+    expect(tight.subScores.convergence).toBe(0);
+  });
+
+  it('forwards compassWarnDeg / compassFailDeg to computeCompassAgreement', () => {
+    // Identity alignment + AR-forward (0,0,-1) → heading 270°.
+    // Compass alpha=250 ⇒ delta=20°. Default warn=15/fail=35 →
+    // rampDown(20,15,35)=0.75. Loosened warn=25/fail=45 → 20<25 ⇒ 1.0.
+    const base = {
+      alignmentMatrix: IDENTITY,
+      gpsPositions: [gps(0, 0, 0, 2)],
+      odometryPositions: [[0, 0, 0] as Vector3],
+      zeroRef: ZERO_REF,
+      sensorOrientation: { alpha: 250, beta: 0, gamma: 0, absolute: true },
+    };
+    const def = computeTrackingQualityReport(buildRootState(base) as never);
+    expect(def.subScores.compassAgreement).toBeCloseTo(0.75, 5);
+
+    const loose = computeTrackingQualityReport(buildRootState(base) as never, {
+      compassWarnDeg: 25,
+      compassFailDeg: 45,
+    });
+    expect(loose.subScores.compassAgreement).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // §4.8b — EMA-smoothed convergence sub-score (Finding 4)
 // ---------------------------------------------------------------------------
 
@@ -1055,6 +1148,13 @@ describe('§11 (d) corpus-derived defaults', () => {
     expect(DEFAULT_TRACKING_QUALITY_OPTIONS.coverageWalkedDistanceM).toBe(15);
     expect(DEFAULT_TRACKING_QUALITY_OPTIONS.coverageDirectionSpreadDeg).toBe(
       90
+    );
+  });
+
+  it('convergence warn thresholds match the values calibrated in computeConvergence', () => {
+    expect(DEFAULT_TRACKING_QUALITY_OPTIONS.convergenceRotationWarnDeg).toBe(6);
+    expect(DEFAULT_TRACKING_QUALITY_OPTIONS.convergenceTranslationWarnM).toBe(
+      2
     );
   });
 });

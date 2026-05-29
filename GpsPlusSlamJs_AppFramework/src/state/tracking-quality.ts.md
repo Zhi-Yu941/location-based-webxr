@@ -108,6 +108,16 @@ receive — copies are taken before sorting or sliding-window operations.
   value is the one surfaced on the report (and to the HUD); the raw value
   is no longer exposed.
 - All sub-scores are clamped to `[0, 1]`; never `NaN` for empty input.
+- **All helper thresholds are forwarded from the aggregator.** Every seed
+  threshold in `TrackingQualityOptions` is passed through by
+  `computeTrackingQualityReport` (and the listener's first-agreement
+  detector) to the matching `compute*` helper, so overriding the store /
+  aggregator options actually takes effect. In particular
+  `convergenceRotationWarnDeg` / `convergenceTranslationWarnM` (§4.1) reach
+  `computeConvergence`, and `compassWarnDeg` / `compassFailDeg` (§4.3) reach
+  `computeCompassAgreement`. The helpers' own single-arg defaults fall back
+  to `DEFAULT_TRACKING_QUALITY_OPTIONS` so direct callers (e.g. the
+  Investigation harness) get the same calibrated values.
 
 ## Defensive measures
 

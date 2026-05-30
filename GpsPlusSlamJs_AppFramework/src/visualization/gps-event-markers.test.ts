@@ -271,6 +271,33 @@ describe('GpsEventVisualizer', () => {
       expect(raw.scale.x).toBeCloseTo(1);
     });
 
+    // Why this test matters: although the `accuracy` parameter is typed
+    // `GpsEventAccuracy | undefined`, this is exported library API. A non-TS
+    // caller (or a nullable API response forwarded verbatim) could pass `null`.
+    // Before the `== null` guard, the `=== undefined` check let `null` through
+    // and the subsequent destructuring (`const { horizontal, vertical } =
+    // accuracy`) threw a TypeError, crashing the marker render. This asserts
+    // `null` falls back to the legacy fixed 8 cm sphere instead of throwing.
+    it('treats explicit null accuracy as missing (no crash, legacy sphere)', () => {
+      setupZero();
+
+      expect(() =>
+        visualizer.addGpsEvent(
+          [10, 5, 20],
+          [1, 2, 3],
+          null as unknown as undefined
+        )
+      ).not.toThrow();
+
+      const raw = findRaw();
+      expect(
+        (raw.geometry as THREE.SphereGeometry).parameters.radius
+      ).toBeCloseTo(0.08);
+      expect(raw.scale.x).toBeCloseTo(1);
+      expect(raw.scale.y).toBeCloseTo(1);
+      expect(raw.scale.z).toBeCloseTo(1);
+    });
+
     // A non-finite accuracy (Infinity/NaN) must fall back to the fixed sphere:
     // scaling a Three.js mesh by Infinity corrupts its world matrix and can
     // crash rendering. `Infinity > 0` is true, so the positive-value guard

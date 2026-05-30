@@ -69,7 +69,13 @@ export interface GpsEventAccuracy {
 function resolveEllipsoidScale(
   accuracy: GpsEventAccuracy | undefined
 ): { horizontal: number; vertical: number } | null {
-  if (accuracy === undefined) return null;
+  // `== null` catches BOTH `undefined` and `null`. Although the parameter type
+  // forbids `null`, this is exported library API: a non-TS caller (or a
+  // nullable API response forwarded verbatim) could pass `null`, and
+  // destructuring `null` on the next line would throw a TypeError. Reject it
+  // here and fall back to the legacy fixed sphere — same defensive stance as
+  // the NaN/Infinity/half-populated guards below.
+  if (accuracy == null) return null;
   const { horizontal, vertical } = accuracy;
   // `typeof === 'number'` narrows `number | undefined` to `number`, so the
   // finite/range checks below operate on a non-nullable value without any

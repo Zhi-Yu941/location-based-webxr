@@ -22,7 +22,7 @@ Visualizes GPS events as 3D markers during recording and replay. Shows three typ
 - `addGpsEvent(gpsCoords: [x,y,z], odomPos: [x,y,z], accuracy?: GpsEventAccuracy): void` — add markers for a GPS event.
   - When `accuracy` is omitted (recording mode), the yellow raw-GPS marker is a fixed 8 cm sphere at opacity 0.3 (legacy behaviour, all existing call sites unchanged).
   - When **both** `accuracy.horizontal` and `accuracy.vertical` are positive numbers, the yellow marker becomes a unit-sphere scaled to `(h, v, h)` metres at opacity 0.13 with `renderOrder = -1` so cyan/red markers stay visible inside it.
-  - Half-populated, non-positive, or non-finite (`NaN`/`Infinity`) accuracy falls back to the legacy fixed sphere (defensive — same policy as `preview-map.ts`). `Infinity` is rejected explicitly because scaling a mesh by `Infinity` corrupts its world matrix and can crash rendering.
+  - Half-populated, non-positive, non-finite (`NaN`/`Infinity`), or explicit `null` accuracy falls back to the legacy fixed sphere (defensive — same policy as `preview-map.ts`). `Infinity` is rejected explicitly because scaling a mesh by `Infinity` corrupts its world matrix and can crash rendering. `null` is rejected via a `== null` guard because — although the parameter type forbids it — a non-TS caller (or a nullable API response) could pass it, and destructuring `null` would throw a `TypeError`.
   - Cyan fused and red snapshot markers are NEVER affected by the `accuracy` argument.
 - `addAlignmentSnapshot(nuePosition: readonly number[]): void` — add a red snapshot sphere at scene root.
 - `getAlignmentSnapshotPositions(): number[][]` — return positions of all snapshot markers as arrays.
@@ -58,7 +58,7 @@ export const gpsEventVisualizer: GpsEventVisualizer;
 - **Cyan fused** and **red snapshot** spheres: fixed radius (8 cm / 10 cm), identity scale, opacity 0.3 / 0.5. Geometry is `SphereGeometry` with 12 segments; `MeshBasicMaterial` is transparent with `depthWrite: false` to prevent z-fighting.
 - **Yellow raw-GPS** sphere has two rendering modes:
   - **Legacy fixed mode** (no `accuracy` arg): radius 8 cm, identity scale, opacity 0.3. Used by recording mode and any caller that does not opt in.
-  - **Accuracy-aware ellipsoid mode** (`accuracy = { horizontal, vertical }` both > 0): unit-radius sphere (radius 1 m) scaled non-uniformly to `(horizontal, vertical, horizontal)` metres, opacity 0.13, `renderOrder = -1`. The lower opacity and earlier render order keep the smaller cyan / red markers visible inside large ellipsoids (e.g. 20 m altitude jumps with growing GPS accuracy in rec31). Falls back to the legacy fixed mode when either field is missing, non-positive, or non-finite (`NaN`/`Infinity`) — the boundary check lives in `resolveEllipsoidScale()`, which uses `Number.isFinite` before the `> 0` test.
+  - **Accuracy-aware ellipsoid mode** (`accuracy = { horizontal, vertical }` both > 0): unit-radius sphere (radius 1 m) scaled non-uniformly to `(horizontal, vertical, horizontal)` metres, opacity 0.13, `renderOrder = -1`. The lower opacity and earlier render order keep the smaller cyan / red markers visible inside large ellipsoids (e.g. 20 m altitude jumps with growing GPS accuracy in rec31). Falls back to the legacy fixed mode when the argument is `null`, or either field is missing, non-positive, or non-finite (`NaN`/`Infinity`) — the boundary check lives in `resolveEllipsoidScale()`, which uses a `== null` guard then `Number.isFinite` before the `> 0` test.
 
 ## Examples
 

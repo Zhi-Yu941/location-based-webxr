@@ -2,11 +2,12 @@ name = "gps-plus-slam"
 compatibility_date = "2026-04-28"
 
 # Static-site deploy. Cloudflare's Git integration runs the build first
-# (`pnpm run build:recorder`), which writes to GpsPlusSlamJs_RecorderApp/dist,
+# (`pnpm run build:site`), which writes the combined multi-app output to
+# ./dist-site (landing page at /, recorder at /recorder/, starter at /starter/),
 # then this config tells `wrangler versions upload` where to find the assets.
 # No Worker script is involved.
 [assets]
-directory = "./GpsPlusSlamJs_RecorderApp/dist"
+directory = "./dist-site"
 
 # Observability settings for logging and debugging.
 # Enabled via Cloudflare Dashboard - logs persist for debugging deployments.

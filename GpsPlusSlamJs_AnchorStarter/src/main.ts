@@ -7,15 +7,16 @@
  *   1. Capability-gate (E1): no WebXR/GPS → honest message, no crash.
  *   2. On a user gesture, boot the store + AR session + GPS/orientation.
  *   3. Coach the user to move using `computeOnboardingGuidance`.
- *   4. cache-miss → soft-gated "Place anchor" → `createGpsAnchor` + save.
- *      cache-hit  → seed `createGpsAnchor` from the stored GPS and let it
- *                   re-converge, then reveal the marker.
+ *   4. cache-miss → soft-gated "Place anchor" → `createGpsAnchor` + encode the
+ *      anchor into the `?show=` URL param (decision F1).
+ *      cache-hit  → seed `createGpsAnchor` from the URL-decoded anchor and let
+ *                   it re-converge, then reveal the marker in its `ui` style.
  *
  * The ONE place a new developer edits to drop in their own use case is
  * `createAnchorMarker()` in `./marker.ts`. Everything here is plumbing.
  *
  * Pure, unit-tested logic lives in the sibling modules
- * (`setup-state-machine`, `anchor-storage`, `guidance-view`,
+ * (`setup-state-machine`, `url-anchor-state`, `guidance-view`,
  * `placement-view`, `capability`). This file is verified manually via
  * `pnpm dev` on an AR device, the same convention as the MinimalExample.
  */
@@ -62,12 +63,16 @@ import {
   type SetupState,
   type SetupEvent,
 } from "./setup-state-machine.js";
-import { loadAnchor, saveAnchor } from "./anchor-storage.js";
+import {
+  decodeShowParam,
+  encodeAnchorsToShowParam,
+  type AnchorSpec,
+} from "./url-anchor-state.js";
 import { toGuidanceView } from "./guidance-view.js";
 import { toPlacementView } from "./placement-view.js";
 import { isFullySupported, capabilityMessage } from "./capability.js";
 // --- your content here -----------------------------------------------------
-import { createAnchorMarker } from "./marker.js";
+import { createAnchorMarker, type MarkerOptions } from "./marker.js";
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -93,6 +98,7 @@ const dom = {
   banner: el("banner"),
   error: el("error"),
   placeButton: el<HTMLButtonElement>("place-button"),
+  copyLinkButton: el<HTMLButtonElement>("copy-link-button"),
   reloadPrompt: el("reload-prompt"),
 } as const;
 
@@ -147,6 +153,7 @@ function renderPlacement(): void {
   dom.placeButton.disabled = view.button.disabled;
   dom.error.hidden = view.error === null;
   dom.error.textContent = view.error ?? "";
+  dom.copyLinkButton.hidden = !view.copyLink.visible;
   dom.reloadPrompt.hidden = !view.reloadPrompt;
 }
 
@@ -189,13 +196,14 @@ function onStoreChanged(): void {
 function spawnAnchor(
   gpsPoint: LatLong | LatLongAlt,
   skipBootstrap: boolean,
+  markerOptions: MarkerOptions = {},
 ): GpsAnchor {
   const arWorldGroup = getArWorldGroup();
   const camera = getCamera();
   if (!arWorldGroup || !camera) {
     throw new Error("AR scene not ready — cannot place anchor");
   }
-  const marker = createAnchorMarker();
+  const marker = createAnchorMarker(markerOptions);
   arWorldGroup.add(marker);
   return createGpsAnchor({
     object3D: marker,
@@ -210,10 +218,55 @@ function spawnAnchor(
 }
 
 // ---------------------------------------------------------------------------
-// Placement action (cache-miss branch) — synchronous (localStorage write),
-// but still routed through the setup FSM's saving → saved / revert + error
-// transitions so the placement view-model renders the in-progress → final
-// states consistently.
+// URL `?show=` persistence (decision F1) — the anchor lives in the page link,
+// so reloading restores it and the link can be shared to another device.
+// ---------------------------------------------------------------------------
+
+/** Build the minimal default-styled anchor spec from a live GPS fix. */
+function anchorSpecFromGps(gps: LatLongAlt): AnchorSpec {
+  return {
+    lat: gps.lat,
+    lon: gps.lon,
+    alt: gps.altitude ?? 0,
+    ui: 1,
+    scale: 1,
+    rotationDeg: 0,
+  };
+}
+
+/** Encode the anchors into `?show=` without adding a history entry. */
+function writeShowParam(anchors: readonly AnchorSpec[]): void {
+  const param = encodeAnchorsToShowParam(anchors);
+  const url = `${location.pathname}?show=${param}${location.hash}`;
+  history.replaceState(null, "", url);
+}
+
+/** Decode the first anchor from the current `?show=` param, or null. */
+function readCachedAnchor(): AnchorSpec | null {
+  const raw = new URLSearchParams(location.search).get("show");
+  const decoded = decodeShowParam(raw);
+  return decoded?.[0] ?? null;
+}
+
+/** Copy the shareable page link, flipping the button label as feedback. */
+async function copyShareLink(): Promise<void> {
+  const idleLabel = dom.copyLinkButton.textContent ?? "Copy link";
+  try {
+    await navigator.clipboard.writeText(location.href);
+    dom.copyLinkButton.textContent = "Link copied ✓";
+  } catch {
+    dom.copyLinkButton.textContent = "Copy failed — long-press the link";
+  }
+  window.setTimeout(() => {
+    dom.copyLinkButton.textContent = idleLabel;
+  }, 2000);
+}
+
+// ---------------------------------------------------------------------------
+// Placement action (cache-miss branch) — synchronous (URL `?show=` write via
+// history.replaceState), but still routed through the setup FSM's
+// saving → saved / revert + error transitions so the placement view-model
+// renders the in-progress → final states consistently.
 // ---------------------------------------------------------------------------
 
 function placeAnchor(): void {
@@ -224,7 +277,7 @@ function placeAnchor(): void {
     if (!gps)
       throw new Error("No GPS fix yet — wait for a location, then retry");
     anchor = spawnAnchor(gps, false);
-    saveAnchor(gps);
+    writeShowParam([anchorSpecFromGps(gps)]);
     dispatchSetup({ type: "PLACE_SUCCEEDED" });
   } catch (err) {
     dispatchSetup({
@@ -291,13 +344,21 @@ async function startAr(): Promise<void> {
   // Wire the soft-gated "Place anchor" button to the cache-miss placement
   // flow. `placeAnchor` itself no-ops unless the FSM currently allows it.
   dom.placeButton.addEventListener("click", () => placeAnchor());
+  dom.copyLinkButton.addEventListener("click", () => {
+    void copyShareLink();
+  });
 
-  const cached = loadAnchor();
+  const cached = readCachedAnchor();
   if (cached) {
-    // cache-hit: seed from stored GPS and let it re-converge as alignment
-    // settles (skipBootstrap — no live median accumulation).
-    lastGps = cached;
-    anchor = spawnAnchor(cached, true);
+    // cache-hit: seed from the URL-decoded GPS and let it re-converge as
+    // alignment settles (skipBootstrap — no live median accumulation), then
+    // reveal the marker in its requested `ui` style.
+    lastGps = { lat: cached.lat, lon: cached.lon, altitude: cached.alt };
+    anchor = spawnAnchor(lastGps, true, {
+      ui: cached.ui,
+      scale: cached.scale,
+      rotationDeg: cached.rotationDeg,
+    });
   }
   dispatchSetup({ type: "BOOTED", hasCachedAnchor: cached !== null });
   render();

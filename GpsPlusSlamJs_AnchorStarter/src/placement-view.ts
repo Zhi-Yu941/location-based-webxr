@@ -25,8 +25,14 @@ export interface PlacementView {
   readonly button: PlaceButtonView;
   /** Sentence describing what the user should do / what just happened. */
   readonly banner: string;
-  /** Whether to surface the "reload the page" call-to-action. */
+  /** Whether to surface the "reload or share the link" call-to-action. */
   readonly reloadPrompt: boolean;
+  /**
+   * Whether to surface the "copy link" share button. Shown once the anchor is
+   * saved into the URL, so the user can hand the shareable link to another
+   * device or person (decision F1).
+   */
+  readonly copyLink: { readonly visible: boolean };
   /** Last placement error, or null. */
   readonly error: string | null;
 }
@@ -70,7 +76,7 @@ function bannerFor(state: SetupState): string {
     case "saving":
       return "Saving your anchor…";
     case "saved":
-      return "Saved. Reload the page to test cross-session persistence.";
+      return "Saved into the page link — reload to test persistence, or copy the link to open this anchor on another device.";
     case "relocalising":
       return "Move around to re-localise your saved anchor.";
     case "anchor-shown":
@@ -84,6 +90,7 @@ export function toPlacementView(state: SetupState): PlacementView {
     button: buttonFor(state),
     banner: bannerFor(state),
     reloadPrompt: state.phase === "saved",
+    copyLink: { visible: state.phase === "saved" },
     error: state.errorMessage,
   };
 }

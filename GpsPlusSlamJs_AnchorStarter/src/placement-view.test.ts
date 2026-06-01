@@ -71,12 +71,16 @@ describe("toPlacementView", () => {
       busy: true,
     });
     expect(inProgress.reloadPrompt).toBe(false);
+    expect(inProgress.copyLink.visible).toBe(false);
 
     const saved = setupReducer(saving, { type: "PLACE_SUCCEEDED" });
     const final = toPlacementView(saved);
     // Final state reflects the durable end state, not just dispatch.
     expect(final.button).toMatchObject({ label: "Saved ✓", busy: false });
     expect(final.reloadPrompt).toBe(true);
+    // The shareable-link confirmation is reached on the success path.
+    expect(final.copyLink.visible).toBe(true);
+    expect(final.banner).toContain("copy the link");
     expect(final.error).toBeNull();
   });
 
@@ -96,6 +100,7 @@ describe("toPlacementView", () => {
     });
     expect(view.error).toBe("Storage quota exceeded");
     expect(view.reloadPrompt).toBe(false);
+    expect(view.copyLink.visible).toBe(false);
   });
 
   it("cache-hit branch keeps the button hidden and coaches relocalisation", () => {

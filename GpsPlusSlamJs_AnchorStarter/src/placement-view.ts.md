@@ -4,7 +4,7 @@
   UI: the "Place anchor" button, the status banner, the reload call-to-action,
   and the error line. Keeps the async-UX contract testable without a DOM.
 - **Public API:**
-  - `PlacementView { button, banner, reloadPrompt, error }`
+  - `PlacementView { button, banner, reloadPrompt, copyLink, error }`
   - `toPlacementView(state: SetupState): PlacementView` — total/pure.
   - _Internal:_ `PlaceButtonView { visible, label, disabled, busy }` is not
     re-exported; reach it via `PlacementView['button']`.
@@ -15,7 +15,11 @@
     only the banner copy nudges waiting.
   - Async-UX rule: `saving` → `{ label: 'Saving…', disabled, busy }` is the
     in-progress state; the durable end states are `saved`
-    (`reloadPrompt: true`) or a revert to a placeable phase carrying `error`.
+    (`reloadPrompt: true`, `copyLink.visible: true`) or a revert to a placeable
+    phase carrying `error`.
+  - `copyLink.visible` is true only in `saved`: under decision F1 the anchor is
+    encoded into the page URL, so the saved state offers a "copy link" share
+    affordance (the durable, shareable end state).
 - **Examples:**
   - `toPlacementView(savingState).button` → `{ label: 'Saving…', busy: true }`.
   - `toPlacementView(savedState).reloadPrompt` → `true`.

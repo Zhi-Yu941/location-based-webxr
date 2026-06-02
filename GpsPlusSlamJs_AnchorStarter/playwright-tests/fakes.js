@@ -32,6 +32,9 @@ import { expect } from "@playwright/test";
  * @property {boolean} [failClipboard] When true, override
  *   `navigator.clipboard.writeText` to reject so the copy-link failure path can
  *   be exercised.
+ * @property {boolean} [failOrientationPermission] When true, the faked
+ *   `requestDeviceOrientationPermission` rejects so the post-`initAR` boot
+ *   rollback (`failStart`) can be exercised end-to-end.
  */
 
 /**
@@ -50,6 +53,7 @@ export async function installAnchorStarterFakes(page, options = {}) {
       subScores: { coverage: 1, freshness: 1, agreement: 1 },
     },
     failClipboard: options.failClipboard ?? false,
+    failOrientationPermission: options.failOrientationPermission ?? false,
   };
 
   await page.addInitScript((cfg) => {
@@ -96,7 +100,10 @@ export async function installAnchorStarterFakes(page, options = {}) {
         control.gpsCallback = onPosition;
       },
       startOrientationWatch: () => {},
-      requestDeviceOrientationPermission: () => Promise.resolve(),
+      requestDeviceOrientationPermission: () =>
+        cfg.failOrientationPermission
+          ? Promise.reject(new Error("forced orientation-permission failure (e2e)"))
+          : Promise.resolve(),
       createGpsAnchor: () => {
         if (control.failCreateAnchor) {
           throw new Error("forced anchor failure (e2e)");

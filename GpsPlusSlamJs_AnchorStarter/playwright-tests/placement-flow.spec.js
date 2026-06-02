@@ -170,3 +170,38 @@ test.describe("Anchor starter — Tier 1 placement flow", () => {
     await expect(page.getByTestId("copy-link-button")).toBeHidden();
   });
 });
+
+test.describe("Anchor starter — boot rollback", () => {
+  /**
+   * Why this test matters: every step after `initAR` succeeds has a side effect
+   * (sensor watches start, the cache-hit branch may spawn an anchor). If one of
+   * those awaited steps rejects, the app must NOT linger half-started — Start
+   * stuck on "Starting…", the start screen hidden, GPS still watching. The
+   * post-`initAR` try/catch in `startAr` calls `failStart`, which rolls every
+   * side effect back and restores the start screen so the user can retry. Here
+   * we force the awaited `requestDeviceOrientationPermission` to reject and
+   * assert the UI is fully rewound.
+   */
+  test("rewinds to the start screen when a post-initAR step rejects", async ({
+    page,
+  }) => {
+    await installAnchorStarterFakes(page, { failOrientationPermission: true });
+    await page.goto("/");
+
+    await page.getByTestId("start-button").click();
+
+    // The start screen comes back and Start is re-enabled for a retry.
+    const startScreen = page.getByTestId("start-screen");
+    await expect(startScreen).toBeVisible();
+    const startButton = page.getByTestId("start-button");
+    await expect(startButton).toBeEnabled();
+    await expect(startButton).toHaveText("Start AR");
+
+    // The failure reason is surfaced, and the live HUD stays hidden.
+    const message = page.getByTestId("capability-message");
+    await expect(message).toBeVisible();
+    await expect(message).not.toBeEmpty();
+    await expect(page.getByTestId("guidance")).toBeHidden();
+    await expect(page.getByTestId("placement")).toBeHidden();
+  });
+});

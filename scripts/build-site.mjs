@@ -25,7 +25,14 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { rmSync, mkdirSync, cpSync, existsSync, readFileSync } from 'node:fs';
+import {
+  rmSync,
+  mkdirSync,
+  cpSync,
+  existsSync,
+  readFileSync,
+  readdirSync,
+} from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
 
@@ -73,6 +80,24 @@ function assertNoBareAbsoluteUrls(htmlPath, base) {
   }
 }
 
+/**
+ * Run {@link assertNoBareAbsoluteUrls} on *every* `*.html` file under an app's
+ * output dir, not just `index.html`. Apps can emit secondary pages (e.g. the
+ * RecorderApp's `ar-hittest-test.html`); a bare `/...` URL in any of them would
+ * otherwise pass the deploy guard and 404 once mounted under a subpath.
+ *
+ * @param {string} dir absolute path to an app's built output dir
+ * @param {string} base expected base prefix, e.g. '/recorder/'
+ */
+function assertNoBareAbsoluteUrlsInDir(dir, base) {
+  const htmlFiles = readdirSync(dir, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.html'))
+    .map((entry) => join(entry.parentPath, entry.name));
+  for (const htmlPath of htmlFiles) {
+    assertNoBareAbsoluteUrls(htmlPath, base);
+  }
+}
+
 /** Assert the combined deploy tree matches the documented target layout. */
 function assertSiteTree() {
   const required = [
@@ -111,7 +136,7 @@ run('pnpm', [
   join(distSite, 'recorder'),
   '--emptyOutDir',
 ]);
-assertNoBareAbsoluteUrls(join(distSite, 'recorder', 'index.html'), '/recorder/');
+assertNoBareAbsoluteUrlsInDir(join(distSite, 'recorder'), '/recorder/');
 
 console.log('• Building AnchorStarter (base=/starter/)');
 run('pnpm', ['--filter', 'gps-plus-slam-anchor-starter', 'run', 'typecheck']);
@@ -126,7 +151,7 @@ run('pnpm', [
   join(distSite, 'starter'),
   '--emptyOutDir',
 ]);
-assertNoBareAbsoluteUrls(join(distSite, 'starter', 'index.html'), '/starter/');
+assertNoBareAbsoluteUrlsInDir(join(distSite, 'starter'), '/starter/');
 
 console.log('• Copying landing page to dist-site/index.html');
 cpSync(

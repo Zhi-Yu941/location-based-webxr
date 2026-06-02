@@ -1,0 +1,32 @@
+# AnchorStarter e2e tests
+
+Playwright end-to-end tests for the persistent-anchor starter example.
+
+## Running
+
+```bash
+pnpm run test:e2e          # build framework + run the suite (Chromium)
+pnpm run test:e2e:headed   # same, with a visible browser
+pnpm run test:e2e:ui       # Playwright UI mode for debugging
+```
+
+`pnpm test` runs the full gate (`test:core` then `test:e2e`).
+
+> Always use the pnpm scripts — never call `playwright` directly (repo rule).
+> The scripts build the framework `dist/` first so Vite serves a fresh build.
+
+## Scope
+
+Currently **Tier 0** only — smoke + the E1 capability gate — which needs no
+browser-API mocking because Playwright Chromium genuinely lacks WebXR. See the
+plan and its tiers in
+[2026-06-01-anchor-starter-e2e-test-plan.md](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-01-anchor-starter-e2e-test-plan.md).
+
+Tier 1 (full happy-path via a DEV-only framework seam) is planned but not yet
+implemented.
+
+## Files
+
+- [playwright.config.js](playwright.config.js) — Chromium, port 5181, clipboard
+  permissions, framework-build prerequisite.
+- [smoke.spec.js](smoke.spec.js) — the Tier 0 cases.

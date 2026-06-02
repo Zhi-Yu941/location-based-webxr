@@ -7,5 +7,10 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   server: {
     port: 5181,
+    // Listen on all interfaces so 127.0.0.1 (what the Playwright e2e config
+    // polls) responds, not just the `localhost` alias. On Windows `localhost`
+    // can resolve to IPv6 `::1` while Playwright probes IPv4 127.0.0.1, which
+    // otherwise makes the webServer wait hang. Mirrors the RecorderApp.
+    host: true,
   },
 });

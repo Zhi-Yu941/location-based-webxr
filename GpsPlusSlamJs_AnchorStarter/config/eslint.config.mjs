@@ -152,7 +152,15 @@ export default defineConfig(
   // Ignore generated artefacts, vendor directories, and the Vite config shim
   // (a root .ts file that is intentionally outside the type-aware project).
   {
-    ignores: ["dist/**", "coverage/**", "node_modules/**", "vite.config.ts"],
+    ignores: [
+      "dist/**",
+      "coverage/**",
+      "node_modules/**",
+      "test-results/**",
+      "playwright-report/**",
+      "vite.config.ts",
+      "vitest.config.ts",
+    ],
   },
 
   // Disable ESLint rules that conflict with Prettier (must be last)

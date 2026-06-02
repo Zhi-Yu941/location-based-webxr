@@ -42,7 +42,10 @@
       ]
     },
     "GpsPlusSlamJs_AnchorStarter": {
-      "entry": ["config/stylelint.config.mjs"],
+      "entry": [
+        "config/stylelint.config.mjs",
+        "playwright-tests/**/*.{js,ts}"
+      ],
       "project": ["src/**/*.ts"],
       "ignoreDependencies": [
         "@carlosjeurissen/stylelint-csstree-validator",

@@ -44,8 +44,15 @@ outdoors. On a device without WebXR/GPS the app shows an honest
 capability-gated message instead of crashing (decision E1).
 
 ```bash
-pnpm test         # typecheck + unit tests
+pnpm test         # full gate: static checks + unit tests + Playwright e2e
+pnpm run test:core  # static checks + unit tests only (no browser)
+pnpm run test:e2e   # Playwright Tier 0 smoke / capability-gate suite
 ```
+
+The e2e suite lives in [`playwright-tests/`](playwright-tests/README.md) and
+boots the app in headless Chromium to assert the start screen, the hidden
+guidance/placement panels, and the E1 capability gate. `test:e2e` rebuilds the
+consumed framework `dist/` first so Vite never serves a stale bundle.
 
 ## How it is structured
 

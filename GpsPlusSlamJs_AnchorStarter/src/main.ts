@@ -102,6 +102,11 @@ let anchor: GpsAnchor | null = null;
 let lastGps: LatLongAlt | null = null;
 let lastTrackingReady = false;
 
+/** Idle label for the copy-link button; must match the text in index.html. */
+const COPY_LINK_IDLE_LABEL = "Copy link";
+/** Pending revert timer for the copy-link label, so rapid re-clicks cancel it. */
+let copyLinkRevertTimer: number | null = null;
+
 /**
  * Run a framework selector against the live store. Each selector is typed
  * against a slightly different internal root shape; only the slices it reads
@@ -237,17 +242,28 @@ function readCachedAnchor(): AnchorSpec | null {
   return decoded?.[0] ?? null;
 }
 
-/** Copy the shareable page link, flipping the button label as feedback. */
+/**
+ * Copy the shareable page link, flipping the button label as feedback.
+ *
+ * Uses a constant idle label (never the live `textContent`) and cancels any
+ * pending revert timer before scheduling a new one. Without this, a second
+ * click within the 2 s window would capture the transient "Link copied ✓" as
+ * the idle label and the button would lock to it permanently.
+ */
 async function copyShareLink(): Promise<void> {
-  const idleLabel = dom.copyLinkButton.textContent ?? "Copy link";
+  if (copyLinkRevertTimer !== null) {
+    window.clearTimeout(copyLinkRevertTimer);
+    copyLinkRevertTimer = null;
+  }
   try {
     await navigator.clipboard.writeText(location.href);
     dom.copyLinkButton.textContent = "Link copied ✓";
   } catch {
     dom.copyLinkButton.textContent = "Copy failed — long-press the link";
   }
-  window.setTimeout(() => {
-    dom.copyLinkButton.textContent = idleLabel;
+  copyLinkRevertTimer = window.setTimeout(() => {
+    dom.copyLinkButton.textContent = COPY_LINK_IDLE_LABEL;
+    copyLinkRevertTimer = null;
   }, 2000);
 }
 

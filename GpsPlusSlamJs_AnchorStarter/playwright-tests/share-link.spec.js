@@ -56,6 +56,26 @@ test.describe("Anchor starter — Tier 1 copy-link sharing", () => {
     await expect(copyButton).toHaveText("Copy link");
   });
 
+  test("clicking twice within the revert window still reverts to idle", async ({
+    page,
+  }) => {
+    // Regression: a second click used to capture the transient "Link copied ✓"
+    // as the idle label, locking the button to it permanently after the timer.
+    await installAnchorStarterFakes(page);
+    await placeAndSave(page);
+
+    const copyButton = page.getByTestId("copy-link-button");
+    await copyButton.click();
+    await expect(copyButton).toHaveText("Link copied ✓");
+
+    // Second click before the ~2 s revert fires.
+    await copyButton.click();
+    await expect(copyButton).toHaveText("Link copied ✓");
+
+    // The single (latest) timer must restore the idle affordance, not lock it.
+    await expect(copyButton).toHaveText("Copy link");
+  });
+
   test("shows a fallback hint when clipboard write fails", async ({ page }) => {
     await installAnchorStarterFakes(page, { failClipboard: true });
     await placeAndSave(page);

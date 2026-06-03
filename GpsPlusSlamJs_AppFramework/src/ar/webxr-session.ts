@@ -60,6 +60,7 @@ import {
 import { CameraBlitCapture, computeCaptureSize } from './camera-blit-capture';
 import { acquireCameraTexture } from './xr-camera-texture';
 import { clearFrameUpdates, runFrameUpdates } from './frame-loop';
+import { clearXrFrameUpdates, runXrFrameUpdates } from './xr-frame-loop';
 import {
   type OdometryTrackingRestartedPayload,
   nueToWebXR as _nueToWebXR,
@@ -193,6 +194,7 @@ export function resetWebXRState(): void {
   latestArPose = null;
   lastFrameTime = 0;
   clearFrameUpdates();
+  clearXrFrameUpdates();
   imageCaptureManager = null;
   onImageCaptured = null;
   getScreenRotation = null;
@@ -469,16 +471,36 @@ export function getCurrentArPose(): ARPose | null {
 }
 
 /**
+ * Opt-in standard WebXR session features that are independent of the
+ * crash-isolation diagnostic flags. Kept separate from
+ * `ArCrashIsolationOptions` because requesting `hit-test` is a normal app
+ * capability, not a crash-isolation toggle.
+ */
+export interface SessionFeatureOptions {
+  /**
+   * Request the WebXR `hit-test` feature (as an *optional* feature) so app
+   * code can drive a reticle via `registerXrFrameUpdate`. Default `false` —
+   * existing recorder/anchor sessions are unaffected.
+   */
+  requestHitTest?: boolean;
+}
+
+/**
  * Build XR session init options.
  * Extracted as a pure function for testability.
  *
  * @param rootElement - The DOM element for DOM overlay
+ * @param isolationOptions - Crash-isolation diagnostic flags (DOM overlay,
+ *   depth-sensing, camera-access)
+ * @param sessionFeatures - Opt-in standard WebXR features that are independent
+ *   of crash isolation (currently `requestHitTest`)
  * @returns XRSessionInit options
  * @throws Error if rootElement is null
  */
 export function buildSessionOptions(
   rootElement: Element | null,
-  isolationOptions: Partial<ArCrashIsolationOptions> = {}
+  isolationOptions: Partial<ArCrashIsolationOptions> = {},
+  sessionFeatures: SessionFeatureOptions = {}
 ): XRSessionInit {
   if (!rootElement) {
     throw new Error('App root element not found');
@@ -511,6 +533,14 @@ export function buildSessionOptions(
 
   if (normalizedOptions.enableCameraAccess) {
     optionalFeatures.push('camera-access');
+  }
+
+  // Hit-test is requested as an *optional* feature (not required) so the
+  // session still starts on devices/runtimes without hit-test support; the
+  // app guards on whether a hit-test source is actually obtainable. Opt-in
+  // via `requestHitTest` so existing recorder/anchor sessions are unaffected.
+  if (sessionFeatures.requestHitTest) {
+    optionalFeatures.push('hit-test');
   }
 
   if (optionalFeatures.length > 0) {
@@ -632,10 +662,14 @@ export function createSceneHierarchy(): {
 /**
  * Initialize the AR session and Three.js renderer.
  * @param container - DOM element to host the AR canvas and CSS3D overlay.
+ * @param isolationOptions - Crash-isolation diagnostic flags.
+ * @param sessionFeatures - Opt-in standard WebXR features (e.g.
+ *   `requestHitTest`) forwarded to the session negotiation.
  */
 export async function initAR(
   container: HTMLElement,
-  isolationOptions: Partial<ArCrashIsolationOptions> = {}
+  isolationOptions: Partial<ArCrashIsolationOptions> = {},
+  sessionFeatures: SessionFeatureOptions = {}
 ): Promise<void> {
   if (!navigator.xr) {
     throw new Error('WebXR not available');
@@ -688,7 +722,8 @@ export async function initAR(
   // Request AR session with validated options
   const sessionOptions = buildSessionOptions(
     container,
-    currentArCrashIsolationOptions
+    currentArCrashIsolationOptions,
+    sessionFeatures
   );
 
   xrSession = await navigator.xr.requestSession('immersive-ar', sessionOptions);
@@ -891,6 +926,22 @@ function onXRFrame(time: number, frame: XRFrame | undefined): void {
   const elapsed = time / 1000;
   lastFrameTime = time;
   runFrameUpdates(dt, elapsed);
+
+  // Hand the live XR context to app-registered per-frame callbacks (hit-test,
+  // light estimation, …). `frame`/`referenceSpace`/`session` are valid only
+  // synchronously inside each callback — see `xr-frame-loop.ts` safety
+  // contract. We only run these when a session is live (it always is inside
+  // `onXRFrame`, but the guard keeps the types honest and avoids firing during
+  // teardown races).
+  if (xrSession) {
+    runXrFrameUpdates({
+      frame,
+      referenceSpace,
+      session: xrSession,
+      dt,
+      elapsed,
+    });
+  }
 
   if (arPose) {
     // Store the latest pose for getCurrentArPose()

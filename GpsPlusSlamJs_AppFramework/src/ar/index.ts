@@ -44,6 +44,13 @@ export {
 // --- frame-loop ---
 export { type FrameUpdate, registerFrameUpdate } from './frame-loop.js';
 
+// --- xr-frame-loop ---
+export {
+  type XrFrameContext,
+  type XrFrameUpdate,
+  registerXrFrameUpdate,
+} from './xr-frame-loop.js';
+
 // --- image-capture ---
 export {
   MIN_VALID_IMAGE_BYTES,
@@ -88,6 +95,11 @@ export {
   getDepthSampleCount,
   setFrameCallback,
   getLiveCss3dManager,
+  getScene,
+  getArWorldGroup,
+  getCamera,
+  getCurrentArPose,
+  type SessionFeatureOptions,
 } from './webxr-session.js';
 
 // --- xr-camera-texture ---

@@ -182,6 +182,53 @@ describe('buildSessionOptions', () => {
     expect(options.domOverlay).toBeUndefined();
     expect(options.depthSensing).toBeUndefined();
   });
+
+  /**
+   * Why this test matters:
+   * The minimal AR hit-test example needs the session to request the WebXR
+   * `hit-test` feature. It is opt-in (default off) so existing
+   * recorder/anchor sessions are unaffected, and it is *optional* (not
+   * required) so the session still starts on runtimes without hit-test. See
+   * `2026-06-03-threejs-arbutton-minimal-ar-example-user-feedback.md` §6.3.
+   */
+  it('does not request hit-test by default', () => {
+    const mockElement = document.createElement('div');
+
+    const options = buildSessionOptions(mockElement);
+
+    expect(options.optionalFeatures ?? []).not.toContain('hit-test');
+    expect(options.requiredFeatures).not.toContain('hit-test');
+  });
+
+  it('requests hit-test as an optional feature when requestHitTest is true', () => {
+    const mockElement = document.createElement('div');
+
+    const options = buildSessionOptions(
+      mockElement,
+      {},
+      { requestHitTest: true }
+    );
+
+    expect(options.optionalFeatures).toContain('hit-test');
+    // Still optional, never required, so unsupported devices can still start.
+    expect(options.requiredFeatures).toEqual(['local-floor']);
+  });
+
+  it('keeps hit-test off when requestHitTest is false even with other flags disabled', () => {
+    const mockElement = document.createElement('div');
+
+    const options = buildSessionOptions(
+      mockElement,
+      {
+        enableDomOverlay: false,
+        enableCameraAccess: false,
+        enableDepthSensingFeature: false,
+      },
+      { requestHitTest: false }
+    );
+
+    expect(options.optionalFeatures).toBeUndefined();
+  });
 });
 
 describe('extractPoseFromViewer', () => {

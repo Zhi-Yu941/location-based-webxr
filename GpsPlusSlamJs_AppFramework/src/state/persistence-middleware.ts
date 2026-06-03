@@ -14,7 +14,11 @@
 
 import type { Middleware, UnknownAction } from '@reduxjs/toolkit';
 import type { StorageBackend } from '../storage/storage-backend';
-import { endSession, recordWriteFailure, startSession } from './recording-slice';
+import {
+  endSession,
+  recordWriteFailure,
+  startSession,
+} from './recording-slice';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('PersistenceMiddleware');

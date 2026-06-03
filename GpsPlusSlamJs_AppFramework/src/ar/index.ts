@@ -51,6 +51,17 @@ export {
   registerXrFrameUpdate,
 } from './xr-frame-loop.js';
 
+// --- enable-gps-ar ---
+export {
+  type EnableGpsArStatus,
+  type EnableGpsArState,
+  type EnableGpsArConfig,
+  type EnableGpsArResult,
+  type EnableGpsArDeps,
+  type EnableGpsArController,
+  createEnableGpsArController,
+} from './enable-gps-ar.js';
+
 // --- image-capture ---
 export {
   MIN_VALID_IMAGE_BYTES,

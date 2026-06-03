@@ -21,6 +21,23 @@ framework. The full design rationale lives in the plan doc
    `getArWorldGroup()` (AR-local space), **not** the GPS-aligned scene root
    (`getScene()`). This is the single most important line to get right.
 
+## What you'll see (the contrast demo)
+
+The example is a teaching ladder that ends in a deliberate side-by-side
+comparison. Once AR is running and the first GPS fix has arrived, **tap** to
+place two markers at the same real-world spot:
+
+- an **orange cube** parented to the GPS-aligned `scene` root with **no drift
+  compensation** — the _intentional floater_. As SLAM tracking and GPS disagree
+  over time it visibly slides away from where you placed it.
+- a **green sphere** anchored with `createGpsAnchor` under `arWorldGroup`. It
+  holds the tapped pose while it samples GPS (default bootstrap), then makes a
+  single lazy correction to the GPS median **while off-screen**
+  (`snap-when-offscreen`) — so it stays put from the user's point of view.
+
+Taps before the first GPS fix are ignored with a brief "waiting for GPS…" hint,
+so both markers always start from the same known global pose.
+
 ## Why this exists
 
 1. **Onboarding scaffold.** The full

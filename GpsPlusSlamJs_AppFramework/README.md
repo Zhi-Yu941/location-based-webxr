@@ -206,22 +206,27 @@ When the alignment solver produces a new matrix, the framework writes it to `arW
 
 A pure-function `syncGpsAnchoredMeshes` reconciler (option 1, bulk markers) is shipped by the RecorderApp. Use `createGpsAnchor` when a single visible object, route cue, or POI needs the more careful bootstrap and correction policy.
 
+> **Worked example.** The [`GpsPlusSlamJs_MinimalExample`](../GpsPlusSlamJs_MinimalExample/) ports the stock three.js `webxr_ar_hittest` example onto this convention and ends in a deliberate side-by-side **contrast demo**: a tap co-spawns an option-1 floater under `scene` and an option-3 `createGpsAnchor` marker under `arWorldGroup` at the same world pose, so the drift difference is visible. It is the canonical reference for options 1–3 and for the `registerXrFrameUpdate` + Enable-GPS-AR seams below.
+
 ## Modules
 
 ### `ar/` — WebXR & 3D Scene
 
 WebXR session lifecycle, Three.js renderer setup, image/depth capture, replay scene management.
 
-| Export                                       | Description                                      |
-| -------------------------------------------- | ------------------------------------------------ |
-| `initAR(container)`                          | Start a WebXR AR session with Three.js rendering |
-| `endARSession()`                             | End the active XR session                        |
-| `startImageCapture()` / `stopImageCapture()` | Toggle camera frame capture                      |
-| `ImageCaptureManager`                        | Configurable camera frame capture pipeline       |
-| `DepthSampler`                               | Depth buffer sampling with configurable grids    |
-| `CameraBlitCapture`                          | GPU blit-based camera capture                    |
-| `initReplayScene(container)`                 | Create a 3D replay scene with orbit/FPS controls |
-| `applyChromiumProjectionLayerWorkaround`     | Workaround for Chromium camera-access edge cases |
+| Export                                         | Description                                                                                                                                                            |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `initAR(container, isolation?, features?)`     | Start a WebXR AR session with Three.js rendering. `features.requestHitTest` opts the session into the WebXR `hit-test` feature                                         |
+| `endARSession()`                               | End the active XR session                                                                                                                                              |
+| `createEnableGpsArController()`                | Headless "Enable GPS AR" orchestration (support check + permission bundling + sensor watches + `initAR`) with observable state; the app renders its own button over it |
+| `registerXrFrameUpdate(cb)`                    | Per-frame access to the live `XRFrame` + reference space + session (valid only synchronously inside the callback). Enables app-side hit-test / other WebXR features    |
+| `isFullySupported(s)` / `capabilityMessage(s)` | WebXR + geolocation capability gating + a user-facing message                                                                                                          |
+| `startImageCapture()` / `stopImageCapture()`   | Toggle camera frame capture                                                                                                                                            |
+| `ImageCaptureManager`                          | Configurable camera frame capture pipeline                                                                                                                             |
+| `DepthSampler`                                 | Depth buffer sampling with configurable grids                                                                                                                          |
+| `CameraBlitCapture`                            | GPU blit-based camera capture                                                                                                                                          |
+| `initReplayScene(container)`                   | Create a 3D replay scene with orbit/FPS controls                                                                                                                       |
+| `applyChromiumProjectionLayerWorkaround`       | Workaround for Chromium camera-access edge cases                                                                                                                       |
 
 ### `sensors/` — GPS & Permissions
 

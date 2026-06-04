@@ -15,27 +15,30 @@
  *
  * There is NOT a single crash here — the Chromium tracker notes the crash on
  * Chrome 147 is different from the crash on 148+, and the simple workaround
- * below only helped on a subset of versions. The timeline:
+ * below only helped on a subset of versions. The empirically-verified
+ * (on-device) timeline is:
  *
  *   - 147 .. 148.0.7778.early : deleting `createProjectionLayer` / `layers`
  *       forces three.js onto `XRWebGLLayer` and sidesteps the crash.
- *   - 148.0.7778.12 .. 149.0.7821 : the delete-only trick stopped working.
- *       An additional patch is needed: persist the `baseLayer` reference
- *       across `XRSession.prototype.updateRenderState` so three.js's later
- *       `depthNear`/`depthFar` update does not drop the active `glBaseLayer`.
- *   - > 149.0.7821 (incl. Chrome 150+) : Chromium fixed the root cause and
- *       separated the camera-image lifecycle from the active layer. The fix
- *       targets the stock projection-layer path, so on patched Chrome the
- *       workaround is *harmful*: forcing `XRWebGLLayer` re-enters the legacy
- *       path that was never fixed. On patched Chrome we MUST do nothing and
- *       let three.js use its normal projection-layer path.
+ *   - 148.0.7778.12 .. 149.0.7821 : the delete-only trick stopped being
+ *       sufficient on its own. An ADDITIONAL patch is needed: persist the
+ *       `baseLayer` reference across `XRSession.prototype.updateRenderState`
+ *       so three.js's later `depthNear`/`depthFar` update does not drop the
+ *       active `glBaseLayer`. (Confirmed on Chrome 148: BOTH the delete and
+ *       the baseLayer patch are required for the page not to crash.)
+ *   - > 149.0.7821 (incl. Chrome 150) : the delete-only path is STILL required
+ *       (confirmed on-device: Chrome 150 only stops crashing when the deletes
+ *       are applied), but the extra baseLayer-persistence patch is NOT needed.
+ *       The earlier assumption that Chromium fully fixed this on patched
+ *       builds did not hold on real devices, so we no longer skip the
+ *       workaround on "patched" Chrome.
  *
- * Because of that last point this helper is version-aware: it detects the
- * Chrome build from the user agent and **skips entirely on patched Chrome**.
- * On all other (affected or unknown) environments it behaves like the
- * original delete-based workaround, and additionally applies the
- * baseLayer-persistence patch when a genuinely affected Chrome build is
- * detected.
+ * Resulting policy (see {@link applyChromiumProjectionLayerWorkaround}):
+ *   - ALWAYS apply the deletes (every Chrome build, and unknown/non-Chromium
+ *     environments — restoring the original always-on behavior).
+ *   - Apply the baseLayer-persistence patch ONLY when a detected Chrome build
+ *     falls inside the affected window
+ *     [{@link BASELAYER_WINDOW_MIN} .. {@link BASELAYER_WINDOW_MAX}].
  *
  * Caveats:
  * - This is a Chromium-specific hack and the upstream comment explicitly
@@ -70,15 +73,22 @@ const BASE_LAYER_PATCH_MARKER = '__gpsBaseLayerPersistencePatch';
 export type ChromeVersion = [number, number, number, number];
 
 /**
- * First Chrome version that contains the Chromium-side fix and therefore must
- * NOT receive the workaround. The crash is fixed after `149.0.7819.0` and the
- * camera image is correctly populated after `149.0.7821.0`; we use the later,
- * stricter threshold so that "skip" only happens when the feature is fully
- * working.
- *
- * @see https://github.com/mrdoob/three.js/issues/33404 (alcooper91)
+ * Inclusive lower bound of the Chrome window that additionally needs the
+ * `baseLayer`-persistence patch (on top of the deletes). Below this build the
+ * delete-only workaround was sufficient.
  */
-export const PATCHED_CHROME_MIN: ChromeVersion = [149, 0, 7821, 0];
+export const BASELAYER_WINDOW_MIN: ChromeVersion = [148, 0, 7778, 12];
+
+/**
+ * Inclusive upper bound of the Chrome window that additionally needs the
+ * `baseLayer`-persistence patch. The crash is fixed after `149.0.7819.0` and
+ * the camera image is correctly populated after `149.0.7821.0`; above this
+ * build the extra patch is no longer required (the deletes still are — see
+ * the module header and the on-device matrix for Chrome 150).
+ *
+ * @see https://github.com/mrdoob/three.js/issues/33404
+ */
+export const BASELAYER_WINDOW_MAX: ChromeVersion = [149, 0, 7821, 0];
 
 /**
  * Result of {@link applyChromiumProjectionLayerWorkaround}.
@@ -91,12 +101,6 @@ export interface ChromiumProjectionLayerWorkaroundResult {
   deletedRenderStateLayers: boolean;
   /** True if `XRSession.prototype.updateRenderState` was wrapped on this call. */
   patchedUpdateRenderState: boolean;
-  /**
-   * True if the workaround was skipped because the detected Chrome build
-   * already contains the Chromium-side fix (forcing the legacy path would be
-   * harmful). When true, all other booleans are false.
-   */
-  skippedPatchedChrome: boolean;
   /** The detected Chrome version (`"major.minor.build.patch"`), or null. */
   detectedChromeVersion: string | null;
 }
@@ -132,15 +136,27 @@ function isVersionAfter(a: ChromeVersion, b: ChromeVersion): boolean {
   return false;
 }
 
+/** True if `a` >= `b` (lexicographic). */
+function isVersionAtLeast(a: ChromeVersion, b: ChromeVersion): boolean {
+  return !isVersionAfter(b, a);
+}
+
 /**
- * True when the detected Chrome build already contains the Chromium-side fix
- * (> {@link PATCHED_CHROME_MIN}) and therefore must NOT receive the
- * workaround. Non-Chromium user agents return false (treated as potentially
- * affected, preserving the original always-apply behavior).
+ * True when the detected Chrome build falls inside the affected window
+ * [{@link BASELAYER_WINDOW_MIN} .. {@link BASELAYER_WINDOW_MAX}] (inclusive)
+ * and therefore additionally needs the `baseLayer`-persistence patch. Outside
+ * the window (including non-Chromium user agents) returns false — only the
+ * deletes are needed there.
  */
-export function isPatchedChromeForCameraAccess(userAgent: string): boolean {
+export function needsBaseLayerPersistence(userAgent: string): boolean {
   const version = parseChromeVersion(userAgent);
-  return version !== null && isVersionAfter(version, PATCHED_CHROME_MIN);
+  if (version === null) {
+    return false;
+  }
+  return (
+    isVersionAtLeast(version, BASELAYER_WINDOW_MIN) &&
+    isVersionAtLeast(BASELAYER_WINDOW_MAX, version)
+  );
 }
 
 function getUserAgent(): string {
@@ -182,7 +198,7 @@ function patchUpdateRenderStateForBaseLayerPersistence(): boolean {
     if (init.baseLayer !== undefined) {
       lastBaseLayer = init.baseLayer;
     }
-    return (original as UpdateRenderStateFn).call(this, {
+    return original.call(this, {
       baseLayer: lastBaseLayer,
       ...init,
     });
@@ -196,16 +212,20 @@ function patchUpdateRenderStateForBaseLayerPersistence(): boolean {
 /**
  * Apply the Chromium camera-access tab-crash workaround.
  *
- * On Chrome builds that already contain the Chromium-side fix
- * (> {@link PATCHED_CHROME_MIN}, including Chrome 150+) this is a **no-op** —
- * forcing the legacy `XRWebGLLayer` path on patched Chrome re-introduces the
- * very crash the platform fixed. On affected (or unknown) environments it:
+ * Policy (derived from on-device testing — see the module header):
  *
- *  - removes `XRWebGLBinding.prototype.createProjectionLayer` (three.js r184)
- *    and `XRRenderState.prototype.layers` (three.js r158) so three.js falls
- *    back to `XRWebGLLayer`; and
- *  - when a genuinely affected Chrome build is detected, also persists the
- *    `baseLayer` across `XRSession.prototype.updateRenderState`.
+ *  - ALWAYS removes `XRWebGLBinding.prototype.createProjectionLayer`
+ *    (three.js r184) and `XRRenderState.prototype.layers` (three.js r158) so
+ *    three.js falls back to `XRWebGLLayer`. This is required on every affected
+ *    Chrome build observed so far, including Chrome 150, and is also applied
+ *    on unknown/non-Chromium environments (restoring the original always-on
+ *    behavior).
+ *  - ADDITIONALLY persists the `baseLayer` across
+ *    `XRSession.prototype.updateRenderState`, but ONLY when a detected Chrome
+ *    build falls inside the affected window
+ *    [{@link BASELAYER_WINDOW_MIN} .. {@link BASELAYER_WINDOW_MAX}]. Outside
+ *    that window the extra patch is unnecessary (and is skipped on unknown
+ *    environments to avoid touching projection-layer devices like Quest).
  *
  * Call once during bootstrap, before any `requestSession()` call.
  *
@@ -222,17 +242,8 @@ export function applyChromiumProjectionLayerWorkaround(options?: {
     deletedCreateProjectionLayer: false,
     deletedRenderStateLayers: false,
     patchedUpdateRenderState: false,
-    skippedPatchedChrome: false,
     detectedChromeVersion: version ? version.join('.') : null,
   };
-
-  // Patched Chrome (and anything newer): do nothing. The stock three.js
-  // projection-layer path is the one Chromium fixed; forcing the fallback
-  // here would re-break camera access.
-  if (version && isVersionAfter(version, PATCHED_CHROME_MIN)) {
-    result.skippedPatchedChrome = true;
-    return result;
-  }
 
   const binding = (
     globalThis as unknown as { XRWebGLBinding?: XRWebGLBindingLike }
@@ -251,11 +262,11 @@ export function applyChromiumProjectionLayerWorkaround(options?: {
   }
 
   // The baseLayer-persistence patch only matters on genuinely affected Chrome
-  // builds (the 148.0.7778.12 .. 149.0.7821 window). Restricting it to a
-  // detected, non-patched Chrome version avoids touching `updateRenderState`
-  // on unknown environments (desktop/Quest/iOS), keeping the original
-  // delete-only behavior there.
-  if (version) {
+  // builds (the BASELAYER_WINDOW_MIN .. BASELAYER_WINDOW_MAX window). Limiting
+  // it to that detected window avoids touching `updateRenderState` on Chrome
+  // builds that do not need it (e.g. 150) and on unknown environments
+  // (desktop/Quest/iOS), keeping the delete-only behavior there.
+  if (needsBaseLayerPersistence(userAgent)) {
     result.patchedUpdateRenderState =
       patchUpdateRenderStateForBaseLayerPersistence();
   }

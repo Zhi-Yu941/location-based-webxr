@@ -7,15 +7,18 @@ import { describe, it, expect, afterEach } from 'vitest';
 import {
   applyChromiumProjectionLayerWorkaround,
   parseChromeVersion,
-  isPatchedChromeForCameraAccess,
-  PATCHED_CHROME_MIN,
+  needsBaseLayerPersistence,
+  BASELAYER_WINDOW_MIN,
+  BASELAYER_WINDOW_MAX,
 } from './chromium-camera-access-workaround.js';
 
 interface MutableGlobal {
   XRWebGLBinding?: { prototype: { createProjectionLayer?: () => void } };
   XRRenderState?: { prototype: { layers?: unknown } };
   XRSession?: {
-    prototype: { updateRenderState?: (init?: { baseLayer?: unknown }) => unknown };
+    prototype: {
+      updateRenderState?: (init?: { baseLayer?: unknown }) => unknown;
+    };
   };
 }
 
@@ -91,9 +94,9 @@ describe('parseChromeVersion', () => {
   });
 
   it('parses the iOS CriOS variant', () => {
-    expect(
-      parseChromeVersion('Mozilla/5.0 CriOS/149.0.7821.5 Mobile')
-    ).toEqual([149, 0, 7821, 5]);
+    expect(parseChromeVersion('Mozilla/5.0 CriOS/149.0.7821.5 Mobile')).toEqual(
+      [149, 0, 7821, 5]
+    );
   });
 
   it('returns null for non-Chromium user agents', () => {
@@ -105,39 +108,57 @@ describe('parseChromeVersion', () => {
   });
 });
 
-describe('isPatchedChromeForCameraAccess', () => {
-  // Why this matters: this predicate decides whether the whole workaround is
-  // a no-op. Boundary correctness around PATCHED_CHROME_MIN is critical.
-  it('treats Chrome 150 (post-fix) as patched', () => {
-    expect(isPatchedChromeForCameraAccess(UA_PATCHED_150)).toBe(true);
+describe('needsBaseLayerPersistence', () => {
+  // Why this matters: this predicate decides whether the EXTRA baseLayer patch
+  // is applied on top of the always-on deletes. On-device matrix: Chrome 148
+  // needs it, Chrome 150 does not. Boundary correctness around the window
+  // [BASELAYER_WINDOW_MIN .. BASELAYER_WINDOW_MAX] is critical.
+  it('returns true for affected Chrome 148 (inside the window)', () => {
+    expect(needsBaseLayerPersistence(UA_AFFECTED_148)).toBe(true);
   });
 
-  it('treats affected Chrome 148 as not patched', () => {
-    expect(isPatchedChromeForCameraAccess(UA_AFFECTED_148)).toBe(false);
+  it('returns false for Chrome 150 (above the window — deletes only)', () => {
+    expect(needsBaseLayerPersistence(UA_PATCHED_150)).toBe(false);
   });
 
-  it('treats the exact threshold build as not patched (strictly greater)', () => {
-    const exact = `Chrome/${PATCHED_CHROME_MIN.join('.')}`;
-    expect(isPatchedChromeForCameraAccess(exact)).toBe(false);
+  it('returns false for Chrome 147 (below the window — deletes only)', () => {
+    expect(needsBaseLayerPersistence(UA_AFFECTED_147)).toBe(false);
   });
 
-  it('treats one patch above the threshold as patched', () => {
-    const [a, b, c, d] = PATCHED_CHROME_MIN;
-    expect(
-      isPatchedChromeForCameraAccess(`Chrome/${a}.${b}.${c}.${d + 1}`)
-    ).toBe(true);
+  it('includes the inclusive lower bound of the window', () => {
+    const min = `Chrome/${BASELAYER_WINDOW_MIN.join('.')}`;
+    expect(needsBaseLayerPersistence(min)).toBe(true);
   });
 
-  it('treats non-Chromium user agents as not patched (preserves apply behavior)', () => {
-    expect(isPatchedChromeForCameraAccess(UA_NON_CHROMIUM)).toBe(false);
+  it('excludes one patch below the lower bound', () => {
+    const [a, b, c, d] = BASELAYER_WINDOW_MIN;
+    expect(needsBaseLayerPersistence(`Chrome/${a}.${b}.${c}.${d - 1}`)).toBe(
+      false
+    );
+  });
+
+  it('includes the inclusive upper bound of the window', () => {
+    const max = `Chrome/${BASELAYER_WINDOW_MAX.join('.')}`;
+    expect(needsBaseLayerPersistence(max)).toBe(true);
+  });
+
+  it('excludes one patch above the upper bound', () => {
+    const [a, b, c, d] = BASELAYER_WINDOW_MAX;
+    expect(needsBaseLayerPersistence(`Chrome/${a}.${b}.${c}.${d + 1}`)).toBe(
+      false
+    );
+  });
+
+  it('returns false for non-Chromium user agents', () => {
+    expect(needsBaseLayerPersistence(UA_NON_CHROMIUM)).toBe(false);
   });
 });
 
 describe('applyChromiumProjectionLayerWorkaround — version gating', () => {
-  it('skips entirely on patched Chrome and leaves prototypes intact', () => {
-    // Why this matters: on patched Chrome the legacy XRWebGLLayer path was
-    // never fixed, so forcing it would re-introduce the crash. The helper
-    // must be a no-op here.
+  it('still applies the deletes on Chrome 150 (deletes are always required)', () => {
+    // Why this matters: on-device, Chrome 150 still crashes unless the deletes
+    // force the XRWebGLLayer fallback. The earlier "skip on patched Chrome"
+    // assumption did not hold on real devices, so the deletes must always run.
     g.XRWebGLBinding = {
       prototype: { createProjectionLayer: () => undefined },
     };
@@ -147,13 +168,13 @@ describe('applyChromiumProjectionLayerWorkaround — version gating', () => {
       userAgent: UA_PATCHED_150,
     });
 
-    expect(result.skippedPatchedChrome).toBe(true);
-    expect(result.deletedCreateProjectionLayer).toBe(false);
-    expect(result.deletedRenderStateLayers).toBe(false);
+    expect(result.deletedCreateProjectionLayer).toBe(true);
+    expect(result.deletedRenderStateLayers).toBe(true);
+    // ...but the extra baseLayer patch is NOT needed above the window.
+    expect(result.patchedUpdateRenderState).toBe(false);
     expect(result.detectedChromeVersion).toBe('150.0.8000.5');
-    // Prototypes are untouched so three.js uses its (now fixed) stock path.
-    expect('createProjectionLayer' in g.XRWebGLBinding.prototype).toBe(true);
-    expect('layers' in g.XRRenderState.prototype).toBe(true);
+    expect('createProjectionLayer' in g.XRWebGLBinding.prototype).toBe(false);
+    expect('layers' in g.XRRenderState.prototype).toBe(false);
   });
 
   it('applies the deletes on affected Chrome 148', () => {
@@ -166,7 +187,6 @@ describe('applyChromiumProjectionLayerWorkaround — version gating', () => {
       userAgent: UA_AFFECTED_148,
     });
 
-    expect(result.skippedPatchedChrome).toBe(false);
     expect(result.deletedCreateProjectionLayer).toBe(true);
     expect(result.deletedRenderStateLayers).toBe(true);
     expect(result.detectedChromeVersion).toBe('148.0.7778.20');
@@ -181,7 +201,6 @@ describe('applyChromiumProjectionLayerWorkaround — version gating', () => {
       userAgent: UA_AFFECTED_147,
     });
 
-    expect(result.skippedPatchedChrome).toBe(false);
     expect(result.deletedCreateProjectionLayer).toBe(true);
   });
 });
@@ -218,7 +237,7 @@ describe('applyChromiumProjectionLayerWorkaround — baseLayer persistence', () 
     expect(calls[1].baseLayer).toBe(baseLayer);
   });
 
-  it('does not wrap updateRenderState on patched Chrome', () => {
+  it('does not wrap updateRenderState on Chrome 150 (above the window)', () => {
     g.XRSession = {
       prototype: { updateRenderState: () => undefined },
     };

@@ -22,10 +22,11 @@ export {
 export {
   type ChromiumProjectionLayerWorkaroundResult,
   type ChromeVersion,
-  PATCHED_CHROME_MIN,
+  BASELAYER_WINDOW_MIN,
+  BASELAYER_WINDOW_MAX,
   applyChromiumProjectionLayerWorkaround,
   parseChromeVersion,
-  isPatchedChromeForCameraAccess,
+  needsBaseLayerPersistence,
 } from './chromium-camera-access-workaround.js';
 
 // --- capture-failure-tracker ---

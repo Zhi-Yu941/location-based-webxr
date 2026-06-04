@@ -174,8 +174,10 @@ function toGpsSeed(position: GpsPosition): LatLong | LatLongAlt {
 
 function main(): void {
   // Apply the Chromium WebXR camera-access tab-crash workaround before any
-  // session setup. It is version-aware (a no-op on patched Chrome and on
-  // non-affected environments), so calling it unconditionally here is safe.
+  // session setup. It always forces the XRWebGLLayer fallback (required on
+  // every affected Chrome build, incl. Chrome 150) and additionally persists
+  // the baseLayer only on the affected Chrome window, so calling it
+  // unconditionally here is safe.
   applyChromiumProjectionLayerWorkaround();
 
   const statusEl = getElement<HTMLPreElement>('status');

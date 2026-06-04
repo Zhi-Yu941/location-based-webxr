@@ -22,8 +22,6 @@ verified on-device.
 
 - `ANCHOR_MODE: GpsAnchorMode = 'snap-when-offscreen'` — the required mode; keeps
   the teaching "jump" out of view (the anchor only corrects while off-screen).
-- `createAnchorMarker(): Mesh` — a small green sphere, visually distinct from the
-  orange floater cube.
 - `coSpawnAtWorldPose({ scene, arWorldGroup, worldPosition }): { cube, anchorObject }`
   - cube → `placeRootCube(scene, worldPosition)` (GPS-aligned root);
   - anchorObject → under `arWorldGroup` at `arWorldGroup.worldToLocal(worldPosition)`

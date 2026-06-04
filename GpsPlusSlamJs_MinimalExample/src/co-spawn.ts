@@ -38,8 +38,8 @@ import { placeRootCube } from './placement.js';
 export const ANCHOR_MODE: GpsAnchorMode = 'snap-when-offscreen';
 
 /** Build the anchor marker — a small green sphere, visually distinct from the
- * orange floater cube. */
-export function createAnchorMarker(): Mesh {
+ * orange floater cube. Internal to this module (used by `coSpawnAtWorldPose`). */
+function createAnchorMarker(): Mesh {
   return new Mesh(
     new SphereGeometry(0.1, 16, 12),
     new MeshStandardMaterial({ color: 0x66ff99 })

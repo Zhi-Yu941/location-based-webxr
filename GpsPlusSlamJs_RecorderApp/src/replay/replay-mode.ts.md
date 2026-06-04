@@ -19,7 +19,7 @@ Orchestrates all replay building blocks (Iterations 1-5) into a single entry poi
 ### `ReplayModeController`
 
 | Method              | Signature                   | Description                                  |
-| ------------------- | --------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| ------------------- | --------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `play(speedFactor)` | `(number) => Promise<void>` | Start dispatching actions at the given speed |
 | `pause()`           | `() => void`                | Pause the replay                             |
 | `resume()`          | `() => Promise<void>`       | Resume from where we paused                  |

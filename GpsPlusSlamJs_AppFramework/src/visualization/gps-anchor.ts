@@ -41,6 +41,17 @@ export interface GpsAnchorOptions {
   readonly getGpsZeroRef: () => LatLong | null;
   /** Returns the current GPS reading at "now", or null when no fix yet. */
   readonly getCurrentGpsPoint: () => GpsAnchorSamplePoint | null;
+  /**
+   * Optional callback invoked whenever the bootstrap median is committed (the
+   * anchor's GPS reference is (re)assigned). Receives the exact committed point
+   * — the same value assigned to `gpsPoint`. Fires once after the initial
+   * bootstrap and again after every re-bootstrap (`markMovedExternally` →
+   * re-accumulate → commit). Never fires when `skipBootstrap` is true (there is
+   * no bootstrap to complete). Lets a host persist the committed reference (e.g.
+   * AnchorStarter writing `?show=`) so the persisted link equals the committed
+   * reference by construction.
+   */
+  readonly onBootstrapComplete?: (gpsPoint: LatLong | LatLongAlt) => void;
   readonly mode?: GpsAnchorMode;
   readonly floorY?: () => number | null;
   readonly distanceThreshold?: number;
@@ -241,6 +252,11 @@ export function createGpsAnchor(options: GpsAnchorOptions): GpsAnchor {
     phase = 'anchored';
     isFullyAnchored = true;
     samples.length = 0;
+    // Hand the host the exact committed reference so it can persist it (the
+    // persisted value equals the committed `gpsPoint` by construction). Re-fires
+    // after every re-bootstrap because this is the only place `gpsPoint` is
+    // assigned from a median.
+    options.onBootstrapComplete?.(gpsPoint);
   };
 
   /**

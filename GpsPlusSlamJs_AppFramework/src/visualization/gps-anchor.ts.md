@@ -43,7 +43,8 @@ constructor seam is reserved but not yet consulted.
 - `type GpsAnchorSamplePoint = LatLong | LatLongAlt`.
 - `interface GpsAnchorOptions` — required: `object3D`, `arWorldGroup`,
   `camera`, `gpsPoint`, `getAlignmentMatrix`, `getGpsZeroRef`,
-  `getCurrentGpsPoint`. Optional: `skipBootstrap`, `mode`, `floorY`,
+  `getCurrentGpsPoint`. Optional: `skipBootstrap`, `onBootstrapComplete`,
+  `mode`, `floorY`,
   `distanceThreshold` (default 2 m), `angleThresholdInDegrees`
   (default 15°), `targetPosRefreshRateInSec` (default 3 s),
   `secondsToAccumulateGpsPose` (default 7 samples at 1 Hz),
@@ -85,6 +86,13 @@ object as an `@internal` testing seam in lieu of pumping the global
 - **`getCurrentGpsPoint` returning null is a non-error**: the tick is
   silently skipped (no sample pushed, `lastSampleAtElapsed` not
   updated, so the next tick will retry). Mirrors "no fix yet".
+- **`onBootstrapComplete` fires from the median commit only**: invoked with the
+  exact committed `gpsPoint` whenever the bootstrap median is committed — once
+  after the initial bootstrap and again after every re-bootstrap
+  (`markMovedExternally` → re-accumulate → commit). It never fires when
+  `skipBootstrap` is true (there is no bootstrap to complete), so a host that
+  persists the committed reference (e.g. AnchorStarter's `?show=`) gets a value
+  equal to the committed `gpsPoint` by construction.
 - **`gpsPoint` getter reflects the committed pose**: during
   `'bootstrap'` it is the seed; after the median is committed it is
   the median. Callers may use it to decide visibility (e.g. ghost the

@@ -241,6 +241,65 @@ describe('createGpsAnchor — bootstrap', () => {
     anchor.dispose();
   });
 
+  it('`onBootstrapComplete` fires with the committed median and re-fires after re-bootstrap', () => {
+    // Why this test matters: AnchorStarter persists the anchor's committed
+    // reference into `?show=` via this callback, so the persisted link equals
+    // the committed `gpsPoint` by construction. The callback must receive the
+    // EXACT median (not the seed) and must re-fire on every re-bootstrap so a
+    // moved anchor's link stays correct.
+    const env = makeAnchorEnv();
+    const committed: Array<{ lat: number; lon: number }> = [];
+    let currentSample: GpsAnchorSamplePoint = { lat: 48.0, lon: 11.0 };
+    const anchor = createGpsAnchor({
+      ...env,
+      gpsPoint: { lat: 48.0, lon: 11.0 },
+      getAlignmentMatrix: () => null,
+      getGpsZeroRef: () => ({ lat: 48.0, lon: 11.0 }),
+      getCurrentGpsPoint: () => currentSample,
+      secondsToAccumulateGpsPose: 2,
+      onBootstrapComplete: (point) => {
+        committed.push({ lat: point.lat, lon: point.lon });
+      },
+    });
+
+    currentSample = { lat: 48.001, lon: 11.0 };
+    anchor.__tickForTests(1, 1);
+    currentSample = { lat: 48.003, lon: 11.0 };
+    anchor.__tickForTests(1, 2);
+    // First commit: median of [48.001, 48.003] = 48.002, and the value must
+    // equal the anchor's committed reference.
+    expect(committed).toHaveLength(1);
+    expect(committed[0]!.lat).toBeCloseTo(48.002, 6);
+    expect(committed[0]!.lat).toBeCloseTo(anchor.gpsPoint.lat, 6);
+
+    anchor.markMovedExternally();
+    currentSample = { lat: 49.001, lon: 11.0 };
+    anchor.__tickForTests(1, 10);
+    currentSample = { lat: 49.003, lon: 11.0 };
+    anchor.__tickForTests(1, 11);
+    // Re-bootstrap commit: callback re-fires with the new median.
+    expect(committed).toHaveLength(2);
+    expect(committed[1]!.lat).toBeCloseTo(49.002, 6);
+    anchor.dispose();
+  });
+
+  it('`onBootstrapComplete` never fires when `skipBootstrap` is true (no bootstrap to complete)', () => {
+    const env = makeAnchorEnv();
+    const onBootstrapComplete = vi.fn();
+    const anchor = createGpsAnchor({
+      ...env,
+      gpsPoint: { lat: 48.1, lon: 11.2, altitude: 500 },
+      skipBootstrap: true,
+      getAlignmentMatrix: () => null,
+      getGpsZeroRef: () => ({ lat: 48.0, lon: 11.0 }),
+      getCurrentGpsPoint: () => null,
+      onBootstrapComplete,
+    });
+    expect(anchor.phase).toBe('anchored');
+    expect(onBootstrapComplete).not.toHaveBeenCalled();
+    anchor.dispose();
+  });
+
   it('`dispose()` unregisters the anchor from the global frame loop', async () => {
     const env = makeAnchorEnv();
     const getCurrentGpsPoint = vi.fn<() => GpsAnchorSamplePoint | null>(() => ({

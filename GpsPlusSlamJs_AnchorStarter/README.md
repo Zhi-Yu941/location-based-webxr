@@ -23,9 +23,11 @@ It is the middle rung of the example ladder:
 
 1. Go outside with an AR-capable phone. The app coaches you to **move around**
    until alignment is good enough (a "N% ready" meter).
-2. Place a **GPS anchor** (a marker) in the real world. Its coordinates are
-   encoded into the page **URL** (the `?show=` query param) — the address bar
-   updates in place and the link becomes shareable.
+2. Place a **GPS anchor** (a marker) in the real world: point your phone at the
+   ground until a reticle ring appears on the surface (the "AR cursor"), then
+   tap **Place** to drop the anchor there — not at your own feet. Its
+   coordinates are encoded into the page **URL** (the `?show=` query param) — the
+   address bar updates in place and the link becomes shareable.
 3. **Reload the page** _or_ **share the link** to another person / second
    device. Move around again to re-localise; the saved marker reappears at the
    exact same physical spot — proving cross-session _and_ cross-device
@@ -80,8 +82,14 @@ content (replace)**:
     map the framework metric + FSM to render-ready strings (the async-UX
     in-progress → final contract is tested here).
   - [`capability.ts`](src/capability.ts.md) — the E1 decision + message.
+  - [`placement-decision.ts`](src/placement-decision.ts.md) — the pure
+    surface/alignment gate for the Place press (places only when a reticle
+    surface AND a GPS alignment are present, else returns an actionable hint).
 - **Glue:** [`main.ts`](src/main.ts.md) — composes the seams with `initAR`,
-  `createGpsPositionHandler`, `createGpsAnchor`, GPS/orientation watches.
+  `createGpsPositionHandler`, `createGpsAnchor`, GPS/orientation watches, and
+  the hit-test reticle ([`reticle-hit-test.ts`](src/reticle-hit-test.ts.md),
+  which reuses the framework's `hit-test-reticle` view-model). Same placement
+  model as the MinimalExample (place under the AR cursor), plus URL persistence.
 - **Your content here:** [`marker.ts`](src/marker.ts.md) — the **single**
   place to edit. Swap `createAnchorMarker()` for your own `THREE.Object3D`
   and the persistence + anchoring keep working unchanged.
@@ -98,6 +106,9 @@ content (replace)**:
   `computeOnboardingGuidance`, so wording/thresholds stay consistent with the
   recorder HUD.
 - **D4 — soft gate:** "Place anchor" is always enabled; the guidance meter and
-  banner copy nudge waiting for good tracking.
+  banner copy nudge waiting for good tracking. The press itself is gated on a
+  reticle surface + GPS alignment (`placement-decision.ts`): with no surface /
+  alignment it surfaces an actionable hint instead of placing (it never
+  hard-disables the button), mirroring the MinimalExample's tap gate.
 - **D5 — E1 capability gate:** a clear "open on an AR phone outdoors" message
   on unsupported devices; no simulation fallback (yet).

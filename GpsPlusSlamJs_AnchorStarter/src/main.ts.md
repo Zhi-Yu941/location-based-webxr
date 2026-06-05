@@ -11,6 +11,7 @@
   `getCamera`, `startGpsWatch`, `startOrientationWatch`,
   `requestDeviceOrientationPermission`, `createGpsAnchor`,
   `enableArWorldGroupAlignment`, `selectTrackingQuality`,
+  `selectAlignmentMatrix`, `startReticleHitTest`,
   `checkWebXRSupport`, `checkGeolocationPermission`, `createAnchorMarker`) is
   resolved through `getSeams()` from [seams.ts](seams.ts.md) instead of being
   called directly. In production `getSeams()` returns the real imports; the
@@ -23,28 +24,38 @@
   - `startAr()` (user gesture): `createSlamAppStore({ NullStorageBackend })` →
     `setTrackingStore` → `initAR` (with the camera/depth crash-surface flags
     `enableCameraAccess` / `enableDepthSensingFeature` /
-    `enableCameraTextureAcquisition` set to `false`, since this example only
-    places 3D anchors under a reticle; `dom-overlay` / CSS3D stay on for the
-    overlay UI) → `startSession` (so the GPS coordinator
+    `enableCameraTextureAcquisition` set to `false`, and `requestHitTest: true`
+    in the session-features arg so the cache-miss reticle works; this example
+    places 3D anchors under a screen-centre hit-test reticle and never reads the
+    camera image; `dom-overlay` / CSS3D stay on for the overlay UI) →
+    `startSession` (so the GPS coordinator
     feeds alignment) → `enableArWorldGroupAlignment({ store, arWorldGroup })`
     (lerps the alignment onto `arWorldGroup` so the camera + anchor ride it
     together — GPS-registers the view, without which the camera is pure-VIO) →
     `createGpsPositionHandler` + `startGpsWatch` →
     `requestDeviceOrientationPermission` + `startOrientationWatch` →
     wire `placeButton` + `copyLinkButton` clicks →
-    `readCachedAnchor()` → `dispatchSetup(BOOTED)`.
-  - `placeAnchor()` (cache-miss): `PLACE_REQUESTED` (saving) →
-    `spawnAnchor(gps, false)` + `writeShowParam([anchorSpecFromGps(gps)])`
-    (encodes the anchor into the `?show=` URL via `history.replaceState`) →
-    `PLACE_SUCCEEDED`, or `PLACE_FAILED` on error (revert + error line). On
-    failure it also `dispose()`s + nulls any partially created `anchor`, so a
-    retry can never accumulate overlapping markers / leaked frame-loop
-    registrations.
-    Note: this path is **synchronous** — `saving` → `saved` happen in one
-    call stack, so the transient `Saving…` state is a view-model concern, not
-    an observable painted frame.
+    `readCachedAnchor()` → on a **cache-miss** start the reticle loop
+    (`startReticleHitTest({ arWorldGroup })`); on a **cache-hit** spawn the
+    saved anchor (`skipBootstrap` + `hideUntilAligned`) → `dispatchSetup(BOOTED)`.
+  - `placeAnchor()` (cache-miss): gated by `decideAnchorPlacement` — a press
+    only commits when a surface is under the reticle AND a GPS alignment exists,
+    else it surfaces a hint via `PLACE_BLOCKED` (stays placeable, no `saving`).
+    On a valid press: `PLACE_REQUESTED` (saving) →
+    `spawnAnchor(gps, false, {}, { worldPosition, onBootstrapComplete })` places
+    the marker at the reticle world pose and starts the bootstrap. `?show=` is
+    **not** written here — it is persisted from the committed bootstrap median
+    via `onBootstrapComplete`, which also disposes the reticle and dispatches
+    `PLACE_SUCCEEDED`. So `saving` holds until the median lands and `saved`
+    reflects the durable URL write (per the repo async-UX rule). A throw during
+    spawn → `PLACE_FAILED` (revert + error line) and `dispose()`s any partially
+    created `anchor` so a retry can never accumulate overlapping markers.
   - `spawnAnchor()` builds `createGpsAnchor` with `getAlignmentMatrix` /
-    `getGpsZeroRef` / `getCurrentGpsPoint` bound to the live store + last GPS.
+    `getGpsZeroRef` bound to the live store, and `getCurrentGpsPoint` bound to
+    the marker's own **GPS-world (NUE) world pose** via `worldNueToGps`. Its
+    optional `{ worldPosition }` places the marker at the reticle hit point
+    (world→`arWorldGroup`-local); `{ onBootstrapComplete }` is forwarded to the
+    anchor so the cache-miss path can persist the committed median into `?show=`.
     It adds the marker to the AR world group _before_ `createGpsAnchor`; if
     creation throws it removes the marker again, and it wraps the returned
     `dispose()` so disposing the anchor also detaches its marker (the
@@ -65,19 +76,25 @@
     the AR render loop automatically.
   - `lastGps` always carries a finite altitude (defaults to `0`) so the anchor
     seed is a well-formed `LatLongAlt`.
-  - **Bootstrap source is the phone GPS (`getCurrentGpsPoint: () => lastGps`),
-    deliberately NOT the object's world pose.** Unlike the MinimalExample (whose
-    anchor sits at a reticle offset and medians its own world pose), this app's
-    marker sits at the AR origin and the `?show=` URL persists `lastGps`; pinning
-    the anchor to the phone fix keeps the committed reference consistent with the
-    shared/reloaded URL. Sampling the origin's world pose instead would anchor at
-    the session start point and diverge from the persisted value.
+  - **Cache-miss bootstrap source is the marker's own world pose**
+    (`getCurrentGpsPoint` → `worldNueToGps(marker.getWorldPosition(), zero)`),
+    matching the MinimalExample — the marker is positioned at the reticle hit
+    point, so the anchor commits to the point the user aimed at, not the device.
+    This works only because `enableArWorldGroupAlignment` makes the marker's
+    world position GPS-world NUE. The persisted `?show=` is the **committed
+    bootstrap median** (via `onBootstrapComplete`), so the shared link equals
+    the anchor's committed reference by construction and stays correct across
+    re-bootstraps. (Cache-hit uses `skipBootstrap`, so its `getCurrentGpsPoint`
+    is never sampled and the URL GPS is the decoded one.)
 - **Tests:** glue is verified manually via `pnpm dev` on an AR device. The
   decision logic it composes is unit-tested in the sibling modules
   ([setup-state-machine](setup-state-machine.ts.md),
+  [placement-decision](placement-decision.ts.md),
   [url-anchor-state](url-anchor-state.ts.md),
   [guidance-view](guidance-view.ts.md), [placement-view](placement-view.ts.md),
-  [capability](capability.ts.md), [marker](marker.ts.md)). The placement glue —
-  including the failure cleanup that prevents leaked / overlapping markers — is
-  covered end-to-end by the Tier 1 Playwright suite
+  [capability](capability.ts.md), [marker](marker.ts.md)). The reticle loop
+  ([reticle-hit-test](reticle-hit-test.ts.md)) is device-only glue. The
+  placement glue — including the reticle gate (place when a surface is present,
+  hint when not) and the failure cleanup that prevents leaked / overlapping
+  markers — is covered end-to-end by the Tier 1 Playwright suite
   (`playwright-tests/placement-flow.spec.js`).

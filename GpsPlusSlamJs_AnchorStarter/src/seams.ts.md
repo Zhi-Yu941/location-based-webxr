@@ -10,7 +10,11 @@
     may override (`checkWebXRSupport`, `checkGeolocationPermission`, `initAR`,
     `getArWorldGroup`, `getCamera`, `startGpsWatch`, `startOrientationWatch`,
     `requestDeviceOrientationPermission`, `createGpsAnchor`,
-    `selectTrackingQuality`, `createAnchorMarker`).
+    `enableArWorldGroupAlignment`, `selectTrackingQuality`,
+    `selectAlignmentMatrix`, `startReticleHitTest`, `createAnchorMarker`).
+    `selectAlignmentMatrix` lets the e2e fake drive the placement alignment gate
+    (a desktop browser never computes a real alignment); `startReticleHitTest`
+    lets it drive the hit-test reticle (surface present / absent) deterministically.
   - `realSeams: AnchorStarterSeams` — the production seams (the unmodified
     imports), exported for the prod-inert unit test.
   - `getSeams(): AnchorStarterSeams` — returns `realSeams` unless a DEV-only

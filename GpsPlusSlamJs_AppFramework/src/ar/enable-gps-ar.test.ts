@@ -195,6 +195,26 @@ describe('createEnableGpsArController — enable() failure paths', () => {
     expect(controller.getState().status).toBe('running');
   });
 
+  it('proceeds when the orientation probe REJECTS (truly non-blocking)', async () => {
+    // The real `requestOrientationPermission` catches its own errors, but the
+    // dep contract is `Promise<PermissionStatus>` and the orchestration's stated
+    // intent is "orientation never blocks AR". A rejecting probe (a broken shim,
+    // a future impl that throws) must therefore degrade gracefully rather than
+    // bubble to enable()'s catch and fail the whole session.
+    const deps = makeDeps({
+      requestOrientationPermission: vi.fn(() =>
+        Promise.reject(new Error('orientation shim blew up'))
+      ),
+    });
+    const controller = createEnableGpsArController(deps);
+
+    const result = await controller.enable({ container: fakeContainer() });
+
+    expect(result.ok).toBe(true);
+    expect(deps.initAR).toHaveBeenCalledTimes(1);
+    expect(controller.getState().status).toBe('running');
+  });
+
   it('fails when an opted-in depth probe is denied', async () => {
     const deps = makeDeps({
       requestWebXRWithDepthPermission: vi.fn(() => Promise.resolve(denied)),

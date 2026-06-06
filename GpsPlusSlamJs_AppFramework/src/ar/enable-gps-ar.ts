@@ -196,8 +196,15 @@ export function createEnableGpsArController(
 
     // Orientation is recommended, not blocking: many Android devices grant it
     // implicitly, and a denial should not stop AR (the compass simply degrades).
-    // We still request it so iOS shows its prompt inside the gesture.
-    await resolved.requestOrientationPermission();
+    // We still request it so iOS shows its prompt inside the gesture. A
+    // *rejecting* probe (broken shim / future impl that throws) must degrade
+    // just like a denial — never bubble to enable()'s catch and fail the
+    // session — so we swallow the rejection here.
+    try {
+      await resolved.requestOrientationPermission();
+    } catch {
+      // Best-effort: orientation never blocks AR startup.
+    }
 
     if (config.requestDepth) {
       const depth = await resolved.requestWebXRWithDepthPermission();

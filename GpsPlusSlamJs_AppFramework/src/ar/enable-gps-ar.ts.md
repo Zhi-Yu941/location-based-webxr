@@ -47,6 +47,10 @@ framework does not own button DOM (unlike three.js' `ARButton`).
   `requestOrientationPermission`, `requestWebXRWithDepthPermission`,
   `startGpsWatch`, `startOrientationWatch`, `initAR`). This keeps the
   orchestration unit-testable without WebXR/GPS hardware or a DOM.
+- **Listener isolation:** `setState` dispatches over a snapshot and wraps each
+  subscriber in try/catch (logging via `createLogger('EnableGpsAr')`), so one
+  throwing subscriber cannot abort the dispatch or interrupt the
+  `refreshSupport()`/`enable()` transition that drives it.
 - Uses the `PermissionStatus`-returning `requestOrientationPermission` from
   `sensors/permission-checker.ts`, **not** the legacy `boolean`-returning one in
   `sensors/gps.ts` (plan §6.1 disambiguation).
@@ -78,8 +82,9 @@ controller.subscribe((s) => {
 minimal default set (depth NOT probed), `requestHitTest` forwarding, depth opt-in,
 geolocation-denied error (no `initAR`), orientation-denied proceed, depth-denied
 error, `initAR` rejection, the `starting → running` and `starting → error`
-transitional ordering, idempotency (running + still-starting), and unsubscribe
-hygiene.
+transitional ordering, idempotency (running + still-starting), unsubscribe
+hygiene, and listener isolation (a throwing subscriber does not abort dispatch
+or the controller's own flow).
 
 ## Related
 

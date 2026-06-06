@@ -41,6 +41,9 @@ import {
   isWebXRSupported as defaultIsWebXRSupported,
   type SessionFeatureOptions,
 } from './webxr-session';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('EnableGpsAr');
 
 /**
  * Lifecycle status of the controller. The app maps these onto its button:
@@ -160,9 +163,15 @@ export function createEnableGpsArController(
   function setState(next: EnableGpsArState): void {
     state = next;
     // Snapshot so a listener that (un)subscribes during dispatch cannot mutate
-    // the set mid-iteration.
+    // the set mid-iteration. Each listener is isolated in a try/catch so one
+    // throwing subscriber cannot abort the dispatch and destabilize the
+    // refreshSupport()/enable() state transitions that drive it.
     for (const listener of [...listeners]) {
-      listener(state);
+      try {
+        listener(state);
+      } catch (err) {
+        log.error('State listener threw; continuing dispatch:', err);
+      }
     }
   }
 

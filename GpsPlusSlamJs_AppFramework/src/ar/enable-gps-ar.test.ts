@@ -304,4 +304,31 @@ describe('createEnableGpsArController — subscription hygiene', () => {
 
     expect(listener.mock.calls.length).toBe(callsBefore);
   });
+
+  // Why this test matters: setState() drives every refreshSupport()/enable()
+  // transition. If a single subscriber throws (a buggy app render callback) it
+  // must not abort the dispatch — remaining listeners must still observe the
+  // new state and the controller's own flow must not be interrupted.
+  it('isolates a throwing listener so others still receive the state', async () => {
+    const controller = createEnableGpsArController(makeDeps());
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+
+    const throwing = vi.fn(() => {
+      throw new Error('bad subscriber');
+    });
+    const healthy = vi.fn();
+    controller.subscribe(throwing);
+    controller.subscribe(healthy);
+
+    await controller.refreshSupport();
+
+    expect(throwing).toHaveBeenCalled();
+    expect(healthy).toHaveBeenCalled();
+    // The flow itself completed despite the throwing subscriber.
+    expect(controller.getState().status).toBe('ready');
+
+    consoleError.mockRestore();
+  });
 });

@@ -19,6 +19,7 @@
 
 import * as THREE from 'three';
 import { createLogger } from '../utils/logger';
+import { WEBXR_TO_NUE } from './webxr-nue-basis';
 import {
   ImageCaptureManager,
   type ImageCaptureCallbacks,
@@ -1134,28 +1135,6 @@ export function getArPose(): THREE.Object3D | null {
 export function setArPose(a: THREE.Object3D | null): void {
   arPoseNode = a;
 }
-
-/**
- * Constant matrix converting WebXR local-floor coordinates to the internal
- * NUE (North-Up-East) convention.
- *
- * WebXR: X=East, Y=Up, Z=South (right-handed, toward viewer)
- * NUE:   X=North, Y=Up, Z=East (right-handed)
- *
- * Mapping:  NUE_X = -WebXR_Z,  NUE_Y = WebXR_Y,  NUE_Z = WebXR_X
- *
- * Row-major:
- *   [ 0  0 -1  0 ]
- *   [ 0  1  0  0 ]
- *   [ 1  0  0  0 ]
- *   [ 0  0  0  1 ]
- *
- * Stored column-major (Three.js / gl-matrix convention).
- */
-const WEBXR_TO_NUE = new THREE.Matrix4().fromArray([
-  // col0    col1     col2     col3
-  0, 0, 1, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 0, 1,
-]);
 
 /**
  * Apply an alignment matrix to the AR world group.

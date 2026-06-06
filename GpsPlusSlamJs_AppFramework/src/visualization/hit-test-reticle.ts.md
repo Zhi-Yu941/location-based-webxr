@@ -21,13 +21,14 @@ subtly wrong.
   Returns a mesh with `matrixAutoUpdate = false` and `visible = false`.
 - `updateReticle(reticle: Object3D, matrix: HitMatrix | null): void` — applies
   the pose:
-  - non-null 16-element matrix → the reticle's **world** pose adopts it and the
-    reticle becomes visible. The pose is in the WebXR reference space (the
-    three.js scene-root/world frame); when the reticle has a parent (e.g.
-    `arWorldGroup`, which carries the GPS alignment) the pose is converted into
-    the parent's local space so the reticle's _world_ pose equals the hit pose
-    regardless of the parent transform. With no parent the local matrix adopts
-    the pose verbatim.
+  - non-null 16-element matrix → the reticle becomes visible and its **local**
+    matrix is set to `WEBXR_TO_NUE · pose`. The hit pose arrives in the WebXR
+    reference space (`X=East, Y=Up, Z=South`), but the reticle is parented under
+    `arWorldGroup`, whose local space is NUE (`X=North, Y=Up, Z=East`). Applying
+    the basis change makes the reticle's world pose
+    `arWorldGroup.matrix · WEBXR_TO_NUE · pose` — the same chain the camera
+    rides through the static `basisChangeNode` — so it stays pinned under the
+    screen centre.
   - `null` → reticle is hidden.
 
 Exported from `gps-plus-slam-app-framework/visualization`.
@@ -37,14 +38,14 @@ Exported from `gps-plus-slam-app-framework/visualization`.
 - `matrixAutoUpdate` **must** stay `false` on the reticle: the world transform
   is written wholesale from the hit pose each frame, so letting Three.js
   recompose it from position/quaternion/scale would discard the pose.
-- The mesh is parented under `getArWorldGroup()` (AR-local space) by the caller,
-  **not** the GPS-aligned scene root — so any placed content shares the same
-  scene subtree. Because the hit pose is a **live world-space pose**, the reticle
-  itself must _not_ ride the parent's alignment: `updateReticle` cancels the
-  parent transform (`reticle.matrix = parent.matrixWorld⁻¹ · pose`) so the
-  reticle stays pinned under the screen centre. Writing the pose into the local
-  matrix directly (the previous behaviour) double-applied `arWorldGroup`'s
-  alignment and drifted the reticle sideways on-device.
+- The mesh is parented under `getArWorldGroup()` (NUE local space) by the
+  caller, **not** the GPS-aligned scene root — so the reticle rides the same
+  lerped `arWorldGroup` alignment as the camera. Because the hit pose is in the
+  **WebXR** reference space, `updateReticle` applies the `WEBXR_TO_NUE` basis
+  change (`reticle.matrix = WEBXR_TO_NUE · pose`). Writing the WebXR pose into
+  the NUE-frame local matrix directly (the previous behaviour) misread
+  East/North as swapped: the Up axis matched but the reticle drifted sideways
+  instead of tracking the screen centre.
 - `updateReticle` operates on any `Object3D`, so it is testable without a WebGL
   context. It does not validate matrix length; callers pass the 16-element
   `XRPose.transform.matrix`.
@@ -66,11 +67,12 @@ updateReticle(reticle, hitPose ? hitPose.transform.matrix : null);
 ## Tests
 
 [hit-test-reticle.test.ts](hit-test-reticle.test.ts) — pins: the mesh starts
-hidden with manual matrix updates; a hit pose makes it visible and is adopted
-verbatim when unparented (including a `Float32Array` pose); a `null` hit hides it
-(no stale reticle); and, under a transformed parent (a yaw+translation
-alignment), the reticle's resulting **world** pose equals the hit pose (the
-screen-centre-drift regression).
+hidden with manual matrix updates; a hit pose makes it visible and the
+`WEBXR_TO_NUE` basis change is applied (`(x,y,z)_WebXR → (-z,y,x)_NUE`,
+including a `Float32Array` pose); a `null` hit hides it (no stale reticle); and,
+under an `arWorldGroup` parent, a pure-East WebXR hit (`+X`) lands on the NUE
+East axis (`+Z`) not North (`+X`) — the screen-centre-drift / axis-swap
+regression.
 
 ## Consumers
 

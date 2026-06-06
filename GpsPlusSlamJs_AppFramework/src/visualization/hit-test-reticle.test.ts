@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { Matrix4, Object3D, Vector3 } from 'three';
 
 import { createReticleMesh, updateReticle } from './hit-test-reticle.js';
+import { WEBXR_TO_NUE } from '../ar/webxr-nue-basis.js';
 
 /**
  * Why these tests matter: the reticle view-model is the small piece of the
- * hit-test glue most likely to be ported incorrectly. We pin two invariants
- * that the per-frame XR plumbing in each app relies on every frame:
- *   1. a hit pose makes the reticle visible AND adopts the pose verbatim, and
+ * hit-test glue most likely to be ported incorrectly. We pin the invariants the
+ * per-frame XR plumbing relies on every frame:
+ *   1. a hit pose makes the reticle visible AND is converted from the WebXR
+ *      reference space into the reticle's NUE parent frame via the WEBXR_TO_NUE
+ *      basis change (the on-device "drifts to the side" regression), and
  *   2. the absence of a hit hides the reticle (otherwise a stale reticle would
  *      stick to the last surface).
  */
@@ -20,20 +23,24 @@ describe('createReticleMesh', () => {
 });
 
 describe('updateReticle', () => {
-  it('adopts the hit pose matrix and shows the reticle', () => {
+  it('applies the WebXR→NUE basis change to the hit pose and shows the reticle', () => {
     const reticle = new Object3D();
     reticle.matrixAutoUpdate = false;
     reticle.visible = false;
 
-    // A pose translated to (1, 2, 3): column-major identity with translation in
-    // the last column's first three rows (elements 12,13,14).
+    // A pose translated to WebXR (1, 2, 3): column-major identity with the
+    // translation in the last column's first three rows (elements 12,13,14).
     const pose = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 2, 3, 1];
     updateReticle(reticle, pose);
 
+    // WEBXR_TO_NUE maps (x, y, z)_WebXR → (-z, y, x)_NUE, so the stored LOCAL
+    // (arWorldGroup-frame) translation is (-3, 2, 1). The Up axis is preserved
+    // (2) but East/North are NOT swapped — exactly the fix for the reticle
+    // sliding sideways when WebXR coords were misread as NUE.
     expect(reticle.visible).toBe(true);
-    expect(reticle.matrix.elements[12]).toBe(1);
-    expect(reticle.matrix.elements[13]).toBe(2);
-    expect(reticle.matrix.elements[14]).toBe(3);
+    expect(reticle.matrix.elements[12]).toBeCloseTo(-3, 6);
+    expect(reticle.matrix.elements[13]).toBeCloseTo(2, 6);
+    expect(reticle.matrix.elements[14]).toBeCloseTo(1, 6);
   });
 
   it('hides the reticle when there is no hit (null)', () => {
@@ -46,48 +53,51 @@ describe('updateReticle', () => {
   it('accepts a Float32Array pose matrix (XRPose.transform.matrix shape)', () => {
     const reticle = new Object3D();
     reticle.matrixAutoUpdate = false;
+    // WebXR translation (5, 6, 7) → NUE (-7, 6, 5).
     const pose = new Float32Array([
       1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 5, 6, 7, 1,
     ]);
     updateReticle(reticle, pose);
     expect(reticle.visible).toBe(true);
-    expect(reticle.matrix.elements[14]).toBe(7);
+    expect(reticle.matrix.elements[12]).toBeCloseTo(-7, 6);
+    expect(reticle.matrix.elements[14]).toBeCloseTo(5, 6);
   });
 
-  // Why this matters: the reticle is parented under arWorldGroup, whose matrix
-  // carries the GPS alignment (alignment × WEBXR_TO_NUE). The hit pose is in the
-  // WebXR reference space (the scene-root/world frame). If updateReticle wrote
-  // that world pose straight into the reticle's LOCAL matrix, the parent's
-  // alignment would double-apply and the reticle would drift off screen-centre
-  // (the bug reported on-device: up axis right, but it slides to the side as the
-  // alignment rotates). The reticle's resulting WORLD pose must equal the live
-  // hit pose regardless of the parent transform.
-  it("keeps the reticle's world pose equal to the hit pose under a transformed parent", () => {
-    // arWorldGroup carries a 90°-yaw + translation alignment (non-identity).
+  // The core on-device regression. The reticle lives under arWorldGroup (NUE),
+  // but its world pose must match the transform chain the camera rides:
+  //   camera_world = arWorldGroup.matrix · WEBXR_TO_NUE · camera_local
+  // so the reticle's world pose must be arWorldGroup.matrix · WEBXR_TO_NUE ·
+  // hitPose. A pure-East WebXR offset (+X) must therefore land on the NUE East
+  // axis (+Z), NOT the North axis (+X) — the swap that pushed the reticle off
+  // screen-centre while the Up axis still looked right.
+  it('keeps the reticle in the camera frame: a WebXR +X (East) hit maps to NUE +Z (East)', () => {
     const arWorldGroup = new Object3D();
     arWorldGroup.matrixAutoUpdate = false;
-    arWorldGroup.matrix
-      .makeRotationY(Math.PI / 2)
-      .setPosition(new Vector3(10, 20, 30));
+    // Identity alignment isolates the basis change from any GPS rotation.
+    arWorldGroup.matrix.identity();
 
     const reticle = new Object3D();
     reticle.matrixAutoUpdate = false;
     arWorldGroup.add(reticle);
 
-    // A hit pose at world (1, 2, 3) under the screen centre.
-    const pose = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 2, 3, 1];
+    // A hit pose 1 m along WebXR +X (East), level with the origin.
+    const pose = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1];
     updateReticle(reticle, pose);
 
-    // Compose the reticle's world matrix the way three.js would during render.
+    // Compose the world matrix the way three.js would during render.
     const reticleWorld = new Matrix4().multiplyMatrices(
       arWorldGroup.matrix,
       reticle.matrix
     );
     const worldPosition = new Vector3().setFromMatrixPosition(reticleWorld);
 
+    // Expected: arWorldGroup(identity) · WEBXR_TO_NUE · (1,0,0) = (0, 0, 1).
+    const expected = new Vector3(1, 0, 0).applyMatrix4(WEBXR_TO_NUE);
     expect(reticle.visible).toBe(true);
-    expect(worldPosition.x).toBeCloseTo(1, 6);
-    expect(worldPosition.y).toBeCloseTo(2, 6);
-    expect(worldPosition.z).toBeCloseTo(3, 6);
+    expect(worldPosition.x).toBeCloseTo(expected.x, 6); // North ≈ 0
+    expect(worldPosition.y).toBeCloseTo(expected.y, 6); // Up ≈ 0
+    expect(worldPosition.z).toBeCloseTo(expected.z, 6); // East ≈ 1
+    expect(worldPosition.z).toBeCloseTo(1, 6);
+    expect(worldPosition.x).toBeCloseTo(0, 6);
   });
 });

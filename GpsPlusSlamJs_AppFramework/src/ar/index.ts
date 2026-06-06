@@ -118,6 +118,9 @@ export {
   type SessionFeatureOptions,
 } from './webxr-session.js';
 
+// --- webxr-nue-basis ---
+export { WEBXR_TO_NUE } from './webxr-nue-basis.js';
+
 // --- xr-camera-texture ---
 export {
   type CameraTextureResult,

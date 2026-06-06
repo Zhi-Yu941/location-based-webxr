@@ -62,23 +62,41 @@ export function startReticleHitTest(args: {
   let hitTestSource: XRHitTestSource | null = null;
   let hitTestSourceRequested = false;
   let disposed = false;
+  let removeEndListener: (() => void) | null = null;
+
+  // Reset on session end so a fresh session re-requests its own hit-test source.
+  const handleSessionEnd = () => {
+    hitTestSource = null;
+    hitTestSourceRequested = false;
+  };
 
   const unregister = registerXrFrameUpdate(
     ({ frame, referenceSpace, session }) => {
+      // Register the session-end listener exactly once. The request-retry path
+      // below resets `hitTestSourceRequested`, so it must not live in that
+      // block or a failed request would stack a duplicate listener each frame.
+      if (!removeEndListener) {
+        session.addEventListener("end", handleSessionEnd);
+        removeEndListener = () =>
+          session.removeEventListener("end", handleSessionEnd);
+      }
+
       if (!hitTestSourceRequested) {
         hitTestSourceRequested = true;
         requestHitTestSource(session)
           .then((source) => {
+            // Guard the race where dispose() ran while the request was in
+            // flight: cancel the now-orphaned source instead of leaking it.
+            if (disposed) {
+              source?.cancel();
+              return;
+            }
             hitTestSource = source;
           })
           .catch(() => {
             // Allow a later frame to retry if the request failed transiently.
             hitTestSourceRequested = false;
           });
-        session.addEventListener("end", () => {
-          hitTestSource = null;
-          hitTestSourceRequested = false;
-        });
       }
 
       if (!hitTestSource) {
@@ -99,6 +117,11 @@ export function startReticleHitTest(args: {
       if (disposed) return;
       disposed = true;
       unregister();
+      removeEndListener?.();
+      removeEndListener = null;
+      // Stop the live hit-test so it does not keep running after teardown.
+      hitTestSource?.cancel();
+      hitTestSource = null;
       args.arWorldGroup.remove(reticle);
     },
   };

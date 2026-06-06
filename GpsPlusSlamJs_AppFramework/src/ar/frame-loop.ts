@@ -11,6 +11,10 @@
  * selectors; no direct Redux dispatch from inside a tick).
  */
 
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('FrameLoop');
+
 export type FrameUpdate = (dt: number, elapsed: number) => void;
 
 const updates = new Set<FrameUpdate>();
@@ -39,11 +43,20 @@ export function registerFrameUpdate(fn: FrameUpdate): () => void {
  * same frame are deferred to the next tick. Iterating the live `Set`
  * would otherwise skip a not-yet-visited entry that an earlier handler
  * unregistered — a hard-to-debug source of non-determinism.
+ *
+ * Each callback is invoked in its own `try/catch` so a throwing handler is
+ * isolated: it cannot abort the remaining callbacks nor propagate up through
+ * `onXRFrame` and kill the scene render for the whole frame. Failures are
+ * logged and the loop continues — mirrored by `runXrFrameUpdates`.
  */
 export function runFrameUpdates(dt: number, elapsed: number): void {
   const snapshot = Array.from(updates);
   for (const fn of snapshot) {
-    fn(dt, elapsed);
+    try {
+      fn(dt, elapsed);
+    } catch (error) {
+      log.error('A registered FrameUpdate threw; continuing the loop', error);
+    }
   }
 }
 

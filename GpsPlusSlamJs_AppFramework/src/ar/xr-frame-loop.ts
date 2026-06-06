@@ -20,6 +20,10 @@
  * §6.2/§6.3 (option H-A2) for the design rationale.
  */
 
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('XrFrameLoop');
+
 /**
  * Live, frame-scoped WebXR context. Valid only synchronously inside the
  * `XrFrameUpdate` callback it is passed to.
@@ -63,11 +67,21 @@ export function registerXrFrameUpdate(fn: XrFrameUpdate): () => void {
  * The set is snapshotted before iterating so that
  * `registerXrFrameUpdate` / unregister calls made by a handler during the
  * same frame are deferred to the next tick — mirroring `runFrameUpdates`.
+ *
+ * Each callback is invoked in its own `try/catch`: this registry is the public
+ * app seam, so a bug in one app-registered callback (which throws every frame)
+ * must not abort the remaining callbacks nor propagate up through `onXRFrame`
+ * and kill the scene render for the whole session. Failures are logged and the
+ * loop continues — mirroring `runFrameUpdates`.
  */
 export function runXrFrameUpdates(ctx: XrFrameContext): void {
   const snapshot = Array.from(updates);
   for (const fn of snapshot) {
-    fn(ctx);
+    try {
+      fn(ctx);
+    } catch (error) {
+      log.error('A registered XrFrameUpdate threw; continuing the loop', error);
+    }
   }
 }
 

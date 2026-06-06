@@ -102,6 +102,30 @@ describe('registerFrameUpdate / runFrameUpdates', () => {
       runFrameUpdates(0.016, 0.016);
     }).not.toThrow();
   });
+
+  it('isolates a throwing callback so the remaining callbacks still run and the loop survives', () => {
+    // Why this matters: a single buggy FrameUpdate must not abort the whole
+    // frame. runFrameUpdates is called from onXRFrame *before* the scene
+    // render, so a propagating throw would kill rendering for the frame.
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const boom: FrameUpdate = () => {
+      throw new Error('callback blew up');
+    };
+    const after = vi.fn<FrameUpdate>();
+    registerFrameUpdate(boom);
+    registerFrameUpdate(after);
+
+    expect(() => {
+      runFrameUpdates(0.016, 0.016);
+    }).not.toThrow();
+    expect(after).toHaveBeenCalledTimes(1);
+    expect(after).toHaveBeenCalledWith(0.016, 0.016);
+    expect(consoleError).toHaveBeenCalledTimes(1);
+
+    consoleError.mockRestore();
+  });
 });
 
 describe('clearFrameUpdates', () => {

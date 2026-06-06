@@ -109,6 +109,31 @@ describe('registerXrFrameUpdate / runXrFrameUpdates', () => {
       runXrFrameUpdates(fakeCtx(0.016, 0.016));
     }).not.toThrow();
   });
+
+  it('isolates a throwing callback so the remaining callbacks still run and the loop survives', () => {
+    // Why this matters: this is the public app seam, so a buggy app-registered
+    // callback that throws every frame must not abort the rest of the
+    // callbacks nor propagate up through onXRFrame and stop the scene render.
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const boom: XrFrameUpdate = () => {
+      throw new Error('callback blew up');
+    };
+    const after = vi.fn<XrFrameUpdate>();
+    registerXrFrameUpdate(boom);
+    registerXrFrameUpdate(after);
+
+    const ctx = fakeCtx(0.016, 0.016);
+    expect(() => {
+      runXrFrameUpdates(ctx);
+    }).not.toThrow();
+    expect(after).toHaveBeenCalledTimes(1);
+    expect(after).toHaveBeenCalledWith(ctx);
+    expect(consoleError).toHaveBeenCalledTimes(1);
+
+    consoleError.mockRestore();
+  });
 });
 
 describe('clearXrFrameUpdates', () => {

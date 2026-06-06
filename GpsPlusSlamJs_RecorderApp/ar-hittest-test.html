@@ -271,7 +271,15 @@
           // InvalidStateError. The WeakMap also lets entries be GC'd with their
           // sessions.
           const lastBaseLayerBySession = new WeakMap();
-          XRSession.prototype.updateRenderState = function (options = {}) {
+          XRSession.prototype.updateRenderState = function (rawOptions) {
+            // Normalize null/undefined/non-object to {} so an explicit
+            // updateRenderState(null) does not throw on options.baseLayer
+            // (native WebXR coerces a null dictionary arg to an empty one; a
+            // default param value only covers undefined). Mirrors the helper.
+            const options =
+              typeof rawOptions === 'object' && rawOptions !== null
+                ? rawOptions
+                : {};
             if (typeof this !== 'object' || this === null) {
               return originalUpdateRenderState.call(this, options);
             }
@@ -279,10 +287,12 @@
               lastBaseLayerBySession.set(this, options.baseLayer);
             }
             const remembered = lastBaseLayerBySession.get(this);
+            // Spread options FIRST so the restored baseLayer always wins; an
+            // explicit baseLayer: undefined in options must not clobber it.
             return originalUpdateRenderState.call(
               this,
               remembered !== undefined
-                ? { baseLayer: remembered, ...options }
+                ? { ...options, baseLayer: remembered }
                 : options
             );
           };

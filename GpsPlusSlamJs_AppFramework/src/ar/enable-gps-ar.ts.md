@@ -40,11 +40,15 @@ framework does not own button DOM (unlike three.js' `ARButton`).
   success and the denied path. Tests assert this ordering for both.
 - **Idempotency:** `enable()` is a no-op (returns `{ ok: false }`) while the
   status is `starting` or `running`, so a double-tap cannot start two sessions.
-- **Stale-probe guard:** `refreshSupport()` awaits the support probe, then
-  applies `ready`/`unsupported` **only if** the status is still `checking`.
-  A concurrent `enable()` (not blocked from `checking`) or a resume-time
-  `refreshSupport()` over an already-`running` session would otherwise have the
-  late probe clobber the active state and wrongly revert the button.
+- **Active-session guard:** `refreshSupport()` returns immediately (no probe, no
+  `setState`) when the status is `starting` or `running`. A resume/visibility
+  `refreshSupport()` over an active session would otherwise enter `checking` and
+  clobber the live state, wrongly reverting the button to a "not started" CTA.
+- **Stale-probe guard:** once past the active-session guard, `refreshSupport()`
+  awaits the support probe, then applies `ready`/`unsupported` **only if** the
+  status is still `checking`. This covers a concurrent `enable()` (not blocked
+  from `checking`) that advances the status _during_ the probe, so the late probe
+  result cannot clobber the new active state.
 - **Watches start after `initAR`:** the sensor watches are started **only after**
   `initAR` resolves. The controller exposes no watch teardown, so starting them
   before `initAR` would leak active watches on an `initAR` rejection and let a

@@ -176,11 +176,19 @@ export function createEnableGpsArController(
   }
 
   async function refreshSupport(): Promise<void> {
+    // Never clobber an active session. refreshSupport() may be called on
+    // resume/visibility-change while enable() is mid-orchestration (`starting`)
+    // or a session already runs (`running`). Re-probing WebXR support is moot
+    // then, and entering `checking` here would revert the button to a
+    // "not started" CTA. This pre-probe guard is what actually protects those
+    // states: the post-probe guard below only covers a *concurrent* enable()
+    // that advances the status *during* the probe — by then we have already
+    // overwritten any pre-existing active status, so it cannot restore it.
+    if (state.status === 'starting' || state.status === 'running') return;
     setState({ status: 'checking' });
     const supported = await probeSupport();
     // Guard the async gap: a concurrent enable() (which is not blocked from the
-    // `checking` state) — or an already-`running` session when refreshSupport is
-    // called on resume — can advance the status while the probe is in flight.
+    // `checking` state) can advance the status while the probe is in flight.
     // Only the `checking` state we set above is ours to replace; otherwise this
     // stale probe result would clobber an active starting/running state and
     // wrongly revert the button to a "not started" CTA.

@@ -110,6 +110,58 @@ describe('createEnableGpsArController — support probe', () => {
 
     expect(controller.getState().status).toBe('running');
   });
+
+  // Why this test matters: refreshSupport() may be called on resume/visibility
+  // change while a session is ALREADY running (the comment in refreshSupport
+  // explicitly names this case). The first setState({ status: 'checking' }) must
+  // not fire in that situation — otherwise it clobbers the active `running`
+  // state to `checking` (and then `ready`) BEFORE the post-probe guard can run,
+  // wrongly reverting the button to a "not started" CTA. The probe must not even
+  // be invoked, since support is moot while a session runs.
+  it('does not clobber an already-running session when refreshSupport is called', async () => {
+    const isWebXRSupported = vi.fn(() => Promise.resolve(true));
+    const controller = createEnableGpsArController(
+      makeDeps({ isWebXRSupported })
+    );
+
+    await controller.enable({ container: fakeContainer() });
+    expect(controller.getState().status).toBe('running');
+    isWebXRSupported.mockClear();
+
+    await controller.refreshSupport();
+
+    expect(controller.getState().status).toBe('running');
+    expect(isWebXRSupported).not.toHaveBeenCalled();
+  });
+
+  // Same hazard for the in-gesture `starting` state: a resume-triggered
+  // refreshSupport() while enable() is mid-orchestration must leave `starting`
+  // untouched rather than flipping the button back to `checking`.
+  it('does not clobber an in-flight starting state when refreshSupport is called', async () => {
+    let releaseGeo: (status: PermissionStatus) => void = () => undefined;
+    const controller = createEnableGpsArController(
+      makeDeps({
+        requestGeolocationPermission: vi.fn(
+          () =>
+            new Promise<PermissionStatus>((resolve) => {
+              releaseGeo = resolve;
+            })
+        ),
+      })
+    );
+
+    // enable() sets `starting` synchronously, then parks on the geolocation
+    // permission request — leaving the controller deterministically `starting`.
+    const enabling = controller.enable({ container: fakeContainer() });
+    expect(controller.getState().status).toBe('starting');
+
+    await controller.refreshSupport();
+    expect(controller.getState().status).toBe('starting');
+
+    releaseGeo(granted);
+    await enabling;
+    expect(controller.getState().status).toBe('running');
+  });
 });
 
 describe('createEnableGpsArController — enable() success path', () => {

@@ -212,8 +212,17 @@ function patchUpdateRenderStateForBaseLayerPersistence(): boolean {
   const lastBaseLayerBySession = new WeakMap<object, unknown>();
   const patched: UpdateRenderStateFn = function (
     this: unknown,
-    init: { baseLayer?: unknown } = {}
+    rawInit?: { baseLayer?: unknown } | null
   ) {
+    // Defensively normalize the argument. The WebXR spec coerces a `null` or
+    // `undefined` dictionary argument to an empty dictionary, but a default
+    // parameter value only substitutes for `undefined` — an explicit
+    // `updateRenderState(null)` would otherwise reach `init.baseLayer` and
+    // throw a TypeError before we delegate to the original. Treat any
+    // non-object as an empty init so the wrapper never diverges from native.
+    const init: { baseLayer?: unknown } =
+      typeof rawInit === 'object' && rawInit !== null ? rawInit : {};
+
     // The browser always invokes this as a method on an XRSession instance, so
     // `this` is an object we can key on. If called without a session context
     // (abnormal), pass the init through untouched rather than risk keying a
@@ -225,9 +234,13 @@ function patchUpdateRenderStateForBaseLayerPersistence(): boolean {
       lastBaseLayerBySession.set(this, init.baseLayer);
     }
     const remembered = lastBaseLayerBySession.get(this);
+    // Spread `init` FIRST so the restored `baseLayer` always wins. Spreading
+    // after `{ baseLayer: remembered }` would let an explicit
+    // `baseLayer: undefined` in `init` clobber the persisted layer back to
+    // `undefined`, defeating the patch.
     return original.call(
       this,
-      remembered !== undefined ? { baseLayer: remembered, ...init } : init
+      remembered !== undefined ? { ...init, baseLayer: remembered } : init
     );
   };
   (patched as unknown as Record<string, unknown>)[BASE_LAYER_PATCH_MARKER] =

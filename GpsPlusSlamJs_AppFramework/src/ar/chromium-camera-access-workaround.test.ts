@@ -315,6 +315,68 @@ describe('applyChromiumProjectionLayerWorkaround — baseLayer persistence', () 
     expect(calls[1].baseLayer).toBeUndefined();
   });
 
+  it('restores the remembered baseLayer when init explicitly passes baseLayer: undefined', () => {
+    // Why this matters: three.js's depth update could surface as
+    // `updateRenderState({ baseLayer: undefined, depthNear, depthFar })`.
+    // Spreading init AFTER `{ baseLayer: remembered }` would let that explicit
+    // `undefined` clobber the persisted layer back to undefined, silently
+    // defeating the patch and re-triggering the crash. The restored layer must
+    // win regardless of an explicit `undefined` in init.
+    const calls: Array<{ baseLayer?: unknown }> = [];
+    g.XRSession = {
+      prototype: {
+        updateRenderState(init?: { baseLayer?: unknown }) {
+          calls.push({ ...init });
+          return undefined;
+        },
+      },
+    };
+
+    applyChromiumProjectionLayerWorkaround({ userAgent: UA_AFFECTED_148 });
+
+    const update = g.XRSession.prototype.updateRenderState!;
+    const session = { name: 'session' };
+    const baseLayer = { id: 'base' };
+    update.call(session, { baseLayer });
+    // Depth-only update that explicitly carries `baseLayer: undefined`.
+    update.call(session, { baseLayer: undefined, depthNear: 0.1 } as {
+      baseLayer?: unknown;
+    });
+
+    expect(calls[0].baseLayer).toBe(baseLayer);
+    expect(calls[1].baseLayer).toBe(baseLayer);
+  });
+
+  it('does not throw and delegates when init is explicitly null', () => {
+    // Why this matters: the `init = {}` default only substitutes for
+    // `undefined`, not `null`. `updateRenderState(null)` would otherwise reach
+    // `init.baseLayer` and throw a TypeError, whereas native WebXR coerces a
+    // null dictionary argument to an empty dictionary. The wrapper must
+    // normalize null to an empty init and delegate safely.
+    const calls: Array<{ baseLayer?: unknown }> = [];
+    g.XRSession = {
+      prototype: {
+        updateRenderState(init?: { baseLayer?: unknown }) {
+          calls.push({ ...init });
+          return undefined;
+        },
+      },
+    };
+
+    applyChromiumProjectionLayerWorkaround({ userAgent: UA_AFFECTED_148 });
+
+    const update = g.XRSession.prototype.updateRenderState!;
+    const session = { name: 'session' };
+    const baseLayer = { id: 'base' };
+    update.call(session, { baseLayer });
+
+    // A null arg must not throw, and must still carry the remembered baseLayer.
+    expect(() =>
+      update.call(session, null as unknown as { baseLayer?: unknown })
+    ).not.toThrow();
+    expect(calls[1].baseLayer).toBe(baseLayer);
+  });
+
   it('does not wrap updateRenderState on Chrome 150 (above the window)', () => {
     g.XRSession = {
       prototype: { updateRenderState: () => undefined },

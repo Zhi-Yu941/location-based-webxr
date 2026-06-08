@@ -55,7 +55,6 @@ import {
 import type { LatLong, LatLongAlt } from 'gps-plus-slam-app-framework/core';
 import { Vector3 } from 'three';
 
-import { createAlignmentBinding } from './alignment-binding.js';
 import { ANCHOR_MODE, coSpawnAtWorldPose } from './co-spawn.js';
 import { createConnectorLine } from './connector-line.js';
 import { decideTapPlacement } from './placement.js';
@@ -210,15 +209,6 @@ function main(): void {
   let gpsFixCount = 0;
   let lastGps: LatLong | LatLongAlt | null = null;
 
-  // Holds the single live ArWorldGroupAlignment binding. Each `running`
-  // transition hands us a fresh arWorldGroup, so re-binding here disposes the
-  // previous binding's per-frame lerp + store subscription instead of leaking
-  // them against the detached old group (see alignment-binding.ts).
-  const alignmentBinding = createAlignmentBinding({
-    store: store as unknown as SubscribableStore,
-    enable: enableArWorldGroupAlignment,
-  });
-
   function refreshStatus(): void {
     statusEl.textContent = formatStatus({
       isRecording: store.getState().recording.isRecording,
@@ -325,10 +315,16 @@ function main(): void {
       // so the camera and every anchored child ride the alignment together (the
       // scene-root contrast cube deliberately does NOT, so it visibly slides).
       // Without this the camera is pure-VIO and anchors must absorb the full
-      // alignment delta on each re-registration.
+      // alignment delta on each re-registration. Fire-and-forget: the framework
+      // ties this binding's disposal to the AR session teardown (it registers a
+      // session disposer that `resetWebXRState()` flushes), so re-entering AR
+      // never leaks the previous session's lerp + store subscription.
       const arWorldGroup = getArWorldGroup();
       if (arWorldGroup) {
-        alignmentBinding.bind(arWorldGroup);
+        enableArWorldGroupAlignment({
+          store: store as unknown as SubscribableStore,
+          arWorldGroup,
+        });
       }
       startArInteraction({
         hasGpsFix: () => gpsFixCount > 0,
@@ -337,12 +333,6 @@ function main(): void {
         },
         onPlace: placeContrastPair,
       });
-    } else {
-      // Any non-running state (stopping, error, or the resting ready state
-      // after a stop) means this session's arWorldGroup is gone — release the
-      // alignment binding so its per-frame lerp + store subscription don't
-      // linger. A later `running` transition re-binds against the fresh group.
-      alignmentBinding.dispose();
     }
   });
 

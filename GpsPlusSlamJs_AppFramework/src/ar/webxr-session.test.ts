@@ -50,6 +50,10 @@ import {
   type ARPose,
 } from './webxr-session.js';
 import { createMockPose } from '../test-utils/browser-mocks.js';
+import {
+  registerSessionDisposer,
+  clearSessionDisposers,
+} from './session-disposers.js';
 import { SCENE_NODE } from './scene-node-names';
 
 describe('buildSessionOptions', () => {
@@ -717,6 +721,28 @@ describe('module state accessors', () => {
    */
   it('getCamera returns null before initialization', () => {
     expect(getCamera()).toBeNull();
+  });
+
+  /**
+   * Why this test matters: `resetWebXRState()` is the single teardown chokepoint
+   * every restart must pass through (initAR throws while a prior session is
+   * live). Session-scoped resources that are not per-frame ticks — e.g. the
+   * store subscription opened by `enableArWorldGroupAlignment` — register a
+   * disposer that this flush must run, or they leak across sessions. This pins
+   * the wiring so a future refactor of the teardown can't silently drop it.
+   */
+  it('resetWebXRState runs (and clears) registered session disposers', () => {
+    const dispose = vi.fn();
+    registerSessionDisposer(dispose);
+
+    resetWebXRState();
+    expect(dispose).toHaveBeenCalledTimes(1);
+
+    // Cleared as it ran: a second teardown must not re-run it.
+    resetWebXRState();
+    expect(dispose).toHaveBeenCalledTimes(1);
+
+    clearSessionDisposers();
   });
 
   /**

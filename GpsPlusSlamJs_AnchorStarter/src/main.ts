@@ -61,7 +61,6 @@ import { toGuidanceView } from "./guidance-view.js";
 import { toPlacementView } from "./placement-view.js";
 import { isFullySupported, capabilityMessage } from "./capability.js";
 import { getSeams } from "./seams.js";
-import { createSerialDisposable } from "./serial-disposable.js";
 import { decideAnchorPlacement } from "./placement-decision.js";
 import { type ReticleHandle } from "./reticle-hit-test.js";
 // --- your content here -----------------------------------------------------
@@ -105,11 +104,6 @@ let store: AppStore | null = null;
 let setupState: SetupState = initialSetupState;
 let anchor: GpsAnchor | null = null;
 let reticleHandle: ReticleHandle | null = null;
-// Holds the single live ArWorldGroupAlignment binding across `startAr()` runs.
-// Each run builds a fresh store + arWorldGroup, so re-binding disposes the
-// previous binding's per-frame lerp + store subscription (see
-// serial-disposable.ts).
-const alignmentBinding = createSerialDisposable();
 let lastGps: LatLongAlt | null = null;
 let lastTrackingReady = false;
 
@@ -462,9 +456,6 @@ function failStart(err: unknown, fallbackMessage: string): void {
   anchor = null;
   reticleHandle?.dispose();
   reticleHandle = null;
-  // Release the alignment binding so a boot that failed *after* it was enabled
-  // doesn't leak its per-frame lerp + store subscription against the dead group.
-  alignmentBinding.dispose();
 
   dom.startScreen.hidden = false;
   dom.guidance.hidden = true;
@@ -541,12 +532,14 @@ async function startAr(): Promise<void> {
     // delta on every off-screen re-registration.
     const alignmentArWorldGroup = getSeams().getArWorldGroup();
     if (alignmentArWorldGroup) {
-      alignmentBinding.set(
-        getSeams().enableArWorldGroupAlignment({
-          store,
-          arWorldGroup: alignmentArWorldGroup,
-        }),
-      );
+      // Fire-and-forget: the framework ties this binding's disposal to the AR
+      // session teardown (it registers a session disposer that
+      // `resetWebXRState()` flushes), so a restart never leaks the previous
+      // session's per-frame lerp + store subscription.
+      getSeams().enableArWorldGroupAlignment({
+        store,
+        arWorldGroup: alignmentArWorldGroup,
+      });
     }
 
     // GPS → store (+ remember the latest fix for the anchor's
@@ -658,7 +651,6 @@ window.addEventListener("beforeunload", () => {
   stopGpsWatch();
   anchor?.dispose();
   reticleHandle?.dispose();
-  alignmentBinding.dispose();
 });
 
 void main();

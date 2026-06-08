@@ -61,6 +61,7 @@ import {
 import { CameraBlitCapture, computeCaptureSize } from './camera-blit-capture';
 import { acquireCameraTexture } from './xr-camera-texture';
 import { clearFrameUpdates, runFrameUpdates } from './frame-loop';
+import { runSessionDisposers } from './session-disposers';
 import { clearXrFrameUpdates, runXrFrameUpdates } from './xr-frame-loop';
 import {
   type OdometryTrackingRestartedPayload,
@@ -196,6 +197,12 @@ export function resetWebXRState(): void {
   lastFrameTime = 0;
   clearFrameUpdates();
   clearXrFrameUpdates();
+  // Flush session-scoped teardown (e.g. the store subscription opened by
+  // `enableArWorldGroupAlignment`). `clearFrameUpdates` above already drops the
+  // per-frame ticks; this releases the non-frame resources that would otherwise
+  // outlive the session. This is the single chokepoint every restart passes
+  // through, so callers never have to dispose those by hand.
+  runSessionDisposers();
   imageCaptureManager = null;
   onImageCaptured = null;
   getScreenRotation = null;

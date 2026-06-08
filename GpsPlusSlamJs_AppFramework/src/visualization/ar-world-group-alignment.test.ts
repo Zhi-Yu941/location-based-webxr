@@ -22,6 +22,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { enableArWorldGroupAlignment } from './ar-world-group-alignment.js';
 import { runFrameUpdates, clearFrameUpdates } from '../ar/frame-loop.js';
+import {
+  runSessionDisposers,
+  clearSessionDisposers,
+} from '../ar/session-disposers.js';
 import { makeNonTrivialAlignment } from '../test-utils/non-trivial-alignment.js';
 import type { SubscribableStore } from '../state/subscribe-to-selector.js';
 import type { CombinedRootState } from '../state/combined-root-state.js';
@@ -74,6 +78,7 @@ function expectMatrixClose(
 
 afterEach(() => {
   clearFrameUpdates();
+  clearSessionDisposers();
 });
 
 describe('enableArWorldGroupAlignment', () => {
@@ -153,5 +158,51 @@ describe('enableArWorldGroupAlignment', () => {
     runFrameUpdates(1, 2);
     runFrameUpdates(1, 3);
     expect(arWorldGroup.matrix.toArray()).toEqual(afterFirst);
+  });
+
+  // Why these matter: the leak that two apps independently hit was the store
+  // subscription surviving a session teardown. enableArWorldGroupAlignment now
+  // registers its own disposal with the session registry that resetWebXRState
+  // flushes, so an app calls it once and never has to hold the handle. These
+  // pin that the teardown flush actually releases the subscription, and that a
+  // manual dispose() afterwards is a safe no-op (idempotent).
+  it('auto-disposes on the session teardown flush (no manual dispose needed)', () => {
+    const m1 = makeNonTrivialAlignment(6);
+    const store = makeFakeStore(m1);
+    const arWorldGroup = new THREE.Group();
+    enableArWorldGroupAlignment({ store, arWorldGroup }); // handle intentionally discarded
+    runFrameUpdates(1, 1);
+    const afterFirst = arWorldGroup.matrix.toArray();
+
+    // Simulate the session teardown chokepoint (resetWebXRState flushes this).
+    runSessionDisposers();
+
+    // The subscription is gone: a later dispatch + frames must not move the
+    // group, exactly as an explicit dispose() would have guaranteed.
+    store.setAlignment(makeNonTrivialAlignment(7));
+    runFrameUpdates(1, 2);
+    runFrameUpdates(1, 3);
+    expect(arWorldGroup.matrix.toArray()).toEqual(afterFirst);
+  });
+
+  it('dispose() after the teardown flush is an idempotent no-op', () => {
+    const store = makeFakeStore(makeNonTrivialAlignment(8));
+    const arWorldGroup = new THREE.Group();
+    const handle = enableArWorldGroupAlignment({ store, arWorldGroup });
+
+    runSessionDisposers(); // teardown already disposed it
+    // A handle the app happens to still hold must not double-tear-down or throw.
+    expect(() => handle.dispose()).not.toThrow();
+  });
+
+  it('manual dispose() deregisters, so the later teardown flush is a no-op', () => {
+    const store = makeFakeStore(makeNonTrivialAlignment(9));
+    const arWorldGroup = new THREE.Group();
+    const handle = enableArWorldGroupAlignment({ store, arWorldGroup });
+
+    // Disposing mid-session must remove the registration so the teardown flush
+    // doesn't try to run a teardown whose resources are already gone.
+    handle.dispose();
+    expect(() => runSessionDisposers()).not.toThrow();
   });
 });

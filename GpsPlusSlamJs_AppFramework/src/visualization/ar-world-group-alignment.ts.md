@@ -13,6 +13,16 @@
       (defaults to the lerper's own `DEFAULT_LERP_RATE`).
     - Returns a handle with `dispose()` that removes the store subscription, the
       per-frame update, and disposes the lerper.
+    - **Disposal is automatic on session teardown.** The binding registers
+      itself with the session-disposer registry (`ar/session-disposers.ts`) that
+      `resetWebXRState()` flushes, so a caller can enable it once and never hold
+      the handle — it cannot outlive its session. (Before this, the store
+      subscription leaked across sessions: `clearFrameUpdates()` drops the
+      per-frame tick but not the subscription, and two example apps independently
+      grew bespoke per-app disposal bookkeeping to compensate.) The handle is
+      still returned for stopping alignment mid-session, and is idempotent +
+      self-deregistering so the manual `dispose()` and the teardown flush never
+      double-run.
 
 - **Invariants & assumptions:**
   - The first alignment target is applied **instantly** (via the lerper's
@@ -35,11 +45,16 @@
   ```
 
 - **Tests:** `ar-world-group-alignment.test.ts` covers: adopt-at-enable, null
-  ignored, instant-first-then-ease convergence, and dispose-stops-updates. Driven
-  with the real `frame-loop` (`runFrameUpdates`) + a minimal fake
-  `SubscribableStore`.
+  ignored, instant-first-then-ease convergence, dispose-stops-updates, and the
+  session-lifecycle disposal (auto-dispose when `runSessionDisposers()` flushes,
+  `dispose()`-after-flush is an idempotent no-op, and a manual `dispose()`
+  deregisters so the later flush is a no-op). Driven with the real `frame-loop`
+  (`runFrameUpdates`) + `session-disposers` (`runSessionDisposers`) + a minimal
+  fake `SubscribableStore`.
 
 - **Related:** `alignment-lerper.ts` (the smoothing primitive),
-  `gps-anchor.ts` (anchors ride this alignment), and the plan at
+  `ar/session-disposers.ts` (the teardown registry this binds to),
+  `gps-anchor.ts` (anchors ride this alignment), the plan at
   `gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-05-gps-anchor-frame-architecture-bug-and-plan.md`
-  (Slice 2 / Bug A).
+  (Slice 2 / Bug A), and the disposal plan at
+  `gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-08-arworldgroup-alignment-session-scoped-disposal.md`.

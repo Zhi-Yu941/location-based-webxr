@@ -10,8 +10,10 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fc from 'fast-check';
+import type { Matrix4 } from 'gps-plus-slam-js';
 import {
   DepthSampler,
+  wrapXRDepthInfo,
   type DepthSamplerConfig,
   type DepthSamplerCallbacks,
 } from './depth-sampler';
@@ -56,8 +58,14 @@ describe('DepthSampler', () => {
       expect(sampler.getConfig().intervalMs).toBe(1000);
     });
 
-    it('uses default grid size of 3', () => {
-      expect(sampler.getConfig().gridSize).toBe(3);
+    /**
+     * Why this test matters:
+     * The default density feeds the AR-space occupancy grid
+     * (2026-06-11-depth-occupancy-grid-port-plan.md §1): 16×16 = 256 pts/s
+     * is the minimum useful density for judging grid correctness on-device.
+     */
+    it('uses default grid size of 16', () => {
+      expect(sampler.getConfig().gridSize).toBe(16);
     });
   });
 
@@ -155,12 +163,14 @@ describe('DepthSampler', () => {
     });
 
     it('samples grid of points from depth buffer', () => {
-      sampler.start();
-      sampler.onFrame(0, createMockDepthInfo(3));
+      const gridSampler = new DepthSampler(callbacks, { gridSize: 3 });
+      gridSampler.start();
+      gridSampler.onFrame(0, createMockDepthInfo(3));
 
       const sample = vi.mocked(callbacks.onSampleCaptured).mock.calls[0][0];
       // 3x3 grid = 9 points
       expect(sample.points).toHaveLength(9);
+      gridSampler.stop();
     });
 
     it('uses correct grid coordinates', () => {
@@ -189,6 +199,32 @@ describe('DepthSampler', () => {
         expect(typeof point.depthM).toBe('number');
         expect(point.depthM).toBeGreaterThan(0);
       }
+    });
+
+    /**
+     * Why these tests matter:
+     * The capturing view's projection matrix is the camera intrinsics needed
+     * to unproject (screenX, screenY, depthM) back into a 3D AR-space point
+     * (occupancy-grid port plan §1 blocker). It must travel inside each
+     * persisted DepthSample; samples from old recordings without it must
+     * still flow through unchanged (additive format change).
+     */
+    it('copies the projectionMatrix from depth info into the emitted sample', () => {
+      sampler.start();
+      sampler.onFrame(0, createMockDepthInfo(3, TEST_PROJECTION_MATRIX));
+
+      const sample = vi.mocked(callbacks.onSampleCaptured).mock.calls[0][0];
+      expect(sample.projectionMatrix).toEqual(TEST_PROJECTION_MATRIX);
+    });
+
+    it('omits projectionMatrix when depth info has none (back-compat)', () => {
+      sampler.start();
+      sampler.onFrame(0, createMockDepthInfo(3));
+
+      const sample = vi.mocked(callbacks.onSampleCaptured).mock.calls[0][0];
+      expect(sample.projectionMatrix).toBeUndefined();
+      // The sample must remain JSON-round-trippable without the field
+      expect(JSON.parse(JSON.stringify(sample))).toEqual(sample);
     });
 
     it('handles varying grid sizes', () => {
@@ -438,13 +474,85 @@ describe('DepthSampler', () => {
   });
 });
 
+describe('wrapXRDepthInfo', () => {
+  /**
+   * Why these tests matter:
+   * webxr-session.ts used to hand the raw browser XRDepthInformation object
+   * to the sampler as-is. To attach the capturing view's projectionMatrix,
+   * it now wraps it via wrapXRDepthInfo — the wrapper must keep
+   * getDepthInMeters bound to the original object (browser implementations
+   * are this-sensitive) and defensively validate the matrix input.
+   */
+  function createRawDepthInformation() {
+    return {
+      width: 160,
+      height: 90,
+      // this-sensitive on purpose: throws when called unbound
+      getDepthInMeters(this: { width: number }, x: number, _y: number) {
+        if (typeof this.width !== 'number') {
+          throw new Error('getDepthInMeters called with wrong this');
+        }
+        return 1 + x;
+      },
+    };
+  }
+
+  it('copies width/height and keeps getDepthInMeters bound to the source', () => {
+    const raw = createRawDepthInformation();
+    const wrapped = wrapXRDepthInfo(
+      raw,
+      new Float32Array(TEST_PROJECTION_MATRIX)
+    );
+
+    expect(wrapped.width).toBe(160);
+    expect(wrapped.height).toBe(90);
+    const fn = wrapped.getDepthInMeters;
+    expect(fn(0.5, 0.5)).toBeCloseTo(1.5);
+  });
+
+  it('copies a valid 16-float matrix into a plain serializable tuple', () => {
+    const source = new Float32Array(TEST_PROJECTION_MATRIX);
+    const wrapped = wrapXRDepthInfo(createRawDepthInformation(), source);
+
+    expect(wrapped.projectionMatrix).toEqual(TEST_PROJECTION_MATRIX);
+    expect(Array.isArray(wrapped.projectionMatrix)).toBe(true);
+    // Must be a copy, not a view aliasing the (reused) GPU-side array
+    source[0] = 999;
+    expect(wrapped.projectionMatrix?.[0]).toBe(TEST_PROJECTION_MATRIX[0]);
+  });
+
+  it('omits the matrix when input is missing, wrong-length, or non-finite', () => {
+    const raw = createRawDepthInformation();
+    expect(wrapXRDepthInfo(raw, undefined).projectionMatrix).toBeUndefined();
+    expect(
+      wrapXRDepthInfo(raw, new Float32Array(12)).projectionMatrix
+    ).toBeUndefined();
+    const withNaN = new Float32Array(TEST_PROJECTION_MATRIX);
+    withNaN[5] = NaN;
+    expect(wrapXRDepthInfo(raw, withNaN).projectionMatrix).toBeUndefined();
+  });
+});
+
+/**
+ * A plausible column-major perspective projection matrix (60° vFOV, 16:9)
+ * with all entries representable exactly enough in float32 for toEqual
+ * comparisons after a Float32Array round-trip.
+ */
+const TEST_PROJECTION_MATRIX: Matrix4 = [
+  0.974279, 0, 0, 0, 0, 1.732051, 0, 0, 0, 0, -1.000391, -1, 0, 0, -0.020004, 0,
+].map((v) => Math.fround(v)) as unknown as Matrix4;
+
 /**
  * Create a mock depth info object for testing.
  */
-function createMockDepthInfo(_gridSize: number): {
+function createMockDepthInfo(
+  _gridSize: number,
+  projectionMatrix?: Matrix4
+): {
   getDepthInMeters: (x: number, y: number) => number;
   width: number;
   height: number;
+  projectionMatrix?: Matrix4;
 } {
   return {
     width: 256,
@@ -453,5 +561,6 @@ function createMockDepthInfo(_gridSize: number): {
       // Return a depth based on position (1-5 meters)
       return 1 + x * 2 + y * 2;
     },
+    ...(projectionMatrix ? { projectionMatrix } : {}),
   };
 }

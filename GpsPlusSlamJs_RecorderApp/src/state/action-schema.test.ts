@@ -234,6 +234,47 @@ describe('Action Schema Validation', () => {
       expect(depthAction.payload.points[0]).toHaveProperty('depthM');
     });
 
+    /**
+     * Why this test matters:
+     * New recordings carry the capturing view's projectionMatrix (camera
+     * intrinsics for unprojection into the AR-space occupancy grid). The
+     * field is optional/additive — the previous test (no matrix) proves old
+     * payload shapes still persist unchanged; this one proves the matrix
+     * survives persistence as a plain 16-number array.
+     */
+    it('should persist the optional projectionMatrix on new recordings', async () => {
+      store.dispatch(
+        startSession({
+          scenarioName: 'Test',
+          sessionName: 'test',
+          startTime: Date.now(),
+        })
+      );
+
+      const projectionMatrix = [
+        0.97, 0, 0, 0, 0, 1.73, 0, 0, 0, 0, -1.0004, -1, 0, 0, -0.02, 0,
+      ] as const;
+      store.dispatch(
+        recordDepthSample({
+          timestamp: Date.now(),
+          cameraPos: [0, 0, 0],
+          cameraRot: [0, 0, 0, 1],
+          points: [{ screenX: 0.5, screenY: 0.5, depthM: 2.0 }],
+          projectionMatrix,
+        })
+      );
+      await flushWrites();
+
+      const depthAction = writtenActions.find(
+        (a) => (a as RecordedAction).type === 'recording/recordDepthSample'
+      ) as { type: string; payload: DepthSample };
+
+      expect(depthAction.payload.projectionMatrix).toHaveLength(16);
+      const json = JSON.stringify(depthAction);
+      const parsed = JSON.parse(json) as typeof depthAction;
+      expect(parsed.payload.projectionMatrix).toEqual([...projectionMatrix]);
+    });
+
     it('should be JSON-serializable for replay', async () => {
       store.dispatch(
         startSession({

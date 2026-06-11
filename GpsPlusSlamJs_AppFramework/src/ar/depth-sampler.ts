@@ -7,6 +7,7 @@
  * @see depth-sampler.md for detailed documentation
  */
 
+import type { Matrix4 } from 'gps-plus-slam-js';
 import type { ARPose, DepthPoint, DepthSample } from '../types/ar-types';
 import { extractOdomPosition } from '../state/gps-event-coordinator';
 
@@ -18,7 +19,11 @@ export type { DepthSample } from '../types/ar-types';
 export interface DepthSamplerConfig {
   /** Interval between samples in milliseconds. Default: 1000ms */
   intervalMs: number;
-  /** Number of points per dimension (gridSize x gridSize). Default: 3 */
+  /**
+   * Number of points per dimension (gridSize x gridSize). Default: 16
+   * (256 pts at 1 Hz — dense enough to populate the AR-space occupancy
+   * grid for on-device verification, see the 2026-06-11 port plan §1).
+   */
   gridSize: number;
   /** Time in ms to wait before declaring depth unavailable. Default: 5000ms */
   unavailabilityThresholdMs: number;
@@ -41,17 +46,53 @@ export interface DepthSamplerCallbacks {
 }
 
 /**
- * WebXR depth info interface (subset of XRDepthInformation).
+ * WebXR depth info interface (subset of XRDepthInformation), extended with
+ * the capturing view's projection matrix so each emitted DepthSample carries
+ * the intrinsics needed for unprojection. Build via {@link wrapXRDepthInfo}.
  */
 export interface DepthInfo {
   width: number;
   height: number;
   getDepthInMeters: (x: number, y: number) => number;
+  /** Column-major projection matrix of the capturing XRView, if known. */
+  projectionMatrix?: Matrix4;
+}
+
+/**
+ * Wrap a raw browser XRDepthInformation object into a {@link DepthInfo}.
+ *
+ * - `getDepthInMeters` is bound to the source object (browser
+ *   implementations are this-sensitive).
+ * - `projectionMatrix` (typically `XRView.projectionMatrix`, a Float32Array
+ *   the UA may reuse across frames) is defensively validated and copied into
+ *   a plain serializable 16-tuple; invalid input (wrong length, non-finite
+ *   entries) yields a DepthInfo without a matrix rather than an error.
+ */
+export function wrapXRDepthInfo(
+  raw: {
+    width: number;
+    height: number;
+    getDepthInMeters: (x: number, y: number) => number;
+  },
+  projectionMatrix: ArrayLike<number> | undefined
+): DepthInfo {
+  const wrapped: DepthInfo = {
+    width: raw.width,
+    height: raw.height,
+    getDepthInMeters: raw.getDepthInMeters.bind(raw),
+  };
+  if (projectionMatrix && projectionMatrix.length === 16) {
+    const copy = Array.from(projectionMatrix);
+    if (copy.every((v) => Number.isFinite(v))) {
+      wrapped.projectionMatrix = copy as unknown as Matrix4;
+    }
+  }
+  return wrapped;
 }
 
 const DEFAULT_CONFIG: DepthSamplerConfig = {
   intervalMs: 1000,
-  gridSize: 3,
+  gridSize: 16,
   unavailabilityThresholdMs: 5000,
 };
 
@@ -178,6 +219,11 @@ export class DepthSampler {
         pose.orientation.w,
       ],
       points,
+      // Spread keeps the field absent (not `undefined`) when the depth info
+      // carries no matrix, so persisted JSON stays identical to old format
+      ...(depthInfo.projectionMatrix
+        ? { projectionMatrix: depthInfo.projectionMatrix }
+        : {}),
     };
 
     this.lastSampleTime = timestamp;

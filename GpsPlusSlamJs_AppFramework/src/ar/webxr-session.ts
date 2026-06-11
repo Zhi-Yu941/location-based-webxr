@@ -54,6 +54,7 @@ export interface TrackingSubscribableStore {
 }
 import {
   DepthSampler,
+  wrapXRDepthInfo,
   type DepthSamplerCallbacks,
   type DepthSample,
   type DepthInfo,
@@ -1051,14 +1052,19 @@ function getDepthInfoFromFrame(
   frame: XRFrame,
   pose: XRViewerPose | null
 ): DepthInfo | null {
-  if (!pose || !pose.views[0]) {
+  const view = pose?.views[0];
+  if (!view) {
     return null;
   }
 
   // XRFrame may have getDepthInformation method if depth-sensing feature is enabled
   // TypeScript doesn't have full types for this yet
   const xrFrame = frame as XRFrame & {
-    getDepthInformation?: (view: XRView) => DepthInfo | null;
+    getDepthInformation?: (view: XRView) => {
+      width: number;
+      height: number;
+      getDepthInMeters: (x: number, y: number) => number;
+    } | null;
   };
 
   if (typeof xrFrame.getDepthInformation !== 'function') {
@@ -1066,8 +1072,14 @@ function getDepthInfoFromFrame(
   }
 
   try {
-    const result = xrFrame.getDepthInformation(pose.views[0]);
-    return result ?? null;
+    const result = xrFrame.getDepthInformation(view);
+    if (!result) {
+      return null;
+    }
+    // Wrap instead of passing the raw browser object through: this binds
+    // getDepthInMeters and attaches the capturing view's projection matrix,
+    // which each DepthSample needs for later unprojection (occupancy grid).
+    return wrapXRDepthInfo(result, view.projectionMatrix);
   } catch {
     // Depth sensing may fail on some devices
     return null;

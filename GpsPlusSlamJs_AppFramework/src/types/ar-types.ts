@@ -6,7 +6,7 @@
  * between webxr-session.ts and depth-sampler.ts.
  */
 
-import type { Vector3, Quaternion } from 'gps-plus-slam-js';
+import type { Vector3, Quaternion, Matrix4 } from 'gps-plus-slam-js';
 
 /**
  * Tuple-form AR pose for storage/serialization.
@@ -89,4 +89,12 @@ export interface DepthSample {
   readonly cameraRot: Quaternion;
   /** Grid of depth points */
   readonly points: DepthPoint[];
+  /**
+   * Projection matrix of the capturing XRView (16 floats, column-major,
+   * serializable tuple — not a THREE.Matrix4). Camera intrinsics needed to
+   * unproject (screenX, screenY, depthM) back into a 3D AR-space point.
+   * Optional: recordings made before 2026-06 do not carry it; consumers
+   * must skip unprojection for such samples.
+   */
+  readonly projectionMatrix?: Matrix4;
 }

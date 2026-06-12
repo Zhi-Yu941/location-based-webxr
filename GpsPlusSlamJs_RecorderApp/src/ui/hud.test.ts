@@ -18,6 +18,8 @@ import {
   updateFrameCount,
   hideFrameCount,
   hideRecordingControls,
+  showRecordingControls,
+  setStopButtonBusy,
   setPermissionsReady,
   setFolderSelected,
   setSaveLocationSelected,
@@ -1485,6 +1487,79 @@ describe('hideRecordingControls', () => {
       await import('./hud.js');
 
     expect(() => freshHideRecordingControls()).toThrow('called before initUI');
+  });
+});
+
+/**
+ * Tests for setStopButtonBusy.
+ *
+ * UI feedback for async actions (CLAUDE.md): stopping a recording runs a
+ * multi-second final sync. The Stop button must move to a distinguishable
+ * in-progress state (disabled + relabelled + aria-busy) while that work runs,
+ * and return to its idle state for the next recording. This is the feedback
+ * that removes the double-tap which caused Sentry issue 7319627943.
+ */
+describe('setStopButtonBusy', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('disables, relabels and marks the Stop button busy', () => {
+    setupMinimalDOM();
+    initUI(createMockCallbacks());
+
+    const btnStop = document.getElementById('btn-stop') as HTMLButtonElement;
+    btnStop.textContent = '⏹ Stop';
+
+    setStopButtonBusy(true);
+
+    expect(btnStop.hasAttribute('disabled')).toBe(true);
+    expect(btnStop.getAttribute('aria-busy')).toBe('true');
+    // Label must visibly change so the user sees the action was registered.
+    expect(btnStop.textContent).not.toBe('⏹ Stop');
+    expect(btnStop.textContent?.toLowerCase()).toContain('stopping');
+  });
+
+  it('restores the idle Stop button state', () => {
+    setupMinimalDOM();
+    initUI(createMockCallbacks());
+
+    const btnStop = document.getElementById('btn-stop') as HTMLButtonElement;
+
+    setStopButtonBusy(true);
+    setStopButtonBusy(false);
+
+    expect(btnStop.hasAttribute('disabled')).toBe(false);
+    expect(btnStop.getAttribute('aria-busy')).toBe('false');
+    expect(btnStop.textContent).toBe('⏹ Stop');
+  });
+
+  /**
+   * Why this test matters: a new recording must start with a clean (enabled,
+   * "Stop") button even if the prior stop left it in the busy state.
+   */
+  it('is reset to idle by showRecordingControls', () => {
+    setupMinimalDOM();
+    initUI(createMockCallbacks());
+
+    const btnStop = document.getElementById('btn-stop') as HTMLButtonElement;
+    setStopButtonBusy(true);
+
+    showRecordingControls();
+
+    expect(btnStop.hasAttribute('disabled')).toBe(false);
+    expect(btnStop.getAttribute('aria-busy')).toBe('false');
+    expect(btnStop.textContent).toBe('⏹ Stop');
+  });
+
+  it('throws when called before initUI', async () => {
+    vi.resetModules();
+    setupMinimalDOM();
+
+    const { setStopButtonBusy: freshSetStopButtonBusy } =
+      await import('./hud.js');
+
+    expect(() => freshSetStopButtonBusy(true)).toThrow('called before initUI');
   });
 });
 

@@ -66,6 +66,7 @@ import {
 import {
   showRecordingControls,
   hideRecordingControls,
+  setStopButtonBusy,
   showError,
   updateStatus,
   hideFrameCount,
@@ -217,6 +218,7 @@ export function createRecordingSessionHandlers(
   let syncManager: SyncManager | null = null;
   let lastSyncResult: ZipExportResult | null = null;
   let backDuringRecordingInProgress = false;
+  let stopInProgress = false;
   let unsubscribeStore: (() => void) | null = null;
   let unsubscribeRefPoints: (() => void) | null = null;
 
@@ -433,7 +435,34 @@ export function createRecordingSessionHandlers(
     updateStatus(`Recording: ${currentSessionName}`);
   }
 
+  /**
+   * Re-entrancy-guarded entry point for stopping a recording.
+   *
+   * The teardown awaits a final external sync that can take many seconds for
+   * large sessions. Without a guard, a second Stop tap during that window ran
+   * the whole teardown concurrently and stopped + nulled the shared
+   * `syncManager` out from under the first call, which then threw
+   * "Cannot read properties of null (reading 'stop')" (Sentry issue
+   * 7319627943). The guard makes the second tap a no-op; `setStopButtonBusy`
+   * additionally disables the button so the double-tap cannot be issued.
+   */
   async function handleStopRecording(): Promise<void> {
+    if (stopInProgress) {
+      log.info(
+        'Stop recording already in progress, ignoring duplicate request'
+      );
+      return;
+    }
+    stopInProgress = true;
+    setStopButtonBusy(true);
+    try {
+      await performStop();
+    } finally {
+      stopInProgress = false;
+    }
+  }
+
+  async function performStop(): Promise<void> {
     log.info('Stop recording');
 
     disableBeforeUnloadWarning();
@@ -502,17 +531,22 @@ export function createRecordingSessionHandlers(
       log.error('Failed to write session metadata:', err);
     }
 
-    // Final sync before stopping
-    if (syncManager) {
+    // Final sync before stopping. Capture the manager into a local and claim
+    // ownership (null the shared field) *before* the await, so any concurrent
+    // teardown path (a second stop, cleanupForNewRecording on an XR
+    // session-end) sees null and no-ops instead of stopping it from under us.
+    // Defense in depth alongside the re-entrancy guard (Sentry issue 7319627943).
+    const sm = syncManager;
+    syncManager = null;
+    if (sm) {
       try {
         log.info('Triggering final sync before stopping...');
-        await syncManager.syncNow();
+        await sm.syncNow();
         log.info('Final sync completed successfully');
       } catch (err) {
         log.error('Final sync failed:', err);
       }
-      syncManager.stop();
-      syncManager = null;
+      sm.stop();
       log.info('External ZIP sync stopped');
     }
 
@@ -722,6 +756,7 @@ export function createRecordingSessionHandlers(
   function reset(): void {
     cleanupForNewRecording();
     backDuringRecordingInProgress = false;
+    stopInProgress = false;
   }
 
   return {

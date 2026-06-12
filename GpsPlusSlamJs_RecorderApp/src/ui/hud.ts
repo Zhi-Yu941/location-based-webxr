@@ -676,8 +676,36 @@ export function showRecordingControls(): void {
   cachedElements.btnStop.classList.remove('hidden');
   cachedElements.btnRefPoint.classList.remove('hidden');
 
+  // A prior stop may have left the button in its busy state — ensure each new
+  // recording starts with a clean, enabled "Stop" button.
+  setStopButtonBusy(false);
+
   // Show recording indicator
   cachedElements.recordingIndicator.classList.remove('hidden');
+}
+
+/** Idle and in-progress labels for the recording Stop button. */
+const STOP_BUTTON_IDLE_LABEL = '⏹ Stop';
+const STOP_BUTTON_BUSY_LABEL = '⏹ Stopping…';
+
+/**
+ * Move the Stop button into (or out of) its in-progress state.
+ *
+ * Stopping a recording runs a final external sync that can take many seconds
+ * for large sessions. Per the async-feedback rule (CLAUDE.md) the button must
+ * become clearly non-idle for that duration: disabled (so it cannot be tapped
+ * again — the double-tap that produced Sentry issue 7319627943), relabelled to
+ * "Stopping…", and flagged `aria-busy` for assistive tech. Passing `false`
+ * restores the idle label and re-enables the button.
+ */
+export function setStopButtonBusy(busy: boolean): void {
+  if (!cachedElements) {
+    throw new Error('setStopButtonBusy called before initUI()');
+  }
+  const btnStop = cachedElements.btnStop;
+  btnStop.toggleAttribute('disabled', busy);
+  btnStop.setAttribute('aria-busy', busy ? 'true' : 'false');
+  btnStop.textContent = busy ? STOP_BUTTON_BUSY_LABEL : STOP_BUTTON_IDLE_LABEL;
 }
 
 /**

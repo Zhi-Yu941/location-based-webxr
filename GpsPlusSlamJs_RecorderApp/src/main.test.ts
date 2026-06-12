@@ -272,6 +272,7 @@ vi.mock('./ui/hud', () => ({
   populateScenarios: vi.fn(),
   hideRecordingControls: vi.fn(),
   showRecordingControls: vi.fn(),
+  setStopButtonBusy: vi.fn(),
   showArReadyControls: vi.fn(),
   setFolderSelected: vi.fn(),
   setSaveLocationSelected: vi.fn(),

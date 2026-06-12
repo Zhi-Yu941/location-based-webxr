@@ -59,6 +59,7 @@ const {
   mockReplaceScreenState,
   mockShowRecordingControls,
   mockHideRecordingControls,
+  mockSetStopButtonBusy,
   mockShowError,
   mockUpdateStatus,
   mockHideFrameCount,
@@ -148,6 +149,7 @@ const {
     mockReplaceScreenState: vi.fn(),
     mockShowRecordingControls: vi.fn(),
     mockHideRecordingControls: vi.fn(),
+    mockSetStopButtonBusy: vi.fn(),
     mockShowError: vi.fn(),
     mockUpdateStatus: vi.fn(),
     mockHideFrameCount: vi.fn(),
@@ -263,6 +265,7 @@ vi.mock('../ui/navigation', () => ({
 vi.mock('../ui/hud', () => ({
   showRecordingControls: mockShowRecordingControls,
   hideRecordingControls: mockHideRecordingControls,
+  setStopButtonBusy: mockSetStopButtonBusy,
   showError: mockShowError,
   updateStatus: mockUpdateStatus,
   hideFrameCount: mockHideFrameCount,
@@ -891,6 +894,100 @@ describe('handleStopRecording', () => {
     mockGetSaveFileHandle.mockReturnValue(null);
     await handlers.handleStopRecording();
     expect(mockExportSessionAsZip).toHaveBeenCalled();
+  });
+
+  // ── Re-entrancy & concurrent teardown (Sentry issue 7319627943) ──────────
+  //
+  // The final sync awaited in handleStopRecording can take 20+ seconds for a
+  // large session. The Stop button stayed live, so users tapped it again. The
+  // second invocation ran the whole teardown concurrently and stopped + nulled
+  // the shared `syncManager` while the first call was still suspended at
+  // `await syncManager.syncNow()`. When the first resumed it executed
+  // `syncManager.stop()` on the now-null reference →
+  // "TypeError: Cannot read properties of null (reading 'stop')".
+
+  /** Resolve after both pending microtask + the next, so a started async fn reaches its first await. */
+  async function flushMicrotasks(): Promise<void> {
+    await Promise.resolve();
+    await Promise.resolve();
+  }
+
+  it('does not throw and stops the sync manager once when Stop is tapped twice mid-sync', async () => {
+    mockGetSaveFileHandle.mockReturnValue({});
+    await handlers.handleStartRecording();
+    vi.clearAllMocks();
+
+    // First final sync stays pending (models the slow ZIP export); a second sync
+    // would resolve immediately (SyncManager's "already in progress, skipping").
+    let releaseFirstSync!: () => void;
+    const firstSync = new Promise<void>((resolve) => {
+      releaseFirstSync = resolve;
+    });
+    mockSyncManagerInstance.syncNow
+      .mockReturnValueOnce(firstSync)
+      .mockResolvedValue(undefined);
+
+    // First Stop tap — suspends at `await syncManager.syncNow()`.
+    const firstStop = handlers.handleStopRecording();
+    await flushMicrotasks();
+
+    // Second Stop tap while the first is still in flight: the re-entrancy guard
+    // must make this a no-op rather than a concurrent teardown.
+    await handlers.handleStopRecording();
+
+    // Release the first sync; the first call resumes past its await.
+    releaseFirstSync();
+
+    // The crash manifested as an unhandled rejection of this first stop.
+    await expect(firstStop).resolves.toBeUndefined();
+
+    // The single live sync manager is stopped exactly once, and the terminal
+    // summary transition happens once — the second tap did nothing.
+    expect(mockSyncManagerInstance.stop).toHaveBeenCalledTimes(1);
+    expect(mockShowSessionSummary).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks the Stop button busy when stopping begins, even if the final sync fails', async () => {
+    // UI feedback for async actions (CLAUDE.md): the multi-second final sync
+    // must move the Stop button to a distinguishable in-progress state — both as
+    // feedback and to remove the double-tap that triggered the crash. This must
+    // hold even when the sync rejects.
+    mockGetSaveFileHandle.mockReturnValue({});
+    await handlers.handleStartRecording();
+    vi.clearAllMocks();
+    mockSyncManagerInstance.syncNow.mockRejectedValueOnce(
+      new Error('network down')
+    );
+
+    await handlers.handleStopRecording();
+
+    expect(mockSetStopButtonBusy).toHaveBeenCalledWith(true);
+  });
+
+  it('is unaffected by cleanupForNewRecording racing the in-flight final sync', async () => {
+    // Defense in depth (capture-local): the other concurrent path is an XR
+    // session-end firing cleanupForNewRecording() while the final sync is still
+    // awaiting. Because performStop captures the manager and nulls the shared
+    // field before the await, cleanup sees null and must not double-stop it.
+    mockGetSaveFileHandle.mockReturnValue({});
+    await handlers.handleStartRecording();
+    vi.clearAllMocks();
+
+    let releaseSync!: () => void;
+    const sync = new Promise<void>((resolve) => {
+      releaseSync = resolve;
+    });
+    mockSyncManagerInstance.syncNow.mockReturnValueOnce(sync);
+
+    const stop = handlers.handleStopRecording();
+    await flushMicrotasks();
+
+    // XR session-end teardown fires mid-sync.
+    handlers.cleanupForNewRecording();
+
+    releaseSync();
+    await expect(stop).resolves.toBeUndefined();
+    expect(mockSyncManagerInstance.stop).toHaveBeenCalledTimes(1);
   });
 
   it('should call exportSessionAsZip on main thread (Bug 12 — known limitation)', async () => {

@@ -48,3 +48,13 @@ class FrameTileVisualizer {
   scene is the live WebXR scene. The library's `webxrToNUE`
   conversion is only relevant to the serialized `odometryPath`
   inside `gpsDataSlice` and does not apply here.
+  - **⚠️ Known issue — this claim is wrong (frame bug, fix pending).**
+    The visualizer is parented at the **scene root**, which is the
+    GPS-world NUE frame, not a WebXR-frame node — so the raw-WebXR
+    poses land axis-swapped (missing `WEBXR_TO_NUE`) and detached from
+    the alignment matrix. Confirmed by code review; same wrong-node
+    class as the hit-test reticle and the occupancy cubes (Iter 7).
+    Tracked, with the failing-test-first resolution path, in
+    [2026-06-12-followup-frame-tile-visualizer-frame-check.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-12-followup-frame-tile-visualizer-frame-check.md).
+    This note (and the header comment) will be rewritten when the fix
+    lands.

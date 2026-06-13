@@ -100,6 +100,14 @@ export class GpsEventVisualizer {
   private zeroRef: LatLong | null = null;
   private eventCounter = 0;
   private snapshotCounter = 0;
+  /**
+   * Whether the debug markers are drawn. Toggled by {@link setVisible} for the
+   * recorder's `visualization.gpsAlignmentMarkers` opt-out (Finding B). Applied
+   * to every marker at creation so events spawned later by the live
+   * store-subscriber inherit the current state instead of popping into view.
+   * Default `true` — the markers render exactly as before until opted out.
+   */
+  private markersVisible = true;
 
   /**
    * Set the GPS zero reference (origin for coordinate conversion).
@@ -257,7 +265,26 @@ export class GpsEventVisualizer {
     });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.name = `${namePrefix}-${eventId}`;
+    // Inherit the current visibility so markers spawned while the operator has
+    // the overlay toggled off (Finding B) do not pop into view.
+    mesh.visible = this.markersVisible;
     return mesh;
+  }
+
+  /**
+   * Show or hide ALL debug markers — raw GPS (yellow), fused (cyan), and
+   * alignment-snapshot (red) — and remember the state so markers added later
+   * inherit it. Used by the recorder's `visualization.gpsAlignmentMarkers`
+   * opt-out, read once at Enter-AR (live only; replay keeps markers visible).
+   *
+   * This only changes rendering: capture, GPS-event recording, counts, and the
+   * snapshot positions read back at session end are all unaffected.
+   */
+  setVisible(visible: boolean): void {
+    this.markersVisible = visible;
+    for (const mesh of this.rawGpsMarkers) mesh.visible = visible;
+    for (const mesh of this.fusedMarkers) mesh.visible = visible;
+    for (const mesh of this.snapshotMarkers) mesh.visible = visible;
   }
 
   /**
@@ -275,6 +302,12 @@ export class GpsEventVisualizer {
     this.zeroRef = null;
     this.eventCounter = 0;
     this.snapshotCounter = 0;
+    // Return to pristine (visible) state. The visualizer is a singleton shared
+    // by live + replay; resetting here means a live session's
+    // `setVisible(false)` opt-out never leaks into a subsequent replay (which
+    // never calls setVisible and must always show the captured markers). The
+    // live Enter-AR path re-applies the option explicitly after this reset.
+    this.markersVisible = true;
   }
 
   /**

@@ -26,7 +26,8 @@ Visualizes GPS events as 3D markers during recording and replay. Shows three typ
   - Cyan fused and red snapshot markers are NEVER affected by the `accuracy` argument.
 - `addAlignmentSnapshot(nuePosition: readonly number[]): void` — add a red snapshot sphere at scene root.
 - `getAlignmentSnapshotPositions(): number[][]` — return positions of all snapshot markers as arrays.
-- `clearAll(): void` — remove all markers (including snapshots) and reset.
+- `setVisible(visible: boolean): void` — show/hide **all** debug markers (raw + fused + snapshot) and remember the state so markers added later inherit it. Backs the recorder's `visualization.gpsAlignmentMarkers` opt-out (Finding B), read once at Enter-AR (live only — replay keeps markers visible). Affects rendering only: capture, GPS-event recording, counts, and snapshot positions are unchanged. Default visible; `clearAll()` resets it to visible so a live opt-out never leaks into a subsequent replay on the shared singleton.
+- `clearAll(): void` — remove all markers (including snapshots), reset counters/zero-ref, and restore visibility to the default (visible).
 - `getCounts(): { raw, fused, snapshots }` — get marker counts including alignment snapshots.
 - `getRawMarkerWorldSizes(): Array<{ x, y, z }>` — diagnostic accessor returning the world-space bounding-box size (`THREE.Box3.setFromObject`) of each raw-GPS marker in insertion order. Used by the §3c Playwright spec to verify accuracy-ellipsoid scaling.
 
@@ -105,6 +106,7 @@ Unit tests in `gps-event-markers.test.ts`:
 - `addGpsEvent` — marker creation, colors, placement, guard checks.
 - `addGpsEvent accuracy-aware ellipsoid (§3)` — non-uniform scale on the raw marker, defensive fallback on missing/non-positive accuracy, lowered opacity, `renderOrder = -1`, cyan/red unaffected. See [`2026-05-19-investigate-rec31-altitude-drop.md`](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-19-investigate-rec31-altitude-drop.md) §3 for the motivation.
 - `scene-graph propagation` — world position via `arWorldGroup.matrix`.
+- `setVisible` — hides/shows all three marker types, later-added markers inherit the state, and `clearAll` restores visibility (replay safety). See [`2026-06-14-followup-frame-tile-legacy-aspect-and-live-toggle.md`](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-14-followup-frame-tile-legacy-aspect-and-live-toggle.md) (Finding B / Slice 3).
 - `clearAll` — cleanup and disposal.
 - `getCounts` — counter functionality.
 - `marker sizing` — verify legacy 8 cm radius on default code path.

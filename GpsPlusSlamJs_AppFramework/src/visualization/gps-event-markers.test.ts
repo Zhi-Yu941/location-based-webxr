@@ -709,6 +709,99 @@ describe('GpsEventVisualizer', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // Visibility toggle (Finding B / Slice 3 of
+  // 2026-06-14-followup-frame-tile-legacy-aspect-and-live-toggle.md)
+  // ---------------------------------------------------------------------------
+  // Why these tests matter: the recorder's new `visualization.gpsAlignmentMarkers`
+  // toggle must be able to hide ALL GPS+VIO debug spheres live — raw (yellow),
+  // fused (cyan), AND alignment-snapshot (red) — without touching capture or
+  // replay. The markers are created at different times, so the contract is:
+  // setVisible(false) hides every existing marker AND every marker added
+  // afterwards (the live store-subscriber keeps adding events during recording);
+  // setVisible(true) restores them. This is the load-bearing new framework
+  // capability the recorder's Enter-AR gating depends on.
+  describe('setVisible', () => {
+    const findRaw = (): THREE.Mesh[] =>
+      mockScene.children.filter((c) =>
+        c.name.startsWith('raw-gps-')
+      ) as THREE.Mesh[];
+    const findFused = (): THREE.Mesh[] =>
+      mockArWorldGroup.children.filter((c) =>
+        c.name.startsWith('fused-')
+      ) as THREE.Mesh[];
+    const findSnapshots = (): THREE.Mesh[] =>
+      mockScene.children.filter((c) =>
+        c.name.startsWith('alignment-snapshot-')
+      ) as THREE.Mesh[];
+
+    it('markers are visible by default (purely additive — no behaviour change)', () => {
+      visualizer.setZeroRef({ lat: 48.8566, lon: 2.3522 });
+      visualizer.addGpsEvent([10, 5, 20], [1, 2, 3]);
+      visualizer.addAlignmentSnapshot([10, 0, 5]);
+
+      expect(findRaw()[0].visible).toBe(true);
+      expect(findFused()[0].visible).toBe(true);
+      expect(findSnapshots()[0].visible).toBe(true);
+    });
+
+    it('setVisible(false) hides existing raw, fused, and snapshot markers; setVisible(true) restores', () => {
+      visualizer.setZeroRef({ lat: 48.8566, lon: 2.3522 });
+      visualizer.addGpsEvent([10, 5, 20], [1, 2, 3]);
+      visualizer.addGpsEvent([15, 6, 25], [4, 5, 6]);
+      visualizer.addAlignmentSnapshot([10, 0, 5]);
+
+      visualizer.setVisible(false);
+      for (const m of [...findRaw(), ...findFused(), ...findSnapshots()]) {
+        expect(m.visible).toBe(false);
+      }
+
+      visualizer.setVisible(true);
+      for (const m of [...findRaw(), ...findFused(), ...findSnapshots()]) {
+        expect(m.visible).toBe(true);
+      }
+    });
+
+    it('markers added AFTER setVisible(false) inherit the hidden state', () => {
+      // The live store-subscriber keeps adding events during recording — a
+      // marker spawned after the operator opted out must NOT pop into view.
+      visualizer.setZeroRef({ lat: 48.8566, lon: 2.3522 });
+      visualizer.setVisible(false);
+
+      visualizer.addGpsEvent([10, 5, 20], [1, 2, 3]);
+      visualizer.addAlignmentSnapshot([10, 0, 5]);
+
+      expect(findRaw()[0].visible).toBe(false);
+      expect(findFused()[0].visible).toBe(false);
+      expect(findSnapshots()[0].visible).toBe(false);
+    });
+
+    it('markers added AFTER setVisible(true) are visible again', () => {
+      visualizer.setZeroRef({ lat: 48.8566, lon: 2.3522 });
+      visualizer.setVisible(false);
+      visualizer.setVisible(true);
+
+      visualizer.addGpsEvent([10, 5, 20], [1, 2, 3]);
+      expect(findRaw()[0].visible).toBe(true);
+      expect(findFused()[0].visible).toBe(true);
+    });
+
+    it('clearAll resets visibility to visible (replay safety after a live opt-out)', () => {
+      // The visualizer is a singleton shared by live + replay. If a live
+      // session opted out (setVisible(false)) and then replay started, replay
+      // markers must still show — clearAll restores the pristine visible state.
+      visualizer.setZeroRef({ lat: 48.8566, lon: 2.3522 });
+      visualizer.setVisible(false);
+      visualizer.clearAll();
+
+      // A fresh marker (e.g. the first replay event) is visible again.
+      visualizer.setZeroRef({ lat: 48.8566, lon: 2.3522 });
+      visualizer.addGpsEvent([10, 5, 20], [1, 2, 3]);
+      expect(findRaw()[0].visible).toBe(true);
+      expect(findFused()[0].visible).toBe(true);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Alignment Snapshot Markers (Issue #1 — feedback session 2026-03-21)
   // ---------------------------------------------------------------------------
   describe('addAlignmentSnapshot / getAlignmentSnapshotPositions', () => {

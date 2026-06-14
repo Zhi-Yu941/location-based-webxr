@@ -36,13 +36,28 @@ export async function mapWithConcurrencyLimit<T, R>(
 
   // Use a pool of workers that pull from a shared index counter
   let nextIndex = 0;
+  // Shared fail-fast flag: once any worker throws, the surviving workers stop
+  // pulling new items instead of draining the queue in the background after the
+  // caller has already observed the rejection.
+  let failed = false;
 
   const worker = async (): Promise<void> => {
     while (nextIndex < items.length) {
+      if (failed) {
+        return;
+      }
       // Safe: read + increment is synchronous (no yield between while-check and capture),
       // so no two workers can grab the same index.
       const currentIndex = nextIndex++;
-      results[currentIndex] = await mapper(items[currentIndex]!, currentIndex);
+      try {
+        results[currentIndex] = await mapper(
+          items[currentIndex]!,
+          currentIndex
+        );
+      } catch (err) {
+        failed = true;
+        throw err;
+      }
     }
   };
 
@@ -97,16 +112,25 @@ export async function forEachWithConcurrencyLimit<T>(
   }
 
   let nextIndex = 0;
+  // Shared fail-fast flag: once any worker throws, the surviving pumps stop
+  // pulling new items — mirroring the abort path — so they don't keep emitting
+  // side effects into a consumer that is already tearing down after the failure.
+  let failed = false;
 
   const pump = async (): Promise<void> => {
     while (nextIndex < items.length) {
-      if (signal?.aborted) {
+      if (signal?.aborted || failed) {
         return;
       }
       // Safe: read + increment is synchronous (no yield between the guard and
       // the capture), so no two workers can grab the same index.
       const currentIndex = nextIndex++;
-      await worker(items[currentIndex]!, currentIndex);
+      try {
+        await worker(items[currentIndex]!, currentIndex);
+      } catch (err) {
+        failed = true;
+        throw err;
+      }
     }
   };
 

@@ -82,6 +82,34 @@ describe('mapWithConcurrencyLimit', () => {
     ).rejects.toThrow('boom');
   });
 
+  it('stops pulling new items once a mapper fails (fail-fast)', async () => {
+    // Why: the docs promise fail-fast, but Promise.all only makes the *caller*
+    // see the first rejection — the sibling worker loops keep pulling new items
+    // and running the mapper in the background, wasting I/O after the operation
+    // has already been reported as failed. With a shared failure flag, surviving
+    // workers stop pulling once any worker has thrown.
+    const items = [1, 2, 3, 4, 5, 6, 7, 8];
+    const processed: number[] = [];
+
+    const promise = mapWithConcurrencyLimit(items, 2, async (x, i) => {
+      processed.push(x);
+      if (i === 0) {
+        throw new Error('boom');
+      }
+      // Slow enough that, without fail-fast, the surviving worker would loop
+      // back and drain the rest of the queue after the failure is observed.
+      await new Promise((r) => setTimeout(r, 10));
+      return x;
+    });
+
+    await expect(promise).rejects.toThrow('boom');
+
+    // Let any background loops settle; with the bug they drain all 8 items.
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(processed.length).toBeLessThan(items.length);
+  });
+
   it('handles concurrency limit of 1 (sequential execution)', async () => {
     // Why: Limit=1 means tasks run one at a time. This is the most restrictive
     // setting and should still produce correct, ordered results.
@@ -205,6 +233,31 @@ describe('forEachWithConcurrencyLimit', () => {
       controller.signal
     );
     expect(calls).toBe(0);
+  });
+
+  it('stops pulling new items once a worker fails (fail-fast)', async () => {
+    // Why: streaming workers are side-effecting (they emit recordings into a
+    // consumer). Once one worker throws and the caller observes the rejection,
+    // the surviving workers must stop pulling new items — otherwise they keep
+    // emitting into a consumer that is already tearing down. This mirrors the
+    // abort path ("stop pulling new items") for the internal-failure case.
+    const items = [1, 2, 3, 4, 5, 6, 7, 8];
+    const processed: number[] = [];
+
+    const promise = forEachWithConcurrencyLimit(items, 2, async (x, i) => {
+      processed.push(x);
+      if (i === 0) {
+        throw new Error('boom');
+      }
+      await new Promise((r) => setTimeout(r, 10));
+    });
+
+    await expect(promise).rejects.toThrow('boom');
+
+    // Let any background loops settle; with the bug they drain all 8 items.
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(processed.length).toBeLessThan(items.length);
   });
 
   it('throws RangeError when limit is below 1', async () => {

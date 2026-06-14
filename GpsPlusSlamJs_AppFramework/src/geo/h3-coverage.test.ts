@@ -165,4 +165,18 @@ describe('clusterCellsByZoom', () => {
       cellToParent(base, 9),
     ]);
   });
+
+  // Why: A *valid* cell coarser than targetRes (e.g. a res-8 cell from legacy or
+  // future metadata) cannot have a parent at the finer targetRes — cellToParent
+  // throws ("incompatible resolutions"). isValidCell does NOT catch this, and the
+  // targetRes clamp only bounds the requested res, not the cell's own res. Such
+  // cells must be skipped, not crash the whole view render (defensive boundary).
+  it('skips valid cells coarser than targetRes (no throw)', () => {
+    const coarse = cellToParent(base, 8); // valid res-8 cell
+    expect(() =>
+      clusterCellsByZoom([coarse, base], H3_RESOLUTION)
+    ).not.toThrow();
+    // base is already res-11 so it survives at targetRes 11; coarse is dropped.
+    expect(clusterCellsByZoom([coarse, base], H3_RESOLUTION)).toEqual([base]);
+  });
 });

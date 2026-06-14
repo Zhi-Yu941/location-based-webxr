@@ -28,7 +28,7 @@ Shared H3 hexagonal grid utilities for reference point identity and matching. Re
 - `h3CellsMatch` is NOT symmetric in edge cases (gridDisk overlap is checked from A to B only), but for res-11 this is practically symmetric
 - **Zoom-clustering coarsens via `cellToParent`, never hex-string truncation.** H3 encodes resolution in the high bits (2nd hex char) with trailing `f` padding, so slicing the id yields an _invalid_ cell, not a parent (verified — see the D1 gotcha in `GpsPlusSlamJs_Docs/docs/2026-06-14-map-centric-recording-browser-and-h3-index-user-feedback.md`).
 - `clusterCellsByZoom` clamps `targetRes` to `[0, H3_RESOLUTION]`: `cellToParent` throws for a finer res than the cell, and res 11 is the finest stored data, so `cellToParent(cell, 11) === cell` (highest zooms are unclustered). A non-finite `targetRes` degrades to unclustered output.
-- Both coverage helpers are defensive: `gpsPathToCoverageCells` skips non-finite coords; `clusterCellsByZoom` skips cells failing `isValidCell`.
+- Both coverage helpers are defensive: `gpsPathToCoverageCells` skips non-finite coords; `clusterCellsByZoom` skips cells failing `isValidCell` **and** valid cells whose own resolution is coarser than `targetRes` (no parent at the finer res → `cellToParent` would throw "incompatible resolutions"). The `targetRes` clamp only bounds the requested res, not the input cell's res, so this is a separate guard.
 
 ## Examples
 

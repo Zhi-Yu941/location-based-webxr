@@ -12,7 +12,13 @@
  * @see docs/2026-03-08-ref-point-naming-investigation.md §6
  */
 
-import { latLngToCell, gridDisk, cellToParent, isValidCell } from 'h3-js';
+import {
+  latLngToCell,
+  gridDisk,
+  cellToParent,
+  isValidCell,
+  getResolution,
+} from 'h3-js';
 
 /** H3 resolution 11: ~25m edge, ~65m gridDisk safe zone */
 export const H3_RESOLUTION = 11;
@@ -82,7 +88,9 @@ export function gpsPathToCoverageCells(path: readonly LatLngLike[]): string[] {
  * data stored — so the highest map zooms render the stored cells unclustered
  * (`cellToParent(cell, 11) === cell`). A non-finite `targetRes` (e.g. a bad
  * zoom→res mapping) degrades to unclustered output rather than throwing.
- * Invalid input cells (corrupt/legacy metadata) are skipped defensively.
+ * Invalid input cells (corrupt/legacy metadata) are skipped defensively, as are
+ * valid cells coarser than `res` (which have no parent at the finer target res
+ * and would otherwise throw "incompatible resolutions").
  *
  * Output is deduplicated in first-seen order: sibling cells under one parent
  * collapse to a single tile.
@@ -98,6 +106,13 @@ export function clusterCellsByZoom(
   const parents: string[] = [];
   for (const cell of cells) {
     if (!isValidCell(cell)) {
+      continue;
+    }
+    // A valid cell coarser than `res` (e.g. legacy/future metadata storing
+    // non-res-11 cells) has no parent at the finer `res`; cellToParent would
+    // throw ("incompatible resolutions"). isValidCell does not catch this, so
+    // skip such cells defensively rather than crash the view render.
+    if (getResolution(cell) < res) {
       continue;
     }
     const parent = cellToParent(cell, res);

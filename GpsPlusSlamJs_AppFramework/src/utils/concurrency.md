@@ -16,24 +16,50 @@ Maps over an array with a concurrency cap on the async mapper function. Behaves 
   - Throws `RangeError` if `limit < 1` (e.g., 0, negative values)
   - Re-throws the first error from any mapper invocation (fail-fast, matching `Promise.all` semantics)
 
+### `forEachWithConcurrencyLimit<T>(items: readonly T[], limit: number, worker: (item: T, index: number) => Promise<void>, signal?: AbortSignal): Promise<void>`
+
+Runs an async, side-effecting worker over each item with a concurrency cap, invoking the worker **per item as the pool pulls it** rather than collecting results. This is the "emit as each settles" shape progressive consumers need (e.g. `streamRecordingIndex` emitting one recording at a time).
+
+- **Input:** Items, concurrency limit (`>= 1`), async worker, optional `AbortSignal`
+- **Output:** `void` — the worker produces its own side effect (e.g. a streaming callback)
+- **Errors:**
+  - Throws `RangeError` if `limit < 1`
+  - Re-throws the first error from any worker invocation (fail-fast)
+- **Abort:** When `signal` is aborted, workers stop pulling **new** items (checked before each pull). In-flight workers run to completion (the underlying File System Access reads cannot be torn mid-read). An already-aborted signal starts no work at all.
+
 ## Invariants & Assumptions
 
-- Results are always returned **in input order**, regardless of completion order.
-- At most `limit` mapper invocations are active at any time.
+- `mapWithConcurrencyLimit` results are always returned **in input order**, regardless of completion order.
+- `forEachWithConcurrencyLimit` makes **no ordering guarantee** — completion order depends on which worker finishes first. Each item's worker is invoked exactly once unless aborted.
+- At most `limit` invocations are active at any time (both helpers).
 - If `limit >= items.length`, behavior is identical to `Promise.all`.
 - Worker pool pattern: `min(limit, items.length)` workers pull from a shared index counter.
 
 ## Examples
 
 ```typescript
-import { mapWithConcurrencyLimit } from './concurrency';
+import {
+  mapWithConcurrencyLimit,
+  forEachWithConcurrencyLimit,
+} from './concurrency';
 
-// Read metadata from 50 zip files, max 4 at a time
+// Read metadata from 50 zip files, max 4 at a time (ordered array of results)
 const results = await mapWithConcurrencyLimit(zipFiles, 4, async (file) => {
   return await readMetadata(file);
 });
+
+// Stream coverage per recording as each resolves, abortable
+const controller = new AbortController();
+await forEachWithConcurrencyLimit(
+  legacyEntries,
+  4,
+  async (entry) => emit(await deriveCoverage(entry)),
+  controller.signal
+);
 ```
 
 ## Tests
 
-- Unit tests: `concurrency.test.ts` — 9 tests covering ordered results, empty input, limit > items, peak concurrency tracking, error propagation, sequential execution (limit=1), RangeError for limit=0, RangeError for negative limit, and descriptive error message content.
+- Unit tests: `concurrency.test.ts`.
+  - `mapWithConcurrencyLimit` — ordered results, empty input, limit > items, peak concurrency tracking, error propagation, sequential execution (limit=1), RangeError for limit=0, RangeError for negative limit, descriptive error message content.
+  - `forEachWithConcurrencyLimit` — one invocation per item, empty-input no-op, concurrency cap, abort stops pulling new items, already-aborted signal starts no work, RangeError for limit < 1.

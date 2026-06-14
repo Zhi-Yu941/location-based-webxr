@@ -9,7 +9,10 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { mapWithConcurrencyLimit } from './concurrency';
+import {
+  mapWithConcurrencyLimit,
+  forEachWithConcurrencyLimit,
+} from './concurrency';
 
 describe('mapWithConcurrencyLimit', () => {
   it('maps all items and returns results in order', async () => {
@@ -118,5 +121,95 @@ describe('mapWithConcurrencyLimit', () => {
     await expect(
       mapWithConcurrencyLimit([1], 0, (x) => Promise.resolve(x))
     ).rejects.toThrow('Concurrency limit must be >= 1, got 0');
+  });
+});
+
+describe('forEachWithConcurrencyLimit', () => {
+  // Why these tests matter: unlike mapWithConcurrencyLimit (which resolves the
+  // whole array before returning), forEachWithConcurrencyLimit invokes its
+  // worker per item as the pool pulls it. The map-centric browser's progressive
+  // index (`streamRecordingIndex`) needs this "emit as each settles" shape plus
+  // an AbortSignal so closing the browser stops pulling new work mid-stream.
+
+  it('invokes the worker exactly once per item', async () => {
+    // Why: streaming must place every recording exactly once — no drops, no
+    // duplicates — even though completion order is not guaranteed.
+    const items = [1, 2, 3, 4, 5];
+    const seen: number[] = [];
+    await forEachWithConcurrencyLimit(items, 2, (x) => {
+      seen.push(x);
+      return Promise.resolve();
+    });
+    expect([...seen].sort((a, b) => a - b)).toEqual(items);
+  });
+
+  it('is a no-op for empty input', async () => {
+    let calls = 0;
+    await forEachWithConcurrencyLimit([], 3, () => {
+      calls++;
+      return Promise.resolve();
+    });
+    expect(calls).toBe(0);
+  });
+
+  it('caps the number of concurrently active workers', async () => {
+    // Why: legacy backfill reads every GPS action file; an uncapped fan-out over
+    // 70 zips would thrash browser I/O. The cap is the whole point.
+    let active = 0;
+    let peak = 0;
+    await forEachWithConcurrencyLimit([1, 2, 3, 4, 5, 6], 2, async () => {
+      active++;
+      peak = Math.max(peak, active);
+      await new Promise((r) => setTimeout(r, 10));
+      active--;
+    });
+    expect(peak).toBe(2);
+  });
+
+  it('stops pulling new items once the signal is aborted', async () => {
+    // Why: closing the browser (or opening another folder) must abort the
+    // in-flight stream so it stops reading zips into a destroyed map. In-flight
+    // workers may finish, but no NEW items are pulled after the abort.
+    const items = [1, 2, 3, 4, 5, 6, 7, 8];
+    const controller = new AbortController();
+    const processed: number[] = [];
+    await forEachWithConcurrencyLimit(
+      items,
+      2,
+      async (x) => {
+        processed.push(x);
+        await new Promise((r) => setTimeout(r, 10));
+        // Abort partway through: after the first batch, no further items start.
+        if (processed.length === 2) {
+          controller.abort();
+        }
+      },
+      controller.signal
+    );
+    // Only the first concurrent batch (2 workers) ran; the rest were never pulled.
+    expect(processed.length).toBeLessThan(items.length);
+    expect(processed.length).toBeLessThanOrEqual(4);
+  });
+
+  it('does not start any work when the signal is already aborted', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    let calls = 0;
+    await forEachWithConcurrencyLimit(
+      [1, 2, 3],
+      2,
+      () => {
+        calls++;
+        return Promise.resolve();
+      },
+      controller.signal
+    );
+    expect(calls).toBe(0);
+  });
+
+  it('throws RangeError when limit is below 1', async () => {
+    await expect(
+      forEachWithConcurrencyLimit([1, 2], 0, () => Promise.resolve())
+    ).rejects.toThrow(RangeError);
   });
 });

@@ -23,6 +23,9 @@ import { gpsPathToCoverageCells } from 'gps-plus-slam-app-framework/geo';
 import {
   loadCoverageCellsForEntry,
   buildRecordingIndex,
+  streamRecordingIndex,
+  type RecordingCoverage,
+  type IndexProgress,
 } from './recording-index';
 import {
   discoverScenariosFromZipMetadata,
@@ -166,5 +169,133 @@ describe('buildRecordingIndex', () => {
     const index = await buildRecordingIndex(root);
 
     expect(index).toEqual([]);
+  });
+});
+
+describe('streamRecordingIndex', () => {
+  /**
+   * Build a folder mixing `count.meta` metadata-carrying recordings and
+   * `count.legacy` legacy recordings (no h3Cells). Returns the root handle.
+   */
+  async function makeMixedFolder(count: {
+    meta: number;
+    legacy: number;
+  }): Promise<MockFSDirectoryHandle> {
+    const root = new MockFSDirectoryHandle('Recordings');
+    for (let i = 0; i < count.meta; i++) {
+      const zip = await produceTestZip({
+        scenarioName: 'Covered',
+        h3Cells: ['8b1fa1da1d64fff'],
+      });
+      root.addFile(`Covered-${i}-2026-03-01_09-00-00utc.zip`, zip.zipData);
+    }
+    for (let i = 0; i < count.legacy; i++) {
+      const zip = await produceTestZip({ scenarioName: 'Legacy' });
+      root.addFile(`Legacy-${i}-2026-03-02_09-00-00utc.zip`, zip.zipData);
+    }
+    return root;
+  }
+
+  it('emits every recording exactly once and reports the correct total', async () => {
+    // Why: progressive streaming must place every recording once — no drops,
+    // no duplicates — and onTotal must equal the zip count so the progress UI
+    // can show "N / total".
+    const root = await makeMixedFolder({ meta: 2, legacy: 2 });
+    const emitted: RecordingCoverage[] = [];
+    let total = -1;
+    await streamRecordingIndex(root, {
+      onTotal: (t) => {
+        total = t;
+      },
+      onRecording: (rec) => emitted.push(rec),
+    });
+
+    expect(total).toBe(4);
+    expect(emitted).toHaveLength(4);
+    // Each filename appears exactly once.
+    const names = emitted.map((r) => r.entry.filename).sort();
+    expect(new Set(names).size).toBe(4);
+  });
+
+  it('emits metadata-present recordings before legacy ones', async () => {
+    // Why: the metadata fast path needs no I/O, so those recordings must appear
+    // first/instantly; legacy backfill (every GPS file) streams in afterwards.
+    const root = await makeMixedFolder({ meta: 2, legacy: 2 });
+    const order: boolean[] = []; // true = backfilled (legacy)
+    await streamRecordingIndex(root, {
+      onRecording: (rec) => order.push(rec.backfilled),
+    });
+
+    expect(order).toHaveLength(4);
+    // All non-backfilled (metadata) emissions precede the first backfilled one.
+    const firstLegacy = order.indexOf(true);
+    const lastMeta = order.lastIndexOf(false);
+    expect(lastMeta).toBeLessThan(firstLegacy);
+  });
+
+  it('reports monotonically increasing progress ending at total', async () => {
+    // Why: the progress pill must count up smoothly to total and never regress.
+    const root = await makeMixedFolder({ meta: 1, legacy: 3 });
+    const progress: IndexProgress[] = [];
+    await streamRecordingIndex(root, {
+      onRecording: () => {},
+      onProgress: (p) => progress.push({ ...p }),
+    });
+
+    expect(progress.length).toBe(4);
+    for (let i = 1; i < progress.length; i++) {
+      expect(progress[i]!.done).toBe(progress[i - 1]!.done + 1);
+      expect(progress[i]!.total).toBe(4);
+    }
+    expect(progress.at(-1)!.done).toBe(4);
+  });
+
+  it('does not emit any recording when the signal is already aborted', async () => {
+    // Why: opening a new folder while one is still indexing must not paint the
+    // old folder's tours. onTotal may still fire (discovery already ran), but no
+    // recordings stream in.
+    const root = await makeMixedFolder({ meta: 2, legacy: 2 });
+    const controller = new AbortController();
+    controller.abort();
+    const emitted: RecordingCoverage[] = [];
+    let total = -1;
+    await streamRecordingIndex(root, {
+      onTotal: (t) => {
+        total = t;
+      },
+      onRecording: (rec) => emitted.push(rec),
+      signal: controller.signal,
+    });
+
+    expect(total).toBe(4);
+    expect(emitted).toHaveLength(0);
+  });
+
+  it('stops emitting once the signal is aborted mid-stream', async () => {
+    // Why: closing the browser mid-index must stop adding tours to a torn-down
+    // map. Aborting during the (sequential, instant) metadata phase determinist
+    // -ically halts before the next emission.
+    const root = await makeMixedFolder({ meta: 4, legacy: 0 });
+    const controller = new AbortController();
+    const emitted: RecordingCoverage[] = [];
+    await streamRecordingIndex(root, {
+      onRecording: (rec) => {
+        emitted.push(rec);
+        controller.abort(); // abort after the very first emission
+      },
+      signal: controller.signal,
+    });
+
+    // The metadata loop checks the signal before each emission, so exactly one
+    // recording is emitted before the abort takes effect.
+    expect(emitted).toHaveLength(1);
+  });
+
+  it('buildRecordingIndex collects the full stream', async () => {
+    // Why: buildRecordingIndex must stay a faithful await-all wrapper over the
+    // stream so non-progressive callers and existing tests keep working.
+    const root = await makeMixedFolder({ meta: 2, legacy: 1 });
+    const index = await buildRecordingIndex(root);
+    expect(index).toHaveLength(3);
   });
 });

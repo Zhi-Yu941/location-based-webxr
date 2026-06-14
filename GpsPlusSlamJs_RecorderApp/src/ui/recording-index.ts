@@ -20,7 +20,7 @@
 
 import { loadGpsPathFromBlob } from 'gps-plus-slam-app-framework/storage/zip-reader';
 import { gpsPathToCoverageCells } from 'gps-plus-slam-app-framework/geo';
-import { mapWithConcurrencyLimit } from 'gps-plus-slam-app-framework/utils/concurrency';
+import { forEachWithConcurrencyLimit } from 'gps-plus-slam-app-framework/utils/concurrency';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
 import {
   discoverScenariosFromZipMetadata,
@@ -78,21 +78,37 @@ export async function loadCoverageCellsForEntry(
   }
 }
 
-/**
- * Build the in-memory recording-coverage index for a folder.
- *
- * Discovers all recordings via `discoverScenariosFromZipMetadata` (which already
- * reads `h3Cells` from each `session.json`), then resolves coverage for each —
- * metadata when present, in-memory GPS-path backfill for legacy recordings.
- * Nothing is written to disk (D2).
- *
- * The returned list is flat across scenarios; callers that need grouping can use
- * `RecordingCoverage.scenario`. Order is by scenario name, then by the
- * discovery order within each scenario (most-recent-first).
- */
-export async function buildRecordingIndex(
+/** Progress of an in-flight {@link streamRecordingIndex} run. */
+export interface IndexProgress {
+  /** Recordings resolved and emitted so far. */
+  readonly done: number;
+  /** Total recordings discovered in the folder. */
+  readonly total: number;
+}
+
+/** Callbacks driving a progressive {@link streamRecordingIndex} run. */
+export interface StreamRecordingIndexHandlers {
+  /**
+   * Called once after discovery (metadata-only) completes, before any coverage
+   * is resolved. Lets the UI show "0 / total" immediately.
+   */
+  onTotal?: (total: number) => void;
+  /** Called once per resolved recording, as soon as its coverage is known. */
+  onRecording: (rec: RecordingCoverage) => void;
+  /** Called after each `onRecording`; `done` is monotonic, ending at `total`. */
+  onProgress?: (progress: IndexProgress) => void;
+  /**
+   * Aborts the stream: once aborted, no further recordings are emitted and the
+   * legacy backfill stops pulling new zips. In-flight reads run to completion
+   * but their results are dropped (not emitted).
+   */
+  signal?: AbortSignal;
+}
+
+/** Flatten discovered scenarios into a single ordered recording list. */
+async function discoverFlatRecordings(
   rootHandle: FileSystemDirectoryHandle
-): Promise<RecordingCoverage[]> {
+): Promise<{ scenario: string; entry: SessionEntry }[]> {
   const { scenarioSessions } =
     await discoverScenariosFromZipMetadata(rootHandle);
 
@@ -102,13 +118,91 @@ export async function buildRecordingIndex(
       flat.push({ scenario, entry });
     }
   }
+  return flat;
+}
 
-  return mapWithConcurrencyLimit(
-    flat,
+/**
+ * Progressively build the in-memory recording-coverage index for a folder,
+ * emitting each recording as soon as its coverage is resolved.
+ *
+ * The flow (D2 — in-memory only, no disk cache):
+ *   1. Discover all recordings via `discoverScenariosFromZipMetadata` (cheap,
+ *      metadata-only) and report the count via `onTotal`.
+ *   2. Emit **metadata-present** recordings first — their `h3Cells` are already
+ *      in hand from discovery, so this needs no further I/O and is effectively
+ *      instant. This is what lets the map populate immediately for new folders.
+ *   3. Backfill **legacy** recordings (no `h3Cells`) with bounded concurrency,
+ *      reading each zip's GPS path in memory and emitting as each resolves.
+ *
+ * `signal` makes the whole run abortable: closing the browser or opening another
+ * folder cancels further emission and stops pulling new legacy zips, so a torn
+ * -down map never receives stray tiles. Nothing is written to disk.
+ *
+ * @see ./recording-index.md
+ */
+export async function streamRecordingIndex(
+  rootHandle: FileSystemDirectoryHandle,
+  handlers: StreamRecordingIndexHandlers
+): Promise<void> {
+  const { onTotal, onRecording, onProgress, signal } = handlers;
+
+  const flat = await discoverFlatRecordings(rootHandle);
+  onTotal?.(flat.length);
+
+  let done = 0;
+  const emit = (rec: RecordingCoverage): void => {
+    // Drop emissions once aborted, even for reads that were already in flight,
+    // so a destroyed consumer never receives stray recordings.
+    if (signal?.aborted) {
+      return;
+    }
+    onRecording(rec);
+    done += 1;
+    onProgress?.({ done, total: flat.length });
+  };
+
+  // Phase 1 — metadata-present recordings: no GPS unzip, emitted first/instantly.
+  const legacy: { scenario: string; entry: SessionEntry }[] = [];
+  for (const item of flat) {
+    if (signal?.aborted) {
+      return;
+    }
+    if (item.entry.h3Cells === undefined) {
+      legacy.push(item);
+      continue;
+    }
+    const { cells, backfilled } = await loadCoverageCellsForEntry(item.entry);
+    emit({ entry: item.entry, scenario: item.scenario, cells, backfilled });
+  }
+
+  // Phase 2 — legacy backfill: read each zip's GPS path with bounded concurrency.
+  await forEachWithConcurrencyLimit(
+    legacy,
     COVERAGE_BACKFILL_CONCURRENCY,
     async ({ scenario, entry }) => {
       const { cells, backfilled } = await loadCoverageCellsForEntry(entry);
-      return { entry, scenario, cells, backfilled };
-    }
+      emit({ entry, scenario, cells, backfilled });
+    },
+    signal
   );
+}
+
+/**
+ * Build the in-memory recording-coverage index for a folder, resolving every
+ * recording before returning. A thin `await`-all wrapper over
+ * {@link streamRecordingIndex} for non-progressive callers and tests.
+ *
+ * The returned list is flat across scenarios; callers that need grouping can use
+ * `RecordingCoverage.scenario`. Coverage comes from metadata when present, or an
+ * in-memory GPS-path backfill for legacy recordings (D2). Order follows the
+ * stream: metadata-present recordings first, then legacy ones.
+ */
+export async function buildRecordingIndex(
+  rootHandle: FileSystemDirectoryHandle
+): Promise<RecordingCoverage[]> {
+  const result: RecordingCoverage[] = [];
+  await streamRecordingIndex(rootHandle, {
+    onRecording: (rec) => result.push(rec),
+  });
+  return result;
 }

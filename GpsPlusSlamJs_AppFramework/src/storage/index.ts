@@ -84,3 +84,6 @@ export {
   type ZipSubdirEntry,
   loadEntriesFromSubdir,
 } from './zip-reader.js';
+
+// --- zip-coverage-embed ---
+export { embedCoverageInSessionJson } from './zip-coverage-embed.js';

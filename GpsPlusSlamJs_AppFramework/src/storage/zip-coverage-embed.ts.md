@@ -1,0 +1,37 @@
+# zip-coverage-embed.ts
+
+## Purpose
+
+One-line: produce a copy of a recording zip whose `session.json` gains the H3 coverage fields (`h3Cells` + `h3Resolution`), leaving every other entry byte-for-byte unchanged.
+
+This is the **B3** primitive of the in-zip backfill (O3 — in-zip rewrite): it lets a one-time "upgrade" embed the derived coverage **inside the recording**, so legacy recordings index instantly on every future open in this app and any other reader. See the plan: `GpsPlusSlamJs_Docs/docs/2026-06-14-followup-progressive-map-browser-indexing-and-backfill.md`.
+
+## Public API
+
+- `embedCoverageInSessionJson(zip: Blob, h3Cells: string[], h3Resolution: number): Promise<Blob>`
+  - **Input:** a recording zip blob + the coverage cells/resolution to embed.
+  - **Output:** a **new** zip blob with `session.json` merged to include `h3Cells` + `h3Resolution`; or the **input blob unchanged (same reference)** when it skips.
+  - **Skips (returns input by reference):** no `session.json`; unparseable `session.json`; `session.json` already has `h3Cells` (idempotent); or any unexpected read/write failure. Callers detect a skip via `result === zip`.
+  - **Never throws** for zip-content reasons and **never emits a partial** zip — on a mid-write failure it abandons the half-built zip and returns the original.
+
+## Invariants & assumptions
+
+- **Pure transform, no I/O side effects.** It does not touch the filesystem — the caller (RecorderApp backfill, B4) owns the safe write-then-verify-then-overwrite protocol around it.
+- **Byte-preserving.** Built on `@zip.js/zip.js` in store mode (`level: 0`), matching the exporter; every non-`session.json` entry is re-emitted with byte-identical uncompressed content. Directory entries are dropped (paths stay implied by file names, as the exporter already does).
+- **Idempotent.** A zip already carrying `h3Cells` is returned unchanged, so re-running the upgrade is a no-op and new recordings (which already have the field) are skipped. It does **not** overwrite existing cells.
+- **Defensive.** Missing/malformed `session.json` returns the input untouched rather than writing over a broken recording.
+
+## Examples
+
+```ts
+const result = await embedCoverageInSessionJson(zipBlob, cells, 11);
+if (result === zipBlob) {
+  // skipped (no/broken session.json, or already embedded) — nothing to write
+} else {
+  // result is a new blob to verify, then atomically swap over the original
+}
+```
+
+## Tests
+
+- `zip-coverage-embed.test.ts` — embeds into a legacy `produceTestZip` and reads the fields back via `loadSessionMetadataFromBlob`; asserts every non-session entry is byte-identical (open-reader byte map); idempotent on an already-embedded zip (same reference, original cells preserved, not overwritten); returns the input untouched for absent and malformed `session.json` (hand-crafted zips).

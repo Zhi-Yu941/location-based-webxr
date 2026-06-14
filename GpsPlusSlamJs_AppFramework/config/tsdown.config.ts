@@ -81,6 +81,7 @@ const entryFiles = [
   'src/storage/storage-backend.ts',
   'src/storage/zip-export.ts',
   'src/storage/zip-reader.ts',
+  'src/storage/zip-coverage-embed.ts',
 
   // test-utils/ (advertised in `exports`; consumed by RecorderApp tests)
   'src/test-utils/browser-mocks.ts',

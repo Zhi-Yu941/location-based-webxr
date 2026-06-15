@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>gps-plus-slam — QR-tracking demo</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #111;
+        color: #eee;
+        font-family: system-ui, sans-serif;
+        overflow: hidden;
+      }
+      /* AR session mounts its canvas here. */
+      #app {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+      }
+      #overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        pointer-events: none;
+        padding: 16px;
+        box-sizing: border-box;
+      }
+      #overlay > * {
+        pointer-events: auto;
+      }
+      #start-screen {
+        margin: auto;
+        max-width: 28rem;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      #start-button {
+        font-size: 1.25rem;
+        padding: 14px 28px;
+        border: 0;
+        border-radius: 12px;
+        background: #3df;
+        color: #062b33;
+        font-weight: 700;
+      }
+      #start-button:disabled {
+        opacity: 0.6;
+      }
+      #capability-message {
+        color: #ffcf66;
+        font-size: 0.95rem;
+      }
+      #hud {
+        align-self: flex-start;
+        background: rgb(0 0 0 / 55%);
+        border-radius: 12px;
+        padding: 12px 16px;
+        font-variant-numeric: tabular-nums;
+        line-height: 1.5;
+      }
+      #hud-status {
+        font-weight: 700;
+        color: #3df;
+      }
+      .hud-row {
+        display: flex;
+        gap: 8px;
+        justify-content: space-between;
+      }
+      .hud-label {
+        color: #9aa;
+      }
+      #hud-size {
+        font-size: 1.3rem;
+        font-weight: 700;
+      }
+      #error {
+        color: #ff8080;
+        align-self: center;
+      }
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="overlay">
+      <section id="hud" data-testid="hud" hidden>
+        <div id="hud-status" data-testid="hud-status">Point at a QR code</div>
+        <div class="hud-row">
+          <span class="hud-label">size</span>
+          <span id="hud-size" data-testid="hud-size">—</span>
+        </div>
+        <div class="hud-row">
+          <span class="hud-label">samples</span>
+          <span id="hud-samples" data-testid="hud-samples">0 samples</span>
+        </div>
+        <div class="hud-row">
+          <span class="hud-label">spread</span>
+          <span id="hud-spread" data-testid="hud-spread">±0 mm</span>
+        </div>
+        <div class="hud-row">
+          <span class="hud-label">stage</span>
+          <span id="hud-lifecycle" data-testid="hud-lifecycle">unknown</span>
+        </div>
+      </section>
+
+      <div id="start-screen" data-testid="start-screen">
+        <h1>QR-tracking demo</h1>
+        <p>
+          Point your phone at any printed QR code. The demo measures its size
+          from the depth map and glues a 3D axis + a translucent cube to the
+          printed code — walk around to check they stay locked.
+        </p>
+        <button id="start-button" data-testid="start-button">Start AR</button>
+        <p id="capability-message" data-testid="capability-message" hidden></p>
+      </div>
+
+      <p id="error" data-testid="error" hidden></p>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

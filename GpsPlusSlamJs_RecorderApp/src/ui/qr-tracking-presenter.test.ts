@@ -12,6 +12,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   createQrTrackingPresenter,
   qrStatusText,
+  type PresentableLevel,
 } from './qr-tracking-presenter';
 
 function setup() {
@@ -41,7 +42,8 @@ describe('createQrTrackingPresenter — success path', () => {
     presenter.onStatus('scanning');
     presenter.onStatus('loading-level');
     presenter.onStatus('tracking');
-    presenter.onLocked({ version: 2 });
+    const level: PresentableLevel = { version: 2 };
+    presenter.onLocked(level);
 
     const lines = updateStatus.mock.calls.map((c) => c[0] as string);
     // Transitional feedback was shown…

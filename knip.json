@@ -55,6 +55,18 @@
     },
     "GpsPlusSlamJs_MinimalExample": {
       "project": ["src/**/*.ts"]
+    },
+    "GpsPlusSlamJs_QrTrackingDemo": {
+      "entry": [
+        "config/stylelint.config.mjs",
+        "playwright-tests/**/*.{js,ts}"
+      ],
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": [
+        "@carlosjeurissen/stylelint-csstree-validator",
+        "postcss-html",
+        "stylelint-config-standard"
+      ]
     }
   }
 }

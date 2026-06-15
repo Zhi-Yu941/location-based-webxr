@@ -1,0 +1,11 @@
+{
+  // Solution-style root config — owns no files, only wires the real projects so
+  // tsserver assigns each opened file the right options (sources →
+  // tsconfig.app.json, tests → tsconfig.vitest.json). Build/CI target the
+  // concrete configs directly.
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.vitest.json" }
+  ]
+}

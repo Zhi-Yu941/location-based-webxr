@@ -30,6 +30,19 @@ import { createQrDebugView, type QrDebugView } from "./qr-debug-view.js";
 import { createQrDemoController } from "./demo-controller.js";
 import { toHudView, type DemoStatus } from "./hud-view.js";
 import { isDemoSupported, capabilityMessage } from "./capability.js";
+import {
+  createDebugLog,
+  formatDetectionLine,
+  formatStatusLine,
+} from "./debug-log.js";
+
+/**
+ * Detection cadence (ms between detection STARTS) — ~8 Hz, within the plan §9
+ * 5–10 Hz target. NOT per-frame: a phone renders ~30–60 fps and running the
+ * detector + depth unproject every frame would waste CPU/battery and never
+ * improve a throttled, coalesced pipeline.
+ */
+const DETECT_INTERVAL_MS = 125;
 
 function el<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -48,6 +61,7 @@ const dom = {
   hudSamples: el("hud-samples"),
   hudSpread: el("hud-spread"),
   hudLifecycle: el("hud-lifecycle"),
+  debugLog: el("debug-log"),
   error: el("error"),
 } as const;
 
@@ -57,6 +71,17 @@ let stopFrames: (() => void) | null = null;
 let status: DemoStatus = "idle";
 /** The most-recently detected payload — drives which marker the HUD shows. */
 let activeText: string | null = null;
+
+/** On-screen detection log (cadence/tuning aid — see debug-log.ts). */
+const debugLog = createDebugLog();
+/** Clock of the previous lock, for the per-line Δt. */
+let lastLockMs: number | null = null;
+
+function renderDebugLog(): void {
+  dom.debugLog.textContent = debugLog.lines.join("\n");
+  // Keep the newest line in view.
+  dom.debugLog.scrollTop = dom.debugLog.scrollHeight;
+}
 
 function renderHud(): void {
   const size =
@@ -118,6 +143,21 @@ async function startAr(): Promise<void> {
     },
     recordSize: (text, estimate) => {
       store?.dispatch(recordQrSizeEstimate({ text, estimate }));
+      // Log every lock with the Δt since the previous one — the cadence signal
+      // for tuning the throttle + accumulator thresholds on a real device.
+      const nowMs = performance.now();
+      debugLog.append(
+        formatDetectionLine({
+          clockMs: nowMs,
+          deltaMs: lastLockMs === null ? null : nowMs - lastLockMs,
+          text,
+          sizeStatus: estimate.status,
+          estimateM: estimate.estimateM,
+          sampleCount: estimate.sampleCount,
+        }),
+      );
+      lastLockMs = nowMs;
+      renderDebugLog();
     },
     updateScene: (pose, sizeM) => {
       // Need a measured size to draw the cube; skip until one is available.
@@ -125,8 +165,11 @@ async function startAr(): Promise<void> {
     },
     onStatus: (next) => {
       status = next;
+      debugLog.append(formatStatusLine(performance.now(), next));
+      renderDebugLog();
       renderHud();
     },
+    minIntervalMs: DETECT_INTERVAL_MS,
   });
 
   stopFrames = seams.startFrameSource((image) => controller.offerFrame(image));

@@ -14,6 +14,12 @@ boot store + AR session + debug view + controller → per-frame
   store dispatches, `updateScene` to the debug view (skips until a size exists),
   and `startFrameSource` to `offerFrame`. `failStart` rolls the UI back on a boot
   error.
+- **Sets the detection throttle** here: `minIntervalMs = DETECT_INTERVAL_MS`
+  (125 ms ≈ 8 Hz, plan §9) — the controller's own default is 0 (no throttle) so
+  unit tests stay fast; production cadence is a wiring decision, set in `main`.
+- Maintains an on-screen **debug log** (`debug-log.ts`): every lock appends a
+  line with the Δt since the previous lock (cadence/tuning aid), and status
+  transitions are logged too.
 - HUD re-renders on store change and status change.
 
 ## Verification

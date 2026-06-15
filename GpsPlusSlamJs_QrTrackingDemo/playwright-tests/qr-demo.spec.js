@@ -31,6 +31,11 @@ test.describe("QR-tracking demo — measure + glue flow", () => {
     await expect(page.getByTestId("hud-size")).toHaveText("20.0 cm");
     await expect(page.getByTestId("hud-spread")).toHaveText("±0 mm");
     await expect(page.getByTestId("hud-status")).toContainText("Locked");
+
+    // The debug log records per-lock lines with a Δt cadence stamp.
+    const log = page.getByTestId("debug-log");
+    await expect(log).toContainText("estimated 20.0cm");
+    await expect(log).toContainText("Δ"); // inter-lock cadence is shown
   });
 
   test("glues the debug axis + cube under arWorldGroup once locked", async ({

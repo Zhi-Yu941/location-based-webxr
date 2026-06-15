@@ -110,8 +110,10 @@ export async function bootQrDemo(page) {
 }
 
 /**
- * Drive `n` frames through the stashed frame callback, awaiting the async
- * detect chain between each so locks accumulate deterministically.
+ * Drive `n` frames through the stashed frame callback. Frames are spaced ~150 ms
+ * apart in real time so each clears the controller's ~125 ms detection throttle
+ * (and the async detect chain settles between pumps) — locks accumulate
+ * deterministically while exercising the real throttle path, not bypassing it.
  * @param {import('@playwright/test').Page} page
  * @param {number} n
  */
@@ -121,7 +123,7 @@ export async function feedFrames(page, n) {
     if (!control.pump) throw new Error("frame source not started — boot first");
     for (let i = 0; i < count; i++) {
       control.pump(control.frameImage);
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 150));
     }
   }, n);
 }

@@ -89,6 +89,21 @@
         font-size: 1.3rem;
         font-weight: 700;
       }
+      #debug-log {
+        margin: 8px 0 0;
+        max-height: 9.5rem;
+        max-width: 70vw;
+        overflow: auto;
+        font-family: ui-monospace, monospace;
+        font-size: 0.7rem;
+        line-height: 1.35;
+        color: #9ad;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      #debug-log:empty {
+        display: none;
+      }
       #error {
         color: #ff8080;
         align-self: center;
@@ -119,6 +134,7 @@
           <span class="hud-label">stage</span>
           <span id="hud-lifecycle" data-testid="hud-lifecycle">unknown</span>
         </div>
+        <pre id="debug-log" data-testid="debug-log"></pre>
       </section>
 
       <div id="start-screen" data-testid="start-screen">

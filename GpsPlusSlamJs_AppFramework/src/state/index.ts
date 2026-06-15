@@ -36,6 +36,31 @@ export {
   selectLastSensorOrientation,
 } from './tracking-slice.js';
 
+// --- qr-detected-slice (opt-in framework slice; Note 3 of the QR-tracking
+//     follow-up plan). Apps wire it via `extraReducers: { qrDetected:
+//     qrDetectedReducer }`; not a built-in of `createSlamAppStore`. ---
+export {
+  DEFAULT_QR_MAX_HISTORY,
+  type QrSizeStatus,
+  type QrSizeEstimate,
+  type QrDetectionEntry,
+  type QrMarkerState,
+  type QrDetectedState,
+  type RootWithQrDetected,
+  recordQrDetection,
+  recordQrSizeEstimate,
+  pruneQrDetections,
+  clearQrMarker,
+  clearAllQrMarkers,
+  setQrMaxHistory,
+  qrDetectedReducer,
+  selectQrMarkers,
+  selectQrMarker,
+  selectLatestQrDetection,
+  selectQrSize,
+  medianQrPosition,
+} from './qr-detected-slice.js';
+
 // --- ref-points-slice — moved to recorder app in Iter 3 of the
 //     AppFramework / RecorderApp boundary migration. Recorder consumers
 //     import these from their own local slice now. ---

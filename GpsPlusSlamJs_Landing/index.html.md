@@ -4,11 +4,12 @@
 
 The static landing page served at the **root** (`/`) of `gps.csutil.com`. It
 gives a one-paragraph pitch of the GPS+SLAM location-based-WebXR framework and
-routes visitors to the three deployed apps that share the origin, each labelled
+routes visitors to the deployed apps that share the origin, each labelled
 by name:
 
 - **"Anchor Starter Demo"** → `/starter/` (the `GpsPlusSlamJs_AnchorStarter` app).
 - **"Minimal Example"** → `/minimal/` (the `GpsPlusSlamJs_MinimalExample` app).
+- **"QR-Tracking Demo"** → `/qr-demo/` (the `GpsPlusSlamJs_QrTrackingDemo` app).
 - **"Recorder"** → `/recorder/` (the `GpsPlusSlamJs_RecorderApp`).
 
 It is the third surface of the multi-app subpath deployment described in
@@ -24,8 +25,8 @@ orchestration (`scripts/build-site.mjs`, Step 5) copies this file verbatim to
 
 ## Invariants & assumptions
 
-- **Absolute subpath links.** The three buttons link to `/starter/`,
-  `/minimal/`, and `/recorder/` (root-absolute, with trailing slash). These are
+- **Absolute subpath links.** The buttons link to `/starter/`, `/minimal/`,
+  `/qr-demo/`, and `/recorder/` (root-absolute, with trailing slash). These are
   deployment URLs on the shared origin, not Vite-processed paths, so they are
   written literally and are **not** rewritten by any base-path logic.
 - **Zero dependencies / no bundler.** Keeping the page pure static HTML+CSS is a

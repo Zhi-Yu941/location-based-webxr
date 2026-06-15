@@ -4,16 +4,18 @@
  * build-site.mjs — orchestrates the multi-app subpath deployment.
  *
  * Builds the framework once, then builds the RecorderApp under base `/recorder/`,
- * the AnchorStarter under base `/starter/`, and the MinimalExample under base
- * `/minimal/` into a single combined output directory (`dist-site/`), and copies
- * the static landing page to the root. The resulting tree is what Cloudflare
- * serves from `gps.csutil.com`:
+ * the AnchorStarter under base `/starter/`, the MinimalExample under base
+ * `/minimal/`, and the QrTrackingDemo under base `/qr-demo/` into a single
+ * combined output directory (`dist-site/`), and copies the static landing page
+ * to the root. The resulting tree is what Cloudflare serves from
+ * `gps.csutil.com`:
  *
  *   dist-site/
  *     index.html        ← landing page (root)
  *     recorder/         ← RecorderApp, base=/recorder/
  *     starter/          ← AnchorStarter, base=/starter/
  *     minimal/          ← MinimalExample, base=/minimal/
+ *     qr-demo/          ← QrTrackingDemo, base=/qr-demo/
  *
  * `base` and `outDir` are passed as build-time CLI flags so the committed app
  * vite configs stay at their `/` + `dist` defaults (dev/USB-debugging unchanged).
@@ -108,6 +110,7 @@ function assertSiteTree() {
     'recorder/ar-hittest-test.html',
     'starter/index.html',
     'minimal/index.html',
+    'qr-demo/index.html',
   ];
   const missing = required.filter((rel) => !existsSync(join(distSite, rel)));
   if (missing.length > 0) {
@@ -170,6 +173,21 @@ run('pnpm', [
   '--emptyOutDir',
 ]);
 assertNoBareAbsoluteUrlsInDir(join(distSite, 'minimal'), '/minimal/');
+
+console.log('• Building QrTrackingDemo (base=/qr-demo/)');
+run('pnpm', ['--filter', 'gps-plus-slam-qr-tracking-demo', 'run', 'typecheck']);
+run('pnpm', [
+  '--filter',
+  'gps-plus-slam-qr-tracking-demo',
+  'exec',
+  'vite',
+  'build',
+  '--base=/qr-demo/',
+  '--outDir',
+  join(distSite, 'qr-demo'),
+  '--emptyOutDir',
+]);
+assertNoBareAbsoluteUrlsInDir(join(distSite, 'qr-demo'), '/qr-demo/');
 
 console.log('• Copying landing page to dist-site/index.html');
 cpSync(

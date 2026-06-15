@@ -33,6 +33,12 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { Vector3 } from 'gps-plus-slam-js';
 import type { Pose } from '../ar/qr-pose.js';
+import type { QrSizeEstimate } from '../ar/qr-size-from-depth.js';
+
+// Re-exported so consumers of the slice keep importing the size lifecycle types
+// from one place. They are DEFINED in `ar/qr-size-from-depth.ts` (where size is
+// measured) so this slice can use them without `ar` ever importing `state`.
+export type { QrSizeStatus, QrSizeEstimate } from '../ar/qr-size-from-depth.js';
 
 /**
  * Default ring-buffer cap per marker. Bounded so an overlay that never prunes
@@ -40,26 +46,6 @@ import type { Pose } from '../ar/qr-pose.js';
  * window and a short motion path. Override via {@link setQrMaxHistory}.
  */
 export const DEFAULT_QR_MAX_HISTORY = 32;
-
-/** Where the size lifecycle currently sits for one marker (Note 3 / Note 4). */
-export type QrSizeStatus =
-  /** No size authored and none measured yet — size-dependent features blocked. */
-  | 'unknown'
-  /** Measurements are accumulating but the estimate has not converged. */
-  | 'measuring'
-  /** A reliably-estimated (or authored) size — size-dependent features unlock. */
-  | 'estimated';
-
-/** Per-marker physical-size estimate (drives the Note 3 size lifecycle). */
-export interface QrSizeEstimate {
-  status: QrSizeStatus;
-  /** Running median side length, meters, or `null` while unknown. */
-  estimateM: number | null;
-  /** How many accepted samples back the estimate. */
-  sampleCount: number;
-  /** Spread of the accepted samples (e.g. max−min), meters — 0 when <2 samples. */
-  spreadM: number;
-}
 
 /**
  * One detection observation. Detection-agnostic by design (Note 1): `text` is

@@ -54,6 +54,17 @@ export {
   type DepthUnprojector,
 } from './depth-unprojection.js';
 
+// --- qr-size-from-depth (Note 4 — measure the QR size from the depth map) ---
+export {
+  type QrSizeStatus,
+  type QrSizeEstimate,
+  type QrSizeObservation,
+  type QrSizeAccumulatorOptions,
+  type QrSizeAccumulator,
+  estimateQrSizeFromDepth,
+  createQrSizeAccumulator,
+} from './qr-size-from-depth.js';
+
 // --- qr-pose ---
 export {
   type Point2,

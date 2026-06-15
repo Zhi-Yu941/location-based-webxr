@@ -58,6 +58,53 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 /**
+ * Validate the optional `qr.physicalSizeM`. When present it MUST be a positive
+ * number (a `0`/negative authored size is a bug, not a "measure it instead"
+ * signal). Returns `undefined` when omitted.
+ */
+function parsePhysicalSize(value: unknown): number | undefined {
+  if (value === undefined) return undefined;
+  if (!isFiniteNumber(value) || value <= 0) {
+    throw new QrLevelValidationError(
+      '"qr.physicalSizeM" must be a positive number when present'
+    );
+  }
+  return value;
+}
+
+/**
+ * Validate the optional `qr.geo`. When present every field is validated (a
+ * partial geo is a bug — it would silently place the vote wrong). Returns
+ * `undefined` when omitted; heading is normalized into `[0, 360)`.
+ */
+function parseGeo(value: unknown): QrGeoPose | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) {
+    throw new QrLevelValidationError('"qr.geo" must be an object when present');
+  }
+  const { lat, lon, alt, headingDeg } = value;
+  if (!isFiniteNumber(lat) || lat < -90 || lat > 90) {
+    throw new QrLevelValidationError(
+      '"qr.geo.lat" must be a number in [-90, 90]'
+    );
+  }
+  if (!isFiniteNumber(lon) || lon < -180 || lon > 180) {
+    throw new QrLevelValidationError(
+      '"qr.geo.lon" must be a number in [-180, 180]'
+    );
+  }
+  if (!isFiniteNumber(alt)) {
+    throw new QrLevelValidationError('"qr.geo.alt" must be a finite number');
+  }
+  if (!isFiniteNumber(headingDeg)) {
+    throw new QrLevelValidationError(
+      '"qr.geo.headingDeg" must be a finite number'
+    );
+  }
+  return { lat, lon, alt, headingDeg: ((headingDeg % 360) + 360) % 360 };
+}
+
+/**
  * Validate an already-parsed value as a {@link QrLevel}. Throws
  * {@link QrLevelValidationError} with a descriptive message on any violation.
  */
@@ -71,56 +118,8 @@ export function parseQrLevel(data: unknown): QrLevel {
   if (!isRecord(data.qr)) {
     throw new QrLevelValidationError('missing/invalid "qr"');
   }
-  const { qr } = data;
-
-  // `physicalSizeM` is optional; when present it MUST be a positive number
-  // (a `0`/negative authored size is a bug, not a "measure it instead" signal).
-  let physicalSizeM: number | undefined;
-  if (qr.physicalSizeM !== undefined) {
-    if (!isFiniteNumber(qr.physicalSizeM) || qr.physicalSizeM <= 0) {
-      throw new QrLevelValidationError(
-        '"qr.physicalSizeM" must be a positive number when present'
-      );
-    }
-    physicalSizeM = qr.physicalSizeM;
-  }
-
-  // `geo` is optional; when present every field is validated (a partial geo is
-  // a bug — it would silently place the vote wrong).
-  let geo: QrGeoPose | undefined;
-  if (qr.geo !== undefined) {
-    if (!isRecord(qr.geo)) {
-      throw new QrLevelValidationError(
-        '"qr.geo" must be an object when present'
-      );
-    }
-    const g = qr.geo;
-    if (!isFiniteNumber(g.lat) || g.lat < -90 || g.lat > 90) {
-      throw new QrLevelValidationError(
-        '"qr.geo.lat" must be a number in [-90, 90]'
-      );
-    }
-    if (!isFiniteNumber(g.lon) || g.lon < -180 || g.lon > 180) {
-      throw new QrLevelValidationError(
-        '"qr.geo.lon" must be a number in [-180, 180]'
-      );
-    }
-    if (!isFiniteNumber(g.alt)) {
-      throw new QrLevelValidationError('"qr.geo.alt" must be a finite number');
-    }
-    if (!isFiniteNumber(g.headingDeg)) {
-      throw new QrLevelValidationError(
-        '"qr.geo.headingDeg" must be a finite number'
-      );
-    }
-    geo = {
-      lat: g.lat,
-      lon: g.lon,
-      alt: g.alt,
-      // Normalize heading into [0, 360).
-      headingDeg: ((g.headingDeg % 360) + 360) % 360,
-    };
-  }
+  const physicalSizeM = parsePhysicalSize(data.qr.physicalSizeM);
+  const geo = parseGeo(data.qr.geo);
 
   return {
     version: data.version,

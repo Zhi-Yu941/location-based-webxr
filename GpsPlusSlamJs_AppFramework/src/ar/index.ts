@@ -77,6 +77,15 @@ export {
   solveQrPose,
 } from './qr-pose.js';
 
+// --- qr-occupancy-check ---
+export {
+  type OccupancySurface,
+  type QrPlausibilityVerdict,
+  type QrPlausibility,
+  type QrPlausibilityOptions,
+  checkQrPlausibility,
+} from './qr-occupancy-check.js';
+
 // --- bresenham3d ---
 export { bresenham3d, type GridCell } from './bresenham3d.js';
 

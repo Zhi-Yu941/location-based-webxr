@@ -114,41 +114,50 @@
     </style>
   </head>
   <body>
-    <div id="app"></div>
-    <div id="overlay">
-      <section id="hud" data-testid="hud" hidden>
-        <div id="hud-status" data-testid="hud-status">Point at a QR code</div>
-        <div class="hud-row">
-          <span class="hud-label">size</span>
-          <span id="hud-size" data-testid="hud-size">—</span>
-        </div>
-        <div class="hud-row">
-          <span class="hud-label">samples</span>
-          <span id="hud-samples" data-testid="hud-samples">0 samples</span>
-        </div>
-        <div class="hud-row">
-          <span class="hud-label">spread</span>
-          <span id="hud-spread" data-testid="hud-spread">±0 mm</span>
-        </div>
-        <div class="hud-row">
-          <span class="hud-label">stage</span>
-          <span id="hud-lifecycle" data-testid="hud-lifecycle">unknown</span>
-        </div>
-        <pre id="debug-log" data-testid="debug-log"></pre>
-      </section>
+    <!-- #overlay MUST stay nested inside #app: #app is the element passed to
+         initAR() → the WebXR dom-overlay root, so only its subtree composites
+         over the camera feed in AR. A sibling overlay is invisible in AR.
+         Guarded by tests/repo-config/hud-overlay-nesting.test.js. -->
+    <div id="app">
+      <div id="overlay">
+        <section id="hud" data-testid="hud" hidden>
+          <div id="hud-status" data-testid="hud-status">Point at a QR code</div>
+          <div class="hud-row">
+            <span class="hud-label">size</span>
+            <span id="hud-size" data-testid="hud-size">—</span>
+          </div>
+          <div class="hud-row">
+            <span class="hud-label">samples</span>
+            <span id="hud-samples" data-testid="hud-samples">0 samples</span>
+          </div>
+          <div class="hud-row">
+            <span class="hud-label">spread</span>
+            <span id="hud-spread" data-testid="hud-spread">±0 mm</span>
+          </div>
+          <div class="hud-row">
+            <span class="hud-label">stage</span>
+            <span id="hud-lifecycle" data-testid="hud-lifecycle">unknown</span>
+          </div>
+          <pre id="debug-log" data-testid="debug-log"></pre>
+        </section>
 
-      <div id="start-screen" data-testid="start-screen">
-        <h1>QR-tracking demo</h1>
-        <p>
-          Point your phone at any printed QR code. The demo measures its size
-          from the depth map and glues a 3D axis + a translucent cube to the
-          printed code — walk around to check they stay locked.
-        </p>
-        <button id="start-button" data-testid="start-button">Start AR</button>
-        <p id="capability-message" data-testid="capability-message" hidden></p>
+        <div id="start-screen" data-testid="start-screen">
+          <h1>QR-tracking demo</h1>
+          <p>
+            Point your phone at any printed QR code. The demo measures its size
+            from the depth map and glues a 3D axis + a translucent cube to the
+            printed code — walk around to check they stay locked.
+          </p>
+          <button id="start-button" data-testid="start-button">Start AR</button>
+          <p
+            id="capability-message"
+            data-testid="capability-message"
+            hidden
+          ></p>
+        </div>
+
+        <p id="error" data-testid="error" hidden></p>
       </div>
-
-      <p id="error" data-testid="error" hidden></p>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

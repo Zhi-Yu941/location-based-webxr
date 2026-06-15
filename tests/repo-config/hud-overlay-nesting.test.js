@@ -58,6 +58,12 @@ const APP_OVERLAY_CONTRACTS = [
     containerId: 'ar-root',
     overlayIds: ['status', 'enter-ar'],
   },
+  {
+    name: 'QrTrackingDemo',
+    htmlPath: 'GpsPlusSlamJs_QrTrackingDemo/index.html',
+    containerId: 'app',
+    overlayIds: ['overlay'],
+  },
 ];
 
 /**

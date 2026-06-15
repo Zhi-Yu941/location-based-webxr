@@ -77,6 +77,25 @@ export {
   solveQrPose,
 } from './qr-pose.js';
 
+// --- qr-level ---
+export {
+  type QrLevel,
+  type FetchLike,
+  type FetchQrLevelOptions,
+  QrLevelValidationError,
+  parseQrLevel,
+  fetchQrLevel,
+} from './qr-level.js';
+
+// --- qr-tracking-controller ---
+export {
+  type QrTrackingStatus,
+  type QrSolvePoseInput,
+  type QrTrackingControllerConfig,
+  type QrTrackingController,
+  createQrTrackingController,
+} from './qr-tracking-controller.js';
+
 // --- qr-frontend ---
 export {
   type RgbaImage,

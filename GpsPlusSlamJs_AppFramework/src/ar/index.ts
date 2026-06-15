@@ -77,6 +77,32 @@ export {
   solveQrPose,
 } from './qr-pose.js';
 
+// --- qr-frontend ---
+export {
+  type RgbaImage,
+  type QrDetection,
+  type QrFrontEnd,
+  type DetectedBarcodeLike,
+  type BarcodeDetectorLike,
+  type ToImageBitmapSource,
+  type CvPointsMat,
+  type CvImageMat,
+  type CvQrDetectorLike,
+  BarcodeDetectorFrontEnd,
+  OpenCvQrFrontEnd,
+  createBarcodeDetectorFrontEnd,
+} from './qr-frontend.js';
+
+// --- opencv-pnp ---
+export { type CvMat, type CvLike, OpenCvPnpSquare } from './opencv-pnp.js';
+
+// --- qr-detection-scheduler ---
+export {
+  type QrDetectionSchedulerConfig,
+  type QrDetectionScheduler,
+  createQrDetectionScheduler,
+} from './qr-detection-scheduler.js';
+
 // --- qr-gps-vote ---
 export {
   METERS_PER_DEG_LAT,

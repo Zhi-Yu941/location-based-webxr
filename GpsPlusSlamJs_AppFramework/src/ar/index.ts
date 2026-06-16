@@ -140,11 +140,7 @@ export {
   type DetectedBarcodeLike,
   type BarcodeDetectorLike,
   type ToImageBitmapSource,
-  type CvPointsMat,
-  type CvImageMat,
-  type CvQrDetectorLike,
   BarcodeDetectorFrontEnd,
-  OpenCvQrFrontEnd,
   createBarcodeDetectorFrontEnd,
 } from './qr-frontend.js';
 

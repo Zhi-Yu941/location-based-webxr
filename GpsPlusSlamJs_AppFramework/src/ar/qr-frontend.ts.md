@@ -1,49 +1,44 @@
 # qr-frontend.ts
 
-**Purpose:** The detect+decode front-ends behind a single `QrFrontEnd` —
+**Purpose:** The detect+decode front-end behind a single `QrFrontEnd` —
 Phase 2 / §3 of the
 [QR-code detection & tracking plan](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-qr-code-detection-tracking-plan.md).
-Native `BarcodeDetector` is preferred; OpenCV's `QRCodeDetector` is the fallback.
+Native `BarcodeDetector` only; the OpenCV `QRCodeDetector` fallback was removed
+(the framework is now OpenCV-free).
 
 ## Public API
 
-- `QrFrontEnd` — `{ kind, detect(image: RgbaImage): Promise<QrDetection | null>, dispose?() }`.
+- `QrFrontEnd` — `{ kind: 'barcode-detector', detect(image: RgbaImage): Promise<QrDetection | null>, dispose?() }`.
   `QrDetection = { corners: [Point2×4], text }`; `RgbaImage = { data, width, height }`.
 - `BarcodeDetectorFrontEnd` — `new (detector: BarcodeDetectorLike, toSource?)`.
   Wraps native `BarcodeDetector`; `toSource` converts `RgbaImage` →
   `ImageBitmapSource` (default `new ImageData(...)`, injectable for tests).
-- `createBarcodeDetectorFrontEnd(ctor?)` — feature-detect factory; `null` when
-  no `BarcodeDetector` constructor exists (→ use the OpenCV fallback).
-- `OpenCvQrFrontEnd` — `new (detector: CvQrDetectorLike)`. Wraps OpenCV's
-  detector with `cv.Mat` discipline (`matFromRgba` + points Mat freed in a
-  `finally`).
+- `createBarcodeDetectorFrontEnd(ctor?)` — feature-detect factory; `null` when no
+  `BarcodeDetector` constructor exists. There is **no OpenCV fallback** — the
+  caller must handle the unsupported-browser case (see the follow-up below).
 - Supporting types: `DetectedBarcodeLike`, `BarcodeDetectorLike`,
-  `ToImageBitmapSource`, `CvQrDetectorLike`, `CvImageMat`, `CvPointsMat`.
+  `ToImageBitmapSource`.
 
 ## Invariants & assumptions
 
-- **Front-end-agnostic corners:** both emit pixel corners (top-left origin) in an
-  arbitrary order; neither order is contractually TL,TR,BR,BL. Winding/order
-  validation is downstream in `qr-pose.ts` `validateQuad` — the pose path does
-  not assume a front-end.
-- **Dependencies injected:** the native detector, the OpenCV detector, and the
-  `RgbaImage`→source conversion are all injected, so this module + tests need no
-  DOM and no WASM.
+- **Front-end-agnostic corners:** corners are emitted in pixel coordinates
+  (top-left origin) in an arbitrary order; the order is not contractually
+  TL,TR,BR,BL. Winding/order validation is downstream in `qr-pose.ts`
+  `validateQuad` — the pose path does not assume a front-end.
+- **Dependencies injected:** the native detector and the `RgbaImage`→source
+  conversion are injected, so this module + tests need no DOM.
 - **Malformed output rejected:** non-4 corner counts, non-finite coordinates, and
   empty decoded text yield `null`.
-- **Worker hosting:** in production this runs in a worker; `OpenCvQrFrontEnd`'s
-  `CvQrDetectorLike` is built from the lazily-loaded `cv` (classic worker,
-  `importScripts`; see plan §9). The pipeline (front-end + `PlanarPnpSquare` +
-  `solveQrPose`) is transport-agnostic, so the same code runs on the main thread
-  in tests. (Pose is now the pure-JS [planar-pnp.ts.md](planar-pnp.ts.md); only
-  the decoder fallback below still uses OpenCV.)
+- **Interim posture is BarcodeDetector-only** (covers the Android-Chrome test
+  devices). A pure-JS decoder fallback (zxing-wasm / jsQR / none) is its own
+  dependency decision — see
+  [2026-06-17-followup-qr-decoder-fallback.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-17-followup-qr-decoder-fallback.md).
 
 ## Tests
 
-- `qr-frontend.test.ts` — BarcodeDetector: first valid QR returned, malformed
-  results skipped, factory null/constructed cases. OpenCV: text+corners returned,
-  empty decode → null, both Mats freed on hit and miss, `dispose()` frees the
-  detector.
+- `qr-frontend.test.ts` — BarcodeDetector: first valid QR returned, nothing
+  detected → null, malformed results (wrong corner count / empty text) skipped;
+  factory null (no ctor) and constructed-with-`qr_code`-format cases.
 
 ## Related
 

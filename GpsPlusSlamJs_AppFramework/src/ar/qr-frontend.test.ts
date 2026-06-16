@@ -1,23 +1,18 @@
 /**
  * QR detection front-ends — unit tests.
  *
- * Why this test matters: both front-ends must emit a uniform {@link QrDetection}
- * (4 finite corner pixels + non-empty text) regardless of their very different
- * native APIs, reject malformed detector output, and — for the OpenCV path —
- * free every `cv.Mat` on both the hit and miss paths. Dependencies are injected
- * so no DOM/WASM is needed.
+ * Why this test matters: the BarcodeDetector front-end must emit a uniform
+ * {@link QrDetection} (4 finite corner pixels + non-empty text), reject
+ * malformed detector output, and the factory must degrade to `null` when no
+ * `BarcodeDetector` exists. The native detector is injected so no DOM is needed.
  */
 
 import { describe, it, expect, vi } from 'vitest';
 import {
   BarcodeDetectorFrontEnd,
-  OpenCvQrFrontEnd,
   createBarcodeDetectorFrontEnd,
   type RgbaImage,
   type DetectedBarcodeLike,
-  type CvQrDetectorLike,
-  type CvImageMat,
-  type CvPointsMat,
 } from './qr-frontend';
 
 const image: RgbaImage = {
@@ -99,56 +94,5 @@ describe('createBarcodeDetectorFrontEnd', () => {
     const fe = createBarcodeDetectorFrontEnd(FakeBarcodeDetector);
     expect(fe).not.toBeNull();
     expect(capturedOpts).toEqual({ formats: ['qr_code'] });
-  });
-});
-
-describe('OpenCvQrFrontEnd', () => {
-  function makeDetector(opts: { text: string; corners?: number[] }) {
-    const live = new Set<CvImageMat | CvPointsMat>();
-    const detector: CvQrDetectorLike & { liveCount: () => number } = {
-      liveCount: () => live.size,
-      matFromRgba: () => {
-        const m: CvImageMat = { delete: () => live.delete(m) };
-        live.add(m);
-        return m;
-      },
-      newPointsMat: () => {
-        const m: CvPointsMat = {
-          data32F: new Float32Array(
-            opts.corners ?? [10, 10, 90, 12, 88, 92, 11, 90]
-          ),
-          delete: () => live.delete(m),
-        };
-        live.add(m);
-        return m;
-      },
-      detectAndDecode: () => opts.text,
-      delete: vi.fn(),
-    };
-    return detector;
-  }
-
-  it('returns the decoded text and corners, freeing both Mats', async () => {
-    const detector = makeDetector({ text: 'https://lvl/2' });
-    const fe = new OpenCvQrFrontEnd(detector);
-    const det = await fe.detect(image);
-    expect(det).not.toBeNull();
-    expect(det!.text).toBe('https://lvl/2');
-    expect(det!.corners[0]).toEqual({ x: 10, y: 10 });
-    expect(detector.liveCount()).toBe(0); // img + points released
-  });
-
-  it('returns null and still frees both Mats when nothing decodes', async () => {
-    const detector = makeDetector({ text: '' });
-    const fe = new OpenCvQrFrontEnd(detector);
-    expect(await fe.detect(image)).toBeNull();
-    expect(detector.liveCount()).toBe(0);
-  });
-
-  it('dispose() frees the detector', () => {
-    const detector = makeDetector({ text: '' });
-    const fe = new OpenCvQrFrontEnd(detector);
-    fe.dispose();
-    expect(detector.delete).toHaveBeenCalled();
   });
 });

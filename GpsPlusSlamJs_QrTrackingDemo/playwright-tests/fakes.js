@@ -69,13 +69,15 @@ export async function installQrDemoFakes(page, { planar = true } = {}) {
         getArWorldGroup: () => fakeGroup,
         createDetect: () => () => Promise.resolve(detection),
         getDepthContext: () => ({
-          // Linear screen→world map; the square frame keeps the quad square.
-          // When `planar` is false, the bottom-right corner (screenX,screenY
-          // both > 0.5) is pushed out of the plane so the quad is non-planar:
-          // `poseFromWorldCorners` still fits a valid pose (lock fires), but
-          // `estimateQrSizeFromDepth`'s planarity score drops below the accept
-          // threshold, so the size never leaves `unknown` (estimateM stays
-          // null) — the real-device "detected but size not yet measured" case.
+          // Linear screen→world map; the square frame keeps the quad square so
+          // the depth→size estimate converges to 0.2 m. When `planar` is false,
+          // the bottom-right corner (screenX,screenY both > 0.5) is pushed out
+          // of the plane so the quad is non-planar: `estimateQrSizeFromDepth`'s
+          // planarity score drops below the accept threshold, so the size never
+          // leaves `unknown` (estimateM stays null) and the controller's
+          // size-exists gate withholds the overlay — the real-device "detected
+          // but size not yet measured" case. (Pose itself is now PnP from the
+          // corner pixels, not the depth-corner fit.)
           unprojector: {
             unproject: (dp) => [
               dp.screenX * unprojectScale,
@@ -85,6 +87,11 @@ export async function installQrDemoFakes(page, { planar = true } = {}) {
           },
           depthAt: () => 1,
           cameraPose: { position: [0, 0, 0], rotation: [0, 0, 0, 1] },
+          // A symmetric perspective projection (column-major) so PnP intrinsics
+          // are sane: fx = fy = 1.732·W/2, principal point at the frame centre.
+          projectionMatrix: [
+            1.732, 0, 0, 0, 0, 1.732, 0, 0, 0, 0, -1.0002, -1, 0, 0, -0.2, 0,
+          ],
         }),
         startFrameSource: (onImage) => {
           control.pump = onImage;

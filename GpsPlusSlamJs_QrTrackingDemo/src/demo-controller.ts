@@ -3,22 +3,32 @@
  *
  * Per throttled/coalesced frame it: detects a QR (front-end), measures the size
  * from depth via the shared framework {@link createQrSizeMeasurer} (samples the
- * corners + an interior point, accumulates a per-marker running median), fits a
- * rigid pose ({@link poseFromWorldCorners}, no solvePnP / no size needed) from
- * the same sampled corners, and — once the N-consecutive-lock fires — records
- * the detection + size into the `qrDetected` store and glues the debug axis +
- * cube to the pose.
+ * corners + an interior point, accumulates a per-marker running median), and —
+ * once a size EXISTS — solves the full pose with the framework's pure-JS PnP
+ * ({@link solveQrPose} + {@link PlanarPnpSquare}, position AND rotation from the
+ * detected corner pixels). On the N-consecutive-lock it records the detection +
+ * size into the `qrDetected` store and glues the debug axis + cube to the pose.
  *
- * Every device-specific dependency (detect, depth context, store dispatch,
- * scene update) is injected, so this whole flow is unit-testable without WebXR,
- * a camera, or depth hardware. It is geo-less: no GPS vote is ever cast.
+ * The pose is now PnP, not the depth-corner rigid fit — so rotation no longer
+ * inherits per-corner depth noise. Depth is still used for the SIZE (the metric
+ * scale PnP needs); the relaxed gate places as soon as a size exists
+ * (`estimateM !== null`), the lever that actually glued on-device. The size
+ * measurer still returns the corner depth samples, but this controller no longer
+ * consumes them (`poseFromWorldCorners` stays a tested off-path utility / the
+ * hybrid-fallback building block).
+ *
+ * Every device-specific dependency (detect, depth context, the pose solve, store
+ * dispatch, scene update) is injected, so this whole flow is unit-testable
+ * without WebXR, a camera, or depth hardware. It is geo-less: no GPS vote is
+ * ever cast.
  */
 
 import {
   createDetectionScheduler,
   createQrSizeMeasurer,
-  composePose,
-  invertPose,
+  intrinsicsFromProjection,
+  solveQrPose,
+  PlanarPnpSquare,
   validateQuad,
   type DetectionScheduler,
   type RgbaImage,
@@ -28,10 +38,16 @@ import {
   type QrSizeEstimate,
   type QrSizeMeasurer,
   type QrDetectionEvent,
+  type QrPoseSolution,
+  type SolveQrPoseInput,
 } from "gps-plus-slam-app-framework/ar";
-import type { Vector3 } from "gps-plus-slam-app-framework/core";
-import { poseFromWorldCorners } from "./pose-from-corners.js";
+import type { Matrix4 } from "gps-plus-slam-app-framework/core";
 import type { DemoStatus } from "./hud-view.js";
+
+/** The framework pose solve, minus the injected solver (which the demo owns). */
+export type DemoSolvePose = (
+  input: Omit<SolveQrPoseInput, "solver">,
+) => QrPoseSolution | null;
 
 /** Everything device-specific the controller needs to read one frame's depth. */
 export interface DepthContext {
@@ -41,6 +57,12 @@ export interface DepthContext {
   depthAt: (screenX: number, screenY: number) => number | null;
   /** Camera pose in raw-WebXR/odom space (for the camera-relative pose). */
   cameraPose: Pose;
+  /**
+   * The view projection matrix for the detector frame — PnP intrinsics come from
+   * `intrinsicsFromProjection(projectionMatrix, image.width, image.height)`. The
+   * corners and this matrix MUST describe the same buffer (the #1 PnP risk).
+   */
+  projectionMatrix: Matrix4;
 }
 
 export interface QrDemoControllerDeps {
@@ -54,6 +76,12 @@ export interface QrDemoControllerDeps {
   recordSize: (text: string, estimate: QrSizeEstimate) => void;
   /** Glue the debug axis + cube to the pose at the measured size (or `null`). */
   updateScene: (pose: Pose, sizeM: number | null) => void;
+  /**
+   * Solve the QR pose from corners + size + intrinsics. Defaults to the
+   * framework `solveQrPose` with a pure-JS {@link PlanarPnpSquare}; injectable so
+   * tests can drive the scene with a canned pose (no reprojection-gate setup).
+   */
+  solvePose?: DemoSolvePose;
   /**
    * Resolve the STABLE (sliding-window filtered) world pose for the OVERLAY —
    * e.g. `selectStableQrPose(store.getState(), text)`. When wired, the rendered
@@ -106,6 +134,11 @@ export function createQrDemoController(
   // The shared framework piece: per-marker depth→size accumulation (Part B,
   // Option 2). Both this demo and the Recorder wire the same measurer.
   const measurer: QrSizeMeasurer = createQrSizeMeasurer();
+  // Default pose solve: the framework PnP with a pure-JS IPPE solver, built once.
+  const defaultSolver = new PlanarPnpSquare();
+  const solvePose: DemoSolvePose =
+    deps.solvePose ??
+    ((input) => solveQrPose({ ...input, solver: defaultSolver }));
   let status: DemoStatus = "idle";
 
   function setStatus(next: DemoStatus): void {
@@ -129,10 +162,10 @@ export function createQrDemoController(
     if (!validateQuad(detection.corners).ok) return null;
 
     const ctx = getDepthContext();
-    if (!ctx) return null; // no depth → cannot size/place (auto-size gate)
+    if (!ctx) return null; // no depth → cannot size (auto-size gate)
 
-    // Measure size + sample corner depth in one shared step; `null` means a
-    // corner lacked a depth read (cannot size/place this frame).
+    // Measure size from depth (folds into the per-marker accumulator). `null`
+    // means depth couldn't be sampled even after the corner-inset fallback.
     const measurement = measurer.measure(
       detection.text,
       detection.corners,
@@ -141,28 +174,37 @@ export function createQrDemoController(
     );
     if (!measurement) return null;
 
-    // Depth-fit pose from the SAME sampled corners (no re-sampling).
-    const world: Vector3[] = [];
-    for (const dp of measurement.cornerSamples) {
-      const p = ctx.unprojector.unproject(dp);
-      if (!p) return null;
-      world.push(p);
-    }
-    const pose = poseFromWorldCorners(world);
-    if (!pose) return null;
-
     const estimate = measurement.estimate;
+    // Relaxed "size exists" gate: place as soon as ANY size is measured (the
+    // lever that actually glued on-device). The strict `estimated` lifecycle is
+    // only the production GPS-vote gate, not the demo overlay.
+    const sizeM = estimate.estimateM;
+    if (sizeM === null) return null;
+
+    // Full PnP pose (position AND rotation) from the detected corner pixels.
+    // Intrinsics come from the detector buffer's projection (same buffer the
+    // corners are in — the #1 PnP correctness risk).
+    const intrinsics = intrinsicsFromProjection(
+      ctx.projectionMatrix,
+      image.width,
+      image.height,
+    );
+    const solution = solvePose({
+      imagePoints: detection.corners,
+      sizeM,
+      intrinsics,
+      cameraPose: ctx.cameraPose,
+    });
+    if (!solution) return null;
 
     const event: QrDetectionEvent = {
       text: detection.text,
-      qrPoseWorld: pose,
-      // Depth-fit gives a world pose; derive the camera-relative pose for the
-      // slice entry. (Depth-fit has no PnP reprojection metric → 0.)
-      qrPoseInCamera: composePose(invertPose(ctx.cameraPose), pose),
-      reprojectionErrorPx: 0,
+      qrPoseWorld: solution.qrPoseWorld,
+      qrPoseInCamera: solution.qrPoseInCamera,
+      reprojectionErrorPx: solution.reprojectionErrorPx,
       timestamp: timestampNow(),
     };
-    return { event, pose, estimate };
+    return { event, pose: solution.qrPoseWorld, estimate };
   }
 
   const scheduler: DetectionScheduler =

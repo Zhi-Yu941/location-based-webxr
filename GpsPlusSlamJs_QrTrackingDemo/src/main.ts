@@ -8,8 +8,9 @@
  *   2. On the Start gesture: boot the store (with the `qrDetected` slice), the
  *      AR session, the debug view under `arWorldGroup`, and the demo controller.
  *   3. Per frame, hand the captured RGBA image to the controller; it detects,
- *      measures the size from depth, fits a pose, records into `qrDetected`, and
- *      glues the axis + cube to the code. The HUD renders the live size readout.
+ *      measures the size from depth, solves a PnP pose from the corners (once a
+ *      size exists), records into `qrDetected`, and glues the axis + cube to the
+ *      code. The HUD renders the live size readout.
  *
  * Pure, unit-tested logic lives in the sibling modules (`capability`,
  * `pose-from-corners`, `qr-debug-view`, `hud-view`, `demo-store`,

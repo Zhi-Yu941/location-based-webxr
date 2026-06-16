@@ -161,6 +161,7 @@ export const realSeams: QrDemoSeams = {
       unprojector,
       depthAt: (x, y) => nearestDepth(sample.points, x, y),
       cameraPose: { position: sample.cameraPos, rotation: sample.cameraRot },
+      projectionMatrix: sample.projectionMatrix,
     };
   },
   startFrameSource(

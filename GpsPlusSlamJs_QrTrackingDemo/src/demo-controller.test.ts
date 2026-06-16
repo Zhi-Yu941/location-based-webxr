@@ -2,11 +2,12 @@
  * QR-tracking demo controller — unit tests.
  *
  * Why this matters: this pins the orchestration the whole demo rests on —
- * detect → sample depth → unproject → fit pose → measure size → (on lock)
- * record into the store + glue the scene. Every device dependency is faked, so
- * the flow is exercised without WebXR/camera/depth. The fake depth context maps
- * the corner screen points to a planar square in world space, so the measured
- * size is constant and converges.
+ * detect → measure size from depth → (size exists) solve PnP → (on lock) record
+ * into the store + glue the scene. Every device dependency is faked: a planar
+ * fake depth context makes the measured size converge, and an injected fake
+ * `solvePose` returns a canned pose so the scene assertions don't depend on the
+ * solver math (which has its own tests in the framework). The flow runs without
+ * WebXR / camera / depth.
  */
 
 import { describe, it, expect } from "vitest";
@@ -15,8 +16,12 @@ import type {
   QrDetection,
   Pose,
 } from "gps-plus-slam-app-framework/ar";
-import type { Vector3 } from "gps-plus-slam-app-framework/core";
-import { createQrDemoController, type DepthContext } from "./demo-controller";
+import type { Vector3, Matrix4 } from "gps-plus-slam-app-framework/core";
+import {
+  createQrDemoController,
+  type DepthContext,
+  type DemoSolvePose,
+} from "./demo-controller";
 
 const TEXT = "https://demo/qr";
 const IMG: RgbaImage = {
@@ -24,6 +29,11 @@ const IMG: RgbaImage = {
   width: 100,
   height: 100,
 };
+
+// A symmetric perspective projection (column-major); only fx/fy/cx/cy are read.
+const PROJECTION = [
+  2, 0, 0, 0, 0, 2, 0, 0, 0, 0, -1.0002, -1, 0, 0, -0.2, 0,
+] as unknown as Matrix4;
 
 // A pixel square on a 100×100 frame → a planar world square (z = −1).
 const detection: QrDetection = {
@@ -49,8 +59,34 @@ function fakeDepthContext(): DepthContext {
     },
     depthAt: () => 1,
     cameraPose: { position: [0, 0, 0], rotation: [0, 0, 0, 1] },
+    projectionMatrix: PROJECTION,
   };
 }
+
+/**
+ * A non-planar fake: the bottom-right corner is pushed off the plane so the
+ * size-quality score never clears the accept threshold → estimateM stays null.
+ */
+function nonPlanarDepthContext(): DepthContext {
+  return {
+    ...fakeDepthContext(),
+    unprojector: {
+      unproject: (dp): Vector3 | null => [
+        dp.screenX * SCALE,
+        dp.screenY * SCALE,
+        dp.screenX > 0.5 && dp.screenY > 0.5 ? -0.6 : -1,
+      ],
+    },
+  };
+}
+
+/** The canned PnP pose the injected solvePose returns. */
+const SOLVED_WORLD: Pose = { position: [1, 2, 3], rotation: [0, 0, 0, 1] };
+const cannedSolvePose: DemoSolvePose = () => ({
+  qrPoseWorld: SOLVED_WORLD,
+  qrPoseInCamera: { position: [0, 0, 1], rotation: [0, 0, 0, 1] },
+  reprojectionErrorPx: 0.5,
+});
 
 const flush = async () => {
   for (let i = 0; i < 6; i++) await Promise.resolve();
@@ -60,16 +96,19 @@ function setup(
   overrides: Partial<Parameters<typeof createQrDemoController>[0]> = {},
 ) {
   const detections: string[] = [];
-  const sizes: { text: string; estimateM: number | null }[] = [];
+  const sizes: { text: string; estimateM: number | null; status: string }[] =
+    [];
   const sceneUpdates: { pose: Pose; sizeM: number | null }[] = [];
   const statuses: string[] = [];
   const controller = createQrDemoController({
     detect: () => Promise.resolve<QrDetection | null>(detection),
     getDepthContext: () => fakeDepthContext(),
     recordDetection: (e) => detections.push(e.text),
-    recordSize: (text, est) => sizes.push({ text, estimateM: est.estimateM }),
+    recordSize: (text, est) =>
+      sizes.push({ text, estimateM: est.estimateM, status: est.status }),
     updateScene: (pose, sizeM) => sceneUpdates.push({ pose, sizeM }),
     onStatus: (s) => statuses.push(s),
+    solvePose: cannedSolvePose,
     requiredLockCount: 2,
     ...overrides,
   });
@@ -87,7 +126,7 @@ async function feed(
 }
 
 describe("createQrDemoController", () => {
-  it("locks after N detections and records detection + size + scene update", async () => {
+  it("locks after N detections and records detection + size + PnP scene update", async () => {
     const { controller, detections, sizes, sceneUpdates, statuses } = setup();
     await feed(controller, 4);
 
@@ -96,6 +135,8 @@ describe("createQrDemoController", () => {
     // The measured square has side 60/100 * SCALE = 0.2 m.
     expect(sizes.at(-1)?.estimateM).toBeCloseTo(0.2, 3);
     expect(sceneUpdates.length).toBeGreaterThan(0);
+    // The scene is driven by the (injected) PnP pose, not a depth-fit pose.
+    expect(sceneUpdates.at(-1)?.pose.position).toEqual([1, 2, 3]);
     expect(sceneUpdates.at(-1)?.sizeM).toBeCloseTo(0.2, 3);
     expect(controller.status).toBe("tracking");
     expect(statuses).toContain("scanning");
@@ -105,9 +146,33 @@ describe("createQrDemoController", () => {
   it('converges the size to "estimated" after enough samples', async () => {
     const { controller, sizes } = setup();
     await feed(controller, 12);
-    // Constant square → spread 0 → estimated once minSamples is reached.
+    // Constant square → spread 0 → estimated once minSamples (8) is reached.
     expect(sizes.at(-1)?.estimateM).toBeCloseTo(0.2, 3);
+    expect(sizes.at(-1)?.status).toBe("estimated");
     expect(controller.status).toBe("tracking");
+  });
+
+  it("does not lock while the size is still unknown (size-exists gate)", async () => {
+    // Non-planar depth → quality below the accept threshold → estimateM null →
+    // the controller must NOT solve a pose or record anything, even though the
+    // QR is detected every frame.
+    const { controller, detections, sceneUpdates } = setup({
+      getDepthContext: () => nonPlanarDepthContext(),
+    });
+    await feed(controller, 4);
+    expect(detections).toHaveLength(0);
+    expect(sceneUpdates).toHaveLength(0);
+    expect(controller.status).toBe("scanning");
+  });
+
+  it("does not lock when the solver returns null", async () => {
+    const { controller, detections, sceneUpdates } = setup({
+      solvePose: () => null,
+    });
+    await feed(controller, 4);
+    expect(detections).toHaveLength(0);
+    expect(sceneUpdates).toHaveLength(0);
+    expect(controller.status).toBe("scanning");
   });
 
   it("does not record or lock when depth is unavailable", async () => {
@@ -166,18 +231,18 @@ describe("createQrDemoController", () => {
       resolveStablePose: () => stable,
     });
     await feed(controller, 4);
-    // The overlay must use the FILTERED pose, not the raw depth-fit pose.
+    // The overlay must use the FILTERED pose, not the raw PnP pose.
     expect(sceneUpdates.at(-1)?.pose.position).toEqual([9, 9, 9]);
   });
 
-  it("falls back to the raw pose while the stable pose is not yet converged", async () => {
+  it("falls back to the raw PnP pose while the stable pose is not yet converged", async () => {
     const { controller, sceneUpdates } = setup({
       resolveStablePose: () => null, // not converged
     });
     await feed(controller, 4);
     expect(sceneUpdates.length).toBeGreaterThan(0);
-    // Raw depth-fit pose centroid of the planar square is at z = −1.
-    expect(sceneUpdates.at(-1)?.pose.position[2]).toBeCloseTo(-1, 6);
+    // The injected PnP pose drives the scene.
+    expect(sceneUpdates.at(-1)?.pose.position).toEqual([1, 2, 3]);
   });
 
   it("reset() clears accumulators and returns to idle", async () => {

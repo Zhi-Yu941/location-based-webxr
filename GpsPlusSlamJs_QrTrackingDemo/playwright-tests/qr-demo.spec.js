@@ -63,25 +63,27 @@ test.describe("QR-tracking demo — measure + glue flow", () => {
 });
 
 /**
- * Regression: a QR can lock (detection + pose) while its depth-measured size is
- * still `unknown` (noisy/non-planar depth → quality below the accept threshold).
- * The HUD said "detected" but NOTHING appeared in 3D, because the scene update
- * was gated on a known size — so even the pose-only AXIS was withheld. The axis
- * needs only the pose; only the cube needs a size.
+ * Regression (post-PnP switch): full PnP needs a metric SIZE to solve a pose, so
+ * when the depth-measured size never converges (noisy/non-planar depth → quality
+ * below the accept threshold), the controller's "size exists" gate withholds the
+ * WHOLE overlay. Unlike the old depth-fit path — which could place a pose-only
+ * axis without a size — PnP cannot run at all, so the QR is detected every frame
+ * but nothing is glued and the demo stays scanning. This pins that intentional
+ * behaviour change.
  */
-test.describe("QR-tracking demo — axis appears before the size converges", () => {
+test.describe("QR-tracking demo — no overlay until a size exists (PnP needs scale)", () => {
   test.beforeEach(async ({ page }) => {
     await installQrDemoFakes(page, { planar: false });
   });
 
-  test("shows the axis on lock even while the size stays unknown (cube waits)", async ({
+  test("withholds the overlay while the size stays unknown", async ({
     page,
   }) => {
     await bootQrDemo(page);
     await feedFrames(page, 12);
 
-    // Detection locked, but the size never converged.
-    await expect(page.getByTestId("hud-status")).toContainText("Locked");
+    // Size never converged → PnP never runs → no lock; HUD stays scanning.
+    await expect(page.getByTestId("hud-status")).toContainText("Scanning");
     await expect(page.getByTestId("hud-lifecycle")).toHaveText("unknown");
     await expect(page.getByTestId("hud-size")).toHaveText("—");
 
@@ -95,10 +97,10 @@ test.describe("QR-tracking demo — axis appears before the size converges", () 
         cubeVisible: kids[1]?.visible,
       };
     });
+    // The debug objects exist (created eagerly) but neither is revealed —
+    // `update()` was never called because no pose was solved.
     expect(scene.count).toBe(2);
-    // The axis (pose only) MUST be visible so the user sees the detection is
-    // glued; the cube (needs a measured size) stays hidden until one arrives.
-    expect(scene.axisVisible).toBe(true);
+    expect(scene.axisVisible).toBe(false);
     expect(scene.cubeVisible).toBe(false);
   });
 });

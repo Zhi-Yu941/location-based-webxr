@@ -36,12 +36,14 @@ const CUBE_DEPTH_M = 0.01;
 export interface QrDebugView {
   /**
    * Glue the debug objects to a solved pose. The **axis** is placed from the
-   * pose alone (it needs no size), so it appears as soon as a detection locks.
-   * The **cube** models the QR's physical extent, so it is shown only when a
-   * measured `sizeM` is available; pass `null` (size not yet measured) to show
-   * the axis while keeping the cube hidden. This is deliberate: a detected QR
-   * must show *something* glued immediately, even before the depth-measured
-   * size converges (which can take seconds, or never, on noisy depth).
+   * pose alone (it needs no size). The **cube** models the QR's physical extent,
+   * so it is shown only when a measured `sizeM` is available; pass `null` to show
+   * the axis while keeping the cube hidden.
+   *
+   * Note: since the demo switched to full PnP (which needs a metric size to solve
+   * a pose at all), the controller only calls this once a size EXISTS, so it
+   * always passes a non-null `sizeM`. The `null` path is retained for the generic
+   * "pose but no size" case (e.g. a future depth-position/PnP-rotation hybrid).
    */
   update(pose: Pose, sizeM: number | null): void;
   /** Hide the objects (e.g. on reset); does NOT detach them from the scene. */

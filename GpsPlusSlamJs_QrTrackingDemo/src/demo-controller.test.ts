@@ -157,6 +157,29 @@ describe("createQrDemoController", () => {
     expect(controller.status).toBe("scanning");
   });
 
+  it("renders the resolveStablePose filtered pose when available", async () => {
+    const stable: Pose = {
+      position: [9, 9, 9],
+      rotation: [0, 0, 0, 1],
+    };
+    const { controller, sceneUpdates } = setup({
+      resolveStablePose: () => stable,
+    });
+    await feed(controller, 4);
+    // The overlay must use the FILTERED pose, not the raw depth-fit pose.
+    expect(sceneUpdates.at(-1)?.pose.position).toEqual([9, 9, 9]);
+  });
+
+  it("falls back to the raw pose while the stable pose is not yet converged", async () => {
+    const { controller, sceneUpdates } = setup({
+      resolveStablePose: () => null, // not converged
+    });
+    await feed(controller, 4);
+    expect(sceneUpdates.length).toBeGreaterThan(0);
+    // Raw depth-fit pose centroid of the planar square is at z = −1.
+    expect(sceneUpdates.at(-1)?.pose.position[2]).toBeCloseTo(-1, 6);
+  });
+
   it("reset() clears accumulators and returns to idle", async () => {
     const { controller } = setup();
     await feed(controller, 4);

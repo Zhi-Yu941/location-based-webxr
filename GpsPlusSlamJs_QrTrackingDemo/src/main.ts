@@ -21,6 +21,7 @@ import {
   recordQrDetection,
   recordQrSizeEstimate,
   selectQrSize,
+  selectStableQrPose,
 } from "gps-plus-slam-app-framework/state";
 import { applyChromiumProjectionLayerWorkaround } from "gps-plus-slam-app-framework/ar/chromium-camera-access-workaround";
 
@@ -167,6 +168,11 @@ async function startAr(): Promise<void> {
       // which withheld even the axis while the depth size was still converging.
       view?.update(pose, sizeM);
     },
+    // Smooth the overlay with the windowed stable pose once it converges; the
+    // controller falls back to the raw frame pose while the window fills. Reads
+    // the slice AFTER recordDetection has fed the current frame in.
+    resolveStablePose: (text) =>
+      store ? selectStableQrPose(store.getState(), text) : null,
     onStatus: (next) => {
       status = next;
       debugLog.append(formatStatusLine(performance.now(), next));

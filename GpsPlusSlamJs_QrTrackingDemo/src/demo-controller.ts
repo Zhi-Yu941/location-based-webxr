@@ -54,6 +54,15 @@ export interface QrDemoControllerDeps {
   recordSize: (text: string, estimate: QrSizeEstimate) => void;
   /** Glue the debug axis + cube to the pose at the measured size (or `null`). */
   updateScene: (pose: Pose, sizeM: number | null) => void;
+  /**
+   * Resolve the STABLE (sliding-window filtered) world pose for the OVERLAY —
+   * e.g. `selectStableQrPose(store.getState(), text)`. When wired, the rendered
+   * axis/cube use the filtered pose so they stop swinging between throttled
+   * detections; a `null` (not yet converged) falls back to this frame's raw pose
+   * so the overlay still appears while the window fills. `recordDetection` runs
+   * first, so the window this reads already includes the current frame.
+   */
+  resolveStablePose?: (text: string) => Pose | null;
   /** Status-change notifications for the HUD. */
   onStatus?: (status: DemoStatus) => void;
   /** Injectable clock (ms) for the detection timestamp + scheduler. */
@@ -86,6 +95,7 @@ export function createQrDemoController(
     recordDetection,
     recordSize,
     updateScene,
+    resolveStablePose,
     onStatus,
     now,
     minIntervalMs = 0,
@@ -164,7 +174,11 @@ export function createQrDemoController(
       onLocked: (result) => {
         recordDetection(result.event);
         recordSize(result.event.text, result.estimate);
-        updateScene(result.pose, result.estimate.estimateM);
+        // Render the windowed stable pose when available (smooth overlay); fall
+        // back to the raw frame pose while the window is still converging.
+        const renderPose =
+          resolveStablePose?.(result.event.text) ?? result.pose;
+        updateScene(renderPose, result.estimate.estimateM);
         setStatus("tracking");
       },
       // Note 3 persistence: on a miss we do NOT clear the scene — the axis + cube

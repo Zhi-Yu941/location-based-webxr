@@ -10,8 +10,9 @@ axis + cube. Geo-less: never casts a GPS vote.
 
 - `createQrDemoController(deps): QrDemoController` — `{ offerFrame(image), status, reset() }`.
 - `QrDemoControllerDeps` — injected `detect`, `getDepthContext`,
-  `recordDetection`, `recordSize`, `updateScene`, optional `onStatus`/`now`/
-  scheduler tuning.
+  `recordDetection`, `recordSize`, `updateScene`, optional `resolveStablePose`
+  (windowed filtered pose for the overlay — e.g. `selectStableQrPose`),
+  `onStatus`/`now`/ scheduler tuning.
 - `DepthContext = { unprojector, depthAt(sx,sy), cameraPose }`.
 
 ## Invariants
@@ -27,6 +28,12 @@ axis + cube. Geo-less: never casts a GPS vote.
 - **Persistence (Note 3):** a miss does NOT clear the scene (objects keep their
   last pose). `qrPoseInCamera` is derived from the depth-fit world pose +
   `cameraPose`; `reprojectionErrorPx` is 0 (depth-fit has no PnP metric).
+- **Stable-pose overlay (sliding-window stabilization):** on a lock the scene is
+  rendered with `resolveStablePose(text)` when it has converged (the windowed,
+  outlier-rejected pose), else the raw frame pose. `recordDetection` runs first,
+  so the window already includes the current frame. The ring buffer keeps the RAW
+  poses — the filtered pose is never written back. See
+  [2026-06-16-followup-qr-pose-stabilization-sliding-window.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-16-followup-qr-pose-stabilization-sliding-window.md).
 - Fully injected → unit-testable without WebXR / camera / depth.
 
 ## Tests

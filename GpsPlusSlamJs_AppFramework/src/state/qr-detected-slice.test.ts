@@ -78,7 +78,7 @@ describe('qrDetectedReducer', () => {
     let s = init();
     s = qrDetectedReducer(s, recordQrDetection(entry('A', 1, [3, 4, 5])));
     expect(
-      selectLatestQrDetection({ qrDetected: s }, 'A')?.qrPoseWorld.position
+      selectLatestQrDetection({ qrDetected: s }, 'A')?.qrPoseWorld?.position
     ).toEqual([3, 4, 5]);
   });
 

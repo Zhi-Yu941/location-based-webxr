@@ -113,6 +113,15 @@ export {
   deriveSolvedQrPose,
 } from './qr-derived-pose.js';
 
+// --- qr-detection-controller (the thin geo-less RAW producer, D-X) ---
+export {
+  type QrScanStatus,
+  type RawObservationSink,
+  type QrDetectionControllerDeps,
+  type QrDetectionController,
+  createQrDetectionController,
+} from './qr-detection-controller.js';
+
 // --- qr-pose-aggregation (sliding-window pose stabilization) ---
 export {
   DEFAULT_ROTATION_INLIER_ANGLE_DEG,

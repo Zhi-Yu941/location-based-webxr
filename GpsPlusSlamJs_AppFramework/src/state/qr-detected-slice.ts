@@ -71,21 +71,15 @@ export const DEFAULT_QR_MAX_HISTORY = 32;
 export interface QrDetectionEntry {
   /** Decoded payload (text/URL) — also the marker key. */
   text: string;
-  /** QR pose in raw-WebXR/odom space (rides `arWorldGroup`). */
-  qrPoseWorld: Pose;
-  /** QR pose relative to the WebXR camera (pre-composition). */
-  qrPoseInCamera: Pose;
-  /** RMS reprojection error in pixels (lower = better fit). */
-  reprojectionErrorPx: number;
   /** Epoch ms when the detection locked. */
   timestamp: number;
 
   // --- RAW detector output (decision D-A, recorder live-QR plan) -----------
   // The authoritative, algorithm-agnostic shape: size + solved pose are DERIVED
-  // from these on read (see `selectSolvedQrPose` → `ar/qr-derived-pose.ts`).
-  // OPTIONAL during the D-A-2 transition — the demo still records the solved
-  // pose above; once the producer dispatches raw-only (WS-3) the solved fields
-  // are dropped and these become required.
+  // from these on read (see `selectSolvedQrPose` → `ar/qr-derived-pose.ts`). A
+  // RAW producer (the Recorder) records ONLY these — the recording stays
+  // algorithm-agnostic / re-testable. OPTIONAL because the legacy geo/demo
+  // producer still records the solved pose below instead. See plan §3 / D-A.
   /** The 4 detected corners in detector-buffer PIXELS, order TL,TR,BR,BL. */
   corners?: readonly Point2[];
   /** Capturing camera pose in raw-WebXR/odom space (PnP camera-relative base). */
@@ -96,6 +90,18 @@ export interface QrDetectionEntry {
   imageWidth?: number;
   /** Detector-buffer height in pixels. */
   imageHeight?: number;
+
+  // --- SOLVED pose (legacy geo/demo producer) ------------------------------
+  // OPTIONAL now (D-A): a RAW producer omits these and derives the pose on read.
+  // The geo workflow + the QR-tracking demo still populate them, and the
+  // `medianQrPosition` / pose-stability selectors consume them; an entry that
+  // carries neither a solved pose NOR raw fields is degenerate.
+  /** QR pose in raw-WebXR/odom space (rides `arWorldGroup`). */
+  qrPoseWorld?: Pose;
+  /** QR pose relative to the WebXR camera (pre-composition). */
+  qrPoseInCamera?: Pose;
+  /** RMS reprojection error in pixels (lower = better fit). */
+  reprojectionErrorPx?: number;
 }
 
 /** Per-marker state: a bounded detection history + the size lifecycle. */
@@ -323,15 +329,19 @@ function medianOf(values: readonly number[]): number {
  * Robust per-axis median of the world positions across a marker's detection
  * window — the "running estimate" the bounded buffer enables (Note 3). Outliers
  * in fewer than half the samples cannot move the result outside the inlier
- * range. Returns `null` for an empty window.
+ * range. Skips RAW-only entries that carry no solved pose (D-A); returns `null`
+ * for an empty window (or one with no solved poses at all).
  */
 export function medianQrPosition(
   entries: readonly QrDetectionEntry[]
 ): Vector3 | null {
-  if (entries.length === 0) return null;
-  const xs = entries.map((e) => e.qrPoseWorld.position[0]);
-  const ys = entries.map((e) => e.qrPoseWorld.position[1]);
-  const zs = entries.map((e) => e.qrPoseWorld.position[2]);
+  const poses = entries
+    .map((e) => e.qrPoseWorld)
+    .filter((p): p is Pose => p !== undefined);
+  if (poses.length === 0) return null;
+  const xs = poses.map((p) => p.position[0]);
+  const ys = poses.map((p) => p.position[1]);
+  const zs = poses.map((p) => p.position[2]);
   return [medianOf(xs), medianOf(ys), medianOf(zs)];
 }
 
@@ -348,7 +358,11 @@ export function selectQrPoseStability(
   options?: QrPoseStabilityOptions
 ): QrPoseStability {
   const marker = state.qrDetected.markers[text];
-  const poses = marker ? marker.detections.map((d) => d.qrPoseWorld) : [];
+  const poses = marker
+    ? marker.detections
+        .map((d) => d.qrPoseWorld)
+        .filter((p): p is Pose => p !== undefined)
+    : [];
   return evaluateQrPoseStability(poses, options);
 }
 

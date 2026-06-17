@@ -273,17 +273,19 @@ describe('createQrSizeAccumulator', () => {
     expect(acc.add(good).status).toBe('measuring');
     acc.add(good);
     acc.add(good);
-    const est = acc.add({ sizeM: 0.205, quality: 1 }); // 4 samples, spread 0.005
+    const est = acc.add({ sizeM: 0.205, quality: 1 }); // 4 samples
     expect(est.status).toBe('estimated');
     expect(est.estimateM).toBeCloseTo(0.2, 2);
     expect(est.sampleCount).toBe(4);
-    expect(est.spreadM).toBeCloseTo(0.005, 6);
+    // spreadM is now a robust confidence half-width (1.4826·MAD/√N), not max−min.
+    expect(est.spreadM).toBeLessThanOrEqual(0.01);
   });
 
   it('stays measuring while the spread is too wide', () => {
     const acc = createQrSizeAccumulator({ minSamples: 2, maxSpreadM: 0.01 });
     acc.add({ sizeM: 0.2, quality: 1 });
-    const est = acc.add({ sizeM: 0.25, quality: 1 }); // spread 0.05 > 0.01
+    // Two far-apart reads → robust half-width (~26 mm) ≫ 10 mm gate.
+    const est = acc.add({ sizeM: 0.25, quality: 1 });
     expect(est.status).toBe('measuring');
   });
 
@@ -299,5 +301,65 @@ describe('createQrSizeAccumulator', () => {
     acc.add(good);
     acc.reset();
     expect(acc.current().status).toBe('unknown');
+  });
+});
+
+describe('createQrSizeAccumulator — lifelong robust refinement (WS-B)', () => {
+  // Deterministic LCG-based noise so the convergence behaviour is reproducible.
+  function noisyStream(truth: number, sigma: number, n: number): number[] {
+    let rng = 0x9e3779b1;
+    const next = (): number => {
+      rng = (rng * 1103515245 + 12345) & 0x7fffffff;
+      return rng / 0x7fffffff; // [0,1)
+    };
+    const out: number[] = [];
+    for (let i = 0; i < n; i++) {
+      // Box-Muller-ish: average two uniforms → roughly centered noise.
+      const noise = (next() + next() - 1) * sigma;
+      out.push(truth + noise);
+    }
+    return out;
+  }
+
+  it('keeps the full history beyond the old 64-sample window (unbounded default)', () => {
+    const acc = createQrSizeAccumulator({ minSamples: 8 });
+    for (const s of noisyStream(0.2, 0.005, 200))
+      acc.add({ sizeM: s, quality: 1 });
+    expect(acc.current().sampleCount).toBe(200); // not capped at 64
+  });
+
+  it('tightens the confidence half-width as evidence accumulates', () => {
+    const acc = createQrSizeAccumulator({ minSamples: 8 });
+    const stream = noisyStream(0.2, 0.006, 200);
+    for (let i = 0; i < 10; i++)
+      acc.add({ sizeM: stream[i] as number, quality: 1 });
+    const early = acc.current().spreadM;
+    for (let i = 10; i < 200; i++)
+      acc.add({ sizeM: stream[i] as number, quality: 1 });
+    const late = acc.current().spreadM;
+    expect(late).toBeLessThan(early); // ~1/√N tightening
+    expect(acc.current().estimateM).toBeCloseTo(0.2, 2);
+  });
+
+  it('a late burst of outliers cannot pull the estimate beyond a bound', () => {
+    const acc = createQrSizeAccumulator({ minSamples: 8 });
+    for (const s of noisyStream(0.2, 0.004, 80))
+      acc.add({ sizeM: s, quality: 1 });
+    const before = acc.current().estimateM!;
+    // 12 gross outliers (still a minority of 92) at 3× the true size.
+    for (let i = 0; i < 12; i++) acc.add({ sizeM: 0.6, quality: 1 });
+    const after = acc.current().estimateM!;
+    expect(Math.abs(after - before)).toBeLessThan(0.01);
+    expect(after).toBeCloseTo(0.2, 2);
+  });
+
+  it('retains "estimated" while refinement continues (it is not terminal)', () => {
+    const acc = createQrSizeAccumulator({ minSamples: 4, maxSpreadM: 0.01 });
+    for (let i = 0; i < 6; i++) acc.add({ sizeM: 0.2, quality: 1 });
+    expect(acc.current().status).toBe('estimated');
+    // A single wider late read must NOT demote it back to 'measuring'.
+    const after = acc.add({ sizeM: 0.22, quality: 1 });
+    expect(after.status).toBe('estimated');
+    expect(after.estimateM).toBeCloseTo(0.2, 2); // median barely moves
   });
 });

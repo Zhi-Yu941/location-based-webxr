@@ -465,9 +465,20 @@ export interface QrSizeAccumulatorOptions {
   qualityThreshold?: number;
   /** Accepted samples required before the estimate can be `estimated`. Default 8. */
   minSamples?: number;
-  /** Max spread (max−min, m) allowed for the `estimated` status. Default 0.01. */
+  /**
+   * Max confidence half-width (`spreadM`, m) allowed for the `estimated` status.
+   * Default 0.01. `spreadM` is a robust standard-error (`1.4826·MAD/√N`) that
+   * TIGHTENS as samples accumulate — not the raw max−min — so it converges
+   * instead of being pinned by one early stray.
+   */
   maxSpreadM?: number;
-  /** Ring cap on retained accepted sizes (robust median window). Default 64. */
+  /**
+   * Optional cap on retained accepted sizes. **Default: unbounded** (lifelong
+   * refinement — WS-B). The QR's physical size never changes, so keeping the
+   * full session history lets the robust median tighten the longer the QR is
+   * seen. Set a finite cap only if memory/perf demands a bounded window; the
+   * estimate then becomes a sliding-window median again.
+   */
   maxSamples?: number;
 }
 
@@ -497,18 +508,30 @@ export function createQrSizeAccumulator(
     qualityThreshold = 0.8,
     minSamples = 8,
     maxSpreadM = 0.01,
-    maxSamples = 64,
+    maxSamples = Infinity,
   } = options;
 
   let sizes: number[] = [];
+  // Latch: once the estimate has converged it STAYS `estimated` while refinement
+  // continues (WS-B) — `estimated` is a confidence signal, not a terminal state,
+  // so a later noisy frame can't flip it back to `measuring`.
+  let everConverged = false;
 
   function estimate(): QrSizeEstimate {
     if (sizes.length === 0) return { ...UNKNOWN };
+    // The point estimate is the median — robust to a minority of bad frames
+    // (a late burst of outliers can't pull it while the history is majority-good).
     const med = median(sizes);
-    const spreadM = Math.max(...sizes) - Math.min(...sizes);
-    const converged = sizes.length >= minSamples && spreadM <= maxSpreadM;
+    // Robust dispersion: MAD about the median → σ ≈ 1.4826·MAD. The reported
+    // `spreadM` is the standard-error of that σ, so it shrinks ~1/√N as evidence
+    // accumulates (the "converges to a very exact value the longer it is seen").
+    const mad = median(sizes.map((s) => Math.abs(s - med)));
+    const sigma = 1.4826 * mad;
+    const spreadM = sigma / Math.sqrt(sizes.length);
+    if (sizes.length >= minSamples && spreadM <= maxSpreadM)
+      everConverged = true;
     return {
-      status: converged ? 'estimated' : 'measuring',
+      status: everConverged ? 'estimated' : 'measuring',
       estimateM: med,
       sampleCount: sizes.length,
       spreadM,
@@ -531,6 +554,7 @@ export function createQrSizeAccumulator(
     current: estimate,
     reset(): void {
       sizes = [];
+      everConverged = false;
     },
   };
 }

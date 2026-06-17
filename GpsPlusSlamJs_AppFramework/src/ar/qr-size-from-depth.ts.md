@@ -36,7 +36,11 @@ authored. This is the **measuring stage** of the Note 3 size lifecycle.
 - `createQrSizeAccumulator(options)` → `{ add(obs|null), current(), reset() }`.
   A robust running **median** over accepted observations, reporting a
   `QrSizeEstimate` with the lifecycle `status`. Options: `qualityThreshold`
-  (0.8), `minSamples` (8), `maxSpreadM` (0.01 m), `maxSamples` (64, ring cap).
+  (0.8), `minSamples` (8), `maxSpreadM` (0.01 m), `maxSamples` (**unbounded by
+  default** — WS-B lifelong refinement; set a finite value only for a bounded
+  sliding window). `spreadM` is a robust confidence half-width (`1.4826·MAD/√N`)
+  that TIGHTENS as samples accumulate, and `estimated` **latches** (it is a
+  confidence signal, not terminal — a later noisy frame can't demote it).
 - **Size value types** `QrSizeStatus` / `QrSizeEstimate` are defined here and
   imported by `state/qr-detected-slice.ts` (keeps `ar` free of any `state`
   import — the reverse direction would close a dependency cycle).
@@ -52,9 +56,14 @@ authored. This is the **measuring stage** of the Note 3 size lifecycle.
 - **Corner depth is noisiest** (edge/background discontinuity): interior samples
   only strengthen the planarity check; a single bad interior read is skipped, not
   fatal.
-- **`estimated` gate:** `sampleCount ≥ minSamples` **and** `spreadM ≤ maxSpreadM`.
-  This is the gate that later promotes a measured size to drive size-dependent
-  features (PnP solve, geo vote) — under the same bar as every other feature.
+- **`estimated` gate:** `sampleCount ≥ minSamples` **and** `spreadM ≤ maxSpreadM`,
+  then **latched** (WS-B): once reached it stays `estimated` while refinement
+  continues. This is the gate that later promotes a measured size to drive
+  size-dependent features (PnP solve, geo vote).
+- **Lifelong refinement (WS-B):** the QR's physical size never changes, so the
+  accumulator keeps the full session history by default and the median tightens
+  the longer the QR is seen. The median is robust to a minority of late outliers
+  (a burst can't pull it); `spreadM` reports the shrinking confidence.
 
 ## Examples
 
@@ -78,6 +87,9 @@ if (est.status === 'estimated') buildCube(est.estimateM!);
   collinear/too-few → null) and `estimateQrSizeFromDepthDense` (fronto from
   interior reads only, a tilted square the corner-only path would mis-size,
   outlier robustness, too-few-reads → null).
+- WS-B lifelong cases: full history beyond 64 samples, the confidence half-width
+  tightens as N grows, a late outlier burst can't move the median, and
+  `estimated` is retained (not demoted) once reached.
 
 ## Related
 

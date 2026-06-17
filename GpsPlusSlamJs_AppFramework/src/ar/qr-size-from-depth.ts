@@ -50,7 +50,11 @@ export interface QrSizeEstimate {
   estimateM: number | null;
   /** How many accepted samples back the estimate. */
   sampleCount: number;
-  /** Spread (max−min) of the accepted samples, meters — 0 when <2 samples. */
+  /**
+   * Robust confidence half-width of the estimate, meters (`1.4826·MAD/√N`), so
+   * it TIGHTENS as samples accumulate (WS-B) — not the raw max−min. 0 when <2
+   * samples. The HUD renders this as the shrinking `±mm`.
+   */
   spreadM: number;
 }
 

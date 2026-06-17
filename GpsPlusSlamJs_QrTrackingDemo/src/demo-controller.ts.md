@@ -26,7 +26,7 @@ axis + cube. Geo-less: never casts a GPS vote.
   coalesce + N-lock). `minIntervalMs` defaults to 0 (debug demo), `requiredLockCount` 2.
 - **Pose is full PnP, not the depth-corner fit.** Depth still supplies the metric
   SIZE (`measurer.measure`); the pose comes from `solvePose({ imagePoints, sizeM,
-  intrinsics, cameraPose })`. Rotation no longer inherits per-corner depth noise.
+intrinsics, cameraPose })`. Rotation no longer inherits per-corner depth noise.
   `pose-from-corners.ts` stays a tested off-path utility (hybrid-fallback building
   block), no longer on the live path.
 - **Size-exists gate (relaxed):** the controller places as soon as ANY size is

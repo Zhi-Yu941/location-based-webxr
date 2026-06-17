@@ -32,6 +32,7 @@ import type { QrSizeDepthContext } from './qr-size-measurer.js';
 import {
   deriveQrSizeM,
   deriveSolvedQrPose,
+  deriveQrPlacement,
   solveQrPoseFromObservation,
   type RawQrObservation,
 } from './qr-derived-pose.js';
@@ -240,6 +241,58 @@ describe('deriveSolvedQrPose', () => {
     const expectedWorld = composePose(cameraPose, qrPoseInCamera);
     for (let i = 0; i < 3; i++) {
       expect(pose!.position[i]).toBeCloseTo(expectedWorld.position[i], 2);
+    }
+  });
+});
+
+describe('deriveQrPlacement', () => {
+  it('returns null for an empty history and when no depth resolves', () => {
+    const deps = {
+      resolveDepthAt: () => constantDepthContext(1),
+      solver: new PlanarPnpSquare(),
+    };
+    expect(deriveQrPlacement('m', [], deps)).toBeNull();
+    const corners = projectedCorners(
+      {
+        position: [0, 0, -0.8] as Vector3,
+        rotation: [0, 0, 0, 1] as Quaternion,
+      },
+      0.2
+    );
+    expect(
+      deriveQrPlacement('m', [makeObservation('m', corners, 1)], {
+        resolveDepthAt: () => null,
+        solver: new PlanarPnpSquare(),
+      })
+    ).toBeNull();
+  });
+
+  it('returns BOTH the pose and the size that solved it (the cube needs the size)', () => {
+    // Same fronto-parallel marker as the re-test guarantee: the placement must
+    // carry the derived metric side (≈0.2 m) alongside the recovered pose, so the
+    // debug cube can be scaled without a second history pass.
+    const sizeM = 0.2;
+    const distance = 0.8;
+    const qrPoseInCamera: Pose = {
+      position: [0, 0, -distance] as Vector3,
+      rotation: [0, 0, 0, 1] as Quaternion,
+    };
+    const corners = projectedCorners(qrPoseInCamera, sizeM);
+    const obs = [10, 20, 30].map((t) => makeObservation('m', corners, t));
+
+    const placement = deriveQrPlacement('m', obs, {
+      resolveDepthAt: () => constantDepthContext(distance),
+      solver: new PlanarPnpSquare(),
+    });
+    expect(placement).not.toBeNull();
+    expect(placement!.sizeM).toBeCloseTo(sizeM, 2);
+    // The pose matches what deriveSolvedQrPose returns (placement.pose IS it).
+    const expectedWorld = composePose(cameraPose, qrPoseInCamera);
+    for (let i = 0; i < 3; i++) {
+      expect(placement!.pose.position[i]).toBeCloseTo(
+        expectedWorld.position[i],
+        2
+      );
     }
   });
 });

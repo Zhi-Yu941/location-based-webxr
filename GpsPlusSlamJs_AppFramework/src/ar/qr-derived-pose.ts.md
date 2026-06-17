@@ -20,9 +20,14 @@ solver: SolvePnpSquare, sizeOptions?, maxReprojectionErrorPx? }`.
   against its own as-of depth; returns the running-median size or `null`.
 - `solveQrPoseFromObservation(observation, sizeM, solver, maxReprojectionErrorPx?) → Pose |
 null` — pure PnP solve of one observation (intrinsics from its projection + frame size).
-- `deriveSolvedQrPose(text, observations, deps) → Pose | null` — accumulate size over the
-  history, then solve the **latest** observation; `null` on empty history / unsizeable /
-  PnP-rejected.
+- `interface DerivedQrPlacement` — `{ pose: Pose, sizeM: number }`: a best-effort placement
+  carrying both the solved pose AND the metric size that solved it (the debug cube needs the
+  size).
+- `deriveQrPlacement(text, observations, deps) → DerivedQrPlacement | null` — accumulate size
+  over the history, solve the **latest** observation, return BOTH pose and size in one history
+  pass; `null` on empty history / unsizeable / PnP-rejected.
+- `deriveSolvedQrPose(text, observations, deps) → Pose | null` — the pose alone
+  (`deriveQrPlacement(...)?.pose ?? null`).
 
 ## Invariants & assumptions
 
@@ -51,4 +56,6 @@ const pose = deriveSolvedQrPose('https://x', observations, {
   exact solver, and the **end-to-end re-test guarantee**: a raw observation forward-projected
   from a known pose, with the real `PlanarPnpSquare` + a constant-depth context, re-derives
   that same world pose (live == replay by construction).
-- Slice-level mapping/guard: `state/qr-detected-slice.test.ts` (`selectSolvedQrPose`).
+- `deriveQrPlacement` returns both the pose and the metric size for the same fixed marker.
+- Slice-level mapping/guard: `state/qr-detected-slice.test.ts` (`selectSolvedQrPose` /
+  `selectDerivedQrPlacement`).

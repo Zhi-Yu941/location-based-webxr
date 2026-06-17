@@ -136,18 +136,29 @@ export function solveQrPoseFromObservation(
   return solution ? solution.qrPoseWorld : null;
 }
 
+/** A best-effort derived placement: the solved world pose AND the metric size
+ * that solved it (the size the debug cube needs). */
+export interface DerivedQrPlacement {
+  /** Solved QR world pose (rides `arWorldGroup`). */
+  pose: Pose;
+  /** Running-median metric side length used to solve `pose`. */
+  sizeM: number;
+}
+
 /**
- * Derive the best-effort solved WORLD pose for a marker: accumulate the size
- * across the whole observation history (each against its as-of depth), then
- * solve the LATEST observation with that size. Returns `null` when there is no
- * history, no observation can be sized, or PnP rejects the latest quad — callers
- * render nothing (best-effort viz) rather than throwing.
+ * Derive the best-effort {@link DerivedQrPlacement} for a marker: accumulate the
+ * size across the whole observation history (each against its as-of depth), then
+ * solve the LATEST observation with that size — returning BOTH the pose and the
+ * size (the debug cube needs the size; deriving once avoids two history passes).
+ * Returns `null` when there is no history, no observation can be sized, or PnP
+ * rejects the latest quad — callers render nothing (best-effort viz) rather than
+ * throwing.
  */
-export function deriveSolvedQrPose(
+export function deriveQrPlacement(
   text: string,
   observations: readonly RawQrObservation[],
   deps: DeriveQrPoseDeps
-): Pose | null {
+): DerivedQrPlacement | null {
   if (observations.length === 0) return null;
   const sizeM = deriveQrSizeM(
     text,
@@ -157,10 +168,24 @@ export function deriveSolvedQrPose(
   );
   if (sizeM === null) return null;
   const latest = observations[observations.length - 1] as RawQrObservation;
-  return solveQrPoseFromObservation(
+  const pose = solveQrPoseFromObservation(
     latest,
     sizeM,
     deps.solver,
     deps.maxReprojectionErrorPx
   );
+  return pose ? { pose, sizeM } : null;
+}
+
+/**
+ * Derive only the best-effort solved WORLD pose for a marker (the size is an
+ * internal of {@link deriveQrPlacement}). Returns `null` under the same
+ * conditions. Kept for callers that need the pose alone.
+ */
+export function deriveSolvedQrPose(
+  text: string,
+  observations: readonly RawQrObservation[],
+  deps: DeriveQrPoseDeps
+): Pose | null {
+  return deriveQrPlacement(text, observations, deps)?.pose ?? null;
 }

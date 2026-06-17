@@ -41,7 +41,9 @@ import {
 } from '../ar/qr-pose-aggregation.js';
 import {
   deriveSolvedQrPose,
+  deriveQrPlacement,
   type DeriveQrPoseDeps,
+  type DerivedQrPlacement,
   type RawQrObservation,
 } from '../ar/qr-derived-pose.js';
 
@@ -437,4 +439,24 @@ export function selectSolvedQrPose(
     .map(toRawObservation)
     .filter((o): o is RawQrObservation => o !== null);
   return deriveSolvedQrPose(text, observations, deps);
+}
+
+/**
+ * Derive the best-effort {@link DerivedQrPlacement} (solved pose AND the metric
+ * size that solved it) for a marker from its RAW observation history. The debug
+ * viz needs the size to draw the cube, so this returns both in one history pass
+ * (decision D-A; see {@link deriveQrPlacement}). `null` under the same
+ * conditions as {@link selectSolvedQrPose}. Runs identically live and on replay.
+ */
+export function selectDerivedQrPlacement(
+  state: RootWithQrDetected,
+  text: string,
+  deps: DeriveQrPoseDeps
+): DerivedQrPlacement | null {
+  const marker = state.qrDetected.markers[text];
+  if (!marker) return null;
+  const observations = marker.detections
+    .map(toRawObservation)
+    .filter((o): o is RawQrObservation => o !== null);
+  return deriveQrPlacement(text, observations, deps);
 }

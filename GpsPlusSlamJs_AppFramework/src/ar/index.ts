@@ -108,10 +108,15 @@ export {
 export {
   type RawQrObservation,
   type DeriveQrPoseDeps,
+  type DerivedQrPlacement,
   deriveQrSizeM,
   solveQrPoseFromObservation,
   deriveSolvedQrPose,
+  deriveQrPlacement,
 } from './qr-derived-pose.js';
+
+// --- qr-debug-view (shared 3D debug axis+cube consumer, WS-5) ---
+export { createQrDebugView, type QrDebugView } from './qr-debug-view.js';
 
 // --- qr-detection-controller (the thin geo-less RAW producer, D-X) ---
 export {

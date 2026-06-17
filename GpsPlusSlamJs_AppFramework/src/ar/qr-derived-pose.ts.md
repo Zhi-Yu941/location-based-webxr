@@ -28,6 +28,15 @@ null` — pure PnP solve of one observation (intrinsics from its projection + fr
   pass; `null` on empty history / unsizeable / PnP-rejected.
 - `deriveSolvedQrPose(text, observations, deps) → Pose | null` — the pose alone
   (`deriveQrPlacement(...)?.pose ?? null`).
+- `createIncrementalQrPlacement(deps) → IncrementalQrPlacement` — the **stateful,
+  incremental** variant for hot store-driven consumers. `update(text, observations)`
+  folds in **only observations newer than the last fold** (O(1) per new detection)
+  and returns the current `DerivedQrPlacement | null`; **F1 memo** — if the newest
+  timestamp is unchanged it returns the cached placement without folding/solving.
+  `reset(text)` drops a marker's accumulated size + memo. Equivalent to a full
+  `deriveQrPlacement` replay over the same sequence (folds each obs once, in order,
+  against its as-of depth), but avoids the O(history)-per-store-action cost that
+  caused the on-device framerate ramp-down (perf-degradation follow-up / open topic D).
 
 ## Invariants & assumptions
 

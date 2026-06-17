@@ -195,3 +195,93 @@ export function deriveSolvedQrPose(
 ): Pose | null {
   return deriveQrPlacement(text, observations, deps)?.pose ?? null;
 }
+
+/**
+ * A stateful, INCREMENTAL placement deriver — the live/replay-hot variant of
+ * {@link deriveQrPlacement}. The stateless `deriveQrPlacement` rebuilds a fresh
+ * measurer and replays the WHOLE observation history on every call; driven by a
+ * store subscriber that fires on every action, that is O(history) per action and
+ * caused an on-device framerate ramp-down once the per-marker ring filled
+ * (perf-degradation follow-up; open topic D). This deriver instead keeps one
+ * persistent size measurer and folds in **only observations newer than the last
+ * fold** — O(1) per new detection, matching the demo's incremental accumulator.
+ *
+ * Equivalence: folding each observation exactly once (in arrival order, against
+ * its as-of depth via `resolveDepthAt`) yields the same running-median size as a
+ * full replay over the same observations, so `update()`'s result equals
+ * {@link deriveQrPlacement} over the same sequence. It runs identically live and
+ * on replay (only reads what it is handed), preserving the re-test guarantee:
+ * the accumulated size is the whole **session** history (the slice ring cap only
+ * bounds what the live store can hand back, not what was already folded), which
+ * is exactly what an offline re-derivation over the full recorded stream sees.
+ */
+export interface IncrementalQrPlacement {
+  /**
+   * Fold any observations newer than the last fold for `text`, then return the
+   * current best-effort placement (or `null` when not yet sizeable / PnP-rejected).
+   * **F1 (memo):** if the newest observation's timestamp is unchanged since the
+   * last call, returns the cached placement WITHOUT folding or re-solving — so
+   * unrelated store changes (depth, GPS) cost a `Map` lookup, not a re-derive.
+   */
+  update(
+    text: string,
+    observations: readonly RawQrObservation[]
+  ): DerivedQrPlacement | null;
+  /** Drop a marker's accumulated size + memo (e.g. on `clearQrMarker`). */
+  reset(text: string): void;
+}
+
+export function createIncrementalQrPlacement(
+  deps: DeriveQrPoseDeps
+): IncrementalQrPlacement {
+  const measurer = createQrSizeMeasurer(deps.sizeOptions);
+  const lastFoldedTs = new Map<string, number>();
+  const lastPlacement = new Map<string, DerivedQrPlacement | null>();
+
+  return {
+    update(text, observations): DerivedQrPlacement | null {
+      if (observations.length === 0) return null;
+      const newestTs = observations[observations.length - 1]!.timestamp;
+      const foldedTs = lastFoldedTs.get(text) ?? -Infinity;
+
+      // F1: nothing new for this marker → return the cached placement untouched.
+      if (newestTs <= foldedTs) return lastPlacement.get(text) ?? null;
+
+      // F2: fold ONLY the observations newer than the last fold (each obs once
+      // across the marker's lifetime), each against its own as-of depth.
+      for (const o of observations) {
+        if (o.timestamp <= foldedTs) continue;
+        const ctx = deps.resolveDepthAt(o.timestamp);
+        if (!ctx) continue;
+        measurer.measure(
+          text,
+          o.corners,
+          { width: o.imageWidth, height: o.imageHeight },
+          ctx
+        );
+      }
+      lastFoldedTs.set(text, newestTs);
+
+      // Solve the LATEST observation with the accumulated running-median size.
+      const sizeM = measurer.current(text).estimateM;
+      let placement: DerivedQrPlacement | null = null;
+      if (sizeM !== null) {
+        const latest = observations[observations.length - 1]!;
+        const pose = solveQrPoseFromObservation(
+          latest,
+          sizeM,
+          deps.solver,
+          deps.maxReprojectionErrorPx
+        );
+        placement = pose ? { pose, sizeM } : null;
+      }
+      lastPlacement.set(text, placement);
+      return placement;
+    },
+    reset(text): void {
+      lastFoldedTs.delete(text);
+      lastPlacement.delete(text);
+      measurer.reset(text);
+    },
+  };
+}

@@ -443,12 +443,28 @@ export function selectSolvedQrPose(
   text: string,
   deps: DeriveQrPoseDeps
 ): Pose | null {
+  const observations = selectQrRawObservations(state, text);
+  return deriveSolvedQrPose(text, observations, deps);
+}
+
+/**
+ * The marker's stored entries narrowed to {@link RawQrObservation}s (entries
+ * carrying the full raw detector output), oldest→newest. Empty for an unknown
+ * marker or one with only solved-pose-only (transitional) entries. This is the
+ * shared mapping the derive-on-read selectors and the incremental deriver
+ * consume — exposed so a stateful consumer (the recorder's debug controller)
+ * can hand raw observations to `createIncrementalQrPlacement` without
+ * re-implementing the `toRawObservation` guard.
+ */
+export function selectQrRawObservations(
+  state: RootWithQrDetected,
+  text: string
+): RawQrObservation[] {
   const marker = state.qrDetected.markers[text];
-  if (!marker) return null;
-  const observations = marker.detections
+  if (!marker) return [];
+  return marker.detections
     .map(toRawObservation)
     .filter((o): o is RawQrObservation => o !== null);
-  return deriveSolvedQrPose(text, observations, deps);
 }
 
 /**
@@ -463,10 +479,5 @@ export function selectDerivedQrPlacement(
   text: string,
   deps: DeriveQrPoseDeps
 ): DerivedQrPlacement | null {
-  const marker = state.qrDetected.markers[text];
-  if (!marker) return null;
-  const observations = marker.detections
-    .map(toRawObservation)
-    .filter((o): o is RawQrObservation => o !== null);
-  return deriveQrPlacement(text, observations, deps);
+  return deriveQrPlacement(text, selectQrRawObservations(state, text), deps);
 }

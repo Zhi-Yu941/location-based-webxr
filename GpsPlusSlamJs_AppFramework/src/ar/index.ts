@@ -109,10 +109,12 @@ export {
   type RawQrObservation,
   type DeriveQrPoseDeps,
   type DerivedQrPlacement,
+  type IncrementalQrPlacement,
   deriveQrSizeM,
   solveQrPoseFromObservation,
   deriveSolvedQrPose,
   deriveQrPlacement,
+  createIncrementalQrPlacement,
 } from './qr-derived-pose.js';
 
 // --- qr-debug-view (shared 3D debug axis+cube consumer, WS-5) ---

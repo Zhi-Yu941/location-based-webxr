@@ -33,6 +33,7 @@ import {
   deriveQrSizeM,
   deriveSolvedQrPose,
   deriveQrPlacement,
+  createIncrementalQrPlacement,
   solveQrPoseFromObservation,
   type RawQrObservation,
 } from './qr-derived-pose.js';
@@ -294,5 +295,107 @@ describe('deriveQrPlacement', () => {
         2
       );
     }
+  });
+});
+
+describe('createIncrementalQrPlacement', () => {
+  // A fronto-parallel marker (the re-test fixture) so both the incremental and
+  // the full-replay path can size + solve it deterministically.
+  const SIZE = 0.2;
+  const DIST = 0.8;
+  const incQrPoseInCamera: Pose = {
+    position: [0, 0, -DIST] as Vector3,
+    rotation: [0, 0, 0, 1] as Quaternion,
+  };
+  const incCorners = projectedCorners(incQrPoseInCamera, SIZE);
+  const growingHistory = (n: number): RawQrObservation[] =>
+    Array.from({ length: n }, (_, i) =>
+      makeObservation('m', incCorners, 10 * (i + 1))
+    );
+
+  it('matches deriveQrPlacement (full replay) after folding the whole history', () => {
+    const obs = growingHistory(5);
+    const deps = {
+      resolveDepthAt: () => constantDepthContext(DIST),
+      solver: new PlanarPnpSquare(),
+    };
+    const inc = createIncrementalQrPlacement(deps);
+    // Drive incrementally, one observation at a time (the live cadence).
+    let live: ReturnType<typeof inc.update> = null;
+    for (let i = 1; i <= obs.length; i++)
+      live = inc.update('m', obs.slice(0, i));
+
+    const replay = deriveQrPlacement('m', obs, deps);
+    expect(live).not.toBeNull();
+    expect(replay).not.toBeNull();
+    expect(live!.sizeM).toBeCloseTo(replay!.sizeM, 6);
+    for (let i = 0; i < 3; i++) {
+      expect(live!.pose.position[i]).toBeCloseTo(replay!.pose.position[i], 6);
+    }
+  });
+
+  /**
+   * Why this test matters (the perf-degradation fix): the OLD store-driven viz
+   * re-folded the WHOLE history on every call — O(history) per store action,
+   * total O(N²) over a growing marker. The incremental deriver folds each
+   * observation EXACTLY ONCE. We count depth resolutions (one per folded
+   * observation): after N incremental updates over a growing history, the total
+   * must be N (linear), NOT N(N+1)/2 (quadratic).
+   */
+  it('folds each observation exactly once — cost is O(1) per new detection', () => {
+    let depthCalls = 0;
+    const inc = createIncrementalQrPlacement({
+      resolveDepthAt: () => {
+        depthCalls += 1;
+        return constantDepthContext(DIST);
+      },
+      solver: new PlanarPnpSquare(),
+    });
+    const N = 12;
+    for (let i = 1; i <= N; i++) inc.update('m', growingHistory(i));
+    expect(depthCalls).toBe(N); // linear — a full replay would be N*(N+1)/2 = 78
+  });
+
+  it('memoizes when no new observation arrived (F1) — no fold, no re-derive', () => {
+    let depthCalls = 0;
+    const inc = createIncrementalQrPlacement({
+      resolveDepthAt: () => {
+        depthCalls += 1;
+        return constantDepthContext(DIST);
+      },
+      solver: new PlanarPnpSquare(),
+    });
+    const obs = growingHistory(3);
+    const first = inc.update('m', obs);
+    const callsAfterFirst = depthCalls; // 3 (folded all three)
+    const second = inc.update('m', obs); // same newest timestamp → no fold
+    expect(depthCalls).toBe(callsAfterFirst); // unchanged — nothing re-folded
+    expect(second).toEqual(first); // cached placement returned
+  });
+
+  it('reset(text) clears the accumulated size so folding starts over', () => {
+    let depthCalls = 0;
+    const inc = createIncrementalQrPlacement({
+      resolveDepthAt: () => {
+        depthCalls += 1;
+        return constantDepthContext(DIST);
+      },
+      solver: new PlanarPnpSquare(),
+    });
+    inc.update('m', growingHistory(3));
+    expect(depthCalls).toBe(3);
+    inc.reset('m');
+    // After reset, the same observations are folded again (cursor cleared).
+    inc.update('m', growingHistory(3));
+    expect(depthCalls).toBe(6);
+  });
+
+  it('returns null until a marker can be sized, without throwing', () => {
+    const inc = createIncrementalQrPlacement({
+      resolveDepthAt: () => null, // never resolvable → never sizeable
+      solver: new PlanarPnpSquare(),
+    });
+    expect(inc.update('m', growingHistory(3))).toBeNull();
+    expect(inc.update('m', [])).toBeNull();
   });
 });

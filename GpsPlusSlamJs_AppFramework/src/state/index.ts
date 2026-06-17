@@ -63,6 +63,7 @@ export {
   selectQrPoseStability,
   selectSolvedQrPose,
   selectDerivedQrPlacement,
+  selectQrRawObservations,
   type QrPoseStabilityStatus,
   type QrPoseStability,
   type QrPoseStabilityOptions,

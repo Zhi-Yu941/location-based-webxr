@@ -20,17 +20,18 @@ the WS-5 **consumer** (debug axis+cube). `main.ts` calls it once in `handleEnter
 
 ## Invariants & assumptions
 
-- **Clock domain (load-bearing, open topic A):** the producer's `now` is pinned to
-  `performance.now()` — the SAME clock the recorded depth stream uses — so the
-  derive-on-read size as-of join pairs each detection with the right depth sample.
-  The framework producer defaults to `Date.now()`; passing `performance.now` is
-  mandatory.
+- **Clock domain (load-bearing, open topic A):** the producer's `now` is
+  `Date.now()` (EPOCH ms) — the SAME clock the recorded depth stream uses
+  (`DepthSample.timestamp = performance.timeOrigin + frameTs`) — so the
+  derive-on-read size as-of join (`depth.ts ≤ detection.ts`) pairs each detection
+  with the right depth sample. Stamping `performance.now()` (relative) was the
+  original "no debug cube" bug: it never satisfies the join.
 - **Single cadence owner:** `startCameraFrameCapture({ intervalMs })` throttles;
   the producer runs `minIntervalMs: 0`.
-- **Camera pose + projection** come from the latest recorded depth sample on the
-  CURRENT store (mirrors the demo's verified post-detect read). The observation's
-  `imageWidth/Height` come from the detector-frame buffer; note the two distinct
-  projection matrices (open topic F).
+- **Camera pose** comes from the current XR frame (`getCurrentArPose()`, Option A) —
+  fresh every frame, not stale to the 1 Hz depth. **Projection** still comes from
+  the latest depth sample (near-constant FOV; per-frame projection is open topic F).
+  The observation's `imageWidth/Height` come from the detector-frame buffer.
 - **Store-swap safe:** dispatches + reads go through `storeRef.get()`, and the
   debug subscriber re-attaches on every swap (Start Recording / replay).
 

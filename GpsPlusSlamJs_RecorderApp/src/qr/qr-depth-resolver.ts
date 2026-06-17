@@ -16,10 +16,11 @@
  * callback; replay: the re-dispatched `recordDepthSample` reflected in the
  * store's `latestDepthSample`), so the join reproduces the live result.
  *
- * **Clock domain (load-bearing):** depth timestamps are `performance.now()`
- * (relative), and the QR producer MUST stamp detections from the same clock
- * (plan open topic A). The lookup is a pure numeric `≤` over those stamps; if the
- * QR producer used epoch ms instead, every join would silently miss.
+ * **Clock domain (load-bearing):** depth timestamps are EPOCH ms
+ * (`DepthSample.timestamp = performance.timeOrigin + frameTs`, `ar/depth-sampler.ts`),
+ * and the QR producer MUST stamp detections from the same epoch clock (`Date.now()`;
+ * plan open topic A). The lookup is a pure numeric `≤` over those stamps; if the QR
+ * producer used relative `performance.now()` instead, every join would silently miss.
  *
  * @see gps-plus-slam-app-framework/ar/qr-derived-pose — the consumer of `resolveDepthAt`.
  * @see qr-debug-controller.ts — drives `append` + renders the derived placement.

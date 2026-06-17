@@ -54,9 +54,12 @@ export interface ReplayAction {
  * Extract an absolute epoch-ms timestamp from a Redux action, or null
  * if the action type doesn't carry one.
  *
- * IMPORTANT: depthSample uses performance.now() (relative to page load),
- * NOT epoch ms. Returning it here would mix clock domains and produce
- * garbage delays. It must return null. (Risk R4)
+ * IMPORTANT: the high-frequency sensor streams (depthSample, qrDetected) return
+ * null here ON PURPOSE — they are NOT used to pace replay delays (they anchor to
+ * the GPS/image/session timeline by recorded ORDER instead). Their payload
+ * `timestamp` IS epoch ms (`performance.timeOrigin + frameTs`, see
+ * `ar/depth-sampler.ts`); the QR size as-of join reads those payload timestamps
+ * directly, independently of this pacing function. (Risk R4)
  *
  * @param action - A Redux action with type and optional payload
  * @returns Epoch milliseconds, or null if unavailable/unreliable
@@ -112,15 +115,16 @@ export function extractActionTimestamp(action: ReplayAction): number | null {
     }
 
     case 'recording/recordDepthSample':
-      // EXPLICITLY null — uses performance.now() (relative), NOT epoch ms.
-      // Mixing clock domains in delay calculation produces garbage. (Risk R4)
+      // EXPLICITLY null — a high-frequency stream replayed in recorded ORDER, not
+      // paced by delay. Its payload `timestamp` is epoch ms but is not consumed
+      // here (Risk R4).
       return null;
 
     case 'qrDetected/recordQrDetection':
-      // EXPLICITLY null — the QR detection timestamp shares the depth sample's
-      // performance.now() domain (the live wiring stamps both from the same
-      // clock so the derive-on-read as-of join aligns), NOT epoch ms. Same
-      // clock-domain reasoning as recordDepthSample above.
+      // EXPLICITLY null — like depthSample, replayed in recorded order, not paced.
+      // The QR `timestamp` is EPOCH ms (`Date.now()`, the SAME domain as the depth
+      // stream) so the derive-on-read size as-of join aligns on the payload
+      // timestamps; this pacing function deliberately ignores it.
       return null;
 
     case 'recording/endSession':

@@ -12,16 +12,17 @@
  *    derived axis+cube under `arWorldGroup`.
  *
  * **Clock domain (load-bearing — plan open topic A):** the producer's `now` is
- * pinned to `performance.now()`, the SAME clock the recorded depth stream uses, so
- * the derive-on-read size as-of join pairs each detection with the right depth
- * sample. The producer defaults to `Date.now()`; passing `performance.now` here is
- * mandatory, not cosmetic.
+ * `Date.now()` (EPOCH ms), the SAME clock the recorded depth stream uses
+ * (`DepthSample.timestamp = performance.timeOrigin + frameTs`, depth-sampler.ts),
+ * so the derive-on-read size as-of join (`depth.ts <= detection.ts`) pairs each
+ * detection with the right depth sample. Using `performance.now()` (relative)
+ * here was a bug: it never satisfies the join, so the size — and the debug cube —
+ * never resolve.
  *
- * Camera-pose + projection for each observation come from the latest recorded
- * depth sample (mirrors the QR demo's verified post-detect read). NOTE the two
- * distinct projection matrices (open topic F): the QR observation carries the
- * depth sample's projection as the PnP-intrinsics source; the depth *unprojection*
- * uses that same sample's projection separately in the resolver. The producer's
+ * Camera POSE comes from the current XR frame (`getCurrentArPose()`, Option A) so
+ * it is not stale to the 1 Hz depth cadence; PROJECTION (PnP intrinsics) still
+ * comes from the latest depth sample (the only per-frame projection source today;
+ * a fresher per-frame projection is open topic F). The producer's
  * `imageWidth/Height` come from the detector-frame buffer (the RGBA capture).
  *
  * The frame SOURCE is the single cadence owner (`startCameraFrameCapture({
@@ -49,6 +50,7 @@ import type { Pose } from 'gps-plus-slam-app-framework/ar/qr-pose';
 import {
   startCameraFrameCapture,
   stopCameraFrameCapture,
+  getCurrentArPose,
 } from 'gps-plus-slam-app-framework/ar/webxr-session';
 import type { QrCaptureOptions } from 'gps-plus-slam-app-framework/state/recording-options';
 import { recordQrDetection } from '../state/recorder-store';
@@ -84,14 +86,30 @@ export function wireQrRecording(options: WireQrRecordingOptions): () => void {
     ? (image: RgbaImage) => frontEnd.detect(image)
     : () => Promise.resolve(null);
 
-  // Camera pose + projection for the observation: the latest recorded depth
-  // sample, read on the CURRENT store at detection-resolve time.
+  // Camera pose: the CURRENT XR-frame pose (Option A) — refreshed every frame,
+  // so it is NOT the up-to-~1s-stale 1 Hz depth-sample pose. It rides the same
+  // raw-WebXR/odom frame as the depth sample's pose, so it is coordinate-
+  // compatible; we only reshape ARPose ({x,y,z}/{x,y,z,w}) into the Pose tuples.
   const getCameraPose = (): Pose | null => {
-    const sample = storeRef.get().getState().recording.latestDepthSample;
-    return sample
-      ? { position: sample.cameraPos, rotation: sample.cameraRot }
-      : null;
+    const arPose = getCurrentArPose();
+    if (!arPose) return null;
+    return {
+      position: [
+        arPose.position.x,
+        arPose.position.y,
+        arPose.position.z,
+      ] as Pose['position'],
+      rotation: [
+        arPose.orientation.x,
+        arPose.orientation.y,
+        arPose.orientation.z,
+        arPose.orientation.w,
+      ] as Pose['rotation'],
+    };
   };
+  // Projection (PnP intrinsics) still comes from the depth sample — the only
+  // per-frame projection source today, and FOV is near-constant per session
+  // (a fresher per-frame projection is open topic F).
   const getProjectionMatrix = () =>
     storeRef.get().getState().recording.latestDepthSample?.projectionMatrix ??
     null;
@@ -102,8 +120,13 @@ export function wireQrRecording(options: WireQrRecordingOptions): () => void {
     getProjectionMatrix,
     recordDetection: (observation) =>
       storeRef.get().dispatch(recordQrDetection(observation)),
-    // MUST match the depth stream's clock (open topic A) — do not drop this.
-    now: () => performance.now(),
+    // MUST share the depth stream's clock: `DepthSample.timestamp` is EPOCH ms
+    // (`performance.timeOrigin + frameTs`, depth-sampler.ts), and the derive-on-
+    // read size as-of join keys QR detections by the SAME timestamp. Date.now()
+    // is epoch; `performance.now()` (relative) would never satisfy
+    // `depth.ts <= detection.ts`, so the size — and the debug cube — never
+    // resolve. (See open topic A; the original "epoch ms" intent was correct.)
+    now: () => Date.now(),
     // The camera-frame source owns the cadence; detect every delivered frame.
     minIntervalMs: 0,
   });

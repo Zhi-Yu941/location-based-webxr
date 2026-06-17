@@ -61,9 +61,10 @@ export interface RawQrObservation {
   imageHeight: number;
   /**
    * Detection time in the producer's injected clock — the depth as-of join key.
-   * MUST share the depth stream's clock; the RAW recorder path uses
-   * `performance.now()` (NOT epoch ms), or the join in {@link deriveQrSizeM}
-   * silently mis-pairs. See the recorder live-QR plan open topic A.
+   * MUST share the depth stream's clock, which is EPOCH ms
+   * (`DepthSample.timestamp = performance.timeOrigin + frameTs`); the RAW recorder
+   * path stamps `Date.now()` (epoch), NOT relative `performance.now()`, or the
+   * `≤` join in {@link deriveQrSizeM} never matches. See open topic A.
    */
   timestamp: number;
 }

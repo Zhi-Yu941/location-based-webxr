@@ -68,21 +68,21 @@ export const DEFAULT_QR_MAX_HISTORY = 32;
 /**
  * One detection observation. Detection-agnostic by design (Note 1): `text` is
  * the label/payload, `reprojectionErrorPx` the confidence proxy, the two poses
- * the 3D placement. `timestamp` is whatever clock the PRODUCER injected — see the
- * field note: the RAW recorder path uses `performance.now()` so the derive-on-read
- * depth as-of join lines up with the depth stream (clock-domain coupling).
+ * the 3D placement. `timestamp` is the producer's injected clock — see the field
+ * note: the RAW recorder path stamps EPOCH ms so the derive-on-read depth as-of
+ * join lines up with the depth stream (clock-domain coupling).
  */
 export interface QrDetectionEntry {
   /** Decoded payload (text/URL) — also the marker key. */
   text: string;
   /**
-   * Detection time in the PRODUCER's injected clock. For the RAW recorder path
-   * this MUST be `performance.now()` (the depth stream's clock), because the
-   * size as-of join (`ar/qr-derived-pose`) pairs this with the depth sample
-   * active at this timestamp — an epoch-ms stamp would silently mis-pair. The
-   * legacy geo/demo producer stamps `Date.now()`; both are fine in isolation,
-   * but never mix a recording's QR + depth clocks. See the recorder live-QR plan
-   * open topic A.
+   * Detection time in the producer's injected clock. For the RAW recorder path
+   * this MUST be **EPOCH ms** (`Date.now()`), because the depth stream it joins
+   * against is epoch (`DepthSample.timestamp = performance.timeOrigin + frameTs`,
+   * `ar/depth-sampler.ts`) and the size as-of join pairs this with the depth
+   * sample whose timestamp is `≤` this one (`ar/qr-derived-pose`). A relative
+   * `performance.now()` stamp (~1e5) never satisfies that join, so the size — and
+   * the debug cube — never resolve. See the recorder live-QR plan open topic A.
    */
   timestamp: number;
 

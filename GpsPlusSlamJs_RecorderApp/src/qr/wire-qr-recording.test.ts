@@ -34,10 +34,24 @@ const {
   };
 });
 
-const { mockStartCapture, mockStopCapture } = vi.hoisted(() => ({
-  mockStartCapture: vi.fn(),
-  mockStopCapture: vi.fn(),
-}));
+const { mockStartCapture, mockStopCapture, mockGetCurrentArPose } = vi.hoisted(
+  () => ({
+    mockStartCapture: vi.fn(),
+    mockStopCapture: vi.fn(),
+    // ARPose shape ({position:{x,y,z}, orientation:{x,y,z,w}}); a known value
+    // distinct from any depth-sample pose so tests can prove Option A. Return type
+    // is the `… | null` union so a test can simulate "no pose yet".
+    mockGetCurrentArPose: vi.fn(
+      (): {
+        position: { x: number; y: number; z: number };
+        orientation: { x: number; y: number; z: number; w: number };
+      } | null => ({
+        position: { x: 7, y: 8, z: 9 },
+        orientation: { x: 0, y: 0, z: 0, w: 1 },
+      })
+    ),
+  })
+);
 
 const { mockDebugController, mockCreateQrDebugController } = vi.hoisted(() => {
   const mockDebugController = { update: vi.fn(), dispose: vi.fn() };
@@ -56,6 +70,7 @@ vi.mock('gps-plus-slam-app-framework/ar/qr-frontend', () => ({
 vi.mock('gps-plus-slam-app-framework/ar/webxr-session', () => ({
   startCameraFrameCapture: mockStartCapture,
   stopCameraFrameCapture: mockStopCapture,
+  getCurrentArPose: mockGetCurrentArPose,
 }));
 vi.mock('./qr-debug-controller', () => ({
   createQrDebugController: mockCreateQrDebugController,
@@ -125,7 +140,7 @@ describe('wireQrRecording', () => {
     capturedProducerDeps.current = null;
   });
 
-  it('creates the producer with a performance.now() clock, NOT epoch ms (open topic A)', () => {
+  it('creates the producer with an EPOCH-ms clock matching the depth stream (the as-of join)', () => {
     const store = makeStore();
     const { ref } = makeStoreRef(store);
     wireQrRecording({
@@ -138,9 +153,14 @@ describe('wireQrRecording', () => {
     const deps = capturedProducerDeps.current!;
     expect(deps).toBeTruthy();
     const now = deps.now as () => number;
-    // performance.now() is a small relative value; Date.now() is ~1.7e12. The
-    // join against the depth stream (performance.now) breaks if this is epoch.
-    expect(now()).toBeLessThan(1e12);
+    // `DepthSample.timestamp` is EPOCH ms (`performance.timeOrigin + frameTs`,
+    // depth-sampler.ts). The as-of size join keys QR detections by the SAME
+    // timestamp, so the producer MUST stamp epoch ms — `performance.now()`
+    // (relative, ~1e5) would never satisfy `depth.ts <= detection.ts` and the
+    // cube would never appear. Assert same domain as `timeOrigin + now()`.
+    const epochApprox = performance.timeOrigin + performance.now();
+    expect(now()).toBeGreaterThan(1e12); // epoch, not relative perf-now
+    expect(Math.abs(now() - epochApprox)).toBeLessThan(2000);
     // The frame source is the single cadence owner.
     expect(deps.minIntervalMs).toBe(0);
   });
@@ -171,7 +191,10 @@ describe('wireQrRecording', () => {
     expect(setProducer).toHaveBeenCalledWith(fakeProducer);
   });
 
-  it('reads camera pose + projection from the latest depth sample', () => {
+  it('reads camera pose from the CURRENT XR frame (Option A), not the depth sample', () => {
+    // The depth sample carries a DIFFERENT pose; getCameraPose must ignore it and
+    // return the fresh per-frame pose from getCurrentArPose() (converted to the
+    // Pose tuple shape), so a 1 Hz-stale depth pose never lands in the recording.
     const sample = {
       timestamp: 5,
       cameraPos: [1, 2, 3],
@@ -187,13 +210,28 @@ describe('wireQrRecording', () => {
       setProducer: vi.fn(),
     });
     const deps = capturedProducerDeps.current!;
+    // From getCurrentArPose() = {position:{7,8,9}, orientation:{0,0,0,1}}.
     expect((deps.getCameraPose as () => unknown)()).toEqual({
-      position: [1, 2, 3],
+      position: [7, 8, 9],
       rotation: [0, 0, 0, 1],
     });
+    // Projection still comes from the depth sample (near-constant FOV).
     expect((deps.getProjectionMatrix as () => unknown)()).toBe(
       sample.projectionMatrix
     );
+  });
+
+  it('returns a null camera pose when no XR frame pose is available yet', () => {
+    mockGetCurrentArPose.mockReturnValueOnce(null);
+    const { ref } = makeStoreRef(makeStore());
+    wireQrRecording({
+      storeRef: ref as never,
+      getArWorldGroup: () => null,
+      qr,
+      setProducer: vi.fn(),
+    });
+    const deps = capturedProducerDeps.current!;
+    expect((deps.getCameraPose as () => unknown)()).toBeNull();
   });
 
   it('dispatches RAW recordQrDetection into the CURRENT store', () => {

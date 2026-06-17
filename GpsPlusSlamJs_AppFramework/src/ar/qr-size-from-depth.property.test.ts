@@ -13,7 +13,11 @@ import { mat4, vec3, vec4 } from 'gl-matrix';
 import type { Matrix4, Quaternion, Vector3 } from 'gps-plus-slam-js';
 import type { DepthPoint } from '../types/ar-types';
 import { createDepthUnprojector } from './depth-unprojection';
-import { estimateQrSizeFromDepth } from './qr-size-from-depth';
+import {
+  estimateQrSizeFromDepth,
+  estimateQrSizeFromDepthDense,
+  type ScreenPoint,
+} from './qr-size-from-depth';
 
 const ORIGIN: Vector3 = [0, 0, 0];
 const IDENTITY: Quaternion = [0, 0, 0, 1];
@@ -62,6 +66,95 @@ const unprojector = () => {
   if (!u) throw new Error('unprojector');
   return u;
 };
+
+/** Bilinear n×n lattice of interior points across a quad (TL,TR,BR,BL). */
+function quadLattice(
+  quad: [Vector3, Vector3, Vector3, Vector3],
+  n: number
+): Vector3[] {
+  const [tl, tr, br, bl] = quad;
+  const lerp = (a: Vector3, b: Vector3, t: number): Vector3 => [
+    a[0] + (b[0] - a[0]) * t,
+    a[1] + (b[1] - a[1]) * t,
+    a[2] + (b[2] - a[2]) * t,
+  ];
+  const pts: Vector3[] = [];
+  for (let i = 0; i < n; i++) {
+    const v = i / (n - 1);
+    const top = lerp(tl, tr, v);
+    const bottom = lerp(bl, br, v);
+    for (let j = 0; j < n; j++) {
+      pts.push(lerp(top, bottom, j / (n - 1)));
+    }
+  }
+  return pts;
+}
+
+const screenOf = (world: Vector3): ScreenPoint => {
+  const p = project(world);
+  return { screenX: p.screenX, screenY: p.screenY };
+};
+
+describe('estimateQrSizeFromDepthDense properties', () => {
+  it('recovers the printed size from interior reads for any size / distance / yaw', () => {
+    fc.assert(
+      fc.property(
+        fc.double({ min: 0.05, max: 0.8, noNaN: true }),
+        fc.double({ min: 1.5, max: 8, noNaN: true }),
+        fc.double({ min: -0.5, max: 0.5, noNaN: true }),
+        fc.double({ min: -Math.PI / 3, max: Math.PI / 3, noNaN: true }),
+        (s, d, x, angle) => {
+          const quad = tiltedSquare(s, [x, 0, -d], angle);
+          const samples = quadLattice(quad, 5).map(project);
+          const obs = estimateQrSizeFromDepthDense(
+            [
+              screenOf(quad[0]),
+              screenOf(quad[1]),
+              screenOf(quad[2]),
+              screenOf(quad[3]),
+            ],
+            samples,
+            unprojector()
+          );
+          expect(obs).not.toBeNull();
+          expect(Math.abs(obs!.sizeM - s)).toBeLessThan(5e-3 * Math.max(1, s));
+          expect(obs!.quality).toBeGreaterThan(0.9);
+        }
+      )
+    );
+  });
+
+  it('stays accurate when a minority of interior reads are gross outliers', () => {
+    fc.assert(
+      fc.property(
+        fc.double({ min: 0.1, max: 0.5, noNaN: true }),
+        fc.double({ min: 2, max: 6, noNaN: true }),
+        fc.integer({ min: 0, max: 4 }), // how many of 36 reads to corrupt
+        (s, d, badCount) => {
+          const quad = tiltedSquare(s, [0, 0, -d], 0);
+          const samples = quadLattice(quad, 6).map(project);
+          for (let k = 0; k < badCount; k++) {
+            const i = (k * 7 + 3) % samples.length;
+            samples[i] = { ...samples[i]!, depthM: samples[i]!.depthM + 0.5 };
+          }
+          const obs = estimateQrSizeFromDepthDense(
+            [
+              screenOf(quad[0]),
+              screenOf(quad[1]),
+              screenOf(quad[2]),
+              screenOf(quad[3]),
+            ],
+            samples,
+            unprojector()
+          );
+          expect(obs).not.toBeNull();
+          // Outliers are rejected, not averaged in → size stays close to truth.
+          expect(Math.abs(obs!.sizeM - s)).toBeLessThan(0.02 * Math.max(1, s));
+        }
+      )
+    );
+  });
+});
 
 describe('estimateQrSizeFromDepth properties', () => {
   it('recovers the printed size for any size / distance / viewing angle', () => {

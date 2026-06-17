@@ -15,7 +15,10 @@ import type { DepthPoint } from '../types/ar-types';
 import { createDepthUnprojector } from './depth-unprojection';
 import {
   estimateQrSizeFromDepth,
+  estimateQrSizeFromDepthDense,
+  fitPlaneRobust,
   createQrSizeAccumulator,
+  type ScreenPoint,
 } from './qr-size-from-depth';
 
 const ORIGIN: Vector3 = [0, 0, 0];
@@ -98,6 +101,163 @@ describe('estimateQrSizeFromDepth', () => {
     const obs = estimateQrSizeFromDepth(
       [{ ...project(tl), depthM: 0 }, project(tr), project(br), project(bl)],
       [],
+      unprojector()
+    );
+    expect(obs).toBeNull();
+  });
+});
+
+/** Bilinear lattice of `n×n` interior points across a quad (TL,TR,BR,BL). */
+function quadLattice(
+  quad: [Vector3, Vector3, Vector3, Vector3],
+  n: number
+): Vector3[] {
+  const [tl, tr, br, bl] = quad;
+  const lerp = (a: Vector3, b: Vector3, t: number): Vector3 => [
+    a[0] + (b[0] - a[0]) * t,
+    a[1] + (b[1] - a[1]) * t,
+    a[2] + (b[2] - a[2]) * t,
+  ];
+  const pts: Vector3[] = [];
+  for (let i = 0; i < n; i++) {
+    const v = n === 1 ? 0.5 : i / (n - 1);
+    const top = lerp(tl, tr, v); // reuse v as the horizontal fraction
+    const bottom = lerp(bl, br, v);
+    for (let j = 0; j < n; j++) {
+      const u = n === 1 ? 0.5 : j / (n - 1);
+      pts.push(lerp(top, bottom, u));
+    }
+  }
+  return pts;
+}
+
+const screenOf = (world: Vector3): ScreenPoint => {
+  const p = project(world);
+  return { screenX: p.screenX, screenY: p.screenY };
+};
+
+describe('fitPlaneRobust', () => {
+  it('fits a fronto-parallel plane (normal ≈ ±z, residual ≈ 0)', () => {
+    const pts = quadLattice(frontoSquare(0.2, [0, 0, -2]), 5);
+    const fit = fitPlaneRobust(pts);
+    expect(fit).not.toBeNull();
+    expect(Math.abs(fit!.normal[2])).toBeCloseTo(1, 6);
+    expect(fit!.rms).toBeLessThan(1e-6);
+  });
+
+  it('rejects a single gross depth outlier (MAD inlier rejection)', () => {
+    const pts = quadLattice(frontoSquare(0.2, [0, 0, -2]), 5);
+    pts[12] = [pts[12]![0], pts[12]![1], pts[12]![2] + 0.5]; // a spike off the plane
+    const fit = fitPlaneRobust(pts);
+    expect(fit).not.toBeNull();
+    // The plane stays at z ≈ -2 (the outlier is rejected, not averaged in).
+    expect(fit!.point[2]).toBeCloseTo(-2, 3);
+    expect(Math.abs(fit!.normal[2])).toBeCloseTo(1, 3);
+  });
+
+  it('returns null for collinear points (no unique plane)', () => {
+    const collinear: Vector3[] = [
+      [0, 0, -2],
+      [0.1, 0, -2],
+      [0.2, 0, -2],
+      [0.3, 0, -2],
+    ];
+    expect(fitPlaneRobust(collinear)).toBeNull();
+  });
+
+  it('returns null for fewer than 3 points', () => {
+    expect(
+      fitPlaneRobust([
+        [0, 0, -2],
+        [0.1, 0, -2],
+      ])
+    ).toBeNull();
+  });
+});
+
+describe('estimateQrSizeFromDepthDense', () => {
+  it('recovers a fronto-parallel size from interior reads only', () => {
+    const s = 0.18;
+    const quad = frontoSquare(s, [0.1, -0.05, -2.5]);
+    const [tl, tr, br, bl] = quad;
+    const samples = quadLattice(quad, 5).map(project); // interior reads, NOT corners
+    const obs = estimateQrSizeFromDepthDense(
+      [screenOf(tl), screenOf(tr), screenOf(br), screenOf(bl)],
+      samples,
+      unprojector()
+    );
+    expect(obs).not.toBeNull();
+    expect(obs!.sizeM).toBeCloseTo(s, 3);
+    expect(obs!.quality).toBeGreaterThan(0.99);
+  });
+
+  it('recovers the size of a TILTED square (the corner-only path loses tilt)', () => {
+    // A square tilted ~25° about the vertical axis: x and z both vary.
+    const s = 0.2;
+    const ang = (25 * Math.PI) / 180;
+    const cos = Math.cos(ang);
+    const sin = Math.sin(ang);
+    const h = s / 2;
+    const center: Vector3 = [0, 0, -2.2];
+    const corner = (sx: number, sy: number): Vector3 => [
+      center[0] + sx * h * cos,
+      center[1] + sy * h,
+      center[2] + sx * h * sin,
+    ];
+    const quad: [Vector3, Vector3, Vector3, Vector3] = [
+      corner(-1, 1),
+      corner(1, 1),
+      corner(1, -1),
+      corner(-1, -1),
+    ];
+    const samples = quadLattice(quad, 6).map(project);
+    const obs = estimateQrSizeFromDepthDense(
+      [
+        screenOf(quad[0]),
+        screenOf(quad[1]),
+        screenOf(quad[2]),
+        screenOf(quad[3]),
+      ],
+      samples,
+      unprojector()
+    );
+    expect(obs).not.toBeNull();
+    expect(obs!.sizeM).toBeCloseTo(s, 2);
+    expect(obs!.quality).toBeGreaterThan(0.9);
+  });
+
+  it('recovers the size even when interior reads carry a few depth outliers', () => {
+    const s = 0.2;
+    const quad = frontoSquare(s, [0, 0, -2]);
+    const samples = quadLattice(quad, 6).map(project);
+    // Corrupt 3 of 36 reads with large depth spikes (edge bleed / background).
+    for (const i of [5, 17, 30]) {
+      samples[i] = { ...samples[i]!, depthM: samples[i]!.depthM + 0.4 };
+    }
+    const obs = estimateQrSizeFromDepthDense(
+      [
+        screenOf(quad[0]),
+        screenOf(quad[1]),
+        screenOf(quad[2]),
+        screenOf(quad[3]),
+      ],
+      samples,
+      unprojector()
+    );
+    expect(obs).not.toBeNull();
+    expect(obs!.sizeM).toBeCloseTo(s, 2);
+  });
+
+  it('returns null when too few interior reads are usable', () => {
+    const quad = frontoSquare(0.2, [0, 0, -2]);
+    const obs = estimateQrSizeFromDepthDense(
+      [
+        screenOf(quad[0]),
+        screenOf(quad[1]),
+        screenOf(quad[2]),
+        screenOf(quad[3]),
+      ],
+      [project(quad[0]), project(quad[1])], // only 2 reads
       unprojector()
     );
     expect(obs).toBeNull();

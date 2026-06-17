@@ -64,6 +64,13 @@ export interface QrSizeObservation {
 
 const EPS = 1e-9;
 
+/**
+ * Absolute floor (meters) for the robust plane-fit inlier band, used when the
+ * MAD-derived σ is ~0 (a near-perfect plane). Comfortably above float round-
+ * trip noise yet far below a real depth outlier at QR scale. See WS-A.
+ */
+const PLANE_INLIER_FLOOR_M = 0.005;
+
 function dist(a: Vector3, b: Vector3): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
@@ -156,6 +163,294 @@ export function estimateQrSizeFromDepth(
       Math.abs(dist(c1, c3) - expectedDiag)
     ) / expectedDiag;
   const planeErr = maxPlaneOffset / meanEdge;
+
+  const relErr = Math.max(edgeErr, diagErr, planeErr);
+  const quality = Math.max(0, Math.min(1, 1 - relErr));
+
+  return { sizeM: median(edges), quality };
+}
+
+// --- Dense plane-fit size estimate (WS-A) ------------------------------
+//
+// The corner-only estimate above unprojects the 4 corner depth reads directly.
+// On a SMALL QR over a coarse depth source the corners share one borrowed depth
+// (a fronto-parallel guess that loses tilt and is wrong whenever the nearest
+// read sits off the QR). The dense path instead fits the QR PLANE to many
+// interior depth reads and recovers the corners by intersecting their pixel
+// rays with that plane — decoupling "where depth exists" from "where the corners
+// are." See `2026-06-17-qr-size-accuracy-and-thin-demo-plan.md` WS-A.
+
+/** A normalized screen position (top-left origin), depth-free. */
+export interface ScreenPoint {
+  screenX: number;
+  screenY: number;
+}
+
+/** A robustly-fitted plane: a point on it, a unit normal, and fit diagnostics. */
+export interface PlaneFit {
+  /** Centroid of the inlier points (a point on the plane). */
+  point: Vector3;
+  /** Unit normal. */
+  normal: Vector3;
+  /** How many points were kept as inliers. */
+  inlierCount: number;
+  /** RMS orthogonal residual of the inliers, meters. */
+  rms: number;
+}
+
+/**
+ * Least-squares plane through a point set, refined from a seed normal. Avoids a
+ * full eigensolver: the seed (from LMS) picks which axis is most aligned with
+ * the normal, that axis becomes the dependent variable of a 2-parameter linear
+ * fit through the centroid (well-conditioned precisely because the plane is not
+ * near-vertical in that axis), and the 2×2 normal equations are solved in closed
+ * form. Returns `null` for fewer than 3 points or a singular (collinear) fit.
+ */
+function fitPlaneLeastSquares(
+  points: readonly Vector3[],
+  seedNormal: Vector3
+): { centroid: Vector3; normal: Vector3 } | null {
+  const n = points.length;
+  if (n < 3) return null;
+  let cx = 0;
+  let cy = 0;
+  let cz = 0;
+  for (const p of points) {
+    cx += p[0];
+    cy += p[1];
+    cz += p[2];
+  }
+  cx /= n;
+  cy /= n;
+  cz /= n;
+
+  // Dependent axis = the one the seed normal points along most strongly.
+  const ax = Math.abs(seedNormal[0]);
+  const ay = Math.abs(seedNormal[1]);
+  const az = Math.abs(seedNormal[2]);
+  const dep = ax >= ay && ax >= az ? 0 : ay >= az ? 1 : 2;
+  // (u, w) are the two independent axes; d is the dependent axis.
+  const split = (p: Vector3): [number, number, number] =>
+    dep === 0
+      ? [p[1] - cy, p[2] - cz, p[0] - cx]
+      : dep === 1
+        ? [p[0] - cx, p[2] - cz, p[1] - cy]
+        : [p[0] - cx, p[1] - cy, p[2] - cz];
+
+  let Suu = 0;
+  let Suw = 0;
+  let Sww = 0;
+  let Sud = 0;
+  let Swd = 0;
+  for (const p of points) {
+    const [u, w, d] = split(p);
+    Suu += u * u;
+    Suw += u * w;
+    Sww += w * w;
+    Sud += u * d;
+    Swd += w * d;
+  }
+  const det = Suu * Sww - Suw * Suw;
+  if (Math.abs(det) < EPS) return null; // collinear → ill-conditioned
+
+  // d ≈ a·u + b·w → plane normal (coefficients of u, w, d) = (-a, -b, 1).
+  const a = (Sud * Sww - Swd * Suw) / det;
+  const b = (Swd * Suu - Sud * Suw) / det;
+  const nUWD: [number, number, number] = [-a, -b, 1];
+  // Map the (u, w, d) normal back to (x, y, z) by the chosen split.
+  const nxyz: Vector3 =
+    dep === 0
+      ? [nUWD[2], nUWD[0], nUWD[1]]
+      : dep === 1
+        ? [nUWD[0], nUWD[2], nUWD[1]]
+        : [nUWD[0], nUWD[1], nUWD[2]];
+  const len = Math.hypot(nxyz[0], nxyz[1], nxyz[2]);
+  if (!(len > EPS)) return null;
+  // Orient to agree with the seed (sign is otherwise arbitrary).
+  const dot =
+    nxyz[0] * seedNormal[0] + nxyz[1] * seedNormal[1] + nxyz[2] * seedNormal[2];
+  const sign = dot < 0 ? -1 : 1;
+  const normal: Vector3 = [
+    (sign * nxyz[0]) / len,
+    (sign * nxyz[1]) / len,
+    (sign * nxyz[2]) / len,
+  ];
+  return { centroid: [cx, cy, cz], normal };
+}
+
+/**
+ * Robustly fit a plane to 3D points. A plain least-squares (PCA) plane is
+ * fragile here: one gross depth outlier (edge depth-bleed, a stray background
+ * read) can dominate the off-plane variance and flip which axis PCA calls the
+ * normal, so MAD rejection then runs against a wrong normal. Instead we use
+ * Least-Median-of-Squares — pick the candidate plane (from a point triple) that
+ * minimizes the MEDIAN squared orthogonal residual (≈50% breakdown, no
+ * threshold) — derive a robust scale from that median, select inliers, then
+ * least-squares refit on the inliers for an accurate normal/centroid.
+ *
+ * Deterministic (fixed-seed triple sampling) so property tests are
+ * reproducible. Returns `null` for fewer than 3 points or a degenerate
+ * (collinear / coincident) set where no non-degenerate triple exists.
+ */
+export function fitPlaneRobust(points: readonly Vector3[]): PlaneFit | null {
+  const n = points.length;
+  if (n < 3) return null;
+
+  // LMS: search candidate planes from point triples for the minimum median
+  // squared residual. Deterministic LCG so the same input always samples the
+  // same triples.
+  let best: { normal: Vector3; p0: Vector3; medSq: number } | null = null;
+  let rng = 0x2545f491;
+  const nextIdx = (): number => {
+    rng = (rng * 1103515245 + 12345) & 0x7fffffff;
+    return rng % n;
+  };
+  const TRIALS = 200;
+  for (let t = 0; t < TRIALS; t++) {
+    const i = nextIdx();
+    const j = nextIdx();
+    const k = nextIdx();
+    if (i === j || j === k || i === k) continue;
+    const a = points[i] as Vector3;
+    const b = points[j] as Vector3;
+    const c = points[k] as Vector3;
+    const ux = b[0] - a[0];
+    const uy = b[1] - a[1];
+    const uz = b[2] - a[2];
+    const vx = c[0] - a[0];
+    const vy = c[1] - a[1];
+    const vz = c[2] - a[2];
+    let nx = uy * vz - uz * vy;
+    let ny = uz * vx - ux * vz;
+    let nz = ux * vy - uy * vx;
+    const len = Math.hypot(nx, ny, nz);
+    if (!(len > EPS)) continue; // degenerate (collinear) triple
+    nx /= len;
+    ny /= len;
+    nz /= len;
+    const sq = points.map((p) => {
+      const d = nx * (p[0] - a[0]) + ny * (p[1] - a[1]) + nz * (p[2] - a[2]);
+      return d * d;
+    });
+    const medSq = median(sq);
+    if (!best || medSq < best.medSq) {
+      best = { normal: [nx, ny, nz], p0: a, medSq };
+    }
+  }
+  if (!best) return null; // every triple degenerate → collinear set
+
+  // Robust LMS scale; keep points within 2.5σ, with an absolute floor so a
+  // near-perfect plane (medSq≈0) keeps its clean points (float round-trip
+  // noise ≪ 5 mm) while gross dm-scale outliers stay rejected.
+  const sigma = 1.4826 * (1 + 5 / Math.max(1, n - 3)) * Math.sqrt(best.medSq);
+  const band = Math.max(2.5 * sigma, PLANE_INLIER_FLOOR_M);
+  const { normal: bn, p0 } = best;
+  let inliers = points.filter(
+    (p) =>
+      Math.abs(
+        bn[0] * (p[0] - p0[0]) + bn[1] * (p[1] - p0[1]) + bn[2] * (p[2] - p0[2])
+      ) <= band
+  );
+  if (inliers.length < 3) inliers = [...points];
+
+  const refit = fitPlaneLeastSquares(inliers, bn);
+  if (!refit) return null;
+  const refitDist = (p: Vector3): number =>
+    refit.normal[0] * (p[0] - refit.centroid[0]) +
+    refit.normal[1] * (p[1] - refit.centroid[1]) +
+    refit.normal[2] * (p[2] - refit.centroid[2]);
+  const rms = Math.sqrt(
+    inliers.reduce((acc, p) => acc + refitDist(p) ** 2, 0) / inliers.length
+  );
+
+  return {
+    point: refit.centroid,
+    normal: refit.normal,
+    inlierCount: inliers.length,
+    rms,
+  };
+}
+
+/**
+ * Intersect the camera ray through a normalized screen point with a plane.
+ * The ray is recovered by unprojecting the screen point at two distinct depths
+ * (both lie on the corner's pixel ray); no explicit camera center is needed.
+ * Returns the metric 3D intersection, or `null` for a parallel/degenerate ray.
+ */
+function intersectScreenRayWithPlane(
+  screen: ScreenPoint,
+  plane: PlaneFit,
+  unprojector: DepthUnprojector
+): Vector3 | null {
+  const a = unprojector.unproject({ ...screen, depthM: 1 });
+  const b = unprojector.unproject({ ...screen, depthM: 2 });
+  if (!a || !b) return null;
+  const dir: Vector3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const { normal: n, point: pp } = plane;
+  const denom = n[0] * dir[0] + n[1] * dir[1] + n[2] * dir[2];
+  if (Math.abs(denom) < EPS) return null; // ray parallel to plane
+  const t =
+    (n[0] * (pp[0] - a[0]) + n[1] * (pp[1] - a[1]) + n[2] * (pp[2] - a[2])) /
+    denom;
+  const hit: Vector3 = [
+    a[0] + t * dir[0],
+    a[1] + t * dir[1],
+    a[2] + t * dir[2],
+  ];
+  return hit.every((v) => Number.isFinite(v)) ? hit : null;
+}
+
+/**
+ * Estimate a QR's physical side length by fitting the QR plane to many interior
+ * depth reads and intersecting the 4 corner pixel rays with that plane.
+ *
+ * @param cornerScreens - the 4 corner screen positions, ordered TL, TR, BR, BL.
+ * @param samples - interior (and optionally corner) depth reads across the QR
+ *   face used for the robust plane fit. Need ≥3 non-collinear usable reads.
+ * @param unprojector - built once per depth sample via `createDepthUnprojector`.
+ * @returns `{ sizeM, quality }`, or `null` when the plane is under-determined
+ *   (too few/collinear reads) or a corner ray cannot meet the plane.
+ */
+export function estimateQrSizeFromDepthDense(
+  cornerScreens: readonly [ScreenPoint, ScreenPoint, ScreenPoint, ScreenPoint],
+  samples: readonly DepthPoint[],
+  unprojector: DepthUnprojector
+): QrSizeObservation | null {
+  const points: Vector3[] = [];
+  for (const s of samples) {
+    const p = unprojector.unproject(s);
+    if (p) points.push(p);
+  }
+  const plane = fitPlaneRobust(points);
+  if (!plane) return null;
+
+  const corners: Vector3[] = [];
+  for (const screen of cornerScreens) {
+    const hit = intersectScreenRayWithPlane(screen, plane, unprojector);
+    if (!hit) return null;
+    corners.push(hit);
+  }
+  const [c0, c1, c2, c3] = corners as [Vector3, Vector3, Vector3, Vector3];
+
+  const edges: [number, number, number, number] = [
+    dist(c0, c1),
+    dist(c1, c2),
+    dist(c2, c3),
+    dist(c3, c0),
+  ];
+  const meanEdge = (edges[0] + edges[1] + edges[2] + edges[3]) / 4;
+  if (!(meanEdge > EPS)) return null;
+
+  const edgeErr =
+    Math.max(...edges.map((e) => Math.abs(e - meanEdge))) / meanEdge;
+  const expectedDiag = meanEdge * Math.SQRT2;
+  const diagErr =
+    Math.max(
+      Math.abs(dist(c0, c2) - expectedDiag),
+      Math.abs(dist(c1, c3) - expectedDiag)
+    ) / expectedDiag;
+  // Plane-fit residual, normalized by the edge so `quality` stays scale-free.
+  const planeErr = plane.rms / meanEdge;
 
   const relErr = Math.max(edgeErr, diagErr, planeErr);
   const quality = Math.max(0, Math.min(1, 1 - relErr));

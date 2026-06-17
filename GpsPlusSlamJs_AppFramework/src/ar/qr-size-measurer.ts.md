@@ -12,36 +12,45 @@ re-implementing the loop.
 
 - `createQrSizeMeasurer(options?: QrSizeMeasurerOptions): QrSizeMeasurer`
   - `measure(text, corners: Point2[], image: {width,height}, ctx): QrSizeMeasurement | null`
-    — samples depth at the 4 corners + the centroid, runs
-    `estimateQrSizeFromDepth`, folds the observation into the per-`text`
-    accumulator, returns the updated estimate **plus** the raw corner/interior
-    depth samples. `null` only when corner depth can't be sampled even after the
-    robustness levers (≥2 corners lack depth), or `corners.length !== 4`. A
-    degenerate quad is NOT a failure here — the null observation just isn't
-    accumulated.
-- `QrSizeMeasurerOptions extends QrSizeAccumulatorOptions` — the depth-at-corners
-  robustness knobs (see below):
-  - `cornerInsetFractions?: number[]` (default `[0.12, 0.25]`) — when a corner
-    pixel has no depth, retry at points inset toward the centroid by these
-    fractions and **borrow** the first valid depth, keeping the true corner
+    — **PRIMARY** path: samples an interior `latticeSize × latticeSize` lattice
+    across the quad, runs `estimateQrSizeFromDepthDense` (robust plane fit + corner
+    ray-plane recovery), folds the observation into the per-`text` accumulator.
+    **FALLBACK** path: when the lattice is too sparse for a fit, samples the 4
+    corners (+ centroid) and runs the corner-only `estimateQrSizeFromDepth`.
+    Returns the updated estimate **plus** the raw samples used. `null` only when
+    neither path can run — `corners.length !== 4`, or the lattice is too sparse
+    **and** corner depth can't be sampled (≥2 corners lack depth). A degenerate
+    quad is NOT a failure here — the null observation just isn't accumulated.
+- `QrSizeMeasurerOptions extends QrSizeAccumulatorOptions`:
+  - `latticeSize?: number` (default `7`) — points-per-side of the interior dense-
+    fit lattice (≤49 reads). Reads with no depth are skipped.
+  - `cornerInsetFractions?: number[]` (default `[0.12, 0.25]`) — **fallback path:**
+    when a corner pixel has no depth, retry at points inset toward the centroid by
+    these fractions and **borrow** the first valid depth, keeping the true corner
     position (so size is not shrunk). `[]` disables inset fallback.
-  - `maxReconstructedCorners?: number` (default `1`) — how many still-missing
-    corners may have their depth reconstructed by a planar fit through the other
-    three. `0` disables reconstruction.
+  - `maxReconstructedCorners?: number` (default `1`) — **fallback path:** how many
+    still-missing corners may have their depth reconstructed by a planar fit
+    through the other three. `0` disables reconstruction.
   - `current(text): QrSizeEstimate` — estimate without adding a sample.
   - `reset(text?)` — clear one marker (or all).
 - `QrSizeDepthContext` — `{ depthAt, unprojector }` (a subset of the demo's
   `DepthContext`).
 - `QrSizeMeasurement` — `{ estimate, cornerSamples, interiorSamples }`.
+  `cornerSamples` is `null` when the dense path produced the estimate but corner
+  depth could not be sampled (a small QR whose corners fall between depth nodes);
+  `interiorSamples` is the dense lattice on the primary path or the centroid on
+  the fallback.
 - `ImageSize` — `{ width, height }`.
 
 ## Invariants & assumptions
 
-- **Pose-agnostic by design.** It returns `cornerSamples` so a depth-fit
-  consumer (the demo) can unproject the SAME points for a pose without
-  re-sampling; a PnP consumer (the Recorder) ignores them and reads only
-  `estimate`. Promoting the rigid depth-corner _pose_ fit
-  (`poseFromWorldCorners`) is the separate §3.3 follow-up.
+- **Dense fit is primary (WS-A).** The size comes from the robust plane fit over
+  interior reads, not the noisy corner depths — so a small/tilted QR is sized from
+  its face. The corner path is only a fallback for a too-sparse interior lattice.
+- **Pose-agnostic by design.** It returns the raw samples so a depth-fit consumer
+  could unproject them without re-sampling; a PnP consumer (the demo/Recorder)
+  ignores them and reads only `estimate`. Promoting the rigid depth-corner _pose_
+  fit (`poseFromWorldCorners`) is the separate §3.3 follow-up.
 - Accumulation is keyed by `text`; markers are independent.
 - Accumulator `options` flow to every per-marker `createQrSizeAccumulator`
   (quality threshold, min samples, spread cap, ring size).
@@ -68,10 +77,13 @@ if (m && m.estimate.status === 'estimated') useSize(m.estimate.estimateM);
 
 ## Tests
 
-- `qr-size-measurer.test.ts` — null on un-sampleable corners / wrong corner
-  count, planar-square convergence to `estimated`, per-marker independence,
-  `reset`/`current`. A fake unprojector maps normalized corners onto a planar
-  square so the full pipeline runs without a device. The robustness block uses a
-  "holey" depth context (depth null inside windows) to exercise the inset
-  fallback, one-corner reconstruction, the ≥2-missing → null budget, and the
+- `qr-size-measurer.test.ts` — wrong corner count → null, no-depth-anywhere →
+  null, planar-square convergence to `estimated` via the dense path, per-marker
+  independence, `reset`/`current`. A fake unprojector maps normalized corners
+  onto a planar square so the full pipeline runs without a device. A "holey"
+  context (depth null on corners) proves the dense path is independent of corner
+  depth — it measures despite one or two missing corner regions even with the
+  corner fallbacks disabled (and still reports best-effort `cornerSamples`). A
+  "corners-only" context (interior empty) exercises the fallback: corner-based
+  measurement, the empty-interior-AND-un-sampleable-corner → null gate, and the
   configurable quality gate.

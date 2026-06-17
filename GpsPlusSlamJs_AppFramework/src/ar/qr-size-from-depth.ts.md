@@ -15,6 +15,24 @@ authored. This is the **measuring stage** of the Note 3 size lifecycle.
   `sizeM`, and scores `quality ∈ [0,1]` from edge agreement + diagonal ≈ `√2·edge`
   - planarity (c2 and the interior samples vs the plane through c0,c1,c3).
     Returns `null` when a corner can't be unprojected or the quad is degenerate.
+    This is the **corner-only** path — now the measurer's _fallback_; it depends
+    on the (noisy) corner depth reads.
+- `estimateQrSizeFromDepthDense(cornerScreens, samples, unprojector)` →
+  `{ sizeM, quality } | null` (WS-A, the **primary** path). Robustly fits the QR
+  **plane** to many interior depth reads, then recovers the 4 corners by
+  intersecting their pixel rays with that plane (a corner ray is obtained by
+  unprojecting its screen point at two depths — no camera centre needed). Edge
+  median → `sizeM`; `quality` from edge/diagonal agreement + the plane-fit RMS.
+  Decouples "where depth exists" from "where the corners are", so a small/tilted
+  QR is sized from its face. Needs ≥3 non-collinear usable reads, else `null`.
+- `fitPlaneRobust(points)` → `{ point, normal, inlierCount, rms } | null`.
+  **Least-Median-of-Squares** plane search over deterministic point triples
+  (≈50% breakdown, no tuning threshold), a robust LMS scale → inlier band (with a
+  5 mm absolute floor so a near-perfect plane keeps its clean points), then a
+  **dominant-axis least-squares refit** on the inliers (the LMS normal picks the
+  dependent axis, so no eigensolver). `null` for <3 points or a collinear set.
+  PCA is deliberately avoided: one gross depth outlier can flip which axis PCA
+  calls the normal.
 - `createQrSizeAccumulator(options)` → `{ add(obs|null), current(), reset() }`.
   A robust running **median** over accepted observations, reporting a
   `QrSizeEstimate` with the lifecycle `status`. Options: `qualityThreshold`
@@ -53,7 +71,13 @@ if (est.status === 'estimated') buildCube(est.estimateM!);
   pushed corner scores < 0.8, null on an unprojectable corner; accumulator
   lifecycle, spread gate, quality/null rejection, reset.
 - `qr-size-from-depth.property.test.ts` — recovers the printed size for random
-  size/distance/yaw (angle-robustness); a non-planar quad scores low.
+  size/distance/yaw (angle-robustness); a non-planar quad scores low. Dense path:
+  recovers the size from interior reads for random size/distance/yaw, and stays
+  accurate when a minority of interior reads are gross outliers.
+- Dense unit cases: `fitPlaneRobust` (fronto, single gross outlier rejected,
+  collinear/too-few → null) and `estimateQrSizeFromDepthDense` (fronto from
+  interior reads only, a tilted square the corner-only path would mis-size,
+  outlier robustness, too-few-reads → null).
 
 ## Related
 

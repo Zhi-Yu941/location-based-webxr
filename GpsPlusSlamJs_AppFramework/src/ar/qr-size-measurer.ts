@@ -27,10 +27,12 @@ import type { DepthPoint } from '../types/ar-types.js';
 import type { DepthUnprojector } from './depth-unprojection.js';
 import {
   estimateQrSizeFromDepth,
+  estimateQrSizeFromDepthDense,
   createQrSizeAccumulator,
   type QrSizeAccumulator,
   type QrSizeAccumulatorOptions,
   type QrSizeEstimate,
+  type ScreenPoint,
 } from './qr-size-from-depth.js';
 
 const EPS = 1e-9;
@@ -43,16 +45,26 @@ const EPS = 1e-9;
  */
 export interface QrSizeMeasurerOptions extends QrSizeAccumulatorOptions {
   /**
+   * Points-per-side of the interior depth lattice sampled across the QR quad for
+   * the PRIMARY dense plane-fit estimate (WS-A). `latticeSize × latticeSize`
+   * points are sampled strictly inside the quad; reads with no depth are
+   * skipped. Default `7` (≤49 reads). Set to a small value (or rely on the
+   * corner fallback) to disable dense sampling. See {@link estimateQrSizeFromDepthDense}.
+   */
+  latticeSize?: number;
+  /**
    * When a corner pixel has no depth, retry at points inset toward the centroid
    * by these fractions (in order) and borrow the first valid depth — keeping the
    * TRUE corner screen position so the measured size is not shrunk. Default
-   * `[0.12, 0.25]`. Set to `[]` to disable inset fallback.
+   * `[0.12, 0.25]`. Set to `[]` to disable inset fallback. Used by the corner-
+   * based FALLBACK estimate (when the interior lattice is too sparse for a fit).
    */
   cornerInsetFractions?: number[];
   /**
    * Max corners whose depth may be reconstructed by a planar fit through the
    * other three when still missing after the inset fallback. Default `1`
-   * (tolerate one un-sampleable corner); `0` disables reconstruction.
+   * (tolerate one un-sampleable corner); `0` disables reconstruction. Used by
+   * the corner-based FALLBACK estimate.
    */
   maxReconstructedCorners?: number;
 }
@@ -75,19 +87,32 @@ export interface ImageSize {
 export interface QrSizeMeasurement {
   /** The per-marker running estimate AFTER folding in this observation. */
   estimate: QrSizeEstimate;
-  /** The 4 corner depth samples (detector order), normalized screen coords. */
-  cornerSamples: [DepthPoint, DepthPoint, DepthPoint, DepthPoint];
-  /** Interior (centroid) depth samples used for the planarity check (may be empty). */
+  /**
+   * The 4 corner depth samples (detector order, normalized screen coords),
+   * best-effort. `null` when corner depth could not be sampled (e.g. a small QR
+   * whose corners fall between depth nodes) but the dense interior fit still
+   * produced an estimate — the dense path does not need corner depths.
+   */
+  cornerSamples: [DepthPoint, DepthPoint, DepthPoint, DepthPoint] | null;
+  /**
+   * The interior depth reads used for the estimate: the dense lattice on the
+   * primary path, or the single centroid sample on the corner-based fallback
+   * (may be empty).
+   */
   interiorSamples: DepthPoint[];
 }
 
 export interface QrSizeMeasurer {
   /**
    * Measure one detection's size from depth and fold it into the per-`text`
-   * accumulator. Returns `null` when the corner depth cannot be sampled even
-   * after the inset fallback and at-most-one planar reconstruction (i.e. ≥2
-   * corners lack a depth read), or `corners.length !== 4` — the marker can't be
-   * sized this frame. A degenerate quad does not fail here: the (null)
+   * accumulator. The PRIMARY path is the dense plane fit (WS-A): sample an
+   * interior lattice, fit the QR plane, recover the corners by ray-plane
+   * intersection. When the lattice is too sparse for a fit it FALLS BACK to the
+   * corner-based estimate (corner depths + inset/reconstruct robustness).
+   *
+   * Returns `null` only when neither path can run — `corners.length !== 4`, or
+   * the interior lattice yields too few reads AND the corner depths cannot be
+   * sampled (≥2 corners missing). A degenerate quad does not throw: the (null)
    * observation is simply not accumulated and the prior estimate stands.
    */
   measure(
@@ -209,6 +234,51 @@ function cornerDepthPoints(
   return out as [DepthPoint, DepthPoint, DepthPoint, DepthPoint];
 }
 
+/**
+ * Sample an `n×n` interior lattice across the detected quad (bilinear in pixel
+ * space, strictly inside via `(i+0.5)/n` fractions so the high-contrast print
+ * boundary is avoided) and return the reads that have depth. These feed the
+ * dense plane fit; reads with no depth are simply skipped.
+ */
+function latticeDepthPoints(
+  corners: readonly Point2[],
+  image: ImageSize,
+  depthAt: QrSizeDepthContext['depthAt'],
+  n: number
+): DepthPoint[] {
+  if (corners.length !== 4 || n < 1) return [];
+  const [tl, tr, br, bl] = corners as [Point2, Point2, Point2, Point2];
+  const out: DepthPoint[] = [];
+  for (let i = 0; i < n; i++) {
+    const u = (i + 0.5) / n;
+    const topX = tl.x + (tr.x - tl.x) * u;
+    const topY = tl.y + (tr.y - tl.y) * u;
+    const botX = bl.x + (br.x - bl.x) * u;
+    const botY = bl.y + (br.y - bl.y) * u;
+    for (let j = 0; j < n; j++) {
+      const v = (j + 0.5) / n;
+      const px = topX + (botX - topX) * v;
+      const py = topY + (botY - topY) * v;
+      const s = toScreen({ x: px, y: py }, image);
+      const depthM = depthAt(s.x, s.y);
+      if (depthM !== null) out.push({ screenX: s.x, screenY: s.y, depthM });
+    }
+  }
+  return out;
+}
+
+/** The 4 corner screen positions (detector order) for the dense ray-plane fit. */
+function cornerScreens(
+  corners: readonly Point2[],
+  image: ImageSize
+): [ScreenPoint, ScreenPoint, ScreenPoint, ScreenPoint] | null {
+  if (corners.length !== 4) return null;
+  return corners.map((c) => {
+    const s = toScreen(c, image);
+    return { screenX: s.x, screenY: s.y };
+  }) as [ScreenPoint, ScreenPoint, ScreenPoint, ScreenPoint];
+}
+
 /** The QR centroid as a single interior depth sample (may be empty). */
 function interiorDepthPoints(
   corners: readonly Point2[],
@@ -233,6 +303,7 @@ export function createQrSizeMeasurer(
 ): QrSizeMeasurer {
   const insetFractions = options.cornerInsetFractions ?? [0.12, 0.25];
   const maxRecon = options.maxReconstructedCorners ?? 1;
+  const latticeSize = options.latticeSize ?? 7;
   const accumulators = new Map<string, QrSizeAccumulator>();
 
   function accumulatorFor(text: string): QrSizeAccumulator {
@@ -246,6 +317,11 @@ export function createQrSizeMeasurer(
 
   return {
     measure(text, corners, image, ctx): QrSizeMeasurement | null {
+      const screens = cornerScreens(corners, image);
+      if (!screens) return null; // corners.length !== 4
+
+      // Best-effort corner depths (returned + used by the fallback). May be null
+      // for a small QR whose corners fall between depth nodes.
       const cornerSamples = cornerDepthPoints(
         corners,
         image,
@@ -253,14 +329,33 @@ export function createQrSizeMeasurer(
         insetFractions,
         maxRecon
       );
-      if (!cornerSamples) return null;
 
-      const interiorSamples = interiorDepthPoints(corners, image, ctx.depthAt);
-      const observation = estimateQrSizeFromDepth(
-        cornerSamples,
-        interiorSamples,
+      // PRIMARY: dense plane fit from an interior lattice — independent of
+      // corner depth availability, robust to tilt and depth outliers.
+      const lattice = latticeDepthPoints(
+        corners,
+        image,
+        ctx.depthAt,
+        latticeSize
+      );
+      let observation = estimateQrSizeFromDepthDense(
+        screens,
+        lattice,
         ctx.unprojector
       );
+      let interiorSamples: DepthPoint[] = lattice;
+
+      if (observation === null) {
+        // FALLBACK: corner-based estimate when the lattice is too sparse to fit.
+        if (!cornerSamples) return null; // can't sample enough depth at all
+        interiorSamples = interiorDepthPoints(corners, image, ctx.depthAt);
+        observation = estimateQrSizeFromDepth(
+          cornerSamples,
+          interiorSamples,
+          ctx.unprojector
+        );
+      }
+
       const estimate = accumulatorFor(text).add(observation);
       return { estimate, cornerSamples, interiorSamples };
     },

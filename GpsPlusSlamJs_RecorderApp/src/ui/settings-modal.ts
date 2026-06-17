@@ -13,6 +13,7 @@ import {
   DEPTH_CONSTRAINTS,
   IMAGE_CONSTRAINTS,
   OCCUPANCY_CONSTRAINTS,
+  QR_CONSTRAINTS,
   type RecordingOptions,
 } from 'gps-plus-slam-app-framework/state/recording-options';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
@@ -60,6 +61,11 @@ let vizFrameTilesCheckbox: HTMLInputElement | null = null;
 let vizOccupancyCubesCheckbox: HTMLInputElement | null = null;
 let vizGpsAlignmentMarkersCheckbox: HTMLInputElement | null = null;
 let vizCompassCubesCheckbox: HTMLInputElement | null = null;
+let qrEnabledCheckbox: HTMLInputElement | null = null;
+let qrIntervalSlider: HTMLInputElement | null = null;
+let qrIntervalValue: HTMLElement | null = null;
+let qrCaptureSizeSlider: HTMLInputElement | null = null;
+let qrCaptureSizeValue: HTMLElement | null = null;
 
 // --- Initialization ---
 
@@ -156,6 +162,13 @@ export function initSettingsModal(
   vizCompassCubesCheckbox = document.getElementById(
     'viz-compass-cubes'
   ) as HTMLInputElement;
+  qrEnabledCheckbox = document.getElementById('qr-enabled') as HTMLInputElement;
+  qrIntervalSlider = document.getElementById('qr-interval') as HTMLInputElement;
+  qrIntervalValue = document.getElementById('qr-interval-value');
+  qrCaptureSizeSlider = document.getElementById(
+    'qr-capture-size'
+  ) as HTMLInputElement;
+  qrCaptureSizeValue = document.getElementById('qr-capture-size-value');
 
   // Wire up events
   btnSettings?.addEventListener('click', showSettingsModal);
@@ -321,6 +334,31 @@ export function initSettingsModal(
     if (workingOptions && vizCompassCubesCheckbox) {
       workingOptions.visualization.compassCubes =
         vizCompassCubesCheckbox.checked;
+    }
+  });
+
+  // QR detection (recorder live-QR WS-2/WS-5). Opt-in; the interval + capture
+  // sliders are gated on the enabled checkbox (mirrors depth/images).
+  qrEnabledCheckbox?.addEventListener('change', () => {
+    if (workingOptions && qrEnabledCheckbox) {
+      workingOptions.qr.enabled = qrEnabledCheckbox.checked;
+      updateQrControlsState();
+    }
+  });
+
+  qrIntervalSlider?.addEventListener('input', () => {
+    if (workingOptions && qrIntervalSlider && qrIntervalValue) {
+      const value = parseInt(qrIntervalSlider.value, 10);
+      workingOptions.qr.intervalMs = value;
+      qrIntervalValue.textContent = `${value} ms`;
+    }
+  });
+
+  qrCaptureSizeSlider?.addEventListener('input', () => {
+    if (workingOptions && qrCaptureSizeSlider && qrCaptureSizeValue) {
+      const value = parseInt(qrCaptureSizeSlider.value, 10);
+      workingOptions.qr.captureSize = value;
+      qrCaptureSizeValue.textContent = `${value} px`;
     }
   });
 
@@ -530,9 +568,33 @@ function populateForm(options: RecordingOptions): void {
     vizCompassCubesCheckbox.checked = options.visualization.compassCubes;
   }
 
+  // QR detection (opt-in). Interval slider in ms, capture-size slider in px.
+  if (qrEnabledCheckbox) {
+    qrEnabledCheckbox.checked = options.qr.enabled;
+  }
+  if (qrIntervalSlider) {
+    qrIntervalSlider.min = String(QR_CONSTRAINTS.intervalMs.min);
+    qrIntervalSlider.max = String(QR_CONSTRAINTS.intervalMs.max);
+    qrIntervalSlider.step = String(QR_CONSTRAINTS.intervalMs.step);
+    qrIntervalSlider.value = String(options.qr.intervalMs);
+  }
+  if (qrIntervalValue) {
+    qrIntervalValue.textContent = `${options.qr.intervalMs} ms`;
+  }
+  if (qrCaptureSizeSlider) {
+    qrCaptureSizeSlider.min = String(QR_CONSTRAINTS.captureSize.min);
+    qrCaptureSizeSlider.max = String(QR_CONSTRAINTS.captureSize.max);
+    qrCaptureSizeSlider.step = String(QR_CONSTRAINTS.captureSize.step);
+    qrCaptureSizeSlider.value = String(options.qr.captureSize);
+  }
+  if (qrCaptureSizeValue) {
+    qrCaptureSizeValue.textContent = `${options.qr.captureSize} px`;
+  }
+
   // Update enabled/disabled state of controls
   updateDepthControlsState();
   updateImageControlsState();
+  updateQrControlsState();
 }
 
 function updateDepthControlsState(): void {
@@ -558,6 +620,17 @@ function updateImageControlsState(): void {
   }
   if (imagesResolutionDivisorSlider) {
     imagesResolutionDivisorSlider.disabled = !enabled;
+  }
+}
+
+function updateQrControlsState(): void {
+  // QR is opt-in (default off), so the sliders start disabled until enabled.
+  const enabled = qrEnabledCheckbox?.checked ?? false;
+  if (qrIntervalSlider) {
+    qrIntervalSlider.disabled = !enabled;
+  }
+  if (qrCaptureSizeSlider) {
+    qrCaptureSizeSlider.disabled = !enabled;
   }
 }
 

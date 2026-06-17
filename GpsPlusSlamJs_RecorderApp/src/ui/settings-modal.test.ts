@@ -905,6 +905,134 @@ describe('settings-modal', () => {
     });
   });
 
+  describe('QR detection settings (recorder live-QR WS-2/WS-5)', () => {
+    // Why these tests matter: QR capture is opt-in (default OFF) and the operator
+    // tunes the cadence + capture resolution from this modal. The UI must
+    // round-trip each control (populate from saved, persist a change) and gate the
+    // sliders on the enabled toggle.
+    it('includes the QR controls in production HTML', () => {
+      const html = loadSettingsModalHtml();
+      expect(html).toContain('id="qr-enabled"');
+      expect(html).toContain('id="qr-interval"');
+      expect(html).toContain('id="qr-interval-value"');
+      expect(html).toContain('id="qr-capture-size"');
+      expect(html).toContain('id="qr-capture-size-value"');
+      expect(html).toContain('QR Detection');
+    });
+
+    it('defaults to OFF with the sliders disabled', () => {
+      initSettingsModal();
+      showSettingsModal();
+
+      const enabled = document.getElementById('qr-enabled') as HTMLInputElement;
+      const interval = document.getElementById(
+        'qr-interval'
+      ) as HTMLInputElement;
+      const capture = document.getElementById(
+        'qr-capture-size'
+      ) as HTMLInputElement;
+      expect(enabled.checked).toBe(false);
+      expect(interval.disabled).toBe(true);
+      expect(capture.disabled).toBe(true);
+    });
+
+    it('enables the sliders when QR is turned on', () => {
+      initSettingsModal();
+      showSettingsModal();
+
+      const enabled = document.getElementById('qr-enabled') as HTMLInputElement;
+      const interval = document.getElementById(
+        'qr-interval'
+      ) as HTMLInputElement;
+      const capture = document.getElementById(
+        'qr-capture-size'
+      ) as HTMLInputElement;
+
+      enabled.checked = true;
+      enabled.dispatchEvent(new Event('change'));
+      expect(interval.disabled).toBe(false);
+      expect(capture.disabled).toBe(false);
+    });
+
+    it('persists the enabled toggle and slider values', () => {
+      initSettingsModal();
+      showSettingsModal();
+
+      const enabled = document.getElementById('qr-enabled') as HTMLInputElement;
+      enabled.checked = true;
+      enabled.dispatchEvent(new Event('change'));
+
+      const interval = document.getElementById(
+        'qr-interval'
+      ) as HTMLInputElement;
+      interval.value = '250';
+      interval.dispatchEvent(new Event('input'));
+
+      const capture = document.getElementById(
+        'qr-capture-size'
+      ) as HTMLInputElement;
+      capture.value = '512';
+      capture.dispatchEvent(new Event('input'));
+
+      document.getElementById('btn-settings-save')?.click();
+
+      const saved = loadRecordingOptions();
+      expect(saved.qr.enabled).toBe(true);
+      expect(saved.qr.intervalMs).toBe(250);
+      expect(saved.qr.captureSize).toBe(512);
+    });
+
+    it('populates the controls from saved options', () => {
+      localStorageMock.getItem.mockReturnValueOnce(
+        JSON.stringify({
+          qr: { enabled: true, intervalMs: 200, captureSize: 768 },
+        })
+      );
+
+      initSettingsModal();
+      showSettingsModal();
+
+      const enabled = document.getElementById('qr-enabled') as HTMLInputElement;
+      const interval = document.getElementById(
+        'qr-interval'
+      ) as HTMLInputElement;
+      const intervalVal = document.getElementById('qr-interval-value');
+      const capture = document.getElementById(
+        'qr-capture-size'
+      ) as HTMLInputElement;
+      const captureVal = document.getElementById('qr-capture-size-value');
+
+      expect(enabled.checked).toBe(true);
+      expect(interval.value).toBe('200');
+      expect(intervalVal?.textContent).toBe('200 ms');
+      expect(capture.value).toBe('768');
+      expect(captureVal?.textContent).toBe('768 px');
+    });
+
+    it('updates the slider value displays on input', () => {
+      initSettingsModal();
+      showSettingsModal();
+
+      const interval = document.getElementById(
+        'qr-interval'
+      ) as HTMLInputElement;
+      interval.value = '300';
+      interval.dispatchEvent(new Event('input'));
+      expect(document.getElementById('qr-interval-value')?.textContent).toBe(
+        '300 ms'
+      );
+
+      const capture = document.getElementById(
+        'qr-capture-size'
+      ) as HTMLInputElement;
+      capture.value = '2048';
+      capture.dispatchEvent(new Event('input'));
+      expect(
+        document.getElementById('qr-capture-size-value')?.textContent
+      ).toBe('2048 px');
+    });
+  });
+
   describe('build version label', () => {
     // Why: Step 6 of the zip-debug-metadata plan — the build version must
     // be visible in the settings modal so users can report it in bug reports.

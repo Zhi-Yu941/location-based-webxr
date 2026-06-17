@@ -967,6 +967,57 @@ No errors</pre
             </div>
           </div>
 
+          <!-- QR Detection Section (recorder live-QR WS-2/WS-5) -->
+          <div class="mb-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-xl">🔳</span>
+              <span class="font-medium text-white">QR Detection</span>
+            </div>
+            <div class="bg-gray-700/50 rounded-lg p-3 space-y-3">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="qr-enabled"
+                  class="w-4 h-4 accent-blue-500"
+                />
+                <span class="text-sm text-gray-200"
+                  >Detect &amp; record QR codes (RAW)</span
+                >
+              </label>
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs text-gray-400">
+                  <span>Detection Interval</span>
+                  <span id="qr-interval-value">125 ms</span>
+                </div>
+                <input
+                  type="range"
+                  id="qr-interval"
+                  aria-label="QR Detection Interval"
+                  class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+              </div>
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs text-gray-400">
+                  <span>Capture Resolution</span>
+                  <span id="qr-capture-size-value">1024 px</span>
+                </div>
+                <input
+                  type="range"
+                  id="qr-capture-size"
+                  aria-label="QR Capture Resolution"
+                  class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+              </div>
+              <p class="text-[11px] text-gray-400">
+                Off by default. When on, every decoded QR is recorded RAW (pose
+                + size are derived on replay) and a debug axis+cube is drawn on
+                the code. Faster interval / higher resolution improve tracking +
+                small QR range but cost more per frame. Applies the next time
+                you enter AR.
+              </p>
+            </div>
+          </div>
+
           <!-- Live Debug Overlays Section (Finding B / DB-2, DB-3) -->
           <div class="mb-6">
             <div class="flex items-center gap-2 mb-3">

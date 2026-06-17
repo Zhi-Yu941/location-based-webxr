@@ -23,6 +23,7 @@ export interface RecordingOptionsInput {
   arCrashIsolation?: Partial<ArCrashIsolationOptions>;
   occupancy?: Partial<OccupancyOptions>;
   visualization?: Partial<VisualizationOptions>;
+  qr?: Partial<QrCaptureOptions>;
 }
 
 /**
@@ -135,6 +136,34 @@ export interface VisualizationOptions {
 }
 
 /**
+ * Configuration for live QR detection + RAW recording (decision §0 of the
+ * recorder live-QR follow-up,
+ * `2026-06-17-followup-recorder-live-qr-next-steps.md`).
+ *
+ * OPT-IN (`enabled` defaults to `false`): turning it on adds per-frame RGBA
+ * capture + a `BarcodeDetector` decode to the session, so it is operator-gated
+ * exactly like the heavy `depth`/`images` streams — an existing recording pays
+ * nothing. When on, the producer dispatches one RAW `qrDetected/recordQrDetection`
+ * action per accepted decode (size + pose are DERIVED on read, never recorded).
+ */
+export interface QrCaptureOptions {
+  /** Whether live QR detection + recording runs. Default: false (opt-in). */
+  enabled: boolean;
+  /**
+   * Capture / detection cadence in ms — the SINGLE cadence owner (the producer
+   * runs `minIntervalMs: 0`; this throttles the camera-frame source). Default
+   * 125 (~8 Hz), matching the QR demo's `DETECT_INTERVAL_MS`.
+   */
+  intervalMs: number;
+  /**
+   * RGBA capture long-edge in px. Larger = more decode range on a small/distant
+   * QR but a costlier blit + detect. Default 1024 (the on-device sweep settled
+   * here; 512 only decoded small QRs at very close range).
+   */
+  captureSize: number;
+}
+
+/**
  * User-configurable recording options.
  * Persisted to localStorage for cross-session consistency.
  */
@@ -149,6 +178,8 @@ export interface RecordingOptions {
   occupancy: OccupancyOptions;
   /** Live AR debug-overlay visibility toggles (live-only; replay unaffected) */
   visualization: VisualizationOptions;
+  /** Live QR detection + RAW recording configuration (opt-in) */
+  qr: QrCaptureOptions;
 }
 
 // --- Constants ---
@@ -197,6 +228,13 @@ export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
     gpsAlignmentMarkers: true,
     compassCubes: true,
   },
+  qr: {
+    // OFF by default (§0): QR capture/detection is opt-in so existing
+    // recordings pay nothing (performance must not regress).
+    enabled: false,
+    intervalMs: 125, // ~8 Hz — the QR demo's DETECT_INTERVAL_MS
+    captureSize: 1024, // long-edge px — the on-device-verified default
+  },
 };
 
 /** Validation constraints for depth options */
@@ -226,6 +264,20 @@ export const IMAGE_CONSTRAINTS = {
  */
 export const OCCUPANCY_CONSTRAINTS = {
   cellSizeM: { min: 0.01, max: 0.2, step: 0.01 },
+} as const;
+
+/**
+ * Validation constraints for QR-capture options.
+ *
+ * `intervalMs` is clamped to 50–1000 ms (20 Hz down to 1 Hz): below ~50 ms the
+ * detector cannot keep up and frames just queue; above 1 s tracking feels dead.
+ * `captureSize` is clamped to 256–2048 px: under 256 even a near QR loses its
+ * modules; over 2048 the blit + decode cost is not worth it on a phone. Both
+ * back a settings slider so a corrupt stored value can never break capture.
+ */
+export const QR_CONSTRAINTS = {
+  intervalMs: { min: 50, max: 1000, step: 25 },
+  captureSize: { min: 256, max: 2048, step: 128 },
 } as const;
 
 /**
@@ -301,6 +353,40 @@ export function validateVisualizationOptions(
  */
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+/**
+ * Validate and normalize QR-capture options. `enabled` is boolean-or-default
+ * (a corrupt/pre-feature value falls back to the OFF default so QR never
+ * silently turns ON); `intervalMs`/`captureSize` are clamped to
+ * {@link QR_CONSTRAINTS}, with a `Number.isFinite` guard so a stored `NaN`
+ * (which is `typeof 'number'` and survives `clamp`) falls back to the default
+ * rather than breaking the camera-frame source.
+ */
+export function validateQrOptions(
+  options: Partial<QrCaptureOptions>
+): QrCaptureOptions {
+  const defaults = DEFAULT_RECORDING_OPTIONS.qr;
+  return {
+    enabled:
+      typeof options.enabled === 'boolean' ? options.enabled : defaults.enabled,
+    intervalMs: clamp(
+      typeof options.intervalMs === 'number' &&
+        Number.isFinite(options.intervalMs)
+        ? options.intervalMs
+        : defaults.intervalMs,
+      QR_CONSTRAINTS.intervalMs.min,
+      QR_CONSTRAINTS.intervalMs.max
+    ),
+    captureSize: clamp(
+      typeof options.captureSize === 'number' &&
+        Number.isFinite(options.captureSize)
+        ? options.captureSize
+        : defaults.captureSize,
+      QR_CONSTRAINTS.captureSize.min,
+      QR_CONSTRAINTS.captureSize.max
+    ),
+  };
 }
 
 /**
@@ -405,6 +491,7 @@ export function validateRecordingOptions(
     ),
     occupancy: validateOccupancyOptions(options.occupancy ?? {}),
     visualization: validateVisualizationOptions(options.visualization ?? {}),
+    qr: validateQrOptions(options.qr ?? {}),
   };
 }
 
@@ -481,5 +568,6 @@ export function cloneRecordingOptions(
     arCrashIsolation: { ...options.arCrashIsolation },
     occupancy: { ...options.occupancy },
     visualization: { ...options.visualization },
+    qr: { ...options.qr },
   };
 }

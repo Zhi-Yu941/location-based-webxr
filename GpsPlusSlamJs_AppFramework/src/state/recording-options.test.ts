@@ -17,6 +17,7 @@ import {
   validateImageOptions,
   validateOccupancyOptions,
   validateVisualizationOptions,
+  validateQrOptions,
   validateRecordingOptions,
   cloneRecordingOptions,
   DEFAULT_RECORDING_OPTIONS,
@@ -24,6 +25,7 @@ import {
   DEPTH_CONSTRAINTS,
   IMAGE_CONSTRAINTS,
   OCCUPANCY_CONSTRAINTS,
+  QR_CONSTRAINTS,
   type RecordingOptions,
 } from './recording-options';
 
@@ -321,10 +323,96 @@ describe('recording-options', () => {
     });
   });
 
+  describe('validateQrOptions', () => {
+    /**
+     * Why these tests matter (recorder live-QR §0): the QR-capture group is
+     * OPT-IN — `enabled` MUST default to false so an existing recording never
+     * silently gains the per-frame detector cost. `intervalMs`/`captureSize`
+     * back settings sliders and feed the camera-frame source, so a corrupt
+     * stored value (NaN, out-of-range, wrong type) must clamp/fall back rather
+     * than break capture.
+     */
+    it('returns defaults (QR OFF) when given empty object', () => {
+      const result = validateQrOptions({});
+      expect(result).toEqual(DEFAULT_RECORDING_OPTIONS.qr);
+      expect(result.enabled).toBe(false);
+    });
+
+    it('preserves valid values', () => {
+      const result = validateQrOptions({
+        enabled: true,
+        intervalMs: 250,
+        captureSize: 512,
+      });
+      expect(result).toEqual({
+        enabled: true,
+        intervalMs: 250,
+        captureSize: 512,
+      });
+    });
+
+    it('falls back to OFF for a non-boolean enabled', () => {
+      expect(
+        validateQrOptions({ enabled: 'yes' as unknown as boolean }).enabled
+      ).toBe(false);
+      // A genuine true must survive.
+      expect(validateQrOptions({ enabled: true }).enabled).toBe(true);
+    });
+
+    it('clamps intervalMs below/above the constraint range', () => {
+      expect(validateQrOptions({ intervalMs: 10 }).intervalMs).toBe(
+        QR_CONSTRAINTS.intervalMs.min
+      );
+      expect(validateQrOptions({ intervalMs: 5000 }).intervalMs).toBe(
+        QR_CONSTRAINTS.intervalMs.max
+      );
+    });
+
+    it('clamps captureSize below/above the constraint range', () => {
+      expect(validateQrOptions({ captureSize: 16 }).captureSize).toBe(
+        QR_CONSTRAINTS.captureSize.min
+      );
+      expect(validateQrOptions({ captureSize: 9999 }).captureSize).toBe(
+        QR_CONSTRAINTS.captureSize.max
+      );
+    });
+
+    it('falls back to defaults for NaN/non-number (would break capture)', () => {
+      // clamp(NaN, …) is NaN (NaN is typeof "number"); the Number.isFinite
+      // guard must catch it before it reaches startCameraFrameCapture.
+      expect(validateQrOptions({ intervalMs: NaN }).intervalMs).toBe(
+        DEFAULT_RECORDING_OPTIONS.qr.intervalMs
+      );
+      expect(
+        validateQrOptions({ captureSize: 'big' as unknown as number })
+          .captureSize
+      ).toBe(DEFAULT_RECORDING_OPTIONS.qr.captureSize);
+    });
+
+    it('defaults to the demo cadence (125 ms) and 1024 px capture', () => {
+      expect(DEFAULT_RECORDING_OPTIONS.qr.intervalMs).toBe(125);
+      expect(DEFAULT_RECORDING_OPTIONS.qr.captureSize).toBe(1024);
+    });
+  });
+
   describe('validateRecordingOptions', () => {
     it('returns defaults when given empty object', () => {
       const result = validateRecordingOptions({});
       expect(result).toEqual(DEFAULT_RECORDING_OPTIONS);
+    });
+
+    it('merges partial qr options with defaults (schema evolution)', () => {
+      // A pre-QR persisted blob (no `qr` key) must gain the OFF default group,
+      // never `undefined` — otherwise main.ts reads `qr.enabled` off undefined.
+      const result = validateRecordingOptions({ qr: { enabled: true } });
+      expect(result.qr.enabled).toBe(true);
+      expect(result.qr.intervalMs).toBe(
+        DEFAULT_RECORDING_OPTIONS.qr.intervalMs
+      );
+      expect(result.qr.captureSize).toBe(
+        DEFAULT_RECORDING_OPTIONS.qr.captureSize
+      );
+      expect(result.depth).toEqual(DEFAULT_RECORDING_OPTIONS.depth);
     });
 
     it('merges partial visualization options with defaults', () => {
@@ -412,6 +500,7 @@ describe('recording-options', () => {
         arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
         occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
+        qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
       };
       localStorageMock.getItem.mockReturnValueOnce(JSON.stringify(stored));
 
@@ -502,6 +591,7 @@ describe('recording-options', () => {
         arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
         occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
+        qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
       };
 
       saveRecordingOptions(options);
@@ -524,6 +614,7 @@ describe('recording-options', () => {
         arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
         occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
+        qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
       };
 
       saveRecordingOptions(options);
@@ -645,6 +736,10 @@ describe('recording-options', () => {
       expect(DEFAULT_RECORDING_OPTIONS.images.enabled).toBe(true);
     });
 
+    it('has QR detection DISABLED by default (opt-in)', () => {
+      expect(DEFAULT_RECORDING_OPTIONS.qr.enabled).toBe(false);
+    });
+
     it('has reasonable default intervals', () => {
       expect(DEFAULT_RECORDING_OPTIONS.depth.intervalMs).toBe(1000);
       expect(DEFAULT_RECORDING_OPTIONS.images.intervalMs).toBe(2000);
@@ -702,6 +797,22 @@ describe('recording-options', () => {
       );
     });
 
+    it('QR_CONSTRAINTS has valid ranges that bracket the defaults', () => {
+      expect(QR_CONSTRAINTS.intervalMs.min).toBeLessThan(
+        QR_CONSTRAINTS.intervalMs.max
+      );
+      expect(QR_CONSTRAINTS.captureSize.min).toBeLessThan(
+        QR_CONSTRAINTS.captureSize.max
+      );
+      const { intervalMs, captureSize } = DEFAULT_RECORDING_OPTIONS.qr;
+      expect(intervalMs).toBeGreaterThanOrEqual(QR_CONSTRAINTS.intervalMs.min);
+      expect(intervalMs).toBeLessThanOrEqual(QR_CONSTRAINTS.intervalMs.max);
+      expect(captureSize).toBeGreaterThanOrEqual(
+        QR_CONSTRAINTS.captureSize.min
+      );
+      expect(captureSize).toBeLessThanOrEqual(QR_CONSTRAINTS.captureSize.max);
+    });
+
     it('defaults are within constraint bounds', () => {
       const { depth, images } = DEFAULT_RECORDING_OPTIONS;
 
@@ -744,6 +855,7 @@ describe('recording-options', () => {
         arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
         occupancy: { cellSizeM: 0.1 },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
+        qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
       };
 
       saveRecordingOptions(customOptions);
@@ -764,6 +876,7 @@ describe('recording-options', () => {
         arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
         occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
+        qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
       };
 
       saveRecordingOptions(options1);
@@ -793,6 +906,7 @@ describe('recording-options', () => {
         arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
         occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
+        qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
       });
 
       // Reset
@@ -850,6 +964,7 @@ describe('recording-options', () => {
         arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
         occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
+        qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
       };
       localStorageMock.setItem(CUSTOM_KEY, JSON.stringify(custom));
 

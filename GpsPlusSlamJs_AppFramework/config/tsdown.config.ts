@@ -41,6 +41,7 @@ const entryFiles = [
   'src/ar/qr-detection-controller.ts',
   'src/ar/qr-frontend.ts',
   'src/ar/qr-pose.ts',
+  'src/ar/qr-size-depth-context.ts',
   'src/ar/qr-size-measurer.ts',
   'src/ar/replay-scene.ts',
   'src/ar/scene-node-names.ts',

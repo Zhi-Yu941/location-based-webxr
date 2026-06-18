@@ -7,11 +7,13 @@
  * but the store only keeps the LATEST sample — so this module keeps a small,
  * bounded history of depth samples and answers `resolveDepthAt(timestamp)` with
  * the sample whose timestamp is the latest `≤ timestamp` (the as-of join). It
- * then builds the {@link QrSizeDepthContext} the size measurer consumes
- * (unprojector + bilinear grid lookup), exactly like the QR demo's live
- * `getDepthContext`, but time-addressed.
+ * then delegates to the shared framework {@link createQrSizeDepthContext} to
+ * build the {@link QrSizeDepthContext} the size measurer consumes (unprojector +
+ * bilinear grid lookup) — the SAME factory the QR demo's live `getDepthContext`
+ * uses, so the two cannot diverge; this module only adds the time addressing.
  *
- * This is the **one genuinely new piece** WS-5 needs. It runs identically live
+ * The **time-addressing** here is the one genuinely new piece WS-5 needs (the
+ * demo only ever needs the latest sample). It runs identically live
  * and on replay: `append` is fed every recorded depth sample (live: the capture
  * callback; replay: the re-dispatched `recordDepthSample` reflected in the
  * store's `latestDepthSample`), so the join reproduces the live result.
@@ -26,11 +28,14 @@
  * @see qr-debug-controller.ts — drives `append` + renders the derived placement.
  */
 
-// Deep subpaths (NOT the `…/ar` barrel) — avoid pulling heavy transitive deps
+// Deep subpath (NOT the `…/ar` barrel) — avoid pulling heavy transitive deps
 // into main.ts's partially-mocked wiring tests (see qr-debug-view's rationale).
-import { createDepthUnprojector } from 'gps-plus-slam-app-framework/ar/depth-unprojection';
-import { createDepthGridLookup } from 'gps-plus-slam-app-framework/ar/depth-grid-lookup';
-import type { QrSizeDepthContext } from 'gps-plus-slam-app-framework/ar/qr-size-measurer';
+// The shared factory builds the unprojector + bilinear grid lookup; this module
+// only adds the as-of time addressing on top.
+import {
+  createQrSizeDepthContext,
+  type QrSizeDepthContext,
+} from 'gps-plus-slam-app-framework/ar/qr-size-depth-context';
 import type { DepthSample } from 'gps-plus-slam-app-framework/types/ar-types';
 
 /** Default cap on retained depth samples — matches the recorder QR history (100). */
@@ -51,25 +56,6 @@ export interface QrDepthResolver {
   resolveDepthAt(timestamp: number): QrSizeDepthContext | null;
   /** Drop all retained samples (e.g. on session end / replay reset). */
   reset(): void;
-}
-
-/**
- * Build a {@link QrSizeDepthContext} from one depth sample, or `null` when it has
- * no projection matrix / a singular one (the unprojector cannot be built). The
- * grid lookup is bilinear (depth varies smoothly across a small QR face).
- */
-function contextFromSample(sample: DepthSample): QrSizeDepthContext | null {
-  const unprojector = createDepthUnprojector(
-    sample.cameraPos,
-    sample.cameraRot,
-    sample.projectionMatrix
-  );
-  if (!unprojector) return null;
-  const lookup = createDepthGridLookup(sample.points);
-  return {
-    unprojector,
-    depthAt: (x, y) => lookup.depthAt(x, y),
-  };
 }
 
 /**
@@ -102,7 +88,7 @@ export function createQrDepthResolver(options?: {
           if (!best || s.timestamp > best.timestamp) best = s;
         }
       }
-      return best ? contextFromSample(best) : null;
+      return best ? createQrSizeDepthContext(best) : null;
     },
     reset(): void {
       samples = [];

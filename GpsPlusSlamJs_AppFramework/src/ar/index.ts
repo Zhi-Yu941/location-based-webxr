@@ -81,6 +81,9 @@ export {
   createQrSizeMeasurer,
 } from './qr-size-measurer.js';
 
+// --- qr-size-depth-context (shared DepthSample → QrSizeDepthContext factory) ---
+export { createQrSizeDepthContext } from './qr-size-depth-context.js';
+
 // --- qr-pose ---
 export {
   type Point2,

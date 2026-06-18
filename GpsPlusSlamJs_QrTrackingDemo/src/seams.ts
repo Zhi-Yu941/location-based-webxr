@@ -37,8 +37,7 @@ import {
 } from "gps-plus-slam-app-framework/ar/webxr-session";
 import {
   createBarcodeDetectorFrontEnd,
-  createDepthUnprojector,
-  createDepthGridLookup,
+  createQrSizeDepthContext,
   type RgbaImage,
   type QrDetection,
 } from "gps-plus-slam-app-framework/ar";
@@ -140,18 +139,14 @@ export const realSeams: QrDemoSeams = {
   getDepthContext(): DepthContext | null {
     const sample = latestDepthSample;
     if (!sample?.projectionMatrix) return null;
-    const unprojector = createDepthUnprojector(
-      sample.cameraPos,
-      sample.cameraRot,
-      sample.projectionMatrix,
-    );
-    if (!unprojector) return null;
-    // Bilinear interpolation over the depth grid (WS-A): depth varies smoothly
-    // across a small QR face instead of snapping to one nearest node.
-    const lookup = createDepthGridLookup(sample.points);
+    // The shared framework factory builds the unprojector + bilinear grid lookup
+    // (WS-A: depth varies smoothly across a small QR face, not nearest-node) —
+    // the SAME piece the Recorder's as-of resolver uses, so the two apps can't
+    // diverge. The demo adds the PnP-only extras (camera pose + projection).
+    const base = createQrSizeDepthContext(sample);
+    if (!base) return null;
     return {
-      unprojector,
-      depthAt: (x, y) => lookup.depthAt(x, y),
+      ...base,
       cameraPose: { position: sample.cameraPos, rotation: sample.cameraRot },
       projectionMatrix: sample.projectionMatrix,
     };

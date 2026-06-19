@@ -37,7 +37,12 @@ Exported from `gps-plus-slam-app-framework/visualization`.
 
 - `matrixAutoUpdate` **must** stay `false` on the reticle: the world transform
   is written wholesale from the hit pose each frame, so letting Three.js
-  recompose it from position/quaternion/scale would discard the pose.
+  recompose it from position/quaternion/scale would discard the pose. Because of
+  this, `updateReticle` also sets `reticle.matrixWorldNeedsUpdate = true` after
+  writing `reticle.matrix` — otherwise the render-time `updateMatrixWorld(force=false)`
+  reuses a stale `matrixWorld` on frames where the parent `arWorldGroup` is
+  unchanged (between ~1 Hz GPS-alignment updates), freezing the reticle at its
+  previous surface.
 - The mesh is parented under `getArWorldGroup()` (NUE local space) by the
   caller, **not** the GPS-aligned scene root — so the reticle rides the same
   lerped `arWorldGroup` alignment as the camera. Because the hit pose is in the

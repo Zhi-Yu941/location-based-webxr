@@ -100,4 +100,33 @@ describe('updateReticle', () => {
     expect(worldPosition.z).toBeCloseTo(1, 6);
     expect(worldPosition.x).toBeCloseTo(0, 6);
   });
+
+  // Regression: with matrixAutoUpdate=false the manual `reticle.matrix` write
+  // must also mark `matrixWorldNeedsUpdate`, or three.js's normal render-time
+  // `updateMatrixWorld(force=false)` keeps a STALE `matrixWorld` whenever the
+  // parent didn't change that frame (arWorldGroup is static between ~1 Hz GPS
+  // alignment updates). The reticle would then render frozen at its previous
+  // surface even though `updateReticle` fed it a new pose every frame. The
+  // earlier tests miss this because they compose the world matrix by hand
+  // instead of going through three.js's matrix-world traversal.
+  it('keeps reticle.matrixWorld fresh under render-time updateMatrixWorld with a static parent', () => {
+    const arWorldGroup = new Object3D();
+    arWorldGroup.matrixAutoUpdate = false;
+    arWorldGroup.matrix.identity();
+
+    const reticle = createReticleMesh();
+    arWorldGroup.add(reticle);
+
+    // Frame 1: a hit 5 m along WebXR +Y (Up), then the normal render traversal.
+    updateReticle(reticle, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 5, 0, 1]);
+    arWorldGroup.updateMatrixWorld(); // force=false, like the renderer
+
+    // Frame 2: the surface moves; parent stays static (no GPS update this frame).
+    updateReticle(reticle, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 9, 0, 1]);
+    arWorldGroup.updateMatrixWorld(); // force=false again
+
+    // matrixWorld must reflect the SECOND pose (NUE Up = +Y), not the stale first.
+    const world = new Vector3().setFromMatrixPosition(reticle.matrixWorld);
+    expect(world.y).toBeCloseTo(9, 6);
+  });
 });

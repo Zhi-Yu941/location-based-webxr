@@ -95,5 +95,12 @@ export function updateReticle(
   hitPoseMatrix.fromArray(matrix);
   // arWorldGroup-local (NUE) = WEBXR_TO_NUE · hitPose (WebXR reference space).
   reticle.matrix.multiplyMatrices(WEBXR_TO_NUE, hitPoseMatrix);
+  // matrixAutoUpdate is false (see createReticleMesh), so a manual local-matrix
+  // write does NOT mark the world matrix dirty by itself. Without this flag the
+  // render-time `updateMatrixWorld(force=false)` reuses a stale `matrixWorld`
+  // whenever the parent (arWorldGroup) didn't change that frame — which it
+  // doesn't between ~1 Hz GPS alignment updates — so the reticle would render
+  // frozen at its previous surface despite a fresh pose each frame.
+  reticle.matrixWorldNeedsUpdate = true;
   reticle.visible = true;
 }

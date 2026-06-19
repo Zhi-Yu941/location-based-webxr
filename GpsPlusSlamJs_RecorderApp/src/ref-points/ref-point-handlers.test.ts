@@ -1894,7 +1894,12 @@ describe('handleMarkRefPoint — re-observation toast feedback', () => {
     expect(callOrder).toEqual(['save', 'toast']);
   });
 
-  it('does NOT show a toast on the picker-driven new ref point path', async () => {
+  // D4/F4-B (2026-06-16 user feedback): the picker-driven new-ref-point path
+  // previously relied solely on the picker closing for feedback, which the field
+  // tester reported as "no indicator that a marker was actually set". It now
+  // confirms with a "Marked '<name>'" toast after the durable OPFS write, plus a
+  // transient "Saving…" in-progress toast and an error toast on write failure.
+  function setupNewPointFixture(pickerName = 'New Point') {
     vi.clearAllMocks();
     mockIsRefPointPickerVisible.mockReturnValue(false);
     mockGetCurrentArPose.mockReturnValue(createMockArPose());
@@ -1902,16 +1907,61 @@ describe('handleMarkRefPoint — re-observation toast feedback', () => {
     mockGetCurrentScenarioHandle.mockReturnValue(createMockScenarioHandle());
     mockExtractOdomPosition.mockReturnValue([1, 2, 3] as Vector3);
     mockExtractOdomRotation.mockReturnValue([0, 0, 0, 1] as Quaternion);
-    mockShowRefPointPicker.mockResolvedValue({ id: 'New Point', isNew: true });
-
+    mockShowRefPointPicker.mockResolvedValue({ id: pickerName, isNew: true });
+    // No imported ref points near GPS → picker (new) path
     const handlers = createRefPointHandlers(
       createDefaultDeps({ getStore: () => store })
     );
-    // No imported ref points near GPS → picker path
+    return { handlers };
+  }
+
+  it('confirms with a "Marked" toast on the picker-driven new ref point path', async () => {
+    const { handlers } = setupNewPointFixture('New Point');
+
     await handlers.handleMarkRefPoint();
 
     expect(mockShowRefPointPicker).toHaveBeenCalledTimes(1);
-    expect(mockShowToast).not.toHaveBeenCalled();
+    // Last toast is the durable-state confirmation naming the new point.
+    const messages = mockShowToast.mock.calls.map((c) => c[0] as string);
+    expect(messages.at(-1)).toContain('Marked');
+    expect(messages.at(-1)).toContain('New Point');
+  });
+
+  it('shows an in-progress "Saving…" toast before the OPFS write, then the final confirmation', async () => {
+    const { handlers } = setupNewPointFixture('New Point');
+
+    const callOrder: string[] = [];
+    mockShowToast.mockImplementation((msg: string) => {
+      callOrder.push(msg.includes('Saving') ? 'saving' : 'final');
+    });
+    mockSaveRefPointObservation.mockImplementation(() => {
+      callOrder.push('save');
+      return Promise.resolve();
+    });
+
+    await handlers.handleMarkRefPoint();
+
+    // In-progress toast fires before the durable write; the "Marked" toast after.
+    expect(callOrder).toEqual(['saving', 'save', 'final']);
+  });
+
+  it('shows an error toast and reverts the in-progress state when the new-point OPFS write fails', async () => {
+    const { handlers } = setupNewPointFixture('New Point');
+    mockSaveRefPointObservation.mockRejectedValueOnce(new Error('disk full'));
+
+    await handlers.handleMarkRefPoint();
+
+    const calls = mockShowToast.mock.calls.map((c) => ({
+      message: c[0] as string,
+      severity: (c[1] as { severity?: string } | undefined)?.severity,
+    }));
+    // The in-progress "Saving…" toast fired first…
+    expect(calls[0]?.message).toContain('Saving');
+    // …and the final toast is an error naming the failed save (reverts it).
+    expect(calls.at(-1)?.message).toContain('Could not save');
+    expect(calls.at(-1)?.severity).toBe('error');
+    // The existing HUD error channel still fires too.
+    expect(mockShowError).toHaveBeenCalled();
   });
 
   it('does NOT show a toast when re-observation is rejected by the cooldown', async () => {

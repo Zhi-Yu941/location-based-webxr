@@ -26,7 +26,7 @@ import {
   extractOdomRotation,
 } from 'gps-plus-slam-app-framework/state/gps-event-coordinator';
 import { showError, updateStatus } from '../ui/hud';
-import { showToast } from '../ui/toast';
+import { showToast, TOAST_DURATION_ERROR } from '../ui/toast';
 import type { GpsPoint, RawGpsPoint } from '../state/recorder-store';
 import {
   addRefPointEntry,
@@ -364,9 +364,19 @@ export function createRefPointHandlers(
         fusedGpsPoint
       );
 
+      const isNewPoint = !nearbyMatch;
+
       // Persist to disk
       let persistOk = true;
       if (scenarioHandle) {
+        // In-progress feedback for the new-ref-point path (D4/F4-B, 2026-06-16
+        // user feedback): the picker has closed and the durable OPFS write is
+        // now awaited, so surface a transient "Saving…" toast that the final
+        // confirmation / error toast then replaces. The re-observe path stays a
+        // quiet single tap (its result toast fires below).
+        if (isNewPoint) {
+          showToast(`Saving "${refPointName}"…`, { severity: 'info' });
+        }
         const observation = buildRefPointObservation(
           odomPosition,
           odomRotation,
@@ -394,13 +404,26 @@ export function createRefPointHandlers(
 
       updateStatus(`Marked reference point: ${refPointId}`);
 
-      // Re-observation toast feedback (Finding 3, 2026-04-29 user feedback):
-      // the single-click re-observation branch shows no picker, so the user
-      // otherwise has no confirmation. Picker-driven new-ref-point flow has
-      // implicit feedback via the picker UI itself, so it does NOT toast.
-      // Only fire after the OPFS write succeeds — the toast reflects the
-      // durable end state, not just the dispatch.
-      if (nearbyMatch && persistOk) {
+      // Confirmation toast — reflects the durable end state, fired only after the
+      // OPFS write resolves. BOTH paths now confirm (D4/F4-B, 2026-06-16 user
+      // feedback): the field tester reported "no indicator that a marker was
+      // set" on the picker-driven new-point path, which previously relied solely
+      // on the picker closing. Re-observe keeps its original "Re-observed" copy
+      // (Finding 3, 2026-04-29).
+      if (isNewPoint) {
+        if (persistOk) {
+          showToast(`Marked "${refPointName}"`, { severity: 'info' });
+        } else {
+          // Revert the in-progress "Saving…" state with an explicit failure
+          // toast (persistRefPointObservation also drives the HUD error
+          // channel via showError, but that is not composited over the AR
+          // camera, so the toast is what the user actually sees in AR).
+          showToast(`Could not save "${refPointName}"`, {
+            severity: 'error',
+            duration: TOAST_DURATION_ERROR,
+          });
+        }
+      } else if (persistOk) {
         showToast(`Re-observed "${refPointName}"`, { severity: 'info' });
       }
 

@@ -310,11 +310,14 @@ describe('main.ts replay mode wiring', () => {
     // Dynamically import main to trigger the main() call
     await import('./main');
 
-    // Allow async main() to complete (all mocks resolve synchronously)
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    // Verify switchToReplayMode was called
-    expect(switchToReplayMode).toHaveBeenCalled();
+    // Wait for the async main() to reach its replay branch. Poll for the signal
+    // instead of a fixed `setTimeout(100)` — that fixed wait was flaky under
+    // full-suite scheduling load (it passed in isolation but intermittently
+    // failed when the whole unit suite ran). Once switchToReplayMode is called,
+    // the rest of the replay-branch calls below have already run synchronously.
+    await vi.waitFor(() => expect(switchToReplayMode).toHaveBeenCalled(), {
+      timeout: 3000,
+    });
 
     // Verify initReplayUI was called with callbacks
     expect(initReplayUI).toHaveBeenCalledWith(

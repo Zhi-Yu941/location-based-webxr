@@ -63,6 +63,13 @@ on teardown; any failure routes to `error`; an unsupported probe routes to
   an `initAR` rejection and let a retry from `error` start duplicates. Gating
   the start calls behind the resolved `initAR` bounds watcher count to one set
   per running session.
+- **Error-path rollback:** if a sensor-watch start throws **after** `initAR` has
+  already started the XR session, `enable()`'s `catch` tears down what was
+  started — stops any started watch and calls `endARSession()` — before routing
+  to `error`. Without this the session + watch would strand, because `disable()`
+  only runs from `running` and a retry from `error` re-enters `enable()` without
+  cleaning up first (so the leak would accumulate). A failure **before** `initAR`
+  (e.g. a permission denial) starts no session, so nothing is torn down.
 - **Teardown resilience:** `disable()` catches and logs `endARSession` rejections
   (e.g. session already ended externally) and still transitions to `ready`, so a
   failing teardown cannot strand the controller in `stopping`.

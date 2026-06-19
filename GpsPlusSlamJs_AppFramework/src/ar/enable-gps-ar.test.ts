@@ -270,6 +270,49 @@ describe('createEnableGpsArController — enable() failure paths', () => {
     expect(seen.indexOf('starting')).toBeLessThan(seen.indexOf('error'));
   });
 
+  it('rolls back the AR session and started watches when a watch start throws after initAR', async () => {
+    // If a sensor-watch start throws synchronously *after* initAR has already
+    // started the XR session (e.g. geolocation absent on a locked-down browser),
+    // the catch must tear down what was started — otherwise the session and the
+    // already-started GPS watch are stranded (disable() only runs from
+    // 'running', and a retry from 'error' re-enters enable() without cleaning
+    // up first, so the leak accumulates).
+    const deps = makeDeps({
+      startOrientationWatch: vi.fn(() => {
+        throw new Error('orientation sensor unavailable');
+      }),
+    });
+    const controller = createEnableGpsArController(deps);
+
+    const result = await controller.enable({
+      container: fakeContainer(),
+      onGpsPosition: vi.fn(),
+      onOrientation: vi.fn(),
+    });
+
+    expect(result.ok).toBe(false);
+    expect(controller.getState().status).toBe('error');
+    // initAR succeeded and the GPS watch started before orientation threw, so
+    // both the session and the started watch must be unwound, not left active.
+    expect(deps.endARSession).toHaveBeenCalledTimes(1);
+    expect(deps.stopGpsWatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not tear down the session when the failure is before initAR', async () => {
+    // Symmetry guard: a permission denial (pre-initAR) must NOT call
+    // endARSession — there is no session to tear down, and doing so would be a
+    // spurious teardown of nothing.
+    const deps = makeDeps({
+      requestGeolocationPermission: vi.fn(() => Promise.resolve(denied)),
+    });
+    const controller = createEnableGpsArController(deps);
+
+    await controller.enable({ container: fakeContainer() });
+
+    expect(deps.initAR).not.toHaveBeenCalled();
+    expect(deps.endARSession).not.toHaveBeenCalled();
+  });
+
   it('proceeds when orientation is denied (best-effort, non-blocking)', async () => {
     const deps = makeDeps({
       requestOrientationPermission: vi.fn(() => Promise.resolve(denied)),

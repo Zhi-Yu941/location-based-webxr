@@ -168,7 +168,7 @@ test.describe('Setup Modal Flow', () => {
 
   test('setup modal title is correct', async ({ page }) => {
     await expect(
-      page.getByRole('heading', { name: 'GpsPlusSlamJs Recorder' })
+      page.getByRole('heading', { name: 'GPS + SLAM Recorder' })
     ).toBeVisible();
   });
 

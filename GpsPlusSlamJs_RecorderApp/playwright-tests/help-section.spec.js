@@ -60,8 +60,10 @@ test.describe('Help Section', () => {
   test('help section contains key concept explanations', async ({ page }) => {
     const helpContent = page.locator('#help-section-content');
 
-    // Should explain what the app is for
-    await expect(helpContent).toContainText(/record.*AR.*GPS/i);
+    // Should explain what the app is for. `[\s\S]*` (not `.*`) so the match
+    // tolerates the prettier-wrapped multi-line Purpose paragraph — "Record
+    // synchronized AR + GPS data …" spans several source lines.
+    await expect(helpContent).toContainText(/record[\s\S]*AR[\s\S]*GPS/i);
 
     // Should explain what a Scenario is
     await expect(helpContent).toContainText(/scenario/i);

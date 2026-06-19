@@ -33,7 +33,7 @@ function createReplayHtmlFixture(): string {
   return `
     <!-- Setup modal elements -->
     <div id="setup-modal">
-      <h1 id="setup-title">GpsPlusSlamJs Recorder</h1>
+      <h1 id="setup-title">GPS + SLAM Recorder</h1>
       <button id="btn-settings">⚙️</button>
       <details id="help-section"><summary>Help</summary><div id="help-section-content">Recording help</div></details>
       <div id="storage-setup">

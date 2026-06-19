@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, user-scalable=no"
     />
-    <title>GpsPlusSlamJs Recorder</title>
+    <title>GPS + SLAM Recorder</title>
     <!-- Favicon -->
     <link
       rel="icon"
@@ -491,7 +491,7 @@ No errors</pre
         >
           <div class="flex justify-between items-center mb-4">
             <h1 id="setup-title" class="text-2xl font-bold">
-              GpsPlusSlamJs Recorder
+              GPS + SLAM Recorder
             </h1>
             <button
               id="btn-settings"
@@ -547,9 +547,14 @@ No errors</pre
               class="mt-2 p-3 bg-gray-700/50 rounded-lg text-sm text-gray-300 space-y-2"
             >
               <p>
-                <strong class="text-white">Purpose:</strong> Record AR + GPS
-                data to test location alignment algorithms. Walk around while
-                the app captures your path, GPS readings, and camera frames.
+                <strong class="text-white">Purpose:</strong> Record synchronized
+                AR + GPS data — camera frames, AR poses, GPS readings and depth
+                — as reusable datasets. Developers use these recordings to build
+                3D reconstructions (COLMAP / Gaussian splatting), evaluate
+                GPS↔AR alignment quality, re-run sessions in desktop replay, and
+                document a site with accurate geo-anchored photos, point clouds
+                and reference markers. Walk around while the app captures
+                everything.
               </p>
               <p>
                 <strong class="text-white">Scenario:</strong> A named physical
@@ -577,8 +582,9 @@ No errors</pre
             >
               <p class="text-xs text-gray-400">
                 Choose where to save this recording. Importing a previous
-                recordings folder is optional — it's only needed to recover
-                reference points the browser no longer has.
+                recordings folder is optional — it's only needed to import
+                reference points from previous recordings when the browser cache
+                is no longer available.
               </p>
 
               <!-- Choose save location (the only required storage step) -->

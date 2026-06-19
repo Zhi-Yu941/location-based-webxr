@@ -33,7 +33,7 @@ test.describe('Replay Mode — Desktop Browser', () => {
 
     // The title should reflect replay mode
     const title = page.locator('#setup-title');
-    await expect(title).toHaveText('GpsPlusSlamJs Replay');
+    await expect(title).toHaveText('GPS + SLAM Replay');
   });
 
   test('hides recording-specific UI elements in replay mode', async ({

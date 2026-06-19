@@ -81,7 +81,7 @@ test.describe('Recorder App Smoke Tests', () => {
 
     // Title should be present
     await expect(
-      page.getByRole('heading', { name: 'GpsPlusSlamJs Recorder' })
+      page.getByRole('heading', { name: 'GPS + SLAM Recorder' })
     ).toBeVisible();
   });
 

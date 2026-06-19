@@ -148,7 +148,7 @@ export function switchToReplayMode(): void {
   // Update title
   const title = el('setup-title');
   if (title) {
-    title.textContent = 'GpsPlusSlamJs Replay';
+    title.textContent = 'GPS + SLAM Replay';
   }
 
   // Update folder button text for replay context

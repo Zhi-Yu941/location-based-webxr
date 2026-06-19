@@ -82,6 +82,49 @@ describe('qrDetectedReducer', () => {
     ).toEqual([3, 4, 5]);
   });
 
+  // Why this test matters: it pins the deliberate "return new state" design of
+  // recordQrDetection/recordQrSizeEstimate against a recurring "critical" review
+  // claim (PR #103) that returning `{ ...state, markers: { ...state.markers } }`
+  // from an Immer/RTK reducer leaks REVOKED draft proxies — so a later read of
+  // `marker.size` / `marker.detections` would throw
+  // "Cannot perform 'get' on a proxy that has been revoked". That is false:
+  // Immer finalizes the entire RETURNED tree, unwrapping every embedded draft,
+  // so the pattern is safe. The slice returns new state on purpose because the
+  // readonly Pose tuples reject Immer's WritableDraft (see the reducer jsdoc and
+  // the Pose-tuple test above) — the review's suggested "fix" (mutate the draft)
+  // would REINTRODUCE that crash, so this test guards against that regression too.
+  it('does not leak revoked Immer draft proxies across chained dispatches', () => {
+    let s = init();
+    s = qrDetectedReducer(s, recordQrDetection(entry('A', 1, [1, 2, 3])));
+
+    // Read the exact deep properties the claim says are revoked proxies.
+    const marker = s.markers['A'];
+    expect(() => JSON.stringify(marker.size)).not.toThrow();
+    expect(marker.size.status).toBe('unknown');
+    expect(marker.detections).toHaveLength(1);
+
+    // A second dispatch reads `existing.size` / `existing.detections` off the
+    // PREVIOUSLY RETURNED state — the precise reads the claim predicts crash.
+    expect(() => {
+      s = qrDetectedReducer(s, recordQrDetection(entry('A', 2, [4, 5, 6])));
+      // recordQrSizeEstimate also reads `existing.detections.slice()`.
+      s = qrDetectedReducer(
+        s,
+        recordQrSizeEstimate({
+          text: 'A',
+          estimate: {
+            status: 'estimated',
+            estimateM: 0.2,
+            sampleCount: 4,
+            spreadM: 0.003,
+          },
+        })
+      );
+    }).not.toThrow();
+    expect(s.markers['A'].detections.map((d) => d.timestamp)).toEqual([1, 2]);
+    expect(s.markers['A'].size.status).toBe('estimated');
+  });
+
   it('bounds each marker to maxHistory (ring buffer, drops oldest)', () => {
     let s = init();
     s = qrDetectedReducer(s, setQrMaxHistory(3));

@@ -1503,7 +1503,14 @@ export function startImageCapture(config?: Partial<ImageCaptureConfig>): void {
   callbacks.captureFrame = async (
     quality: number
   ): Promise<CapturedFrame | null> => {
-    if (!blitCapture || !latestCameraTexture) {
+    // Snapshot the module-level `blitCapture` into a local: ending/resetting the
+    // AR session (resetWebXRState → cleanupBlitResources) can null it WHILE the
+    // captureToBlob() await below is in flight, and the post-await getWidth()/
+    // getHeight() reads would then throw "Cannot read properties of null".
+    // The local keeps a stable handle for this in-flight capture; a frame from a
+    // torn-down session is harmlessly discarded downstream.
+    const bc = blitCapture;
+    if (!bc || !latestCameraTexture) {
       // camera-access not available or no texture yet — fall back to
       // canvas.toBlob. The canvas backing store is what toBlob encodes, so its
       // width/height are the produced JPEG's true pixel dimensions.
@@ -1527,10 +1534,10 @@ export function startImageCapture(config?: Partial<ImageCaptureConfig>): void {
         latestCameraHeight,
         divisor
       );
-      blitCapture.resizeIfNeeded(target.width, target.height);
+      bc.resizeIfNeeded(target.width, target.height);
     }
 
-    const blob = await blitCapture.captureToBlob(
+    const blob = await bc.captureToBlob(
       currentRenderer,
       latestCameraTexture,
       quality
@@ -1540,8 +1547,8 @@ export function startImageCapture(config?: Partial<ImageCaptureConfig>): void {
     // true pixel dimensions for aspect-correct frame-tile rendering.
     return {
       blob,
-      width: blitCapture.getWidth(),
-      height: blitCapture.getHeight(),
+      width: bc.getWidth(),
+      height: bc.getHeight(),
     };
   };
   log.info(`Blit capture pipeline initialized (resolutionDivisor=${divisor})`);

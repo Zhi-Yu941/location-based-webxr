@@ -88,6 +88,12 @@ test.describe('Help Section', () => {
     // synchronized AR + GPS data …" spans several source lines.
     await expect(helpContent).toContainText(/record[\s\S]*AR[\s\S]*GPS/i);
 
+    // D1 (2026-06-19 round-2 feedback): the Purpose copy now leads with the
+    // concrete artifact — a COLMAP-conform ZIP — rather than the abstract
+    // "build 3D reconstructions". Assert that the headline term survives so the
+    // wording can't silently regress to the old framing.
+    await expect(helpContent).toContainText(/COLMAP[- ]conform/i);
+
     // Should explain what Reference Points are
     await expect(helpContent).toContainText(/reference point/i);
   });

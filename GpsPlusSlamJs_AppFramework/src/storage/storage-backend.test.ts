@@ -124,14 +124,16 @@ describe('NullStorageBackend', () => {
 // OpfsStorageBackend
 // ---------------------------------------------------------------------------
 
-// Mock the file-system module so we can verify delegation without real OPFS
-vi.mock('./file-system', () => ({
+// Mock the opfs-storage module so we can verify delegation without real OPFS.
+// Partial mock keeps the rest of opfs-storage real (only the delegated calls
+// are stubbed).
+vi.mock('./opfs-storage', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   writeAction: vi.fn().mockResolvedValue(undefined),
   writeFrame: vi.fn().mockResolvedValue(undefined),
   writeSessionMetadata: vi.fn().mockResolvedValue(undefined),
-  startSession: vi.fn().mockResolvedValue({
-    scenarioPath: '',
-    sessionPath: 'recording-2026-01-01_00-00-00utc',
+  createSession: vi.fn().mockResolvedValue({
+    sessionName: 'recording-2026-01-01_00-00-00utc',
   }),
   listSessions: vi.fn().mockResolvedValue([]),
 }));
@@ -146,9 +148,9 @@ describe('OpfsStorageBackend', () => {
     expect(typeof backend.writeSessionMetadata).toBe('function');
   });
 
-  it('writeAction delegates to file-system writeAction', async () => {
+  it('writeAction delegates to opfs-storage writeAction', async () => {
     // Why: OpfsStorageBackend must forward calls to the existing OPFS functions
-    const { writeAction } = await import('./file-system');
+    const { writeAction } = await import('./opfs-storage');
     const backend = new OpfsStorageBackend();
     const action = { type: 'gpsData/recordGpsEvent', payload: {} };
 
@@ -157,9 +159,9 @@ describe('OpfsStorageBackend', () => {
     expect(writeAction).toHaveBeenCalledWith(action, 42);
   });
 
-  it('writeFrame delegates to file-system writeFrame', async () => {
+  it('writeFrame delegates to opfs-storage writeFrame', async () => {
     // Why: Frame persistence must use the same OPFS path as direct calls
-    const { writeFrame } = await import('./file-system');
+    const { writeFrame } = await import('./opfs-storage');
     const backend = new OpfsStorageBackend();
     const blob = new Blob(['img'], { type: 'image/jpeg' });
 
@@ -168,9 +170,9 @@ describe('OpfsStorageBackend', () => {
     expect(writeFrame).toHaveBeenCalledWith(blob, 7);
   });
 
-  it('writeSessionMetadata delegates to file-system writeSessionMetadata', async () => {
+  it('writeSessionMetadata delegates to opfs-storage writeSessionMetadata', async () => {
     // Why: Session metadata must be written via the same OPFS facade
-    const { writeSessionMetadata } = await import('./file-system');
+    const { writeSessionMetadata } = await import('./opfs-storage');
     const backend = new OpfsStorageBackend();
     const metadata = {
       version: 1 as const,
@@ -187,9 +189,9 @@ describe('OpfsStorageBackend', () => {
     expect(writeSessionMetadata).toHaveBeenCalledWith(metadata);
   });
 
-  it('propagates errors from file-system writeAction', async () => {
+  it('propagates errors from opfs-storage writeAction', async () => {
     // Why: Errors must not be swallowed — the store handles them with onWriteFailure
-    const { writeAction } = await import('./file-system');
+    const { writeAction } = await import('./opfs-storage');
     vi.mocked(writeAction).mockRejectedValueOnce(new Error('OPFS full'));
     const backend = new OpfsStorageBackend();
 
@@ -198,13 +200,12 @@ describe('OpfsStorageBackend', () => {
     );
   });
 
-  it('createSession delegates to file-system startSession', async () => {
+  it('createSession delegates to opfs-storage createSession', async () => {
     // Why: OpfsStorageBackend must forward createSession to the underlying
-    // file-system module for OPFS directory creation
-    const { startSession } = await import('./file-system');
-    vi.mocked(startSession).mockResolvedValueOnce({
-      scenarioPath: '',
-      sessionPath: 'recording-2026-05-03_12-00-00utc',
+    // opfs-storage module for OPFS directory creation
+    const { createSession } = await import('./opfs-storage');
+    vi.mocked(createSession).mockResolvedValueOnce({
+      sessionName: 'recording-2026-05-03_12-00-00utc',
     });
     const backend = new OpfsStorageBackend();
 
@@ -212,13 +213,13 @@ describe('OpfsStorageBackend', () => {
       new Date('2026-05-03T12:00:00Z')
     );
 
-    expect(startSession).toHaveBeenCalled();
+    expect(createSession).toHaveBeenCalled();
     expect(result.sessionName).toBe('recording-2026-05-03_12-00-00utc');
   });
 
-  it('listSessions delegates to file-system listSessions', async () => {
-    // Why: OpfsStorageBackend must forward listSessions to file-system module
-    const { listSessions } = await import('./file-system');
+  it('listSessions delegates to opfs-storage listSessions', async () => {
+    // Why: OpfsStorageBackend must forward listSessions to opfs-storage module
+    const { listSessions } = await import('./opfs-storage');
     vi.mocked(listSessions).mockResolvedValueOnce([
       'recording-2026-05-03_12-00-00utc',
       'recording-2026-05-03_13-00-00utc',

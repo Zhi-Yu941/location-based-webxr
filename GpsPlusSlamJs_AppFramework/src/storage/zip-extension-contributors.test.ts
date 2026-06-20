@@ -79,13 +79,9 @@ describe('zip-export — ZipExportContributor seam', () => {
   it('ignores an empty contributors list and produces the framework-only zip', async () => {
     // Why: backwards compatibility — no consumer must change to keep working.
     const sessionName = await makeFlatSession();
-    const { blob, fileCount } = await exportSessionAsZip(
-      sessionName,
-      undefined,
-      {
-        contributors: [],
-      }
-    );
+    const { blob, fileCount } = await exportSessionAsZip(sessionName, {
+      contributors: [],
+    });
     const files = await unzipAsMap(blob);
     expect(files.has('session.json')).toBe(true);
     expect(files.has('actions/000001.json')).toBe(true);
@@ -112,13 +108,9 @@ describe('zip-export — ZipExportContributor seam', () => {
       },
     };
 
-    const { blob, fileCount } = await exportSessionAsZip(
-      sessionName,
-      undefined,
-      {
-        contributors: [contributor],
-      }
-    );
+    const { blob, fileCount } = await exportSessionAsZip(sessionName, {
+      contributors: [contributor],
+    });
     const files = await unzipAsMap(blob);
 
     expect(files.has('extras/one.json')).toBe(true);
@@ -141,7 +133,7 @@ describe('zip-export — ZipExportContributor seam', () => {
       },
     };
     await expect(
-      exportSessionAsZip(sessionName, undefined, {
+      exportSessionAsZip(sessionName, {
         contributors: [contributor],
       })
     ).rejects.toThrow(/single path segment/);
@@ -158,7 +150,7 @@ describe('zip-export — ZipExportContributor seam', () => {
       },
     });
     await expect(
-      exportSessionAsZip(sessionName, undefined, {
+      exportSessionAsZip(sessionName, {
         contributors: [make(), make()],
       })
     ).rejects.toThrow(/Duplicate ZipExportContributor.subdir/);
@@ -175,7 +167,7 @@ describe('zip-export — ZipExportContributor seam', () => {
       },
     };
     await expect(
-      exportSessionAsZip(sessionName, undefined, {
+      exportSessionAsZip(sessionName, {
         contributors: [contributor],
       })
     ).rejects.toThrow(/must not start with/);
@@ -202,7 +194,7 @@ describe('zip-export — ZipExportContributor seam', () => {
       'sub\\escape.json',
     ]) {
       await expect(
-        exportSessionAsZip(sessionName, undefined, {
+        exportSessionAsZip(sessionName, {
           contributors: [makeContributor(badPath)],
         })
       ).rejects.toThrow(/must not contain/);
@@ -236,7 +228,7 @@ describe('zip-reader — loadEntriesFromSubdir', () => {
         return 2;
       },
     };
-    const { blob } = await exportSessionAsZip(sessionName, undefined, {
+    const { blob } = await exportSessionAsZip(sessionName, {
       contributors: [contributor],
     });
     const data = new Uint8Array(await blob.arrayBuffer());

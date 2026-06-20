@@ -98,17 +98,6 @@ export interface ExportSessionAsZipOptions {
 // ============================================================================
 
 /**
- * Get the OPFS scenarios directory handle.
- * Re-acquires from navigator.storage to avoid holding stale references.
- * Creates on demand so it works even when initOpfsStorage only creates sessions/.
- */
-async function getScenariosHandle(): Promise<FileSystemDirectoryHandle> {
-  const opfsRoot = await navigator.storage.getDirectory();
-  const gpsPlusSlamDir = await opfsRoot.getDirectoryHandle('gps-plus-slam');
-  return gpsPlusSlamDir.getDirectoryHandle('scenarios', { create: true });
-}
-
-/**
  * Get the OPFS sessions directory handle (flat layout).
  */
 async function getSessionsHandle(): Promise<FileSystemDirectoryHandle> {
@@ -162,64 +151,33 @@ async function streamDirectoryToZip(
 // ============================================================================
 
 /**
- * Export a session from OPFS as a ZIP blob.
+ * Export a flat-layout session from OPFS as a ZIP blob.
  *
  * The ZIP structure mirrors the OPFS session structure:
  * - session.json (at root)
  * - actions/000001.json, actions/000002.json, ...
  * - images/frame-000001.jpg, images/frame-000002.jpg, ... (legacy: frames/)
- * - refPoints/{h3}.json (only observations from this session, scenario layout only)
  *
- * Uses "store" mode (compression level 0) for fast packaging.
+ * Uses "store" mode (compression level 0) for fast packaging. Consumers with a
+ * different on-disk layout (e.g. the recorder's `scenarios/{name}/` nesting)
+ * resolve their own session handle and call {@link exportSessionHandleAsZip}.
  *
- * Supports both flat and scenario-based layouts:
- * - `exportSessionAsZip(sessionName)` — flat layout (sessions/)
- * - `exportSessionAsZip(scenarioName, sessionName)` — scenario layout (scenarios/{name}/)
- *
+ * @param sessionName - Name of the session folder under `sessions/`.
  * @returns ZIP export result with blob and file count
- * @throws Error if session not found
+ * @throws Error if the session is not found
  */
 export async function exportSessionAsZip(
-  scenarioNameOrSessionName: string,
-  sessionName?: string,
+  sessionName: string,
   options?: ExportSessionAsZipOptions
 ): Promise<ZipExportResult> {
+  log.info(`Exporting session: ${sessionName}`);
+
+  const sessionsDir = await getSessionsHandle();
   let sessionHandle: FileSystemDirectoryHandle;
-
-  if (sessionName) {
-    // Scenario-based layout: scenarios/{scenarioName}/{sessionName}
-    const scenarioName = scenarioNameOrSessionName;
-    log.info(`Exporting session: ${scenarioName}/${sessionName}`);
-
-    const scenariosDir = await getScenariosHandle();
-    let scenarioHandle: FileSystemDirectoryHandle;
-    try {
-      scenarioHandle = await scenariosDir.getDirectoryHandle(scenarioName);
-    } catch {
-      throw new Error(`Scenario "${scenarioName}" not found in OPFS storage`);
-    }
-
-    try {
-      sessionHandle = await scenarioHandle.getDirectoryHandle(sessionName);
-    } catch {
-      throw new Error(
-        `Session "${sessionName}" not found in scenario "${scenarioName}"`
-      );
-    }
-  } else {
-    // Flat layout: sessions/{sessionName}
-    log.info(`Exporting session: ${scenarioNameOrSessionName}`);
-
-    const sessionsDir = await getSessionsHandle();
-    try {
-      sessionHandle = await sessionsDir.getDirectoryHandle(
-        scenarioNameOrSessionName
-      );
-    } catch {
-      throw new Error(
-        `Session "${scenarioNameOrSessionName}" not found in OPFS storage`
-      );
-    }
+  try {
+    sessionHandle = await sessionsDir.getDirectoryHandle(sessionName);
+  } catch {
+    throw new Error(`Session "${sessionName}" not found in OPFS storage`);
   }
 
   return exportSessionHandleAsZip(sessionHandle, options);
@@ -231,10 +189,10 @@ export async function exportSessionAsZip(
  * framework-owned files.
  *
  * This is the layout-agnostic core of {@link exportSessionAsZip}: consumers
- * that resolve a session directory handle themselves (e.g. the recorder, which
- * nests sessions under `scenarios/{name}/`) call this directly so the
- * framework's ZIP schema stays the single source of truth without the
- * framework needing to know how the handle was located.
+ * that resolve a session directory handle themselves (e.g. an app that nests
+ * sessions under its own grouping layer) call this directly so the framework's
+ * ZIP schema stays the single source of truth without the framework needing to
+ * know how the handle was located.
  *
  * @param sessionHandle - The session directory to package (must contain the
  *   framework-owned `session.json` / `actions/` / `images/` tree).
@@ -315,21 +273,19 @@ export async function exportSessionHandleAsZip(
  * the last synced ZIP contains all data up to that point.
  *
  * @param fileHandle - File handle from showSaveFilePicker
- * @param scenarioName - Name of the scenario
- * @param sessionName - Name of the session folder
+ * @param sessionName - Name of the session folder under `sessions/`
  * @returns ZIP export result with blob and file count
- * @throws Error if scenario or session not found
+ * @throws Error if the session is not found
  */
 export async function syncToExternalZip(
   fileHandle: FileSystemFileHandle,
-  scenarioName: string,
   sessionName: string,
   options?: ExportSessionAsZipOptions
 ): Promise<ZipExportResult> {
-  log.info(`Syncing to external ZIP: ${scenarioName}/${sessionName}`);
+  log.info(`Syncing to external ZIP: ${sessionName}`);
 
   // Export session as blob
-  const result = await exportSessionAsZip(scenarioName, sessionName, options);
+  const result = await exportSessionAsZip(sessionName, options);
 
   // Write to external file handle
   const writable = await fileHandle.createWritable();
@@ -394,21 +350,4 @@ export async function downloadZip(blob: Blob, filename: string): Promise<void> {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 
   log.info(`Download triggered via <a download>: ${filename}`);
-}
-
-/**
- * Export and download a session in one step.
- *
- * Convenience function combining exportSessionAsZip and downloadZip.
- *
- * @param scenarioName - Name of the scenario
- * @param sessionName - Name of the session folder
- */
-export async function exportAndDownloadSession(
-  scenarioName: string,
-  sessionName: string
-): Promise<void> {
-  const { blob } = await exportSessionAsZip(scenarioName, sessionName);
-  const filename = `${scenarioName}-${sessionName}.zip`;
-  await downloadZip(blob, filename);
 }

@@ -89,7 +89,6 @@ const entryFiles = [
 
   // storage/
   'src/storage/index.ts',
-  'src/storage/file-system.ts',
   'src/storage/file-system-utils.ts',
   'src/storage/null-storage-backend.ts',
   'src/storage/opfs-storage.ts',

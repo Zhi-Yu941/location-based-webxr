@@ -13,14 +13,10 @@
  * AppFramework / RecorderApp boundary migration.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createSlamAppStore } from './create-slam-app-store';
 import { COMMUNITY_LICENSE_KEY } from 'gps-plus-slam-js/community-license-key';
 import { NullStorageBackend } from '../storage/null-storage-backend';
-
-vi.mock('../storage/file-system', () => ({
-  writeAction: vi.fn().mockResolvedValue(undefined),
-}));
 
 describe('createSlamAppStore — community license key default', () => {
   it('uses COMMUNITY_LICENSE_KEY by default and validates successfully', () => {

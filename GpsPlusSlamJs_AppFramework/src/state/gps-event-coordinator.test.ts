@@ -13,7 +13,7 @@
  * - Library's recordGpsEvent action is dispatched
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { vec3 as glVec3, quat as glQuat } from 'gl-matrix';
 import { quaternionMagnitude } from 'gps-plus-slam-js';
 import {
@@ -39,11 +39,6 @@ const createRecorderStore = (opts?: { storageBackend?: StorageBackend }) =>
   });
 import type { ARPose } from '../ar/webxr-session';
 import type { GpsPosition, RawDeviceOrientation } from '../sensors/gps';
-
-// Mock file-system to avoid actual file operations
-vi.mock('../storage/file-system', () => ({
-  writeAction: vi.fn().mockResolvedValue(undefined),
-}));
 
 describe('Recording Coordinator', () => {
   beforeEach(() => {

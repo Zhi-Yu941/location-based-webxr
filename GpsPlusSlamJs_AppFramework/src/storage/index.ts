@@ -29,23 +29,6 @@ export {
   writeSessionMetadata,
 } from './opfs-storage.js';
 
-// --- file-system ---
-export {
-  resetStorageState,
-  resetForNewSession,
-  type WriteAccessResult,
-  verifyWriteAccess,
-  initStorage,
-  startSession as startStorageSession,
-  writeAction,
-  writeFrame,
-  writeSessionMetadata as writeSessionMeta,
-  getCurrentScenarioHandle,
-  setCurrentScenario,
-  ensureScenarioDirectory,
-  listSessions as listSessionsFromFileSystem,
-} from './file-system.js';
-
 // --- file-system-utils ---
 export {
   formatTimestamp,
@@ -67,7 +50,6 @@ export {
   exportSessionHandleAsZip,
   syncToExternalZip,
   downloadZip,
-  exportAndDownloadSession,
 } from './zip-export.js';
 
 // --- zip-reader ---

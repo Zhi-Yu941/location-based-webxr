@@ -1,44 +1,47 @@
 /**
  * OpfsStorageBackend
  *
- * Production implementation of StorageBackend that delegates to the
- * existing file-system.ts facade (which in turn uses OPFS).
+ * Production implementation of StorageBackend that delegates directly to the
+ * OPFS storage module. Provides the framework's default flat session layout:
+ * `gps-plus-slam/sessions/{timestamp}/…`.
  *
- * Provides flat session layout: gps-plus-slam/sessions/{timestamp}/…
+ * Apps that need a different on-disk layout (e.g. a grouping layer that nests
+ * sessions under a named bucket) ship their own StorageBackend rather than
+ * extending this one.
  */
 
 import type { SessionMetadata } from './opfs-storage';
 import type { StorageBackend, CreateSessionResult } from './storage-backend';
 import {
-  startSession as fsStartSession,
-  listSessions as fsListSessions,
-  writeAction as fsWriteAction,
-  writeFrame as fsWriteFrame,
-  writeSessionMetadata as fsWriteSessionMetadata,
-} from './file-system';
+  createSession as opfsCreateSession,
+  listSessions as opfsListSessions,
+  writeAction as opfsWriteAction,
+  writeFrame as opfsWriteFrame,
+  writeSessionMetadata as opfsWriteSessionMetadata,
+} from './opfs-storage';
 
 export class OpfsStorageBackend implements StorageBackend {
   async createSession(
-    _timestamp: Date,
+    timestamp: Date,
     _contextTag?: string
   ): Promise<CreateSessionResult> {
-    const result = await fsStartSession();
-    return { sessionName: result.sessionPath };
+    const result = await opfsCreateSession(timestamp);
+    return { sessionName: result.sessionName };
   }
 
   async listSessions(): Promise<string[]> {
-    return fsListSessions();
+    return opfsListSessions();
   }
 
   async writeAction(action: unknown, index: number): Promise<void> {
-    await fsWriteAction(action, index);
+    await opfsWriteAction(action, index);
   }
 
   async writeFrame(blob: Blob, index: number): Promise<void> {
-    await fsWriteFrame(blob, index);
+    await opfsWriteFrame(blob, index);
   }
 
   async writeSessionMetadata(metadata: SessionMetadata): Promise<void> {
-    await fsWriteSessionMetadata(metadata);
+    await opfsWriteSessionMetadata(metadata);
   }
 }

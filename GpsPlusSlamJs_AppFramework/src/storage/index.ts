@@ -64,6 +64,7 @@ export {
   type ZipContributorAddFile,
   type ExportSessionAsZipOptions,
   exportSessionAsZip,
+  exportSessionHandleAsZip,
   syncToExternalZip,
   downloadZip,
   exportAndDownloadSession,

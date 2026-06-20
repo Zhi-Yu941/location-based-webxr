@@ -212,13 +212,12 @@ vi.mock('./storage/sync-manager', () => ({
   DEFAULT_SYNC_INTERVAL_MS: 60000,
 }));
 
-// Mock zip-export for sync integration tests
-vi.mock('gps-plus-slam-app-framework/storage/zip-export', () => ({
-  syncToExternalZip: vi.fn().mockResolvedValue(undefined),
-  exportSessionAsZip: vi
+// Mock the recorder's scenario ZIP export for sync/stop integration tests.
+vi.mock('./storage/scenario-zip-export', () => ({
+  syncScenarioSessionToExternalZip: vi.fn().mockResolvedValue(undefined),
+  exportScenarioSessionAsZip: vi
     .fn()
     .mockResolvedValue({ blob: new Blob(['test']), fileCount: 1 }),
-  downloadZip: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock session-summary for stop recording tests
@@ -1510,8 +1509,8 @@ describe('ZIP generation without external save location (Issue 3)', () => {
    * always has ZIP data.
    */
   it('should call exportSessionAsZip when no save file handle exists', async () => {
-    const { exportSessionAsZip } =
-      await import('gps-plus-slam-app-framework/storage/zip-export');
+    const { exportScenarioSessionAsZip: exportSessionAsZip } =
+      await import('./storage/scenario-zip-export');
     const { getSaveFileHandle } =
       await import('./storage/external-file-storage');
     const {
@@ -1550,8 +1549,8 @@ describe('ZIP generation without external save location (Issue 3)', () => {
    */
   it('should pass ZIP data to showSessionSummary when no save file handle', async () => {
     const { showSessionSummary } = await import('./ui/session-summary');
-    const { exportSessionAsZip } =
-      await import('gps-plus-slam-app-framework/storage/zip-export');
+    const { exportScenarioSessionAsZip: exportSessionAsZip } =
+      await import('./storage/scenario-zip-export');
     const { getSaveFileHandle } =
       await import('./storage/external-file-storage');
     const {
@@ -1598,8 +1597,8 @@ describe('ZIP generation without external save location (Issue 3)', () => {
    */
   it('should handle exportSessionAsZip failure gracefully', async () => {
     const { showSessionSummary } = await import('./ui/session-summary');
-    const { exportSessionAsZip } =
-      await import('gps-plus-slam-app-framework/storage/zip-export');
+    const { exportScenarioSessionAsZip: exportSessionAsZip } =
+      await import('./storage/scenario-zip-export');
     const { getSaveFileHandle } =
       await import('./storage/external-file-storage');
     const {

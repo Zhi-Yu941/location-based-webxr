@@ -222,6 +222,28 @@ export async function exportSessionAsZip(
     }
   }
 
+  return exportSessionHandleAsZip(sessionHandle, options);
+}
+
+/**
+ * Stream an already-resolved session directory handle to a ZIP blob, running
+ * any caller-supplied extension {@link ZipExportContributor}s after the
+ * framework-owned files.
+ *
+ * This is the layout-agnostic core of {@link exportSessionAsZip}: consumers
+ * that resolve a session directory handle themselves (e.g. the recorder, which
+ * nests sessions under `scenarios/{name}/`) call this directly so the
+ * framework's ZIP schema stays the single source of truth without the
+ * framework needing to know how the handle was located.
+ *
+ * @param sessionHandle - The session directory to package (must contain the
+ *   framework-owned `session.json` / `actions/` / `images/` tree).
+ * @returns ZIP export result with blob and file count.
+ */
+export async function exportSessionHandleAsZip(
+  sessionHandle: FileSystemDirectoryHandle,
+  options?: ExportSessionAsZipOptions
+): Promise<ZipExportResult> {
   const blobWriter = new BlobWriter('application/zip');
   const zipWriter = new ZipWriter(blobWriter, { level: 0 });
 

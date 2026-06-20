@@ -34,11 +34,13 @@ import {
 } from '../storage/external-file-storage';
 import { createSyncManager, type SyncManager } from '../storage/sync-manager';
 import {
-  syncToExternalZip,
-  exportSessionAsZip,
   type ZipExportResult,
   type ZipExportContributor,
 } from 'gps-plus-slam-app-framework/storage/zip-export';
+import {
+  syncScenarioSessionToExternalZip,
+  exportScenarioSessionAsZip,
+} from '../storage/scenario-zip-export';
 import { createRefPointsZipContributor } from '../storage/ref-points-zip-contributor';
 import { createColmapZipContributor } from '../colmap/colmap-zip-contributor';
 import { selectFrameTilesInWebXR } from 'gps-plus-slam-app-framework/state';
@@ -441,7 +443,7 @@ export function createRecordingSessionHandlers(
     if (saveFileHandle) {
       syncManager = createSyncManager(
         async () => {
-          lastSyncResult = await syncToExternalZip(
+          lastSyncResult = await syncScenarioSessionToExternalZip(
             saveFileHandle,
             scenarioName,
             currentSessionName,
@@ -646,7 +648,7 @@ export function createRecordingSessionHandlers(
         const scenarioName =
           deps.getStore().getState().scenario.currentScenarioName ||
           FALLBACK_SCENARIO;
-        const result = await exportSessionAsZip(
+        const result = await exportScenarioSessionAsZip(
           scenarioName,
           currentSessionName,
           {

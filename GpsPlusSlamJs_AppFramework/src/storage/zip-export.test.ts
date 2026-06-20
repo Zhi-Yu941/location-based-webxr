@@ -36,6 +36,7 @@ import {
 } from './opfs-storage';
 import {
   exportSessionAsZip,
+  exportSessionHandleAsZip,
   downloadZip,
   syncToExternalZip,
   type ZipExportResult,
@@ -435,6 +436,66 @@ describe('zip-export', () => {
       expect(result.blob.type).toBe('application/zip');
       // session.json + 2 actions + 1 frame = 4 files
       expect(result.fileCount).toBe(4);
+    });
+  });
+
+  describe('exportSessionHandleAsZip', () => {
+    /**
+     * Why this test matters: this is the layout-agnostic core that consumers
+     * with their own directory layout (e.g. the recorder's `scenarios/{name}/`
+     * nesting) call directly. It must package an arbitrary session handle —
+     * including caller-supplied extension contributors — without any knowledge
+     * of how that handle was located.
+     */
+    it('packages a resolved session handle, including a contributor subdir', async () => {
+      await initOpfsStorage();
+      const { scenarioName, sessionName, scenarioHandle } =
+        await createScenarioSession(
+          'handle-test',
+          new Date('2026-03-01T10:00:00Z')
+        );
+      void scenarioName;
+
+      const metadata: SessionMetadata = {
+        version: 1,
+        startedAt: '2026-03-01T10:00:00.000Z',
+        endedAt: '2026-03-01T10:05:00.000Z',
+        contextTag: 'handle-test',
+        actionCount: 1,
+        frameCount: 0,
+        userAgent: 'Test Browser',
+      };
+      await writeSessionMetadata(metadata);
+      await writeAction({ type: 'a1' }, 1);
+
+      // Resolve the session handle the way a layout-owning consumer would.
+      const sessionHandle =
+        await scenarioHandle.getDirectoryHandle(sessionName);
+
+      const { blob, fileCount } = await exportSessionHandleAsZip(
+        sessionHandle,
+        {
+          contributors: [
+            {
+              subdir: 'extras',
+              async contribute(addFile) {
+                await addFile(
+                  'note.txt',
+                  new Blob(['hi'], { type: 'text/plain' })
+                );
+                return 1;
+              },
+            },
+          ],
+        }
+      );
+
+      // session.json + 1 action + 1 contributor file = 3
+      expect(fileCount).toBe(3);
+      const files = await unzipBlob(blob);
+      expect(files.has('session.json')).toBe(true);
+      expect(files.has('actions/000001.json')).toBe(true);
+      expect(files.has('extras/note.txt')).toBe(true);
     });
   });
 

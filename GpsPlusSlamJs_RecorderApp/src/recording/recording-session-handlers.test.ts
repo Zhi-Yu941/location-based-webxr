@@ -255,9 +255,9 @@ vi.mock('../storage/sync-manager', () => ({
   createSyncManager: mockCreateSyncManager,
 }));
 
-vi.mock('gps-plus-slam-app-framework/storage/zip-export', () => ({
-  syncToExternalZip: mockSyncToExternalZip,
-  exportSessionAsZip: mockExportSessionAsZip,
+vi.mock('../storage/scenario-zip-export', () => ({
+  syncScenarioSessionToExternalZip: mockSyncToExternalZip,
+  exportScenarioSessionAsZip: mockExportSessionAsZip,
 }));
 
 vi.mock('../ui/navigation', () => ({

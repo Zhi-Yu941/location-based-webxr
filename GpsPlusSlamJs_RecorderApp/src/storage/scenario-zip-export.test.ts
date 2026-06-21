@@ -138,8 +138,19 @@ describe('scenario-zip-export', () => {
       sessionName
     );
 
-    expect(result.blob).toBeInstanceOf(Blob);
+    // `result.blob` is built deep inside @zip.js/zip.js's `BlobWriter` (the
+    // framework owns the ZIP schema). Assert "is a Blob" via the cross-realm-safe
+    // `toStringTag` check rather than `toBeInstanceOf(Blob)`: depending on how the
+    // framework module is resolved, the `Blob` constructor that produced the value
+    // can differ from the jsdom test realm's global `Blob`, so `instanceof` fails
+    // on a genuine Blob (the CI failure). `Object.prototype.toString` reads
+    // `Symbol.toStringTag`, which is 'Blob' for both Node-native and jsdom Blobs.
+    expect(Object.prototype.toString.call(result.blob)).toBe('[object Blob]');
+    expect(result.blob.type).toBe('application/zip');
+    expect(result.blob.size).toBeGreaterThan(0);
     expect(chunks).toHaveLength(1);
+    // Reference identity: the exact blob returned is the one written to the
+    // handle (realm-independent — the assertion that actually pins the behavior).
     expect(chunks[0]).toBe(result.blob);
   });
 });

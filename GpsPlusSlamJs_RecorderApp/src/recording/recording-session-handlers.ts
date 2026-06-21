@@ -386,7 +386,9 @@ export function createRecordingSessionHandlers(
     // Dispatch session start
     store.dispatch(
       startSession({
-        scenarioName,
+        // The recorder's scenario name rides along in the framework's opaque
+        // `contextTag` slot (renamed from `scenarioName` on 2026-06-21).
+        contextTag: scenarioName,
         sessionName: currentSessionName,
         startTime: now.getTime(),
         deviceInfo: navigator.userAgent,
@@ -577,7 +579,7 @@ export function createRecordingSessionHandlers(
           ? new Date(sessionMetadata.startTime).toISOString()
           : new Date(endTime).toISOString(),
         endedAt: new Date(endTime).toISOString(),
-        contextTag: sessionMetadata?.scenarioName ?? FALLBACK_SCENARIO,
+        contextTag: sessionMetadata?.contextTag ?? FALLBACK_SCENARIO,
         actionCount: gpsPositions.length,
         frameCount: imageCount,
         userAgent: navigator.userAgent,

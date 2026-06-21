@@ -67,7 +67,7 @@ describe('Action Schema Validation', () => {
   describe('startSession action', () => {
     it('should have correct type and payload structure', async () => {
       const metadata: SessionMetadata = {
-        scenarioName: 'Test Scenario',
+        contextTag: 'Test Scenario',
         sessionName: 'recording-2025-01-01_12-00-00utc',
         startTime: 1704110400000,
         deviceInfo: 'Pixel 7',

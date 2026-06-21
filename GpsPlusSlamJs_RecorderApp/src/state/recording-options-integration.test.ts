@@ -54,7 +54,7 @@ describe('Recording Options Integration', () => {
     it('should include default options when not specified', () => {
       store.dispatch(
         startSession({
-          scenarioName: 'Test',
+          contextTag: 'Test',
           sessionName: 'test-session',
           startTime: Date.now(),
         })
@@ -62,7 +62,7 @@ describe('Recording Options Integration', () => {
 
       const state = store.getState().recording;
       // recordingOptions may be undefined if not explicitly passed
-      expect(state.sessionMetadata?.scenarioName).toBe('Test');
+      expect(state.sessionMetadata?.contextTag).toBe('Test');
     });
 
     it('should include custom options in session metadata', () => {

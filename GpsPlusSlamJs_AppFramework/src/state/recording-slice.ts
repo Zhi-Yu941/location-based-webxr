@@ -17,7 +17,15 @@ import type { DepthSample } from '../types/ar-types';
 // --- Recording-specific Types ---
 
 export interface SessionMetadata {
-  scenarioName: string;
+  /**
+   * Opaque grouping label the framework does NOT interpret. Consumers (e.g.
+   * the recorder) use it to carry app-specific grouping such as a scenario
+   * name. Renamed from `scenarioName` on 2026-06-21 to match the on-disk
+   * `SessionMetadata.contextTag` (opfs-storage); the reducer maps the legacy
+   * `scenarioName` field for replayed pre-rename recordings — see
+   * {@link StartSessionPayload}.
+   */
+  contextTag: string;
   sessionName: string;
   startTime: number;
   deviceInfo?: string;
@@ -25,6 +33,19 @@ export interface SessionMetadata {
   /** Recording options used for this session (for replay context) */
   recordingOptions?: RecordingOptions;
 }
+
+/**
+ * Payload accepted by {@link startSession}. New callers pass `contextTag`.
+ * Recordings made before the 2026-06-21 rename persist the legacy
+ * `scenarioName` instead; when such a `recording/startSession` action is
+ * replayed, the reducer maps it onto `contextTag`, so old recordings keep
+ * replaying without a separate migration step.
+ */
+type StartSessionPayload = Omit<SessionMetadata, 'contextTag'> & {
+  contextTag?: string;
+  /** @deprecated legacy alias for {@link SessionMetadata.contextTag}. */
+  scenarioName?: string;
+};
 
 export interface RecordingState {
   isRecording: boolean;
@@ -61,9 +82,15 @@ const recordingSlice = createSlice({
   name: 'recording',
   initialState: initialRecordingState,
   reducers: {
-    startSession(state, action: PayloadAction<SessionMetadata>) {
+    startSession(state, action: PayloadAction<StartSessionPayload>) {
+      // Normalize the legacy `scenarioName` (pre-2026-06-21 recordings) onto
+      // `contextTag`, and drop it from the stored metadata so state stays clean.
+      const { scenarioName, contextTag, ...rest } = action.payload;
       state.isRecording = true;
-      state.sessionMetadata = action.payload;
+      state.sessionMetadata = {
+        ...rest,
+        contextTag: contextTag ?? scenarioName ?? '',
+      };
       state.actionCount = 0;
       state.failedWriteCount = 0;
       state.latestDepthSample = null;

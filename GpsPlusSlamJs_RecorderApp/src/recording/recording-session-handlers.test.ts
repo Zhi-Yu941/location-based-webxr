@@ -342,7 +342,7 @@ function createMockStore(): RecorderStore {
       },
       recording: {
         sessionMetadata: {
-          scenarioName: 'TestScenario',
+          contextTag: 'TestScenario',
           sessionName: 'test-session',
           startTime: 1000000,
         },
@@ -628,7 +628,7 @@ describe('handleStartRecording', () => {
     expect(newStore.dispatch).toHaveBeenCalled();
     expect(mockStartSession).toHaveBeenCalledWith(
       expect.objectContaining({
-        scenarioName: 'TestScenario',
+        contextTag: 'TestScenario',
         sessionName: 'recording-2026-01-01_12-00-00',
       })
     );
@@ -847,7 +847,7 @@ describe('handleStartRecording', () => {
     // Storage session and startSession action should both use 'Paris'
     expect(mockStartStorageSession).toHaveBeenCalledWith('Paris');
     expect(mockStartSession).toHaveBeenCalledWith(
-      expect.objectContaining({ scenarioName: 'Paris' })
+      expect.objectContaining({ contextTag: 'Paris' })
     );
   });
 });
@@ -932,7 +932,7 @@ describe('handleStopRecording', () => {
       },
       recording: {
         sessionMetadata: {
-          scenarioName: 'TestScenario',
+          contextTag: 'TestScenario',
           sessionName: 'test-session',
           startTime: 1000000,
         },
@@ -1310,7 +1310,7 @@ describe('handleStopRecording', () => {
       },
       recording: {
         sessionMetadata: {
-          scenarioName: 'Test',
+          contextTag: 'Test',
           sessionName: 'test-session',
           startTime: Date.now() - 60000,
         },

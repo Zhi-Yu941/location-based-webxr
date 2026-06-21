@@ -51,12 +51,52 @@ describe('recording-slice latestDepthSample', () => {
     state = recordingReducer(state, recordDepthSample(SAMPLE));
     state = recordingReducer(
       state,
-      startSession({ scenarioName: 's', sessionName: 'n', startTime: 1 })
+      startSession({ contextTag: 's', sessionName: 'n', startTime: 1 })
     );
     expect(state.latestDepthSample).toBeNull();
   });
 
   it('keeps the recording/recordDepthSample action type (replay compatibility)', () => {
     expect(recordDepthSample(SAMPLE).type).toBe('recording/recordDepthSample');
+  });
+});
+
+describe('recording-slice startSession contextTag', () => {
+  it('stores contextTag from a current-format payload', () => {
+    const state = recordingReducer(
+      undefined,
+      startSession({ contextTag: 'Park Walk', sessionName: 'n', startTime: 1 })
+    );
+    expect(state.sessionMetadata?.contextTag).toBe('Park Walk');
+  });
+
+  it('maps the legacy scenarioName onto contextTag (replay of pre-rename recordings)', () => {
+    // Why: recordings made before the 2026-06-21 rename persist
+    // `recording/startSession` with `scenarioName`, not `contextTag`. Replaying
+    // such an action must still populate `contextTag` so old recordings keep
+    // working without a separate migration step. This is the backward-compat
+    // contract that lets the field be renamed safely.
+    const state = recordingReducer(
+      undefined,
+      startSession({ scenarioName: 'Old Tour', sessionName: 'n', startTime: 1 })
+    );
+    expect(state.sessionMetadata?.contextTag).toBe('Old Tour');
+    // The stored metadata must NOT carry the legacy field forward.
+    expect(
+      (state.sessionMetadata as unknown as Record<string, unknown>).scenarioName
+    ).toBeUndefined();
+  });
+
+  it('prefers contextTag when both are present', () => {
+    const state = recordingReducer(
+      undefined,
+      startSession({
+        contextTag: 'New',
+        scenarioName: 'Legacy',
+        sessionName: 'n',
+        startTime: 1,
+      })
+    );
+    expect(state.sessionMetadata?.contextTag).toBe('New');
   });
 });

@@ -34,7 +34,10 @@ describe('replayRecording', () => {
   it('returns recorder metadata from startSession action', () => {
     // Why: the startSession action payload must be stored in recorder state
     expect(state.recording.sessionMetadata).not.toBeNull();
-    expect(state.recording.sessionMetadata!.scenarioName).toBe(
+    // The helper emits a pre-rename `scenarioName` startSession action; the
+    // reducer maps it onto `contextTag` (backward-compat), so the replayed
+    // state exposes the label as `contextTag`.
+    expect(state.recording.sessionMetadata!.contextTag).toBe(
       testZip.scenarioName
     );
     expect(state.recording.sessionMetadata!.sessionName).toBe(

@@ -39,7 +39,7 @@ const {
     };
     recording?: {
       sessionMetadata?: {
-        scenarioName?: string;
+        contextTag?: string;
         sessionName?: string;
         startTime?: number;
       };
@@ -59,7 +59,7 @@ const {
   } = {
     recording: {
       sessionMetadata: {
-        scenarioName: 'TestScenario',
+        contextTag: 'TestScenario',
         sessionName: 'recording-test',
         startTime: Date.now(),
       },

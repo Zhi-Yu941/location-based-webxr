@@ -268,7 +268,9 @@ describe('Recording Replay Integration', () => {
     it('recorder store tracks session metadata', () => {
       // Why: startSession action payload must be correctly stored in recorder state
       expect(recorderState.recording.sessionMetadata).not.toBeNull();
-      expect(recorderState.recording.sessionMetadata!.scenarioName).toBe(
+      // The helper emits a pre-rename `scenarioName` startSession action; the
+      // reducer maps it onto `contextTag` (backward-compat).
+      expect(recorderState.recording.sessionMetadata!.contextTag).toBe(
         testZip.scenarioName
       );
       expect(recorderState.recording.sessionMetadata!.sessionName).toBe(

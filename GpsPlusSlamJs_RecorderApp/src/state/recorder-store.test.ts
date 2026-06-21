@@ -57,7 +57,7 @@ describe('Recorder Store', () => {
     it('should start a session', () => {
       store.dispatch(
         startSession({
-          scenarioName: 'Test Scenario',
+          contextTag: 'Test Scenario',
           sessionName: 'recording-2025-01-01_12-00-00utc',
           startTime: Date.now(),
           notes: 'Test notes',
@@ -66,7 +66,7 @@ describe('Recorder Store', () => {
 
       const state = store.getState().recording;
       expect(state.isRecording).toBe(true);
-      expect(state.sessionMetadata?.scenarioName).toBe('Test Scenario');
+      expect(state.sessionMetadata?.contextTag).toBe('Test Scenario');
     });
 
     it('should end a session', () => {

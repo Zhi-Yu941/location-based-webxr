@@ -104,7 +104,32 @@ vi.mock('../visualization/wire-frame-tile-subscribers', () => ({
   wireFrameTileSubscribers: vi.fn(() => mockUnsubscribeFrameTiles),
 }));
 
+// Occupancy-cube wiring: mocked so the replay setup block runs cleanly (the
+// real visualizer would call arWorldGroup.add() on the mock scene node and
+// throw, leaving the block silently caught). Lets us assert Issue A — that
+// the cube-refresh throttle is wired from depth.intervalMs.
+vi.mock('gps-plus-slam-app-framework/state/recording-options', () => ({
+  loadRecordingOptions: vi.fn(() => ({
+    // 500 ms ≠ the visualizer's hardcoded 1000 ms fallback — proves the
+    // throttle is sourced from depth.intervalMs (2026-06-22 cube
+    // cadence/locality plan §2).
+    depth: { enabled: true, intervalMs: 500 },
+    occupancy: { cellSizeM: 0.15, minConfidence: 3 },
+    frameTileDisplay: { divisor: 2 },
+  })),
+}));
+vi.mock('../visualization/occupancy-cubes-visualizer', () => ({
+  // `function` (not arrow) so `new OccupancyCubesVisualizer()` is constructable.
+  OccupancyCubesVisualizer: vi.fn(function () {
+    return { refresh: vi.fn(), clear: vi.fn(), dispose: vi.fn() };
+  }),
+}));
+vi.mock('../visualization/wire-occupancy-grid-subscribers', () => ({
+  wireOccupancyGridSubscribers: vi.fn(() => vi.fn()),
+}));
+
 import { startReplayMode } from './replay-mode.js';
+import { wireOccupancyGridSubscribers } from '../visualization/wire-occupancy-grid-subscribers';
 import { loadRecording } from '../storage/recording-loader';
 import { wireStoreSubscribers } from 'gps-plus-slam-app-framework/state/store-subscribers';
 import type { MapData } from 'gps-plus-slam-app-framework/visualization/map-data';
@@ -471,6 +496,21 @@ describe('replay-mode', () => {
 
     expect(mockUnsubscribeFrameTiles).toHaveBeenCalledTimes(1);
     expect(mockFrameTileVisualizerDispose).toHaveBeenCalledTimes(1);
+  });
+
+  // --- Occupancy cube refresh cadence (Issue A) ---
+
+  it('wires the occupancy cube refresh throttle from depth.intervalMs (Issue A)', async () => {
+    // Why (2026-06-22 cube cadence/locality plan §2): replay must coalesce the
+    // cube-refresh burst to the user's current depth.intervalMs, not a fixed
+    // 1 s. The mock returns 500 ms (≠ the visualizer's 1000 ms fallback), so a
+    // call site that drops refreshIntervalMs would regress this assertion.
+    const config = makeConfig();
+    await startReplayMode(fakeZipData, config);
+
+    expect(wireOccupancyGridSubscribers).toHaveBeenCalledTimes(1);
+    const opts = vi.mocked(wireOccupancyGridSubscribers).mock.calls[0]?.[0];
+    expect(opts?.refreshIntervalMs).toBe(500);
   });
 
   // --- Error handling (R7 wiring) ---

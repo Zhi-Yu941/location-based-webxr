@@ -1296,6 +1296,12 @@ async function handleEnterAR(): Promise<void> {
           storeRef,
           grid: occupancyGrid,
           visualizer: occupancyVisualizerSink,
+          // Tie the cube-refresh throttle to the depth-sample cadence so a
+          // faster `depth.intervalMs` (e.g. 500 ms) isn't capped at the old
+          // hardcoded 1 Hz. At the default 1000 ms this equals the previous
+          // DEFAULT_REFRESH_INTERVAL_MS, so default recordings are unchanged
+          // (2026-06-22 cube cadence/locality plan §2).
+          refreshIntervalMs: recordingOptions.depth.intervalMs,
           onError: (err) => {
             log.warn('Occupancy grid update failed', err);
           },

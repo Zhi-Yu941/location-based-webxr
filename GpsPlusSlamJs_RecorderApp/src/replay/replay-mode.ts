@@ -193,7 +193,8 @@ export async function startReplayMode(
     // resolution without re-capturing — 2026-06-13 occupancy-grid-settings
     // review, item 1. `loadRecordingOptions` is self-defending (returns the
     // validated default on any storage error), so this stays best-effort.
-    const occupancyOptions = loadRecordingOptions().occupancy;
+    const replayOptions = loadRecordingOptions();
+    const occupancyOptions = replayOptions.occupancy;
     const occupancyGrid = new OccupancyGrid({
       cellSizeM: occupancyOptions.cellSizeM,
     });
@@ -207,6 +208,12 @@ export async function startReplayMode(
       storeRef: createStoreRef(store),
       grid: occupancyGrid,
       visualizer: occupancyCubesVisualizer,
+      // Coalesce the replay burst to the user's current `depth.intervalMs`
+      // rather than a fixed 1 s — re-quantization parity with cellSizeM /
+      // minConfidence above (the same global setting re-read per replay),
+      // NOT the recording's original capture cadence (2026-06-22 cube
+      // cadence/locality plan §2).
+      refreshIntervalMs: replayOptions.depth.intervalMs,
       onError: (err) => {
         log.warn('Occupancy grid update failed during replay', err);
       },

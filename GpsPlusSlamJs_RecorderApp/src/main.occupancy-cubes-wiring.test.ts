@@ -290,7 +290,9 @@ vi.mock('gps-plus-slam-app-framework/state/recording-options', () => ({
   loadRecordingOptions: vi.fn().mockReturnValue({
     qr: { enabled: false, intervalMs: 125, captureSize: 1024 },
     images: { enabled: false, intervalMs: 1000, quality: 0.8 },
-    depth: { enabled: false, intervalMs: 1000 },
+    // Deliberately NOT the 1000 ms hardcoded default — proves the cube
+    // refresh throttle is sourced from depth.intervalMs, not the fallback.
+    depth: { enabled: false, intervalMs: 500 },
     occupancy: { cellSizeM: 0.15, minConfidence: 3 },
     frameTileDisplay: { divisor: 2 },
     visualization: {
@@ -476,10 +478,16 @@ describe('Occupancy-grid cube wiring in live AR', () => {
       storeRef: unknown;
       grid: unknown;
       visualizer: unknown;
+      refreshIntervalMs: unknown;
     };
     expect(options.grid).toBe(mockOccupancyGridInstance);
     expect(options.visualizer).toBe(mockVisualizerInstance);
     expect(options.storeRef).toBeDefined();
+    // Issue A (2026-06-22 cube cadence/locality plan §2): the cube-refresh
+    // throttle is wired from depth.intervalMs (500 ms in the mock), not the
+    // visualizer's hardcoded 1000 ms fallback. This pins the one thing that
+    // can silently regress — the call site dropping the option again.
+    expect(options.refreshIntervalMs).toBe(500);
   });
 
   it('resetMainState disposes the wiring and the visualizer', async () => {

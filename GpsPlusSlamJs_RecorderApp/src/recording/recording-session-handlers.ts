@@ -257,6 +257,11 @@ export function createRecordingSessionHandlers(
           deps.getStore().getState().recording.latestDepthSample
             ?.projectionMatrix,
         getOccupancyGrid,
+        // Same noise floor the voxel view uses (`occupancy.minConfidence`), read
+        // live so a changed value applies to the next crash-safety sync / export
+        // — keeps phantom behind-surface points out of the reconstruction.
+        getMinConfidence: () =>
+          deps.getRecordingOptions().occupancy.minConfidence,
       }),
     ];
   }

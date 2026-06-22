@@ -69,6 +69,17 @@ export interface ColmapZipContributorDeps {
   getProjectionMatrix: () => Matrix4 | undefined;
   /** The live occupancy grid via the shared provider, or `null`. */
   getOccupancyGrid: () => OccupancyGrid | null;
+  /**
+   * Minimum observation count for a voxel to be exported — the recording's
+   * `occupancy.minConfidence` (the SAME floor the voxel view applies, so the
+   * export and the live cubes never silently diverge). Filters single-frame
+   * depth noise, in particular the **behind-surface** phantoms free-space
+   * carving can never clear (no ray traverses occluded space). Omitted →
+   * floor 1 (unfiltered/legacy) so callers that predate the setting are
+   * unchanged. See
+   * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-22-occupancy-grid-behind-surface-noise-plan.md.
+   */
+  getMinConfidence?: () => number;
 }
 
 /**
@@ -116,7 +127,10 @@ export function createColmapZipContributor(
         name: bareFilename(f.imageFile),
       }));
 
-      const points = collectPoints(deps.getOccupancyGrid());
+      const points = collectPoints(
+        deps.getOccupancyGrid(),
+        deps.getMinConfidence?.() ?? 1
+      );
 
       await addFile(
         '0/cameras.txt',
@@ -142,9 +156,12 @@ function firstPixelDimensions(
 }
 
 /** Map occupancy-grid cells to COLMAP point records (raw-WebXR == COLMAP world). */
-function collectPoints(grid: OccupancyGrid | null): ColmapPoint3DRecord[] {
+function collectPoints(
+  grid: OccupancyGrid | null,
+  minConfidence: number
+): ColmapPoint3DRecord[] {
   if (!grid) return [];
-  const cells = grid.getOccupiedCells();
+  const cells = grid.getOccupiedCells(minConfidence);
   return cells.map((cell, i) => ({
     pointId: i + 1,
     // The exact per-cell surface point (follow-up Item A) — hugs the real

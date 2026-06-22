@@ -18,6 +18,10 @@ Iter 3.
     intrinsics (wired to `state.recording.latestDepthSample?.projectionMatrix`).
   - `deps.getOccupancyGrid(): OccupancyGrid | null` — the shared live grid (Iter
     2.5 provider).
+  - `deps.getMinConfidence?(): number` — the recording's `occupancy.minConfidence`
+    (the SAME voxel-noise floor the live cube view applies), read live so a
+    changed value applies on the next sync/export. Omitted → floor **1**
+    (unfiltered/legacy).
   - Returns a contributor with `subdir: 'sparse'` that writes
     `0/cameras.txt`, `0/images.txt`, `0/points3D.txt` (file count 3), or **0
     files** when intrinsics are unavailable.
@@ -36,6 +40,12 @@ Iter 3.
   (`getCellPoint(cell) ?? getCellCenter(cell)`, follow-up Item A) — the
   running-average of the measured points in the cell, hugging the real surface
   instead of snapping to the 15 cm lattice.
+- **Confidence floor:** only cells observed `≥ getMinConfidence()` times are
+  exported (`getOccupiedCells(minConfidence)`). This is the same
+  `occupancy.minConfidence` lever the voxel view uses, applied here so
+  single-frame depth noise — in particular **behind-surface** phantoms that
+  free-space carving can never clear — is kept out of the reconstruction. See
+  [2026-06-22-occupancy-grid-behind-surface-noise-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-22-occupancy-grid-behind-surface-noise-plan.md).
 - **World frame:** points are passed to `points3D` untransformed — raw WebXR
   world IS the COLMAP world (Iter-1 camera-only basis change), so points and
   cameras stay registered.
@@ -65,5 +75,7 @@ BOTH the periodic crash-safety sync (`syncToExternalZip`) and the final
 
 - `colmap-zip-contributor.test.ts` — happy path (3 files, PINHOLE dims, RGB
   point), bare-filename NAME (incl. legacy `frames/`), Q4 skips (no matrix / no
-  dims → 0 files), empty-grid valid model, gray fallback. Wiring is covered by
+  dims → 0 files), empty-grid valid model, gray fallback, and the confidence
+  floor (one-shot cell excluded above its count, well-observed cell survives,
+  default floor 1 when `getMinConfidence` omitted). Wiring is covered by
   the recording-session-handlers tests.

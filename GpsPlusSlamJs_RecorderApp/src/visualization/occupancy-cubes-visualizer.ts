@@ -2,10 +2,12 @@
  * Occupancy-cubes visualizer — renders the AR-space occupancy grid as one
  * `THREE.InstancedMesh` of cubes (2026-06-11 depth occupancy-grid port
  * plan §3/Iter 5). The TS equivalent of the Unity debug cubes in
- * `ArCursorOnDepthSurface.cs`: refreshed at ~1 Hz by
- * `wireOccupancyGridSubscribers`, drawing all occupied cells when under
- * the instance cap and a random subset above it (the "randomly picking
- * points every second" behavior — no geometry-shader point billboard is
+ * `ArCursorOnDepthSurface.cs`: refreshed by `wireOccupancyGridSubscribers`
+ * at the depth-sample interval (`depth.intervalMs`; was a fixed ~1 Hz
+ * before Issue A), drawing all occupied cells when under the instance cap
+ * and, above it, the cells nearest the viewer when a pose is supplied
+ * (Issue B1) — otherwise a random subset (the original "randomly picking
+ * points every second" behavior; no geometry-shader point billboard is
  * ported, WebGL has none).
  *
  * Coloring: height-based per-instance color (HSL ramp over the cell's Y)

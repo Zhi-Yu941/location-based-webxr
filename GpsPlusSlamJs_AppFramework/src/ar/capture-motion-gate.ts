@@ -25,16 +25,20 @@ export const DEFAULT_MOTION_WINDOW_SIZE = 3;
 /**
  * Angular velocity (rad/s) above which a sample is treated as a tracking glitch
  * (e.g. relocalization teleport), not real motion. A genuine hand/device turn
- * tops out well below this; a teleport is far above it. Internal/tunable.
+ * tops out well below this; a teleport is far above it. Module-internal tuning
+ * constant (not exported — the gate's user surface is only the four
+ * `MotionFilterConfig` fields); overridable per-instance via the `MotionWindow`
+ * constructor for tests.
  */
-export const ANGULAR_GLITCH_CEILING_RAD_S = 50;
+const ANGULAR_GLITCH_CEILING_RAD_S = 50;
 
 /**
  * Linear velocity (m/s) above which a sample is treated as a tracking glitch.
  * ~20 m/s (72 km/h) is unreachable by handheld scanning but trivially exceeded
- * by a relocalization origin jump. Internal/tunable.
+ * by a relocalization origin jump. Module-internal tuning constant (see
+ * {@link ANGULAR_GLITCH_CEILING_RAD_S}).
  */
-export const LINEAR_GLITCH_CEILING_M_S = 20;
+const LINEAR_GLITCH_CEILING_M_S = 20;
 
 /**
  * User-/consumer-facing motion-filter configuration. Shared by both config

@@ -18,8 +18,10 @@ msSinceDue, maxWaitMs }`. - Returns `'capture'` when both windowed maxima are at
     - `maxAngular()` / `maxLinear()` — max over the window, or `Infinity` when
       empty (so "no data" reads as not-calm).
     - `reset()` — clear (on tracking loss / capture restart).
-  - Constants: `DEFAULT_MOTION_WINDOW_SIZE` (3), `ANGULAR_GLITCH_CEILING_RAD_S`
-    (50), `LINEAR_GLITCH_CEILING_M_S` (20).
+  - Exported constant: `DEFAULT_MOTION_WINDOW_SIZE` (3).
+  - Module-internal tuning constants (NOT exported): angular glitch ceiling
+    (50 rad/s) and linear glitch ceiling (20 m/s), overridable per-instance via
+    the `MotionWindow` constructor.
 
 - **Invariants & assumptions:**
   - **Empty window ⇒ `Infinity` ⇒ not calm.** No capture can fire before at

@@ -367,6 +367,7 @@ const defaultOptions: RecordingOptions = {
     intervalMs: 1000,
     quality: 0.8,
     resolutionDivisor: 1,
+    motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
   },
   depth: { enabled: false, intervalMs: 1000, gridSize: 3, rgb: true },
   arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
@@ -683,6 +684,7 @@ describe('handleStartRecording', () => {
         intervalMs: 500,
         quality: 0.9,
         resolutionDivisor: 2,
+        motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
       },
       depth: { enabled: false, intervalMs: 1000, gridSize: 3, rgb: true },
       arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
@@ -698,6 +700,10 @@ describe('handleStartRecording', () => {
       intervalMs: 500,
       quality: 0.9,
       resolutionDivisor: 2,
+      // motionFilter must forward through the seam too (the same "no dropped
+      // knobs" guarantee that resolutionDivisor pins) so the gate the user
+      // toggled actually reaches ImageCaptureManager.
+      motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
     });
   });
 
@@ -721,6 +727,7 @@ describe('handleStartRecording', () => {
         intervalMs: 1000,
         quality: 0.8,
         resolutionDivisor: 1,
+        motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
       },
       depth: { enabled: true, intervalMs: 500, gridSize: 3, rgb: false },
       arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },

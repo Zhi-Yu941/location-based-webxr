@@ -50,6 +50,7 @@ let imagesQualitySlider: HTMLInputElement | null = null;
 let imagesQualityValue: HTMLElement | null = null;
 let imagesResolutionDivisorSlider: HTMLInputElement | null = null;
 let imagesResolutionDivisorValue: HTMLElement | null = null;
+let imagesMotionFilterCheckbox: HTMLInputElement | null = null;
 let arDomOverlayEnabledCheckbox: HTMLInputElement | null = null;
 let arCameraAccessEnabledCheckbox: HTMLInputElement | null = null;
 let arDepthSensingEnabledCheckbox: HTMLInputElement | null = null;
@@ -133,6 +134,9 @@ export function initSettingsModal(
   imagesResolutionDivisorValue = document.getElementById(
     'images-resolution-divisor-value'
   );
+  imagesMotionFilterCheckbox = document.getElementById(
+    'images-motion-filter'
+  ) as HTMLInputElement;
   arDomOverlayEnabledCheckbox = document.getElementById(
     'ar-dom-overlay-enabled'
   ) as HTMLInputElement;
@@ -307,6 +311,13 @@ export function initSettingsModal(
     if (workingOptions && imagesEnabledCheckbox) {
       workingOptions.images.enabled = imagesEnabledCheckbox.checked;
       updateImageControlsState();
+    }
+  });
+
+  imagesMotionFilterCheckbox?.addEventListener('change', () => {
+    if (workingOptions && imagesMotionFilterCheckbox) {
+      workingOptions.images.motionFilter.enabled =
+        imagesMotionFilterCheckbox.checked;
     }
   });
 
@@ -518,6 +529,9 @@ function populateForm(options: RecordingOptions): void {
   if (imagesEnabledCheckbox) {
     imagesEnabledCheckbox.checked = options.images.enabled;
   }
+  if (imagesMotionFilterCheckbox) {
+    imagesMotionFilterCheckbox.checked = options.images.motionFilter.enabled;
+  }
   if (imagesIntervalSlider) {
     imagesIntervalSlider.min = String(IMAGE_CONSTRAINTS.intervalMs.min);
     imagesIntervalSlider.max = String(IMAGE_CONSTRAINTS.intervalMs.max);
@@ -709,6 +723,11 @@ function updateImageControlsState(): void {
   }
   if (imagesResolutionDivisorSlider) {
     imagesResolutionDivisorSlider.disabled = !enabled;
+  }
+  if (imagesMotionFilterCheckbox) {
+    // The motion gate only applies to captured images, so it is meaningless
+    // when capture is off — disable it alongside the other image sub-controls.
+    imagesMotionFilterCheckbox.disabled = !enabled;
   }
 }
 

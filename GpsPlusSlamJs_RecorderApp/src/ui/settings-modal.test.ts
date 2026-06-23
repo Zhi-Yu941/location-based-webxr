@@ -115,6 +115,7 @@ describe('settings-modal', () => {
       expect(html).toContain('id="depth-grid"');
       expect(html).toContain('id="depth-rgb"');
       expect(html).toContain('id="images-enabled"');
+      expect(html).toContain('id="images-motion-filter"');
       expect(html).toContain('id="images-interval"');
       expect(html).toContain('id="images-quality"');
     });
@@ -580,6 +581,56 @@ describe('settings-modal', () => {
         | Record<string, unknown>
         | undefined;
       expect(flags?.enableCss3dRenderer).toBe(false);
+    });
+  });
+
+  describe('blurry-frame motion gate toggle (2026-06-23 motion-gating plan)', () => {
+    // Why these tests matter: the gate is enabled by default and is the user's
+    // only control over blurry-frame skipping. A dead checkbox would silently
+    // keep (or disable) the gate regardless of the toggle. Round-trip the
+    // control: default on, persists when unchecked, and disabled when capture
+    // itself is off (a sub-control of image capture).
+    beforeEach(() => {
+      initSettingsModal();
+      showSettingsModal();
+    });
+
+    it('is present and defaults to on', () => {
+      const cb = document.getElementById(
+        'images-motion-filter'
+      ) as HTMLInputElement | null;
+      expect(cb).not.toBeNull();
+      expect(cb!.checked).toBe(true);
+    });
+
+    it('persists motionFilter.enabled = false when unchecked', () => {
+      const cb = document.getElementById(
+        'images-motion-filter'
+      ) as HTMLInputElement;
+
+      cb.checked = false;
+      cb.dispatchEvent(new Event('change'));
+
+      document.getElementById('btn-settings-save')?.click();
+
+      expect(loadRecordingOptions().images.motionFilter.enabled).toBe(false);
+    });
+
+    it('disables the motion-filter checkbox while image capture is off', () => {
+      const imagesEnabled = document.getElementById(
+        'images-enabled'
+      ) as HTMLInputElement;
+      const motionFilter = document.getElementById(
+        'images-motion-filter'
+      ) as HTMLInputElement;
+
+      imagesEnabled.checked = false;
+      imagesEnabled.dispatchEvent(new Event('change'));
+      expect(motionFilter.disabled).toBe(true);
+
+      imagesEnabled.checked = true;
+      imagesEnabled.dispatchEvent(new Event('change'));
+      expect(motionFilter.disabled).toBe(false);
     });
   });
 

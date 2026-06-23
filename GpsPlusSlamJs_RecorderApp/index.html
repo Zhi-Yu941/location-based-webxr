@@ -961,6 +961,21 @@ No errors</pre
                   >Capture images during recording</span
                 >
               </label>
+              <!-- Blurry-frame motion gate (2026-06-23 motion-gating plan).    -->
+              <!-- Defers a due capture while the device is moving too fast and  -->
+              <!-- grabs the first calm frame, so the export has sharper frames  -->
+              <!-- for photogrammetry / Gaussian-splat reconstruction.          -->
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="images-motion-filter"
+                  class="w-4 h-4 accent-blue-500"
+                  checked
+                />
+                <span class="text-sm text-gray-200"
+                  >Skip blurry frames (motion)</span
+                >
+              </label>
               <div class="space-y-1">
                 <div class="flex justify-between text-xs text-gray-400">
                   <span>Interval</span>

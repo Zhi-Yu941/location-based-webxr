@@ -38,6 +38,7 @@
 import { quat } from 'gl-matrix';
 import type { Pose } from './qr-pose.js';
 import type { Quaternion, Vector3 } from 'gps-plus-slam-js';
+import { geodesicAngleRad } from '../utils/geodesic-angle.js';
 
 const RAD2DEG = 180 / Math.PI;
 const DEG2RAD = Math.PI / 180;
@@ -77,17 +78,6 @@ type GlQuat = ReturnType<typeof quat.create>;
 function toGl(q: Quaternion): GlQuat {
   const g = quat.fromValues(q[0], q[1], q[2], q[3]);
   return quat.normalize(g, g);
-}
-
-/**
- * Geodesic (shortest-arc) angle in radians between two unit quaternions.
- * Double-cover safe: uses `2·dot² − 1 = cos θ`, which is invariant to the sign
- * of either quaternion (`q` ≡ `−q`), and clamps for float error before `acos`.
- */
-function geodesicAngleRad(a: GlQuat, b: GlQuat): number {
-  const d = quat.dot(a, b);
-  const c = Math.min(1, Math.max(-1, 2 * d * d - 1));
-  return Math.acos(c);
 }
 
 interface InlierMean {

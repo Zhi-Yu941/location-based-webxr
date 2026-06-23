@@ -39,6 +39,7 @@ import { mat4, quat, vec3 } from 'gl-matrix';
 import type { ReadonlyMat4 } from 'gl-matrix';
 import type { GpsPoint, LatLong, Matrix4, Vector3 } from 'gps-plus-slam-js';
 import { calcGpsCoords, distanceInMeters } from 'gps-plus-slam-js';
+import { geodesicAngleRad } from '../utils/geodesic-angle.js';
 import type { CombinedRootState } from './combined-root-state';
 import {
   selectAlignmentMatrix,
@@ -374,7 +375,8 @@ export function computeConvergence(
  * the column-major layout that gl-matrix and the framework use.
  *
  * Rotation: extract the orientation quaternion with `mat4.getRotation`
- * and compute the relative angle via `quat.getAngle` (degrees).
+ * and compute the relative angle via the shared `geodesicAngleRad` kernel
+ * (radians, converted to degrees here).
  * Translation: extract the origin column with `mat4.getTranslation` and
  * compute the Euclidean distance.
  *
@@ -406,12 +408,11 @@ export function matrixDelta(
   mat4.getRotation(currQuat, currMat);
   quat.normalize(prevQuat, prevQuat);
   quat.normalize(currQuat, currQuat);
-  // quat.getAngle can return NaN when the quaternions are nearly identical
-  // (dot product slightly > 1.0 due to float precision → acos(>1) = NaN).
-  const angleRad = quat.getAngle(prevQuat, currQuat);
-  const rotationDeltaDeg = Number.isNaN(angleRad)
-    ? 0
-    : (angleRad * 180) / Math.PI;
+  // Shared geodesic-angle kernel: clamps before acos, so the near-identical
+  // case that made raw quat.getAngle return NaN now returns 0 directly (the
+  // explicit NaN guard this code used to carry is folded into the helper).
+  const angleRad = geodesicAngleRad(prevQuat, currQuat);
+  const rotationDeltaDeg = (angleRad * 180) / Math.PI;
   const prevT = vec3.create();
   const currT = vec3.create();
   mat4.getTranslation(prevT, prevMat);

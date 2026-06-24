@@ -17,6 +17,10 @@ import {
   DEFAULT_MOTION_FILTER,
   type MotionFilterConfig,
 } from './capture-motion-gate';
+import {
+  DEFAULT_QUALITY_FILTER,
+  type QualityFilterConfig,
+} from './image-quality';
 
 const log = createLogger('ImageCapture');
 
@@ -51,6 +55,12 @@ export interface ImageCaptureConfig {
    *  `ImageCaptureOptions.motionFilter` and flowed through the same capture
    *  seam as `resolutionDivisor`. See `capture-motion-gate.ts`. */
   motionFilter: MotionFilterConfig;
+  /** Image-quality gate: drop a blurry/black frame (judged off-thread by the
+   *  injected `analyzeFrame` callback) and retry the next acceptable frame,
+   *  bounded by `maxWaitMs`. The increment ON TOP of the motion gate — only ever
+   *  runs on frames that already passed motion gating. Mirrored in the persisted
+   *  `ImageCaptureOptions.qualityFilter`. See `image-quality.ts`. */
+  qualityFilter: QualityFilterConfig;
 }
 
 /**
@@ -62,6 +72,7 @@ export const DEFAULT_CAPTURE_CONFIG: ImageCaptureConfig = {
   captureTimeoutMs: 5000,
   resolutionDivisor: 1,
   motionFilter: DEFAULT_MOTION_FILTER,
+  qualityFilter: DEFAULT_QUALITY_FILTER,
 };
 
 /**
@@ -115,6 +126,19 @@ export interface CapturedFrame {
 }
 
 /**
+ * Verdict returned by the injected off-thread {@link ImageCaptureCallbacks.analyzeFrame}
+ * analyzer. The manager only needs `accept`; `reason` is carried for logging/
+ * tuning. Structurally compatible with `image-quality.ts`'s `QualityVerdict`, so
+ * the recorder worker can return that type directly.
+ */
+export interface FrameQualityVerdict {
+  /** `true` to save the frame, `false` to drop it and retry. */
+  readonly accept: boolean;
+  /** Optional debug reason (e.g. `'black'` | `'blurry'`); for logging only. */
+  readonly reason?: string | null;
+}
+
+/**
  * Callbacks for image capture integration
  */
 export interface ImageCaptureCallbacks {
@@ -145,6 +169,22 @@ export interface ImageCaptureCallbacks {
    * @see docs/2026-02-06-bug-camera-frames-black.md
    */
   captureFrame?: (quality: number) => Promise<CapturedFrame | null>;
+  /**
+   * Optional off-thread image-quality analyzer (blur/blackness gate). When
+   * provided AND `config.qualityFilter.enabled`, a freshly-encoded blob is NOT
+   * saved immediately: it is handed to this async callback (a Web Worker
+   * round-trip in the recorder) and saved only if the verdict accepts. A reject
+   * drops the blob and re-arms capture so the next acceptable (motion-calm)
+   * frame fills the slot, bounded by `qualityFilter.maxWaitMs` (after which the
+   * next frame is saved regardless, so an interval is never silently lost).
+   *
+   * The manager itself NEVER touches pixels — the off-main-thread guarantee. The
+   * callback MUST settle its promise; if it rejects, or does not settle within
+   * `captureTimeoutMs`, the manager fails open (saves the frame) so a hung
+   * analyzer cannot deadlock the pipeline. See `image-quality.ts` and
+   * `GpsPlusSlamJs_Docs/docs/2026-06-24-image-quality-gate-plan.md`.
+   */
+  analyzeFrame?: (frame: CapturedFrame) => Promise<FrameQualityVerdict>;
 }
 
 /**
@@ -166,6 +206,21 @@ export class ImageCaptureManager {
   private frameCount = 0;
   private captureInProgress = false;
   private captureTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  // --- Image-quality gate state (see image-quality.ts) ---
+  /** True while an `analyzeFrame` verdict is in flight; blocks a second capture
+   *  for the same interval without throttling normal cadence (captureInProgress
+   *  is released after encode, NOT held across the round-trip). */
+  private awaitingVerdict = false;
+  /** The current interval's capture was rejected by the quality gate; bypass the
+   *  interval guard so the next acceptable frame is grabbed immediately. */
+  private retryPending = false;
+  /** Frame time (ms) of the FIRST quality attempt for the current interval; the
+   *  quality `maxWaitMs` fallback measures from here, independent of the motion
+   *  gate's own due clock. `null` between intervals. */
+  private qualityDeadlineBase: number | null = null;
+  /** Safety timeout for a hung `analyzeFrame` (fail-open). */
+  private verdictTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   // --- Motion-gate state (see capture-motion-gate.ts) ---
   /** Sliding window of recent per-frame velocities for the motion gate. */
@@ -204,6 +259,11 @@ export class ImageCaptureManager {
     this.prevTime = 0;
     this.lastSampleWasGlitch = false;
     this.dueTime = null;
+    // Reset image-quality-gate state.
+    this.clearVerdictTimeout();
+    this.awaitingVerdict = false;
+    this.retryPending = false;
+    this.qualityDeadlineBase = null;
   }
 
   /**
@@ -214,6 +274,12 @@ export class ImageCaptureManager {
     this.capturing = false;
     this.clearCaptureTimeout();
     this.captureInProgress = false;
+    // Tear down the quality-gate in-flight state so a stopped session can't
+    // resolve a stale verdict into a save.
+    this.clearVerdictTimeout();
+    this.awaitingVerdict = false;
+    this.retryPending = false;
+    this.qualityDeadlineBase = null;
   }
 
   /**
@@ -248,13 +314,23 @@ export class ImageCaptureManager {
     const pose = this.callbacks.getCurrentPose();
     this.updateMotionWindow(time, pose);
 
-    if (this.captureInProgress) {
+    // Block a new capture while a readback OR a quality verdict is in flight, so
+    // only one frame per interval is ever in the pipeline. awaitingVerdict (not
+    // captureInProgress) covers the async analysis, so normal cadence is not
+    // throttled to the worker round-trip (plan §6).
+    if (this.captureInProgress || this.awaitingVerdict) {
       return;
     }
 
-    // Check if enough time has passed since last capture
+    // Check if enough time has passed since last capture. A pending quality retry
+    // bypasses the interval guard so the next acceptable frame fills the slot
+    // immediately, rather than waiting a full interval (plan §6 "re-arm").
     const elapsed = time - this.lastCaptureTime;
-    if (this.lastCaptureTime > 0 && elapsed < this.config.intervalMs) {
+    if (
+      !this.retryPending &&
+      this.lastCaptureTime > 0 &&
+      elapsed < this.config.intervalMs
+    ) {
       this.dueTime = null; // not due yet — reset the fallback clock
       return;
     }
@@ -289,9 +365,9 @@ export class ImageCaptureManager {
     // precise alignment between the image and its same-frame pose.
     const timestamp = performance.timeOrigin + time;
     const screenRotation = this.callbacks.getScreenRotation();
-    // Use 1-based indexing (frame-000001.jpg, frame-000002.jpg, etc.)
-    // as specified in opfs-storage.ts.md invariants
-    const frameIndex = ++this.frameCount;
+    // The frame index is allocated only when a frame is actually SAVED (in
+    // saveCapture), not here — so a frame dropped+retried by the quality gate
+    // never burns an index and leaves a gap in the frame-NNNNNN.jpg sequence.
 
     // Start safety timeout to prevent permanent captureInProgress deadlock.
     // If the capture promise never resolves (e.g., canvas.toBlob callback dropped
@@ -316,7 +392,7 @@ export class ImageCaptureManager {
             frame?.width,
             frame?.height,
             timestamp,
-            frameIndex,
+            time,
             pose,
             screenRotation
           );
@@ -337,7 +413,7 @@ export class ImageCaptureManager {
             this.canvas.width,
             this.canvas.height,
             timestamp,
-            frameIndex,
+            time,
             pose,
             screenRotation
           );
@@ -436,16 +512,28 @@ export class ImageCaptureManager {
     }
   }
 
+  /** Clear the safety timeout for a hung `analyzeFrame` verdict. */
+  private clearVerdictTimeout(): void {
+    if (this.verdictTimeoutId !== null) {
+      clearTimeout(this.verdictTimeoutId);
+      this.verdictTimeoutId = null;
+    }
+  }
+
   /**
    * Common handler for captured blobs (from either canvas.toBlob or captureFrame).
-   * Handles null blobs, suspicious image detection, and dispatching onCaptured.
+   * Releases `captureInProgress` after the synchronous encode, then either saves
+   * immediately (legacy / gate-off) or runs the off-thread image-quality gate.
+   *
+   * @param time - the XR frame time the capture was dispatched at; the quality
+   *   retry-deadline clock and `lastCaptureTime` are measured from it.
    */
   private handleCapturedBlob(
     blob: Blob | null,
     width: number | undefined,
     height: number | undefined,
     timestamp: number,
-    frameIndex: number,
+    time: number,
     pose: ARPose,
     screenRotation: number
   ): void {
@@ -458,7 +546,95 @@ export class ImageCaptureManager {
       return;
     }
 
-    // Check if the blob is suspiciously small (likely black/empty image)
+    const qf = this.config.qualityFilter;
+    const analyze = this.callbacks.analyzeFrame;
+
+    // Legacy / gate-off path: no analyzer or the gate is disabled → save now.
+    if (!analyze || !qf || !qf.enabled) {
+      this.saveCapture(blob, width, height, timestamp, pose, screenRotation);
+      return;
+    }
+
+    // Quality gate active. Start the retry-deadline clock on the FIRST attempt
+    // for this interval (independent of the motion gate's own due clock).
+    if (this.qualityDeadlineBase === null) this.qualityDeadlineBase = time;
+    if (time - this.qualityDeadlineBase >= qf.maxWaitMs) {
+      // Never-good fallback: too long retrying → save regardless (no analysis)
+      // so a recording interval is never silently lost.
+      this.saveCapture(blob, width, height, timestamp, pose, screenRotation);
+      return;
+    }
+
+    // Off-thread analysis. captureInProgress is already cleared; awaitingVerdict
+    // blocks a second capture for THIS interval until the verdict resolves.
+    // `finish` is guarded to run exactly once per attempt, so the safety timeout
+    // (fail-open) and the real verdict can never both act.
+    this.awaitingVerdict = true;
+    let settled = false;
+    const finish = (accept: boolean, viaTimeout: boolean): void => {
+      if (settled) return;
+      settled = true;
+      this.clearVerdictTimeout();
+      this.awaitingVerdict = false;
+      if (viaTimeout) {
+        log.error(
+          'analyzeFrame verdict timed out — saving frame fail-open to keep the pipeline live'
+        );
+      }
+      if (accept) {
+        this.saveCapture(blob, width, height, timestamp, pose, screenRotation);
+      } else {
+        // Drop + re-arm: the next motion-calm frame fills the slot (retry).
+        this.retryPending = true;
+      }
+    };
+
+    // Defensive: a hung analyzer must not deadlock the pipeline (awaitingVerdict
+    // would otherwise block every future capture). Fail open after the same
+    // budget the readback uses.
+    this.verdictTimeoutId = setTimeout(
+      () => finish(true, true),
+      this.config.captureTimeoutMs
+    );
+
+    analyze({ blob, width: width ?? 0, height: height ?? 0 })
+      .then((verdict) => finish(verdict.accept, false))
+      .catch((err: unknown) => {
+        // Fail-open: a worker/analyzer error must not lose the interval.
+        log.error(
+          'analyzeFrame failed — saving frame without quality gate',
+          err
+        );
+        finish(true, false);
+      });
+  }
+
+  /**
+   * Persist an accepted frame: allocate its 1-based index, run the suspicious-
+   * size belt-and-suspenders check, reset the per-interval gate clocks, and fire
+   * `onCaptured`. Called from the legacy path, the quality fallbacks, and an
+   * accepting verdict — the single place a frame becomes durable.
+   */
+  private saveCapture(
+    blob: Blob,
+    width: number | undefined,
+    height: number | undefined,
+    timestamp: number,
+    pose: ARPose,
+    screenRotation: number
+  ): void {
+    // This interval is now satisfied — clear the retry/quality clocks so the next
+    // interval starts fresh. (dueTime was already nulled at dispatch.)
+    this.retryPending = false;
+    this.qualityDeadlineBase = null;
+
+    // 1-based indexing (frame-000001.jpg, …) per opfs-storage.ts.md invariants;
+    // allocated here so dropped/retried frames never leave gaps.
+    const frameIndex = ++this.frameCount;
+
+    // Check if the blob is suspiciously small (likely black/empty image). The
+    // luminance gate supersedes this for correctness, but keep it as a cheap
+    // belt-and-suspenders signal on every path (plan §4).
     if (blob.size < MIN_VALID_IMAGE_BYTES) {
       log.error(
         `Suspicious image at frame ${frameIndex}: blob size ${blob.size} bytes ` +
@@ -468,9 +644,8 @@ export class ImageCaptureManager {
       // Still proceed with saving the image for debugging purposes
     }
 
-    // Notify caller (frameCount already incremented above). width/height are
-    // the encoded pixel dimensions (blit render target or canvas backing
-    // store) — only attached when known/positive so a degenerate 0 never
+    // width/height are the encoded pixel dimensions (blit render target or canvas
+    // backing store) — only attached when known/positive so a degenerate 0 never
     // poisons the persisted aspect ratio.
     this.callbacks.onCaptured({
       blob,

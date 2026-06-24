@@ -275,6 +275,8 @@ export {
   type ImageCaptureConfig,
   DEFAULT_CAPTURE_CONFIG,
   type CapturedImage,
+  type CapturedFrame,
+  type FrameQualityVerdict,
   type ImageCaptureCallbacks,
   ImageCaptureManager,
 } from './image-capture.js';

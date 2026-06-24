@@ -12,6 +12,10 @@ import {
   DEFAULT_MOTION_FILTER,
   type MotionFilterConfig,
 } from '../ar/capture-motion-gate';
+import {
+  DEFAULT_QUALITY_FILTER,
+  type QualityFilterConfig,
+} from '../ar/image-quality';
 
 const log = createLogger('RecordingOptions');
 
@@ -104,6 +108,16 @@ export interface ImageCaptureOptions {
    * `GpsPlusSlamJs_Docs/docs/2026-06-23-blurry-frame-motion-gating-plan.md`.
    */
   motionFilter: MotionFilterConfig;
+  /**
+   * Image-quality gate — drop a blurry/black frame (judged off-thread) and retry
+   * the next acceptable frame. Mirrors `ImageCaptureConfig.qualityFilter`; flows
+   * through the same capture seam as `motionFilter`. **Default: disabled**
+   * pending field tuning of the relative blur threshold (a mis-tuned gate
+   * silently dropping good frames is worse than the motion gate's default-on).
+   * See `ar/image-quality.ts` and
+   * `GpsPlusSlamJs_Docs/docs/2026-06-24-image-quality-gate-plan.md`.
+   */
+  qualityFilter: QualityFilterConfig;
 }
 
 /**
@@ -264,6 +278,8 @@ export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
     // DEFAULT_CAPTURE_CONFIG.motionFilter — each default group must be its own
     // object so an accidental in-place mutation cannot leak across them.
     motionFilter: { ...DEFAULT_MOTION_FILTER }, // blurry-frame motion gate (on)
+    // Same spread/alias rationale — blur/blackness image gate (off by default).
+    qualityFilter: { ...DEFAULT_QUALITY_FILTER },
   },
   arCrashIsolation: {
     enableDomOverlay: true,
@@ -329,6 +345,26 @@ export const IMAGE_CONSTRAINTS = {
 export const MOTION_FILTER_CONSTRAINTS = {
   maxAngularVelocity: { min: 0.05, max: 5, step: 0.05 },
   maxLinearVelocity: { min: 0.05, max: 5, step: 0.05 },
+  maxWaitMs: { min: 500, max: 20000, step: 500 },
+} as const;
+
+/**
+ * Validation constraints for the image-quality (blur/blackness) gate thresholds.
+ *
+ * `blurRelativeThreshold` (`k` in `sharpness < k·median`) is clamped to
+ * 0.05–0.95: it is a fraction of the recent sharpness median, so values must sit
+ * strictly inside (0, 1) — at ~0 the blur check never rejects, near 1 it rejects
+ * almost everything. `minMeanLuminance` (the absolute black cutoff on a 0–255
+ * luma scale) is clamped to 0–128: 0 disables the black check, and a cutoff
+ * above mid-grey would reject normally-lit frames. `maxWaitMs` mirrors the motion
+ * gate's range (0.5–20 s) so the never-good fallback can always fire. All back a
+ * (currently advanced/hidden) settings slider, so a corrupt stored value can
+ * never disable capture. The default thresholds are placeholders pending
+ * on-device field tuning (plan §5, §10).
+ */
+export const QUALITY_FILTER_CONSTRAINTS = {
+  blurRelativeThreshold: { min: 0.05, max: 0.95, step: 0.05 },
+  minMeanLuminance: { min: 0, max: 128, step: 1 },
   maxWaitMs: { min: 500, max: 20000, step: 500 },
 } as const;
 
@@ -563,6 +599,49 @@ export function validateMotionFilterOptions(
 }
 
 /**
+ * Validate and normalize the image-quality (blur/blackness gate) options. Same
+ * policy as {@link validateMotionFilterOptions}: `enabled` is boolean-or-default;
+ * the three numeric thresholds are clamped to {@link QUALITY_FILTER_CONSTRAINTS}
+ * with a `Number.isFinite` guard (a stored `NaN` is `typeof 'number'` and would
+ * survive `clamp`). A missing group default-fills entirely — a pre-feature
+ * persisted options object that lacks `qualityFilter` loads with the gate
+ * disabled (the safe default) rather than crashing.
+ */
+export function validateQualityFilterOptions(
+  options: Partial<QualityFilterConfig>
+): QualityFilterConfig {
+  const defaults = DEFAULT_RECORDING_OPTIONS.images.qualityFilter;
+  return {
+    enabled:
+      typeof options.enabled === 'boolean' ? options.enabled : defaults.enabled,
+    blurRelativeThreshold: clamp(
+      typeof options.blurRelativeThreshold === 'number' &&
+        Number.isFinite(options.blurRelativeThreshold)
+        ? options.blurRelativeThreshold
+        : defaults.blurRelativeThreshold,
+      QUALITY_FILTER_CONSTRAINTS.blurRelativeThreshold.min,
+      QUALITY_FILTER_CONSTRAINTS.blurRelativeThreshold.max
+    ),
+    minMeanLuminance: clamp(
+      typeof options.minMeanLuminance === 'number' &&
+        Number.isFinite(options.minMeanLuminance)
+        ? options.minMeanLuminance
+        : defaults.minMeanLuminance,
+      QUALITY_FILTER_CONSTRAINTS.minMeanLuminance.min,
+      QUALITY_FILTER_CONSTRAINTS.minMeanLuminance.max
+    ),
+    maxWaitMs: clamp(
+      typeof options.maxWaitMs === 'number' &&
+        Number.isFinite(options.maxWaitMs)
+        ? options.maxWaitMs
+        : defaults.maxWaitMs,
+      QUALITY_FILTER_CONSTRAINTS.maxWaitMs.min,
+      QUALITY_FILTER_CONSTRAINTS.maxWaitMs.max
+    ),
+  };
+}
+
+/**
  * Validate and normalize image options.
  * Invalid values are clamped to valid ranges.
  */
@@ -593,6 +672,7 @@ export function validateImageOptions(
       IMAGE_CONSTRAINTS.resolutionDivisor.max
     ),
     motionFilter: validateMotionFilterOptions(options.motionFilter ?? {}),
+    qualityFilter: validateQualityFilterOptions(options.qualityFilter ?? {}),
   };
 }
 
@@ -745,17 +825,18 @@ export function cloneRecordingOptions(
 ): RecordingOptions {
   return {
     depth: { ...options.depth },
-    // `images` carries a NESTED object (`motionFilter`) — the only group that
-    // does — so it needs a deeper clone than the other flat-primitive groups.
-    // A shallow `{ ...options.images }` would share the same `motionFilter`
-    // reference, and the settings modal mutates it in place
-    // (`workingOptions.images.motionFilter.enabled = …`); without this the
-    // write would reach straight back into DEFAULT_RECORDING_OPTIONS on the
-    // no-storage / reset path (DEFAULT → clone → clone), poisoning the default
-    // for the session.
+    // `images` carries NESTED objects (`motionFilter`, `qualityFilter`) — the
+    // only group that does — so each needs a deeper clone than the other
+    // flat-primitive groups. A shallow `{ ...options.images }` would share the
+    // same nested references, and the settings modal mutates them in place
+    // (`workingOptions.images.motionFilter.enabled = …`,
+    // `…images.qualityFilter.enabled = …`); without this the write would reach
+    // straight back into DEFAULT_RECORDING_OPTIONS on the no-storage / reset path
+    // (DEFAULT → clone → clone), poisoning the default for the session.
     images: {
       ...options.images,
       motionFilter: { ...options.images.motionFilter },
+      qualityFilter: { ...options.images.qualityFilter },
     },
     arCrashIsolation: { ...options.arCrashIsolation },
     occupancy: { ...options.occupancy },

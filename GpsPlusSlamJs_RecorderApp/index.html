@@ -1014,6 +1014,34 @@ No errors</pre
                   >Skip blurry/black frames (image)</span
                 >
               </label>
+              <!-- Image-quality thresholds (for on-device field tuning). Blur is -->
+              <!-- relative (fraction of the recent sharpness median); blackness  -->
+              <!-- is an absolute 0–255 luma cutoff (0 = off). Higher blur =       -->
+              <!-- stricter (drops more).                                          -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs text-gray-400">
+                  <span>Blur sensitivity</span>
+                  <span id="images-blur-threshold-value"
+                    >0.50 (drop &lt; 50% of median)</span
+                  >
+                </div>
+                <input
+                  type="range"
+                  id="images-blur-threshold"
+                  class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+              </div>
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs text-gray-400">
+                  <span>Black cutoff</span>
+                  <span id="images-min-luminance-value">10 / 255</span>
+                </div>
+                <input
+                  type="range"
+                  id="images-min-luminance"
+                  class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+              </div>
               <div class="space-y-1">
                 <div class="flex justify-between text-xs text-gray-400">
                   <span>Interval</span>

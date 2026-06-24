@@ -117,6 +117,8 @@ describe('settings-modal', () => {
       expect(html).toContain('id="images-enabled"');
       expect(html).toContain('id="images-motion-filter"');
       expect(html).toContain('id="images-quality-filter"');
+      expect(html).toContain('id="images-blur-threshold"');
+      expect(html).toContain('id="images-min-luminance"');
       expect(html).toContain('id="images-max-angular"');
       expect(html).toContain('id="images-max-linear"');
       expect(html).toContain('id="images-interval"');
@@ -746,6 +748,77 @@ describe('settings-modal', () => {
       imagesEnabled.checked = true;
       imagesEnabled.dispatchEvent(new Event('change'));
       expect(qualityFilter.disabled).toBe(false);
+    });
+
+    it('exposes the threshold sliders, populated from the defaults', () => {
+      const blur = document.getElementById(
+        'images-blur-threshold'
+      ) as HTMLInputElement | null;
+      const luma = document.getElementById(
+        'images-min-luminance'
+      ) as HTMLInputElement | null;
+      expect(blur).not.toBeNull();
+      expect(luma).not.toBeNull();
+      // Defaults from DEFAULT_QUALITY_FILTER (k=0.5, minMeanLuminance=10).
+      expect(parseFloat(blur!.value)).toBeCloseTo(0.5, 6);
+      expect(parseFloat(luma!.value)).toBeCloseTo(10, 6);
+    });
+
+    it('persists edited threshold values through save/load (gate on)', () => {
+      const qualityFilter = document.getElementById(
+        'images-quality-filter'
+      ) as HTMLInputElement;
+      const blur = document.getElementById(
+        'images-blur-threshold'
+      ) as HTMLInputElement;
+      const luma = document.getElementById(
+        'images-min-luminance'
+      ) as HTMLInputElement;
+
+      qualityFilter.checked = true;
+      qualityFilter.dispatchEvent(new Event('change'));
+      blur.value = '0.35';
+      blur.dispatchEvent(new Event('input'));
+      luma.value = '25';
+      luma.dispatchEvent(new Event('input'));
+
+      document.getElementById('btn-settings-save')?.click();
+
+      const saved = loadRecordingOptions().images.qualityFilter;
+      expect(saved.enabled).toBe(true);
+      expect(saved.blurRelativeThreshold).toBeCloseTo(0.35, 6);
+      expect(saved.minMeanLuminance).toBeCloseTo(25, 6);
+    });
+
+    it('disables the threshold sliders when the gate (or capture) is off', () => {
+      const imagesEnabled = document.getElementById(
+        'images-enabled'
+      ) as HTMLInputElement;
+      const qualityFilter = document.getElementById(
+        'images-quality-filter'
+      ) as HTMLInputElement;
+      const blur = document.getElementById(
+        'images-blur-threshold'
+      ) as HTMLInputElement;
+      const luma = document.getElementById(
+        'images-min-luminance'
+      ) as HTMLInputElement;
+
+      // Gate off (the default) → sliders disabled.
+      expect(blur.disabled).toBe(true);
+      expect(luma.disabled).toBe(true);
+
+      // Gate on → sliders enabled.
+      qualityFilter.checked = true;
+      qualityFilter.dispatchEvent(new Event('change'));
+      expect(blur.disabled).toBe(false);
+      expect(luma.disabled).toBe(false);
+
+      // Capture off overrides → sliders disabled regardless of the gate.
+      imagesEnabled.checked = false;
+      imagesEnabled.dispatchEvent(new Event('change'));
+      expect(blur.disabled).toBe(true);
+      expect(luma.disabled).toBe(true);
     });
   });
 

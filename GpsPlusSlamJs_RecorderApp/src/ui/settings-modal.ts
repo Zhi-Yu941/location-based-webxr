@@ -13,6 +13,7 @@ import {
   DEPTH_CONSTRAINTS,
   IMAGE_CONSTRAINTS,
   MOTION_FILTER_CONSTRAINTS,
+  QUALITY_FILTER_CONSTRAINTS,
   OCCUPANCY_CONSTRAINTS,
   FRAME_TILE_DISPLAY_CONSTRAINTS,
   QR_CONSTRAINTS,
@@ -53,6 +54,10 @@ let imagesResolutionDivisorSlider: HTMLInputElement | null = null;
 let imagesResolutionDivisorValue: HTMLElement | null = null;
 let imagesMotionFilterCheckbox: HTMLInputElement | null = null;
 let imagesQualityFilterCheckbox: HTMLInputElement | null = null;
+let imagesBlurThresholdSlider: HTMLInputElement | null = null;
+let imagesBlurThresholdValue: HTMLElement | null = null;
+let imagesMinLuminanceSlider: HTMLInputElement | null = null;
+let imagesMinLuminanceValue: HTMLElement | null = null;
 let imagesMaxAngularSlider: HTMLInputElement | null = null;
 let imagesMaxAngularValue: HTMLElement | null = null;
 let imagesMaxLinearSlider: HTMLInputElement | null = null;
@@ -146,6 +151,18 @@ export function initSettingsModal(
   imagesQualityFilterCheckbox = document.getElementById(
     'images-quality-filter'
   ) as HTMLInputElement;
+  imagesBlurThresholdSlider = document.getElementById(
+    'images-blur-threshold'
+  ) as HTMLInputElement;
+  imagesBlurThresholdValue = document.getElementById(
+    'images-blur-threshold-value'
+  );
+  imagesMinLuminanceSlider = document.getElementById(
+    'images-min-luminance'
+  ) as HTMLInputElement;
+  imagesMinLuminanceValue = document.getElementById(
+    'images-min-luminance-value'
+  );
   imagesMaxAngularSlider = document.getElementById(
     'images-max-angular'
   ) as HTMLInputElement;
@@ -362,6 +379,30 @@ export function initSettingsModal(
     if (workingOptions && imagesQualityFilterCheckbox) {
       workingOptions.images.qualityFilter.enabled =
         imagesQualityFilterCheckbox.checked;
+      // The threshold sliders only matter while the gate is on.
+      updateImageControlsState();
+    }
+  });
+
+  // Image-quality thresholds: stored exactly as the slider value (a 0–1 fraction
+  // for blur, a 0–255 luma cutoff for blackness), so no unit conversion.
+  imagesBlurThresholdSlider?.addEventListener('input', () => {
+    if (
+      workingOptions &&
+      imagesBlurThresholdSlider &&
+      imagesBlurThresholdValue
+    ) {
+      const value = parseFloat(imagesBlurThresholdSlider.value);
+      workingOptions.images.qualityFilter.blurRelativeThreshold = value;
+      imagesBlurThresholdValue.textContent = formatBlurThreshold(value);
+    }
+  });
+
+  imagesMinLuminanceSlider?.addEventListener('input', () => {
+    if (workingOptions && imagesMinLuminanceSlider && imagesMinLuminanceValue) {
+      const value = parseFloat(imagesMinLuminanceSlider.value);
+      workingOptions.images.qualityFilter.minMeanLuminance = value;
+      imagesMinLuminanceValue.textContent = formatMinLuminance(value);
     }
   });
 
@@ -654,6 +695,44 @@ function populateForm(options: RecordingOptions): void {
       2
     )} m/s`;
   }
+  if (imagesBlurThresholdSlider) {
+    imagesBlurThresholdSlider.min = String(
+      QUALITY_FILTER_CONSTRAINTS.blurRelativeThreshold.min
+    );
+    imagesBlurThresholdSlider.max = String(
+      QUALITY_FILTER_CONSTRAINTS.blurRelativeThreshold.max
+    );
+    imagesBlurThresholdSlider.step = String(
+      QUALITY_FILTER_CONSTRAINTS.blurRelativeThreshold.step
+    );
+    imagesBlurThresholdSlider.value = String(
+      options.images.qualityFilter.blurRelativeThreshold
+    );
+  }
+  if (imagesBlurThresholdValue) {
+    imagesBlurThresholdValue.textContent = formatBlurThreshold(
+      options.images.qualityFilter.blurRelativeThreshold
+    );
+  }
+  if (imagesMinLuminanceSlider) {
+    imagesMinLuminanceSlider.min = String(
+      QUALITY_FILTER_CONSTRAINTS.minMeanLuminance.min
+    );
+    imagesMinLuminanceSlider.max = String(
+      QUALITY_FILTER_CONSTRAINTS.minMeanLuminance.max
+    );
+    imagesMinLuminanceSlider.step = String(
+      QUALITY_FILTER_CONSTRAINTS.minMeanLuminance.step
+    );
+    imagesMinLuminanceSlider.value = String(
+      options.images.qualityFilter.minMeanLuminance
+    );
+  }
+  if (imagesMinLuminanceValue) {
+    imagesMinLuminanceValue.textContent = formatMinLuminance(
+      options.images.qualityFilter.minMeanLuminance
+    );
+  }
 
   if (arDomOverlayEnabledCheckbox) {
     arDomOverlayEnabledCheckbox.checked =
@@ -819,7 +898,7 @@ function updateImageControlsState(): void {
     // captured frames, so it is disabled when capture is off.
     imagesQualityFilterCheckbox.disabled = !enabled;
   }
-  // The threshold sliders require BOTH capture and the gate to be on.
+  // The motion threshold sliders require BOTH capture and the motion gate on.
   const motionEnabled =
     enabled && (imagesMotionFilterCheckbox?.checked ?? true);
   if (imagesMaxAngularSlider) {
@@ -827,6 +906,15 @@ function updateImageControlsState(): void {
   }
   if (imagesMaxLinearSlider) {
     imagesMaxLinearSlider.disabled = !motionEnabled;
+  }
+  // The quality threshold sliders require BOTH capture and the quality gate on.
+  const qualityEnabled =
+    enabled && (imagesQualityFilterCheckbox?.checked ?? false);
+  if (imagesBlurThresholdSlider) {
+    imagesBlurThresholdSlider.disabled = !qualityEnabled;
+  }
+  if (imagesMinLuminanceSlider) {
+    imagesMinLuminanceSlider.disabled = !qualityEnabled;
   }
 }
 
@@ -838,6 +926,24 @@ function updateImageControlsState(): void {
 function formatAngularVelocity(radPerSec: number): string {
   const degPerSec = Math.round((radPerSec * 180) / Math.PI);
   return `${radPerSec.toFixed(2)} rad/s (≈${degPerSec}°/s)`;
+}
+
+/**
+ * Format the relative blur threshold `k` (a fraction of the recent sharpness
+ * median; a frame is dropped when sharpness < k·median). Higher = stricter
+ * (drops more), so label it as the percentage-of-median cutoff.
+ */
+function formatBlurThreshold(k: number): string {
+  return `${k.toFixed(2)} (drop < ${Math.round(k * 100)}% of median)`;
+}
+
+/**
+ * Format the absolute black cutoff (0–255 mean luma). 0 disables the black
+ * check, so call that out.
+ */
+function formatMinLuminance(luma: number): string {
+  const rounded = Math.round(luma);
+  return rounded === 0 ? '0 (off)' : `${rounded} / 255`;
 }
 
 function updateQrControlsState(): void {

@@ -54,6 +54,7 @@ import {
 import {
   startAbsoluteOrientationWatch,
   stopAbsoluteOrientationWatch,
+  getLatestAbsoluteOrientation,
 } from 'gps-plus-slam-app-framework/sensors/absolute-orientation';
 import { createGpsErrorHandler } from 'gps-plus-slam-app-framework/sensors/gps-error-handler';
 import {
@@ -110,13 +111,45 @@ import {
 } from 'gps-plus-slam-app-framework/geo';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
 import type { LatLong, Matrix4 } from 'gps-plus-slam-app-framework/core';
-import { calcGpsCoords } from 'gps-plus-slam-app-framework/core';
+import {
+  calcGpsCoords,
+  magneticHeadingFromEnuQuat,
+} from 'gps-plus-slam-app-framework/core';
 import type { LeafletMapOverlay } from 'gps-plus-slam-app-framework/visualization/leaflet-map-overlay';
 import type { MapData } from 'gps-plus-slam-app-framework/visualization/map-data';
 import { getBuildInfo } from '../utils/build-info';
 import { DEFAULT_SCENARIO } from '../ui/session-browser';
 
 const log = createLogger('RecordingSession');
+
+/**
+ * Live AbsCompass HUD refresh timer. The capture module surfaces lifecycle via
+ * its onStatus callback but not per-reading; this polls the latest reading a few
+ * times a second to show the live magnetic heading (the same number the v3
+ * absolute-compass demo shows), so a field tester can point at a landmark and
+ * cross-check it on the spot. Cleared on recording stop.
+ */
+let absCompassHudTimer: ReturnType<typeof setInterval> | null = null;
+const ABS_COMPASS_HUD_INTERVAL_MS = 200; // 5 Hz — readable, no DOM thrash
+
+function startAbsCompassHudUpdates(): void {
+  stopAbsCompassHudUpdates();
+  absCompassHudTimer = setInterval(() => {
+    const reading = getLatestAbsoluteOrientation();
+    if (!reading) return; // unavailable / not warmed up → leave onStatus text
+    setAbsCompassStatus({
+      state: 'active',
+      headingDeg: magneticHeadingFromEnuQuat(reading.quaternion),
+    });
+  }, ABS_COMPASS_HUD_INTERVAL_MS);
+}
+
+function stopAbsCompassHudUpdates(): void {
+  if (absCompassHudTimer !== null) {
+    clearInterval(absCompassHudTimer);
+    absCompassHudTimer = null;
+  }
+}
 
 /**
  * Single fallback used everywhere a scenario name is needed but unavailable.
@@ -434,8 +467,10 @@ export function createRecordingSessionHandlers(
 
     // Start the AbsoluteOrientationSensor capture (Phase 1 — independent north
     // reference). Passive instrumentation: on-when-available, clean no-op off
-    // Chrome Android. The HUD row lets a field tester confirm capture is live.
+    // Chrome Android. The HUD row shows the live magnetic heading so a field
+    // tester can confirm capture is live and cross-check it against the v3 demo.
     void startAbsoluteOrientationWatch(setAbsCompassStatus);
+    startAbsCompassHudUpdates();
 
     // Start periodic image/depth capture (if enabled). Forward the *whole*
     // validated options section (minus the recorder-only `enabled` gate) as a
@@ -572,6 +607,7 @@ export function createRecordingSessionHandlers(
     stopDepthCapture();
     stopGpsWatch();
     stopOrientationWatch();
+    stopAbsCompassHudUpdates();
     stopAbsoluteOrientationWatch();
     hideAbsCompass();
 

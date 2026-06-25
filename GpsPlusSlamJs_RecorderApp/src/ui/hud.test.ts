@@ -3166,7 +3166,7 @@ describe('AbsCompass status row', () => {
     document.body.appendChild(hud);
   }
 
-  it('shows green "ok" with the heading when active', async () => {
+  it('shows the live magnetic heading in degrees when active (matches v3 demo)', async () => {
     setupDOMWithAbsCompass();
     const { setAbsCompassStatus } = await import('./hud.js');
     setAbsCompassStatus({ state: 'active', headingDeg: 123.4 });
@@ -3174,7 +3174,17 @@ describe('AbsCompass status row', () => {
     const info = document.getElementById('abs-compass-info')!;
     const status = document.getElementById('abs-compass-status')!;
     expect(info.classList.contains('hidden')).toBe(false);
-    expect(status.textContent).toBe('ok (heading 123°)');
+    expect(status.textContent).toBe('123°');
+    expect(status.classList.contains('text-green-400')).toBe(true);
+  });
+
+  it('falls back to "ok" when active but the phone is level (heading undefined)', async () => {
+    setupDOMWithAbsCompass();
+    const { setAbsCompassStatus } = await import('./hud.js');
+    setAbsCompassStatus({ state: 'active', headingDeg: null });
+
+    const status = document.getElementById('abs-compass-status')!;
+    expect(status.textContent).toBe('ok');
     expect(status.classList.contains('text-green-400')).toBe(true);
   });
 

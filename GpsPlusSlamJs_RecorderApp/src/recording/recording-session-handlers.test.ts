@@ -229,6 +229,8 @@ vi.mock('gps-plus-slam-app-framework/sensors/gps', () => ({
 vi.mock('gps-plus-slam-app-framework/sensors/absolute-orientation', () => ({
   startAbsoluteOrientationWatch: mockStartAbsoluteOrientationWatch,
   stopAbsoluteOrientationWatch: mockStopAbsoluteOrientationWatch,
+  // null → the live-HUD poll is a no-op in tests (no leaked HUD writes).
+  getLatestAbsoluteOrientation: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock('gps-plus-slam-app-framework/storage/file-system-utils', () => ({
@@ -334,6 +336,7 @@ vi.mock('gps-plus-slam-app-framework/sensors/gps-error-handler', () => ({
 
 vi.mock('gps-plus-slam-app-framework/core', () => ({
   calcGpsCoords: mockCalcGpsCoords,
+  magneticHeadingFromEnuQuat: vi.fn().mockReturnValue(0),
 }));
 
 vi.mock('../utils/build-info', () => ({

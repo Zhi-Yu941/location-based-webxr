@@ -578,7 +578,13 @@ export interface AbsCompassStatusDisplay {
  * Update the AbsCompass (AbsoluteOrientationSensor) status row — the Phase-1
  * presence indicator that lets a field tester confirm a recording is actually
  * capturing the independent-north sensor before collecting many sessions
- * (plan §5). Green "ok" when active, gray "unavailable", yellow "error".
+ * (plan §5).
+ *
+ * When active with a live heading it shows the **magnetic heading the device
+ * points** as a degree value (0°=N, 90°=E), the same number the v3
+ * absolute-compass demo shows — so the tester can point the phone at a landmark
+ * and cross-check it against that demo on the spot. Falls back to "ok" while the
+ * phone is level (heading undefined), gray "unavailable", yellow "error".
  */
 export function setAbsCompassStatus(status: AbsCompassStatusDisplay): void {
   const info = document.getElementById('abs-compass-info');
@@ -589,11 +595,10 @@ export function setAbsCompassStatus(status: AbsCompassStatusDisplay): void {
   info.classList.remove('hidden');
   el.classList.remove('text-green-400', 'text-yellow-400', 'text-gray-400');
   if (status.state === 'active') {
-    const heading =
+    el.textContent =
       typeof status.headingDeg === 'number'
-        ? ` (heading ${Math.round(status.headingDeg)}°)`
-        : '';
-    el.textContent = `ok${heading}`;
+        ? `${Math.round(status.headingDeg)}°`
+        : 'ok';
     el.classList.add('text-green-400');
   } else if (status.state === 'unavailable') {
     el.textContent = `unavailable${status.reason ? ` (${status.reason})` : ''}`;

@@ -564,6 +564,52 @@ export function updateSyncStatus(status: SyncStatusDisplay): void {
 }
 
 /**
+ * Lifecycle status for the AbsoluteOrientationSensor capture (plan §5).
+ * Structurally compatible with the framework's `AbsoluteOrientationStatus`.
+ */
+export interface AbsCompassStatusDisplay {
+  state: 'active' | 'unavailable' | 'error';
+  reason?: string;
+  /** Optional latest magnetic heading (deg) for the read-out. */
+  headingDeg?: number | null;
+}
+
+/**
+ * Update the AbsCompass (AbsoluteOrientationSensor) status row — the Phase-1
+ * presence indicator that lets a field tester confirm a recording is actually
+ * capturing the independent-north sensor before collecting many sessions
+ * (plan §5). Green "ok" when active, gray "unavailable", yellow "error".
+ */
+export function setAbsCompassStatus(status: AbsCompassStatusDisplay): void {
+  const info = document.getElementById('abs-compass-info');
+  const el = document.getElementById('abs-compass-status');
+  if (!info || !el) {
+    return;
+  }
+  info.classList.remove('hidden');
+  el.classList.remove('text-green-400', 'text-yellow-400', 'text-gray-400');
+  if (status.state === 'active') {
+    const heading =
+      typeof status.headingDeg === 'number'
+        ? ` (heading ${Math.round(status.headingDeg)}°)`
+        : '';
+    el.textContent = `ok${heading}`;
+    el.classList.add('text-green-400');
+  } else if (status.state === 'unavailable') {
+    el.textContent = `unavailable${status.reason ? ` (${status.reason})` : ''}`;
+    el.classList.add('text-gray-400');
+  } else {
+    el.textContent = `⚠️ error${status.reason ? ` (${status.reason})` : ''}`;
+    el.classList.add('text-yellow-400');
+  }
+}
+
+/** Hide the AbsCompass status row (recording stopped). */
+export function hideAbsCompass(): void {
+  document.getElementById('abs-compass-info')?.classList.add('hidden');
+}
+
+/**
  * Hide the setup modal
  */
 function hideSetupModal(): void {

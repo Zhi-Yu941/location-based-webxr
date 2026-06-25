@@ -51,6 +51,10 @@ import {
   startOrientationWatch,
   stopOrientationWatch,
 } from 'gps-plus-slam-app-framework/sensors/gps';
+import {
+  startAbsoluteOrientationWatch,
+  stopAbsoluteOrientationWatch,
+} from 'gps-plus-slam-app-framework/sensors/absolute-orientation';
 import { createGpsErrorHandler } from 'gps-plus-slam-app-framework/sensors/gps-error-handler';
 import {
   getCurrentArPose,
@@ -83,6 +87,8 @@ import {
   hideFrameCount,
   hideTrackingQuality,
   updateSyncStatus,
+  setAbsCompassStatus,
+  hideAbsCompass,
 } from '../ui/hud';
 import {
   showSessionSummary,
@@ -426,6 +432,11 @@ export function createRecordingSessionHandlers(
     // Start orientation watch
     startOrientationWatch(updateDeviceOrientation);
 
+    // Start the AbsoluteOrientationSensor capture (Phase 1 — independent north
+    // reference). Passive instrumentation: on-when-available, clean no-op off
+    // Chrome Android. The HUD row lets a field tester confirm capture is live.
+    void startAbsoluteOrientationWatch(setAbsCompassStatus);
+
     // Start periodic image/depth capture (if enabled). Forward the *whole*
     // validated options section (minus the recorder-only `enabled` gate) as a
     // single config object, so a newly-added tunable reaches the sampler
@@ -561,6 +572,8 @@ export function createRecordingSessionHandlers(
     stopDepthCapture();
     stopGpsWatch();
     stopOrientationWatch();
+    stopAbsoluteOrientationWatch();
+    hideAbsCompass();
 
     // Capture authoritative end time immediately when recording stops,
     // before async operations (metadata write, sync, ZIP export) that

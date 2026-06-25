@@ -3145,3 +3145,71 @@ describe('updateRefPointHint', () => {
     expect(full).toContain('id="ref-point-hint"');
   });
 });
+
+/**
+ * Tests for the AbsCompass status row (AbsoluteOrientationSensor Phase 1, plan §5).
+ *
+ * Why these tests matter: this row is the field tester's only on-device signal
+ * that a recording is actually capturing the independent-north sensor before
+ * collecting many sessions. It must show a green "ok" when active, a gray
+ * "unavailable" with the reason off Chrome Android, and a yellow error — and the
+ * element must actually ship in index.html.
+ */
+describe('AbsCompass status row', () => {
+  function setupDOMWithAbsCompass(): void {
+    const hud = document.createElement('div');
+    hud.innerHTML = `
+      <div id="abs-compass-info" class="hidden">
+        <span id="abs-compass-status">--</span>
+      </div>
+    `;
+    document.body.appendChild(hud);
+  }
+
+  it('shows green "ok" with the heading when active', async () => {
+    setupDOMWithAbsCompass();
+    const { setAbsCompassStatus } = await import('./hud.js');
+    setAbsCompassStatus({ state: 'active', headingDeg: 123.4 });
+
+    const info = document.getElementById('abs-compass-info')!;
+    const status = document.getElementById('abs-compass-status')!;
+    expect(info.classList.contains('hidden')).toBe(false);
+    expect(status.textContent).toBe('ok (heading 123°)');
+    expect(status.classList.contains('text-green-400')).toBe(true);
+  });
+
+  it('shows gray "unavailable" with the reason (iOS/Safari/desktop path)', async () => {
+    setupDOMWithAbsCompass();
+    const { setAbsCompassStatus } = await import('./hud.js');
+    setAbsCompassStatus({ state: 'unavailable', reason: 'no sensor' });
+
+    const status = document.getElementById('abs-compass-status')!;
+    expect(status.textContent).toBe('unavailable (no sensor)');
+    expect(status.classList.contains('text-gray-400')).toBe(true);
+  });
+
+  it('shows a yellow error with the reason', async () => {
+    setupDOMWithAbsCompass();
+    const { setAbsCompassStatus } = await import('./hud.js');
+    setAbsCompassStatus({ state: 'error', reason: 'NotReadableError' });
+
+    const status = document.getElementById('abs-compass-status')!;
+    expect(status.textContent).toContain('NotReadableError');
+    expect(status.classList.contains('text-yellow-400')).toBe(true);
+  });
+
+  it('hideAbsCompass hides the row', async () => {
+    setupDOMWithAbsCompass();
+    const { setAbsCompassStatus, hideAbsCompass } = await import('./hud.js');
+    setAbsCompassStatus({ state: 'active' });
+    hideAbsCompass();
+    expect(
+      document.getElementById('abs-compass-info')!.classList.contains('hidden')
+    ).toBe(true);
+  });
+
+  it('index.html ships the AbsCompass status element', () => {
+    const full = loadFullIndexHtml();
+    expect(full).toContain('id="abs-compass-status"');
+  });
+});

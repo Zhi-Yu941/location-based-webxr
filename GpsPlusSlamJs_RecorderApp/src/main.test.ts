@@ -290,6 +290,8 @@ vi.mock('./ui/hud', () => ({
   setNewRefPointButtonVisible: vi.fn(),
   updateTrackingQuality: vi.fn(),
   hideTrackingQuality: vi.fn(),
+  setAbsCompassStatus: vi.fn(),
+  hideAbsCompass: vi.fn(),
 }));
 
 // Mock session-browser for handleOpenFolder tests (Issue 1 — 2026-02-27 + 2026-03-01)

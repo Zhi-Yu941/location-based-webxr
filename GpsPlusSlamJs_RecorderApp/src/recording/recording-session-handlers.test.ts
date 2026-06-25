@@ -37,6 +37,8 @@ const {
   mockStopGpsWatch,
   mockStartOrientationWatch,
   mockStopOrientationWatch,
+  mockStartAbsoluteOrientationWatch,
+  mockStopAbsoluteOrientationWatch,
   mockFormatTimestamp,
   mockStartStorageSession,
   mockGetCurrentScenarioHandle,
@@ -127,6 +129,8 @@ const {
     mockStopGpsWatch: vi.fn(),
     mockStartOrientationWatch: vi.fn(),
     mockStopOrientationWatch: vi.fn(),
+    mockStartAbsoluteOrientationWatch: vi.fn().mockResolvedValue(undefined),
+    mockStopAbsoluteOrientationWatch: vi.fn(),
     mockFormatTimestamp: vi.fn().mockReturnValue('2026-01-01_12-00-00'),
     mockStartStorageSession: vi.fn().mockResolvedValue(undefined),
     mockGetCurrentScenarioHandle: vi
@@ -222,6 +226,11 @@ vi.mock('gps-plus-slam-app-framework/sensors/gps', () => ({
   stopOrientationWatch: mockStopOrientationWatch,
 }));
 
+vi.mock('gps-plus-slam-app-framework/sensors/absolute-orientation', () => ({
+  startAbsoluteOrientationWatch: mockStartAbsoluteOrientationWatch,
+  stopAbsoluteOrientationWatch: mockStopAbsoluteOrientationWatch,
+}));
+
 vi.mock('gps-plus-slam-app-framework/storage/file-system-utils', () => ({
   formatTimestamp: mockFormatTimestamp,
 }));
@@ -295,6 +304,8 @@ vi.mock('../ui/hud', () => ({
   hideTrackingQuality: vi.fn(),
   updateRefPointButtonLabel: vi.fn(),
   setNewRefPointButtonVisible: vi.fn(),
+  setAbsCompassStatus: vi.fn(),
+  hideAbsCompass: vi.fn(),
 }));
 
 vi.mock('../ui/session-summary', () => ({
@@ -666,6 +677,15 @@ describe('handleStartRecording', () => {
     expect(mockStartOrientationWatch).toHaveBeenCalled();
   });
 
+  it('should start the AbsoluteOrientationSensor capture (independent north, Phase 1)', async () => {
+    // Why: the GPS-independent magnetometer heading must be captured during the
+    // recording so it pairs with each GPS event (plan §5). Passive/no-op off
+    // Chrome Android; the HUD status callback is wired so a field tester can
+    // confirm capture is live.
+    await handlers.handleStartRecording();
+    expect(mockStartAbsoluteOrientationWatch).toHaveBeenCalled();
+  });
+
   it('should enable beforeunload warning', async () => {
     // Why: Prevents accidental data loss during recording
     await handlers.handleStartRecording();
@@ -1013,6 +1033,8 @@ describe('handleStopRecording', () => {
     await handlers.handleStopRecording();
     expect(mockStopGpsWatch).toHaveBeenCalled();
     expect(mockStopOrientationWatch).toHaveBeenCalled();
+    // The AbsoluteOrientationSensor watch must also be torn down (no leak).
+    expect(mockStopAbsoluteOrientationWatch).toHaveBeenCalled();
   });
 
   it('should write session metadata', async () => {

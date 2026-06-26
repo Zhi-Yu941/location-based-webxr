@@ -16,6 +16,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createSlice } from '@reduxjs/toolkit';
+import { setZeroPos } from 'gps-plus-slam-js';
 import { createSlamAppStore } from './create-slam-app-store';
 import { startSession, endSession } from './recording-slice';
 import type { StorageBackend } from '../storage/storage-backend';
@@ -61,6 +62,28 @@ describe('createSlamAppStore', () => {
       expect(state.routing).toBeUndefined();
       expect(state.refPoints).toBeUndefined();
       expect(state.scenario).toBeUndefined();
+    });
+  });
+
+  describe('enableCompassColdStartOverride (Stage-0 debug opt-in)', () => {
+    it('enables the override once gpsData exists (after the first setZeroPos)', () => {
+      // Why: the flag lives on the gpsData slice, which is null until the first
+      // setZeroPos; the factory must defer the opt-in until that slice exists.
+      const store = createSlamAppStore({
+        storageBackend: backend,
+        enableCompassColdStartOverride: true,
+      });
+      // Before any GPS fix: gpsData is null, nothing to enable.
+      expect(store.getState().gpsData).toBeNull();
+      // First fix creates the slice; the one-shot subscription flips the flag.
+      store.dispatch(setZeroPos({ lat: 0, lon: 0 }));
+      expect(store.getState().gpsData?.coldStartOverrideEnabled).toBe(true);
+    });
+
+    it('leaves the override off by default (byte-identical core path)', () => {
+      const store = createSlamAppStore({ storageBackend: backend });
+      store.dispatch(setZeroPos({ lat: 0, lon: 0 }));
+      expect(store.getState().gpsData?.coldStartOverrideEnabled).toBeFalsy();
     });
   });
 

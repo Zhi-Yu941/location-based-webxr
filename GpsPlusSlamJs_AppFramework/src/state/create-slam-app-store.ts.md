@@ -19,7 +19,8 @@ thin `createRecorderStore` that calls this factory with its own extras.
 - `createSlamAppStore<ExtraReducers>(options)` — returns a `SlamAppStore`.
 - `SlamAppStore<ExtraReducers>` — opaque store with `getState` / `dispatch` /
   `subscribe` / `writeFrame` / `writeSessionMetadata`.
-- `SlamAppStoreOptions<ExtraReducers>` — `{ storageBackend, extraReducers?, extraMiddleware?, persistedExtraPrefixes?, onWriteFailure?, enableDevChecks?, licenseKey? }`.
+- `SlamAppStoreOptions<ExtraReducers>` — `{ storageBackend, extraReducers?, extraMiddleware?, persistedExtraPrefixes?, onWriteFailure?, enableDevChecks?, licenseKey?, trackingQualityOptions?, enableCompassColdStartOverride? }`.
+  - `enableCompassColdStartOverride` (**debug/experiment, default false**) — when true, a self-removing store subscription dispatches the library's `setColdStartOverrideEnabled(true)` the first time `gpsData` becomes non-null (right after the first `setZeroPos`, since the flag lives on that slice and can't be set before it exists). Enables the Phase-4 Stage-0 cold-start compass override; OFF ⇒ core solve byte-identical. The dispatched action is a `gpsData` action and is persisted into recordings (a replay re-enables the override), so collect field-calibration recordings with this OFF. See [`GpsPlusSlamJs_Docs/docs/2026-06-26-stage0-field-collection-and-enablement.md`](../../../../GpsPlusSlamJs_Docs/docs/2026-06-26-stage0-field-collection-and-enablement.md).
 - `SlamAppRootState` — base state shape (no extras).
 - `SlamAppCombinedState<ExtraReducers>` — base state plus typed extras.
 - `SlamAppMiddleware` — middleware signature accepted by `extraMiddleware`.

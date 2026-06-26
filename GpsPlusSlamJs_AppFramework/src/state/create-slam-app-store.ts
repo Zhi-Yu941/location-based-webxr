@@ -29,6 +29,7 @@ import {
   sanitizeForDevTools,
   validateLicenseKey,
   setZeroPos,
+  setColdStartOverrideEnabled,
   type RootState as LibraryRootState,
 } from 'gps-plus-slam-js';
 import { COMMUNITY_LICENSE_KEY } from 'gps-plus-slam-js/community-license-key';
@@ -139,6 +140,23 @@ export interface SlamAppStoreOptions<
    * @see docs/2026-05-16-tracking-quality-metrics-plan.md
    */
   trackingQualityOptions?: Partial<TrackingQualityOptions>;
+
+  /**
+   * **Debug/experiment flag** — enable the library's Phase-4 Stage-0 cold-start
+   * compass yaw override. When `true`, the factory dispatches
+   * `setColdStartOverrideEnabled(true)` the first time `gpsData` becomes
+   * non-null (i.e. right after the first `setZeroPos`, since the flag lives on
+   * that slice and cannot be set before it exists). Default `false` ⇒ the core
+   * solve is byte-identical to today. Keep OFF until the override's thresholds
+   * are re-tuned on field data.
+   *
+   * Note: the resulting `setColdStartOverrideEnabled` action is a `gpsData`
+   * action and is therefore persisted into recordings, so a replay re-enables
+   * the override. Collect field-calibration recordings with this OFF.
+   *
+   * @see GpsPlusSlamJs_Docs/docs/2026-06-26-stage0-field-collection-and-enablement.md
+   */
+  enableCompassColdStartOverride?: boolean;
 }
 
 /**
@@ -189,6 +207,7 @@ export function createSlamAppStore<
     enableDevChecks = true,
     licenseKey = COMMUNITY_LICENSE_KEY,
     trackingQualityOptions,
+    enableCompassColdStartOverride = false,
   } = options;
 
   validateLicenseKey(licenseKey);
@@ -231,6 +250,30 @@ export function createSlamAppStore<
       stateSanitizer: sanitizeForDevTools,
     },
   });
+
+  // Debug/experiment opt-in for the Stage-0 cold-start override. The flag lives
+  // on the `gpsData` slice, which is `null` until the first `setZeroPos`, so we
+  // enable it once that slice exists. A self-removing subscription keeps this a
+  // one-shot with no lingering listener.
+  if (enableCompassColdStartOverride) {
+    let enabled = false;
+    const tryEnable = (): void => {
+      if (enabled) return;
+      if ((store.getState() as LibraryRootState).gpsData !== null) {
+        // Set the guard BEFORE dispatching: the dispatch notifies subscribers
+        // synchronously and would otherwise re-enter this and recurse.
+        enabled = true;
+        store.dispatch(setColdStartOverrideEnabled(true));
+      }
+    };
+    tryEnable();
+    if (!enabled) {
+      const unsubscribe = store.subscribe(() => {
+        tryEnable();
+        if (enabled) unsubscribe();
+      });
+    }
+  }
 
   return {
     getState: () => store.getState() as SlamAppCombinedState<ExtraReducers>,

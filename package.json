@@ -26,11 +26,6 @@
         "node": ">=20.0.0"
     },
     "license": "Apache-2.0",
-    "pnpm": {
-        "overrides": {
-            "gps-plus-slam-js": "link:../gps-plus-slam/GpsPlusSlamJs"
-        }
-    },
     "devDependencies": {
         "knip": "^6.13.1",
         "vitest": "^4.1.6",

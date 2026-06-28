@@ -412,12 +412,24 @@ export function matrixDelta(
   // case that made raw quat.getAngle return NaN now returns 0 directly (the
   // explicit NaN guard this code used to carry is folded into the helper).
   const angleRad = geodesicAngleRad(prevQuat, currQuat);
-  const rotationDeltaDeg = (angleRad * 180) / Math.PI;
+  // Finite-guard both deltas: geodesicAngleRad's clamp only fixes near-identity
+  // round-off, NOT NaN/Infinity that a degenerate matrix feeds through
+  // getRotation/quat.normalize (and likewise getTranslation/vec3.distance). An
+  // unguarded NaN here propagates into computeConvergence and turns the whole
+  // tracking-quality score into NaN. Fall back to 0 (no delta) on bad input —
+  // the explicit guard this kernel used to carry before the shared-helper
+  // refactor folded the round-off case (but not the NaN case) into the clamp.
+  const rotationDeltaDeg = Number.isFinite(angleRad)
+    ? (angleRad * 180) / Math.PI
+    : 0;
   const prevT = vec3.create();
   const currT = vec3.create();
   mat4.getTranslation(prevT, prevMat);
   mat4.getTranslation(currT, currMat);
-  const translationDeltaM = vec3.distance(prevT, currT);
+  const rawTranslation = vec3.distance(prevT, currT);
+  const translationDeltaM = Number.isFinite(rawTranslation)
+    ? rawTranslation
+    : 0;
   return { rotationDeltaDeg, translationDeltaM };
 }
 

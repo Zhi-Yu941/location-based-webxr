@@ -147,6 +147,26 @@ describe('matrixDelta', () => {
     });
   });
 
+  it('returns finite zero deltas for a non-finite (NaN/Infinity) matrix', () => {
+    // A degenerate alignment solve can emit NaN/Infinity into the 16-element
+    // matrix. geodesicAngleRad's clamp only fixes near-identity round-off, not
+    // NaN propagation, so without an output finite-guard rotation/translation
+    // become NaN and poison the convergence score downstream. (Restores the
+    // explicit finite-guard the shared-kernel refactor folded away.)
+    const nanRotation = [...IDENTITY];
+    nanRotation[0] = Number.NaN; // NaN in the rotation block
+    const r1 = matrixDelta(nanRotation, IDENTITY);
+    expect(Number.isFinite(r1.rotationDeltaDeg)).toBe(true);
+    expect(Number.isFinite(r1.translationDeltaM)).toBe(true);
+    expect(r1).toEqual({ rotationDeltaDeg: 0, translationDeltaM: 0 });
+
+    const infTranslation = [...IDENTITY];
+    infTranslation[13] = Number.POSITIVE_INFINITY; // Infinity in the translation column
+    const r2 = matrixDelta(IDENTITY, infTranslation);
+    expect(Number.isFinite(r2.rotationDeltaDeg)).toBe(true);
+    expect(Number.isFinite(r2.translationDeltaM)).toBe(true);
+  });
+
   // Why this test matters: §11 (a) of the tracking-quality plan requires
   // matrixDelta to agree numerically with the gl-matrix-quat reference
   // kernel used by GpsPlusSlamJs_Investigation/src/investigation-helpers.ts
@@ -255,6 +275,21 @@ describe('computeConvergence', () => {
       { observationIndex: 2, matrix: [...rotY(Math.PI / 2)] }, // 90°
     ];
     expect(computeConvergence(snaps).score).toBe(0);
+  });
+
+  it('keeps the score finite when a snapshot matrix is non-finite', () => {
+    // A single NaN-bearing alignment matrix must not turn the whole convergence
+    // score into NaN (which would silently break the tracking-quality report).
+    const nanMatrix = [...IDENTITY];
+    nanMatrix[0] = Number.NaN;
+    const snaps: AlignmentSnapshot[] = [
+      { observationIndex: 1, matrix: [...IDENTITY] },
+      { observationIndex: 2, matrix: nanMatrix },
+    ];
+    const r = computeConvergence(snaps);
+    expect(Number.isFinite(r.score)).toBe(true);
+    expect(Number.isFinite(r.recentSumRotationDeltaDeg)).toBe(true);
+    expect(Number.isFinite(r.recentSumTranslationDeltaM)).toBe(true);
   });
 });
 

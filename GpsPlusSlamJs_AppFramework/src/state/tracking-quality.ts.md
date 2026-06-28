@@ -122,7 +122,7 @@ receive — copies are taken before sorting or sliding-window operations.
 
 ## Defensive measures
 
-- `matrixDelta` validates length-16 matrices and returns zero deltas otherwise.
+- `matrixDelta` validates length-16 matrices and returns zero deltas otherwise. It also finite-guards both outputs: a NaN/Infinity-bearing matrix (degenerate alignment solve) would otherwise propagate `NaN` through `getRotation`/`vec3.distance` into `computeConvergence` and turn the whole score `NaN`. On non-finite output it falls back to `0` (no delta).
   Internally uses `mat4.getRotation` + `quat.getAngle` + `mat4.getTranslation`
   from gl-matrix — the same kernel as `computeStabilityDelta` in
   `GpsPlusSlamJs_Investigation/src/investigation-helpers.ts`. Per the plan

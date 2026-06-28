@@ -112,6 +112,25 @@ describe('image-capture', () => {
       });
     });
 
+    it('does not save a frame whose encode completes after stop() (legacy path)', async () => {
+      // The default config has no quality gate, so a captured blob saves
+      // synchronously in the toBlob callback. If stop() lands while toBlob is
+      // still encoding (the common case — the gate is off by default), the late
+      // callback ran saveCapture → onCaptured on a stopped session, writing a
+      // frame after teardown that the recorded frameCount never saw.
+      manager = new ImageCaptureManager(mockCanvas, mockCallbacks);
+      manager.start();
+
+      manager.onFrame(1000); // schedules toBlob (callback deferred to a macrotask)
+      expect(mockCanvas.toBlob).toHaveBeenCalledTimes(1);
+      manager.stop(); // stop before the encode callback fires
+
+      await new Promise((r) => setTimeout(r, 0)); // toBlob callback fires now
+
+      expect(mockCallbacks.onCaptured).not.toHaveBeenCalled();
+      expect(manager.getFrameCount()).toBe(0);
+    });
+
     it('should not capture again before interval elapses', async () => {
       // Why this test matters: prevents excessive captures
       manager = new ImageCaptureManager(mockCanvas, mockCallbacks);

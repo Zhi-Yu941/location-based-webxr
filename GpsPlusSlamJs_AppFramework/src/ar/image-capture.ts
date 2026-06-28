@@ -636,6 +636,13 @@ export class ImageCaptureManager {
     pose: ARPose,
     screenRotation: number
   ): void {
+    // Single durable-write chokepoint, so guard it once for every path
+    // (legacy/gate-off, never-good fallback, AND accepting verdict). A blob
+    // whose async encode or off-thread verdict completes after `stop()` must
+    // not increment frameCount or fire onCaptured on a torn-down session — the
+    // recorded frameCount was already snapshotted at stop. The gate-off path is
+    // the common case (quality gate defaults off), so this is the primary guard.
+    if (!this.capturing) return;
     // This interval is now satisfied — clear the retry/quality clocks so the next
     // interval starts fresh. (dueTime was already nulled at dispatch.)
     this.retryPending = false;

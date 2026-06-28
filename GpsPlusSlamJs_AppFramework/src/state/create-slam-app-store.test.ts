@@ -75,8 +75,10 @@ describe('createSlamAppStore', () => {
       });
       // Before any GPS fix: gpsData is null, nothing to enable.
       expect(store.getState().gpsData).toBeNull();
-      // First fix creates the slice; the subscription flips the flag on a
-      // microtask (so the opt-in persists AFTER setZeroPos — replay fidelity).
+      // First fix creates the slice; a prepended listener-middleware effect
+      // flips the flag after setZeroPos's dispatch unwinds (so the opt-in
+      // persists AFTER setZeroPos — replay fidelity). Effects are async, hence
+      // the await. See slam-app-store-listener.ts.
       store.dispatch(setZeroPos({ lat: 0, lon: 0 }));
       await Promise.resolve();
       expect(store.getState().gpsData?.coldStartOverrideEnabled).toBe(true);
@@ -151,7 +153,8 @@ describe('createSlamAppStore', () => {
       // reset), and a one-shot subscription never re-applied it. The opt-in must
       // therefore be idempotently re-applied whenever gpsData exists with the flag
       // unset, not fired exactly once. Modelled here by clearing it directly.
-      // Re-application runs on a microtask (replay-fidelity fix), hence the awaits.
+      // Re-application runs in a listener-middleware effect (async, level-based
+      // predicate: "gpsData exists and a flag is unset"), hence the awaits.
       const store = createSlamAppStore({
         storageBackend: backend,
         enableCompassColdStartOverride: true,

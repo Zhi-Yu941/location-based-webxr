@@ -459,7 +459,7 @@ describe('Recorder Store', () => {
       const byIndex = writeSpy.mock.calls
         .map((c) => ({
           type: (c[0] as { type: string }).type,
-          index: c[1] as number,
+          index: c[1],
         }))
         .sort((a, b) => a.index - b.index);
       const zero = byIndex.find((x) => x.type === 'gpsData/setZeroPos');
@@ -473,6 +473,18 @@ describe('Recorder Store', () => {
       expect((zero as { index: number }).index).toBeLessThan(
         (cold as { index: number }).index
       );
+      // No re-entrant "storm": each opt-in is persisted EXACTLY ONCE. The old
+      // store.subscribe mechanism re-entered itself and double-dispatched each
+      // flag; the listener middleware applies each unset flag once per gpsData
+      // creation (idempotency re-check before each dispatch).
+      const optInTypes = [
+        'gpsData/setColdStartOverrideEnabled',
+        'gpsData/setCompassRotationPriorEnabled',
+        'gpsData/setCompassWebXRConsistencyEnabled',
+      ];
+      for (const t of optInTypes) {
+        expect(byIndex.filter((x) => x.type === t)).toHaveLength(1);
+      }
     });
 
     it('should use per-instance action indices, not shared across stores (Bug 10)', () => {

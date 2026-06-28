@@ -53,6 +53,10 @@ import {
   createPersistenceMiddleware,
   slicePrefixOf,
 } from './persistence-middleware';
+import {
+  createSlamAppStoreListenerMiddleware,
+  type CompassOptIn,
+} from './slam-app-store-listener';
 
 /**
  * Slice prefixes the framework always persists, derived from the actual
@@ -248,6 +252,52 @@ export function createSlamAppStore<
     trackingQualityOptions
   );
 
+  // Debug/experiment opt-ins for the compass alignment flags. They live on the
+  // `gpsData` slice, which is `null` until the first `setZeroPos`, so a listener
+  // middleware applies them once that slice exists. Each opt-in: a predicate
+  // reading whether the flag is already set, and the action that sets it.
+  //
+  // Why a listener middleware (not a `store.subscribe` dispatch): the apply must
+  // dispatch a follow-up action in reaction to `gpsData` appearing. A synchronous
+  // `store.subscribe` dispatch runs INSIDE the trigger's `next()`, and the
+  // persistence middleware assigns its replay index AFTER `next()` — so the opt-in
+  // would get a LOWER index than the `setZeroPos` that created `gpsData`, be
+  // recorded BEFORE its trigger, and be dropped on replay (field bug 2026-06-27,
+  // recordings 64c6a294 / e7431b85). A prepended listener-middleware effect runs
+  // after the trigger unwinds, so the opt-in is a top-level dispatch persisted
+  // AFTER setZeroPos — correct replay order by construction, no `queueMicrotask`
+  // / re-entrancy guard to hand-maintain. See `slam-app-store-listener.ts` and
+  // GpsPlusSlamJs_Docs/docs/2026-06-28-subscriber-dispatch-persistence-ordering-plan.md.
+  const compassOptIns: CompassOptIn[] = [];
+  if (enableCompassColdStartOverride) {
+    compassOptIns.push({
+      isSet: (s) => s.gpsData?.coldStartOverrideEnabled === true,
+      apply: (dispatch) => dispatch(setColdStartOverrideEnabled(true)),
+    });
+  }
+  if (enableCompassRotationPrior) {
+    compassOptIns.push({
+      isSet: (s) => s.gpsData?.compassRotationPriorEnabled === true,
+      apply: (dispatch) => dispatch(setCompassRotationPriorEnabled(true)),
+    });
+  }
+  if (enableCompassWebXRConsistency) {
+    compassOptIns.push({
+      isSet: (s) => s.gpsData?.compassWebXRConsistencyEnabled === true,
+      apply: (dispatch) => dispatch(setCompassWebXRConsistencyEnabled(true)),
+    });
+  }
+
+  // Listener middlewares are prepended (outermost) so their effects dispatch
+  // OUTSIDE the trigger's `next()` — the compass listener is only added when an
+  // opt-in is requested, so the common path keeps zero per-action overhead.
+  const prependedListeners: SlamAppMiddleware[] = [trackingQualityMiddleware];
+  if (compassOptIns.length > 0) {
+    prependedListeners.push(
+      createSlamAppStoreListenerMiddleware(compassOptIns)
+    );
+  }
+
   const store = configureStore({
     reducer,
     middleware: (getDefaultMiddleware) =>
@@ -255,7 +305,7 @@ export function createSlamAppStore<
         serializableCheck: enableDevChecks,
         immutableCheck: enableDevChecks,
       })
-        .prepend(trackingQualityMiddleware)
+        .prepend(...prependedListeners)
         .concat(
           createPersistenceMiddleware({
             storageBackend,
@@ -272,75 +322,6 @@ export function createSlamAppStore<
       stateSanitizer: sanitizeForDevTools,
     },
   });
-
-  // Debug/experiment opt-ins for the compass alignment flags. They live on the
-  // `gpsData` slice, which is `null` until the first `setZeroPos`, so we enable
-  // them once that slice exists. A single self-removing subscription dispatches
-  // every requested opt-in as a one-shot (no lingering listener).
-  // Each opt-in: a predicate reading whether the flag is already set on gpsData,
-  // and the action that sets it. We RE-APPLY (idempotently) rather than fire
-  // once: in the recorder the flag could land against a gpsData that is then
-  // recreated (store swap / origin reset), and a one-shot would never re-apply
-  // it (field bug 2026-06-27). Dispatching only when a flag is unset means each
-  // settles after one dispatch (no loop), but re-fires if gpsData is recreated.
-  const optIns: Array<{
-    isSet: (s: LibraryRootState) => boolean;
-    apply: () => void;
-  }> = [];
-  if (enableCompassColdStartOverride) {
-    optIns.push({
-      isSet: (s) => s.gpsData?.coldStartOverrideEnabled === true,
-      apply: () => store.dispatch(setColdStartOverrideEnabled(true)),
-    });
-  }
-  if (enableCompassRotationPrior) {
-    optIns.push({
-      isSet: (s) => s.gpsData?.compassRotationPriorEnabled === true,
-      apply: () => store.dispatch(setCompassRotationPriorEnabled(true)),
-    });
-  }
-  if (enableCompassWebXRConsistency) {
-    optIns.push({
-      isSet: (s) => s.gpsData?.compassWebXRConsistencyEnabled === true,
-      apply: () => store.dispatch(setCompassWebXRConsistencyEnabled(true)),
-    });
-  }
-  if (optIns.length > 0) {
-    const applyUnset = (): void => {
-      const s = store.getState() as LibraryRootState;
-      if (s.gpsData === null) return;
-      for (const optIn of optIns) {
-        if (!optIn.isSet(s)) optIn.apply();
-      }
-    };
-    // Apply on a MICROTASK, never synchronously inside the subscriber. A
-    // synchronous opt-in dispatch from within (e.g.) setZeroPos's subscriber
-    // notification persists the opt-in actions BEFORE setZeroPos itself: the
-    // persistence middleware enqueues after `next()`, and Redux runs subscriber
-    // notifications within `next()`, so the nested opt-in dispatches receive
-    // LOWER persistence indices than the setZeroPos that creates gpsData. On
-    // replay the reducer then drops them (gpsData still null at that index), so
-    // the override looked OFF on replay even though it worked live — and the
-    // re-entrant subscriber also double-dispatched each flag (field bug
-    // 2026-06-27, recordings 64c6a294 / e7431b85; repro in recorder-store.test.ts
-    // "persists the compass opt-in AFTER setZeroPos"). Deferring makes the opt-ins
-    // top-level dispatches that persist AFTER setZeroPos and replay correctly; the
-    // `scheduled` guard collapses the re-entrant storm to a single pass.
-    let scheduled = false;
-    const ensureApplied = (): void => {
-      if (scheduled) return;
-      const s = store.getState() as LibraryRootState;
-      if (s.gpsData === null) return; // flags live on gpsData; nothing to set yet
-      if (optIns.every((optIn) => optIn.isSet(s))) return; // all settled
-      scheduled = true;
-      queueMicrotask(() => {
-        scheduled = false;
-        applyUnset();
-      });
-    };
-    ensureApplied(); // schedule now if gpsData already exists
-    store.subscribe(ensureApplied); // re-apply whenever gpsData (re)exists with a flag unset
-  }
 
   return {
     getState: () => store.getState() as SlamAppCombinedState<ExtraReducers>,

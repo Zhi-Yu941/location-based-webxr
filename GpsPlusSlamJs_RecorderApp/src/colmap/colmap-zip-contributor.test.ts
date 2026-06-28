@@ -17,6 +17,7 @@ import { describe, it, expect } from 'vitest';
 import type { ArImageCapture, Matrix4 } from 'gps-plus-slam-app-framework/core';
 import { OccupancyGrid } from 'gps-plus-slam-app-framework/ar/occupancy-grid';
 import { createColmapZipContributor } from './colmap-zip-contributor';
+import { webxrToColmapWorldPoint } from './colmap-conversions';
 
 // A symmetric perspective matrix (column-major): fx=0.5·W·m00, etc.
 // m00=m11=1 → fx=W/2, fy=H/2; m20=m21=0 → cx=W/2, cy=H/2.
@@ -85,7 +86,7 @@ describe('createColmapZipContributor', () => {
     expect(pointLines[0]).toMatch(/^1 \S+ \S+ \S+ 10 20 30 \S+$/);
   });
 
-  it('emits the exact per-cell surface point, not the lattice center (Item A)', async () => {
+  it('emits the exact per-cell surface point, flipped into the COLMAP world frame (Items A+B)', async () => {
     const grid = new OccupancyGrid();
     // depth 2 at center screen → exact point [0,0,-2]; with 0.15 m cells the
     // lattice center is [0,0,-1.95], so exact ≠ center.
@@ -99,6 +100,10 @@ describe('createColmapZipContributor', () => {
     const cell = grid.getOccupiedCells()[0]!;
     const exact = grid.getCellPoint(cell)!;
     expect(exact).not.toEqual(grid.getCellCenter(cell)); // sanity
+    // The export applies the world basis change (Item B, upside-down fix) — the
+    // SAME flip folded into the camera extrinsics — so the written point is the
+    // exact surface point with Y and Z negated, keeping it registered.
+    const expected = webxrToColmapWorldPoint(exact);
 
     const { files } = await runContributor({
       getFrames: () => [frame()],
@@ -111,9 +116,9 @@ describe('createColmapZipContributor', () => {
       .find((l) => /^\d+ /.test(l))!
       .split(' ');
     // POINT3D_ID X Y Z R G B ERROR
-    expect(Number(xyz[1])).toBeCloseTo(exact[0], 5);
-    expect(Number(xyz[2])).toBeCloseTo(exact[1], 5);
-    expect(Number(xyz[3])).toBeCloseTo(exact[2], 5);
+    expect(Number(xyz[1])).toBeCloseTo(expected[0], 5);
+    expect(Number(xyz[2])).toBeCloseTo(expected[1], 5);
+    expect(Number(xyz[3])).toBeCloseTo(expected[2], 5);
   });
 
   it('uses the bare image filename as NAME (image_path → images/)', async () => {

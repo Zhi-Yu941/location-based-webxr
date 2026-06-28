@@ -20,7 +20,11 @@ import type {
   Quaternion,
   Vector3,
 } from 'gps-plus-slam-app-framework/core';
-import { webxrToColmapPose, pinholeFromProjection } from './colmap-conversions';
+import {
+  webxrToColmapPose,
+  webxrToColmapWorldPoint,
+  pinholeFromProjection,
+} from './colmap-conversions';
 
 // ---------------------------------------------------------------------------
 // Arbitraries
@@ -49,11 +53,16 @@ const arbPos: fc.Arbitrary<Vector3> = fc.tuple(
 // ---------------------------------------------------------------------------
 
 describe('webxrToColmapPose (property)', () => {
-  it('maps a world point to the basis-changed WebXR view coordinates', () => {
+  it('keeps cameras and points registered (flipped world point → true camera coords)', () => {
+    // The single most important invariant: after the world basis change (Item B,
+    // the upside-down fix), the extrinsic applied to the FLIPPED world point must
+    // still reproduce the physical point's COLMAP camera coordinates. If it did
+    // not, points and cameras would drift apart and the reconstruction would be
+    // mis-registered. Expected = WebXR view coords then the camera basis change
+    // (negate Y,Z) — unchanged by the world flip; only the world point we feed in
+    // is flipped to match the new world frame.
     fc.assert(
       fc.property(arbPos, arbQuat, arbPos, (camPos, camRot, worldPoint) => {
-        // Expected: WebXR view coords of the point, then negate Y and Z to get
-        // COLMAP camera coords (the +Y-up/−Z-fwd → +Y-down/+Z-fwd basis change).
         const camToWorld = new THREE.Matrix4().compose(
           new THREE.Vector3(...camPos),
           new THREE.Quaternion(camRot[0], camRot[1], camRot[2], camRot[3]),
@@ -69,10 +78,10 @@ describe('webxrToColmapPose (property)', () => {
           -viewWebxr.z
         );
 
-        // Actual: X_cam = R(qvec)·X_world + tvec
+        // Actual: X_cam = R(qvec)·(G·X_world) + tvec, with G the world flip.
         const { qvec, tvec } = webxrToColmapPose(camPos, camRot);
         const rot = new THREE.Quaternion(qvec[1], qvec[2], qvec[3], qvec[0]);
-        const actual = new THREE.Vector3(...worldPoint)
+        const actual = new THREE.Vector3(...webxrToColmapWorldPoint(worldPoint))
           .applyQuaternion(rot)
           .add(new THREE.Vector3(...tvec));
 
@@ -89,6 +98,39 @@ describe('webxrToColmapPose (property)', () => {
       fc.property(arbPos, arbQuat, (camPos, camRot) => {
         const { qvec } = webxrToColmapPose(camPos, camRot);
         expect(Math.hypot(...qvec)).toBeCloseTo(1, 6);
+      })
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// webxrToColmapWorldPoint (the world basis change G = diag(1, −1, −1))
+// ---------------------------------------------------------------------------
+
+describe('webxrToColmapWorldPoint (property)', () => {
+  it('negates Y and Z, preserves X (180° about X — upright, not mirrored)', () => {
+    // Pins the EXACT basis change. Negating exactly Y and Z (and nothing else)
+    // makes the matrix diag(1,−1,−1), whose determinant is +1 → a proper
+    // rotation, so the splat loads upright WITHOUT mirroring (the report: "not
+    // mirrored"). A handedness flip would have negated one or three components.
+    fc.assert(
+      fc.property(arbPos, (p) => {
+        const [x, y, z] = webxrToColmapWorldPoint(p);
+        expect(x).toBe(p[0]);
+        expect(y).toBe(-p[1]);
+        expect(z).toBe(-p[2]);
+      })
+    );
+  });
+
+  it('preserves pairwise distances (it is a rigid rotation, no scaling/shear)', () => {
+    fc.assert(
+      fc.property(arbPos, arbPos, (a, b) => {
+        const fa = webxrToColmapWorldPoint(a);
+        const fb = webxrToColmapWorldPoint(b);
+        const before = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+        const after = Math.hypot(fa[0] - fb[0], fa[1] - fb[1], fa[2] - fb[2]);
+        expect(after).toBeCloseTo(before, 9);
       })
     );
   });

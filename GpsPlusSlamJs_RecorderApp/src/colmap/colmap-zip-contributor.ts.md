@@ -46,24 +46,31 @@ Iter 3.
   single-frame depth noise — in particular **behind-surface** phantoms that
   free-space carving can never clear — is kept out of the reconstruction. See
   [2026-06-22-occupancy-grid-behind-surface-noise-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-22-occupancy-grid-behind-surface-noise-plan.md).
-- **World frame:** points are passed to `points3D` untransformed — raw WebXR
-  world IS the COLMAP world (Iter-1 camera-only basis change), so points and
-  cameras stay registered.
+- **World frame:** points are run through `webxrToColmapWorldPoint` (the
+  `G = diag(1,−1,−1)` world basis change — negate Y,Z) before `points3D`, the
+  SAME `G` folded into the camera extrinsics by `webxrToColmapPose`. This flips
+  our WebXR Y-up world into the viewers' Y-down gravity world so the export loads
+  **upright**, while keeping points and cameras registered (follow-up Item B).
 - **Color fallback:** cells with no observed RGB (`getCellColor` → null) emit
   mid-gray `128 128 128` rather than black.
 - **Empty grid:** still emits a valid model (cameras + images) with an empty
   `points3D.txt`.
 
-## Known: scene loads upside-down (manual fix)
+## Orientation: upright by default (world flip applied)
 
-The exported world is raw-WebXR **+Y-up**; COLMAP/3DGS viewers (Lichtfeld
-Studio, etc.) conventionally treat the world as **+Y-down gravity**, so the
-reconstruction loads **upside-down** (otherwise consistent — not mirrored, not
-mis-scaled). **Fix in the viewer: rotate the splat 180° about the X axis.** This
-is a deliberate decision (follow-up Item B, Q-B1) to keep the export untouched
-rather than fold a world transform into every file; the analysis of the
-in-export fix (a shared `G = diag(1,−1,−1)` world basis change) is recorded in
-the follow-up plan should we ever want upright-by-default.
+COLMAP/3DGS viewers (Lichtfeld Studio, gsplat, Nerfstudio) treat the COLMAP
+world as **+Y-down gravity**, while our raw-WebXR world is **+Y-up**. The export
+therefore applies a shared world basis change `G = diag(1,−1,−1)` (a proper
+180°-about-X rotation, det = +1 → no mirroring) to **both** the points
+(`webxrToColmapWorldPoint`) and the camera extrinsics (`webxrToColmapPose`), so
+new ZIPs load **upright** and stay internally consistent (registered, not
+mirrored, correctly scaled).
+
+This reverses the earlier document-only decision (follow-up Item B / Q-B1, which
+had kept the export raw-WebXR and asked users to rotate 180° about X in the
+viewer). **Old ZIPs exported before this change still load upside-down** — only
+new exports are corrected; no migration is performed. The derivation is in
+[colmap-conversions.ts.md](colmap-conversions.ts.md) and follow-up Item B.
 
 ## Wiring
 

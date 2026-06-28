@@ -33,7 +33,11 @@ import type {
 } from 'gps-plus-slam-app-framework/storage/zip-export';
 import type { ArImageCapture, Matrix4 } from 'gps-plus-slam-app-framework/core';
 import type { OccupancyGrid } from 'gps-plus-slam-app-framework/ar/occupancy-grid';
-import { webxrToColmapPose, pinholeFromProjection } from './colmap-conversions';
+import {
+  webxrToColmapPose,
+  webxrToColmapWorldPoint,
+  pinholeFromProjection,
+} from './colmap-conversions';
 import {
   serializeCamerasTxt,
   serializeImagesTxt,
@@ -155,7 +159,12 @@ function firstPixelDimensions(
   return null;
 }
 
-/** Map occupancy-grid cells to COLMAP point records (raw-WebXR == COLMAP world). */
+/**
+ * Map occupancy-grid cells to COLMAP point records. The exact per-cell surface
+ * point (raw WebXR) is flipped into the COLMAP world frame with the SAME basis
+ * change the camera extrinsics use, so points and cameras stay registered and
+ * the reconstruction loads upright (follow-up Items A + B).
+ */
 function collectPoints(
   grid: OccupancyGrid | null,
   minConfidence: number
@@ -166,8 +175,10 @@ function collectPoints(
     pointId: i + 1,
     // The exact per-cell surface point (follow-up Item A) — hugs the real
     // surface instead of snapping to the 15 cm lattice; falls back to the
-    // cell center defensively.
-    xyz: grid.getCellPoint(cell) ?? grid.getCellCenter(cell),
+    // cell center defensively — then flipped into the COLMAP world (Item B).
+    xyz: webxrToColmapWorldPoint(
+      grid.getCellPoint(cell) ?? grid.getCellCenter(cell)
+    ),
     rgb: grid.getCellColor(cell) ?? FALLBACK_RGB,
     error: POINT_ERROR,
   }));

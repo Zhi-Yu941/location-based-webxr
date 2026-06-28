@@ -442,6 +442,14 @@ export class ImageCaptureManager {
       this.motionWindow.reset();
       this.prevPose = null;
       this.prevTime = 0;
+      // Also reset the quality-gate retry state. `qualityDeadlineBase` measures
+      // the never-good `maxWaitMs` fallback from the FIRST attempt of an interval
+      // (cleared only on save). A tracking outage longer than maxWaitMs would
+      // otherwise leave it stale, so the first frame after recovery satisfies
+      // `time - base >= maxWaitMs` and is saved fail-open WITHOUT analysis — even
+      // if blurry/black. Clearing it lets recovery start a fresh quality attempt.
+      this.retryPending = false;
+      this.qualityDeadlineBase = null;
       return;
     }
     if (this.prevPose && this.prevTime > 0) {

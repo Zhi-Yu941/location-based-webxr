@@ -241,6 +241,52 @@ describe('drawMapData', () => {
     );
   });
 
+  // Finding 2 (2026-06-28): the live/replay overlay draws a thin blue
+  // view-direction line from the user dot, rotated to the absolute (true-north)
+  // heading. The line lives inside the user-position divIcon so it stays a fixed
+  // pixel length at any zoom. When the heading is undefined we draw the dot alone.
+  describe('user heading line (Finding 2)', () => {
+    it('draws a heading line rotated to userHeadingDeg inside the user divIcon', () => {
+      drawMapData(
+        mapStub,
+        emptyMapData({ userPosition: { lat: 9, lng: 10 }, userHeadingDeg: 90 }),
+        { showUserPosition: true }
+      );
+
+      expect(markerCalls).toHaveLength(1);
+      const html = String(divIconCalls[0]!.options.html);
+      expect(html).toContain('map-overlay-user-heading');
+      expect(html).toContain('rotate(90');
+    });
+
+    it('draws the dot only (no heading line) when userHeadingDeg is null', () => {
+      drawMapData(
+        mapStub,
+        emptyMapData({
+          userPosition: { lat: 9, lng: 10 },
+          userHeadingDeg: null,
+        }),
+        { showUserPosition: true }
+      );
+
+      expect(markerCalls).toHaveLength(1);
+      const html = String(divIconCalls[0]!.options.html);
+      expect(html).not.toContain('map-overlay-user-heading');
+      // The dot itself is still present.
+      expect(html).toContain(USER_POSITION_COLOR);
+    });
+
+    it('draws the dot only when userHeadingDeg is absent (legacy MapData literal)', () => {
+      drawMapData(
+        mapStub,
+        emptyMapData({ userPosition: { lat: 9, lng: 10 } }),
+        { showUserPosition: true }
+      );
+      const html = String(divIconCalls[0]!.options.html);
+      expect(html).not.toContain('map-overlay-user-heading');
+    });
+  });
+
   it('skips empty slices without creating layers', () => {
     const result = drawMapData(mapStub, emptyMapData());
     expect(polylineCalls).toHaveLength(0);

@@ -28,8 +28,9 @@
  * § Step 5.
  */
 
-import type { LatLong, Matrix4, Vector3 } from 'gps-plus-slam-js';
+import type { LatLong, Matrix4, Quaternion, Vector3 } from 'gps-plus-slam-js';
 import { computeFusedPath } from '../utils/fused-path';
+import { computeUserHeadingDeg } from '../utils/user-heading';
 import type { GpsCoord, RawGpsSample } from '../types/geo-types';
 
 // ============================================================================
@@ -46,6 +47,19 @@ export interface MapData {
   fusedPath: GpsCoord[];
   /** Alignment-snapshot GPS positions (red). */
   alignmentSnapshots: GpsCoord[];
+  /**
+   * Absolute view-direction bearing (degrees clockwise from true geographic
+   * north, `[0, 360)`) for the user-position heading line, or null when
+   * undefined (no rotation/alignment yet, or camera near-vertical). See
+   * Finding 2 of
+   * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-28-map-rings-transparency-and-view-direction-user-feedback.md.
+   *
+   * Optional only so pre-existing direct `MapData` literals (e.g. the static
+   * summary map, which is out of scope and draws no heading line) keep
+   * compiling. `buildMapData` ALWAYS sets it (to a bearing or null); a missing
+   * value is treated by `drawMapData` exactly like null (no line).
+   */
+  userHeadingDeg?: number | null;
 }
 
 /**
@@ -57,6 +71,13 @@ export interface MapDataInput {
   rawGpsPath?: readonly RawGpsSample[];
   /** Odometry positions (AR-local) used to derive the fused path. */
   odometryPositions?: ReadonlyArray<Vector3>;
+  /**
+   * Odometry rotations (NUE quaternions, as stored in
+   * `gpsEvents.odometryRotations`). The LATEST entry drives the user heading
+   * line; earlier entries are ignored here. Pass the `selectOdometryRotations`
+   * value directly.
+   */
+  odometryRotations?: ReadonlyArray<Quaternion>;
   /** Latest alignment matrix from the solver (null until first solve). */
   alignmentMatrix?: Matrix4 | null;
   /** GPS origin for ENU→GPS conversion (null when no GPS yet). */
@@ -104,10 +125,18 @@ export function buildMapData(input: MapDataInput): MapData {
         ? { lat: lastRaw.lat, lng: lastRaw.lng }
         : null;
 
+  const rotations = input.odometryRotations ?? [];
+  const latestRotation = rotations[rotations.length - 1] ?? null;
+  const userHeadingDeg = computeUserHeadingDeg({
+    odometryRotation: latestRotation,
+    alignmentMatrix: input.alignmentMatrix ?? null,
+  });
+
   return {
     userPosition,
     rawGpsPath,
     fusedPath,
     alignmentSnapshots,
+    userHeadingDeg,
   };
 }

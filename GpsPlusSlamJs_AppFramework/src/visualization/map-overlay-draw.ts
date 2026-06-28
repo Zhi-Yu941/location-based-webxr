@@ -14,7 +14,8 @@
  *      polyline stays on top), then the raw GPS polyline;
  *   2. the fused (SLAM+GPS) polyline;
  *   3. the alignment-snapshot polyline;
- *   4. (optional) a user-position marker.
+ *   4. (optional) a user-position marker — a dot plus, when `userHeadingDeg`
+ *      is set, a thin view-direction line rotated to that true-north bearing.
  *
  * SCOPE: this module draws only the genuinely-shared SLAM/GPS trajectory
  * layers. Reference-point markers are a RECORDER concept and are drawn by the
@@ -51,6 +52,33 @@ export const USER_POSITION_COLOR = VIS_COLORS.USER_POSITION.css;
 export const MAP_PATH_POLYLINE_WEIGHT = 3;
 /** Polyline opacity — matches the recorder's `PATH_POLYLINE_OPACITY`. */
 export const MAP_PATH_POLYLINE_OPACITY = 0.8;
+
+/**
+ * Length (px) of the user view-direction line. A FIXED pixel length (not a
+ * metric distance): the line is a direction-only indicator drawn inside the
+ * user-position divIcon, so it stays the same size at every zoom level.
+ * Module-private — internal styling detail, not part of the public surface.
+ */
+const USER_HEADING_LINE_LENGTH_PX = 28;
+
+/**
+ * Build the inner HTML for the user-position divIcon: a centered dot, plus —
+ * when `headingDeg` is a finite bearing — a thin line rotated to that absolute
+ * (true-north) heading. The line lives in a zero-size wrapper centered on the
+ * dot and rotated by CSS, so North (0°) points up and the line keeps a fixed
+ * pixel length regardless of map zoom. A null/undefined/non-finite heading
+ * yields the dot alone (Finding 2: fallback when the camera is near-vertical or
+ * before the first alignment solve).
+ */
+function buildUserMarkerHtml(headingDeg: number | null | undefined): string {
+  const dot = `<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:${USER_POSITION_COLOR};width:14px;height:14px;border-radius:50%;border:2px solid white;"></div>`;
+  if (typeof headingDeg !== 'number' || !Number.isFinite(headingDeg)) {
+    return dot;
+  }
+  const line = `<div style="position:absolute;left:50%;top:50%;transform:rotate(${headingDeg}deg);"><div class="map-overlay-user-heading" style="position:absolute;left:-1px;bottom:0;width:2px;height:${USER_HEADING_LINE_LENGTH_PX}px;background:${USER_POSITION_COLOR};"></div></div>`;
+  // Line first so the dot renders on top of the line's base.
+  return `${line}${dot}`;
+}
 
 // ============================================================================
 // Types
@@ -148,11 +176,11 @@ export function drawMapData(
     }
   }
 
-  // 4. Optional user-position marker.
+  // 4. Optional user-position marker (dot) + optional view-direction line.
   if (options.showUserPosition && data.userPosition) {
     const icon = L.divIcon({
       className: 'map-overlay-user-position',
-      html: `<div style="background:${USER_POSITION_COLOR};width:14px;height:14px;border-radius:50%;border:2px solid white;"></div>`,
+      html: buildUserMarkerHtml(data.userHeadingDeg),
       iconSize: [18, 18],
       iconAnchor: [9, 9],
     });

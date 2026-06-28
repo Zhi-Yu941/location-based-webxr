@@ -486,6 +486,28 @@ describe('LeafletMapOverlay', () => {
       overlay.dispose();
     });
 
+    // Why: Finding 2 (2026-06-28) — the live overlay AND replay both call
+    // render(), which forwards the MapData straight to drawMapData with
+    // showUserPosition: true. A MapData carrying a userHeadingDeg must therefore
+    // produce the rotated view-direction line in the user-position divIcon for
+    // both modes. (Replay re-dispatches recorded odom rotations through the same
+    // store → rebuildMap → render path, so this one assertion covers it.)
+    it('renders the view-direction heading line when MapData carries a userHeadingDeg', () => {
+      const { overlay } = createOverlay();
+      overlay.setGpsPosition(50.0, 8.0);
+      overlay.show();
+
+      vi.mocked(L.divIcon).mockClear();
+      overlay.render({ ...sampleMapData(), userHeadingDeg: 123 });
+
+      const opts = vi.mocked(L.divIcon).mock.calls.at(-1)?.[0] as {
+        html?: string;
+      };
+      expect(String(opts.html)).toContain('map-overlay-user-heading');
+      expect(String(opts.html)).toContain('rotate(123');
+      overlay.dispose();
+    });
+
     // Why: render() draws the trajectory polylines (raw/fused/snapshot)
     it('should draw trajectory polylines from a MapData snapshot', () => {
       const { overlay } = createOverlay();

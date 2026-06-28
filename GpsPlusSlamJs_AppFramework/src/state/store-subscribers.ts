@@ -178,6 +178,7 @@ export function wireStoreSubscribers(
       buildMapData({
         rawGpsPath,
         odometryPositions: selectOdometryPositions(state),
+        odometryRotations: selectOdometryRotations(state),
         alignmentMatrix: selectAlignmentMatrix(state),
         zeroRef: selectZeroReference(state),
         alignmentSnapshots: alignmentSnapshotGps,

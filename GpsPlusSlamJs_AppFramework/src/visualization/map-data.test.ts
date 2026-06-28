@@ -15,8 +15,9 @@
 import { describe, it, expect } from 'vitest';
 import { buildMapData } from './map-data';
 import { computeFusedPath } from '../utils/fused-path';
-import type { Matrix4, Vector3 } from 'gps-plus-slam-js';
+import type { Matrix4, Quaternion, Vector3 } from 'gps-plus-slam-js';
 import type { RawGpsSample } from '../types/geo-types';
+import { computeUserHeadingDeg } from '../utils/user-heading';
 
 // ============================================================================
 // Fixtures
@@ -149,6 +150,50 @@ describe('buildMapData', () => {
     it('is null when there is no raw GPS and none is provided', () => {
       const data = buildMapData({ odometryPositions: ODOM });
       expect(data.userPosition).toBeNull();
+    });
+  });
+
+  // Finding 2 (2026-06-28): the live/replay overlay draws a thin view-direction
+  // line from the user dot. buildMapData carries the bearing as userHeadingDeg.
+  // The frame algebra itself is pinned by user-heading.test.ts; here we only
+  // assert the wiring (latest rotation + alignment matrix → kernel result).
+  describe('userHeadingDeg (Finding 2)', () => {
+    const IDENTITY_Q: Quaternion = [0, 0, 0, 1];
+    // A non-identity rotation that must be IGNORED when it is not the latest.
+    const OTHER_Q: Quaternion = [0, 0.7071, 0, 0.7071];
+
+    it('is null on empty input', () => {
+      expect(buildMapData({}).userHeadingDeg).toBeNull();
+    });
+
+    it('is null when there is no alignment matrix yet', () => {
+      const data = buildMapData({
+        odometryRotations: [IDENTITY_Q],
+        alignmentMatrix: null,
+      });
+      expect(data.userHeadingDeg).toBeNull();
+    });
+
+    it('is null when there are no rotations yet', () => {
+      const data = buildMapData({
+        odometryRotations: [],
+        alignmentMatrix: IDENTITY_MAT4,
+      });
+      expect(data.userHeadingDeg).toBeNull();
+    });
+
+    it('computes the bearing from the LATEST rotation and alignment matrix', () => {
+      const data = buildMapData({
+        // First entry is non-identity and must be ignored; the last wins.
+        odometryRotations: [OTHER_Q, IDENTITY_Q],
+        alignmentMatrix: IDENTITY_MAT4,
+      });
+      const expected = computeUserHeadingDeg({
+        odometryRotation: IDENTITY_Q,
+        alignmentMatrix: IDENTITY_MAT4,
+      });
+      expect(data.userHeadingDeg).toBe(expected);
+      expect(data.userHeadingDeg).toBeCloseTo(0, 3); // identity camera → North
     });
   });
 });

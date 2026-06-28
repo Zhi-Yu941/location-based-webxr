@@ -18,10 +18,14 @@ renderers cannot diverge again.
      drawn first so the polyline stays on top) + raw GPS polyline;
   2. fused SLAM+GPS polyline;
   3. alignment-snapshot polyline;
-  4. optional user-position marker (`options.showUserPosition`).
+  4. optional user-position marker (`options.showUserPosition`) — a dot plus,
+     when `MapData.userHeadingDeg` is a finite bearing, a thin view-direction
+     line rotated to that absolute (true-north) heading.
      Returns `{ layers, bounds }`.
 - `DrawMapDataOptions` — `{ showUserPosition?: boolean }` (default off).
 - `DrawnMapData` — `{ layers: L.Layer[]; bounds: L.LatLngBounds }`.
+- (internal) `USER_HEADING_LINE_LENGTH_PX = 28` — fixed pixel length of the
+  heading line; module-private styling detail, not exported.
 - Color constants: `RAW_GPS_COLOR`, `FUSED_PATH_COLOR`,
   `ALIGNMENT_SNAPSHOT_COLOR`, `USER_POSITION_COLOR` (from
   [vis-colors.ts](vis-colors.ts)).
@@ -41,6 +45,14 @@ renderers cannot diverge again.
   helper (called from both the summary map and the live overlay), so the two
   maps stay identical while the framework stays ref-point-agnostic.
 - Draw order is significant: accuracy circles precede the raw polyline.
+- **Heading line (Finding 2):** drawn inside the user-position `divIcon` (not as
+  a Leaflet polyline) so it keeps a FIXED pixel length at any zoom. It lives in a
+  zero-size wrapper centred on the dot and is rotated by CSS, so North (0°)
+  points up. A `null`/absent/non-finite `userHeadingDeg` yields the dot alone
+  (camera near-vertical, or before the first alignment solve). Accuracy circles
+  are stroke-only — see [accuracy-circles.ts.md](accuracy-circles.ts.md). Both
+  belong to Finding 2 / Finding 1 of
+  [2026-06-28-map-rings-transparency-and-view-direction-user-feedback.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-28-map-rings-transparency-and-view-direction-user-feedback.md).
 
 ## Examples
 
@@ -55,5 +67,6 @@ if (bounds.isValid()) map.fitBounds(bounds, { padding: [20, 20] });
 ## Tests
 
 - [map-overlay-draw.test.ts](map-overlay-draw.test.ts) — draw order, per-layer
-  styles/coordinates, bounds accumulation, returned layers, and the optional
-  user marker, against a recording Leaflet mock.
+  styles/coordinates, bounds accumulation, returned layers, the optional user
+  marker, and the heading line (rotated when `userHeadingDeg` is set, dot-only
+  when null/absent), against a recording Leaflet mock.

@@ -1624,6 +1624,52 @@ describe('wireStoreSubscribers', () => {
       expect(data.fusedPath[0]!.lng).toBeCloseTo(8, 4);
     });
 
+    it('threads the user heading from the latest odometry rotation (Finding 2)', () => {
+      // Why: the live overlay draws a true-north view-direction line. The
+      // subscriber must feed selectOdometryRotations into buildMapData so the
+      // rendered MapData carries userHeadingDeg. Identity rotation + identity
+      // alignment ⇒ the camera looks North ⇒ heading 0.
+      const depsWithFused: StoreSubscriberDeps = {
+        ...deps,
+        mapOverlay: {
+          setGpsPosition: vi.fn(),
+          render: vi.fn<(data: MapData) => void>(),
+        },
+      };
+
+      const mock = makeMockStore(makeState());
+      wireStoreSubscribers(mock.store, depsWithFused);
+
+      mock.setState(
+        makeState({
+          gpsData: {
+            zero: { lat: 50, lon: 8 },
+            gpsEvents: {
+              alignmentMatrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+              gpsPositions: [
+                {
+                  id: 'gps-1',
+                  zeroRef: { lat: 50, lon: 8 },
+                  latitude: 50.001,
+                  longitude: 8.001,
+                  coordinates: [1, 0, 0] as Vector3,
+                  weight: 1,
+                  timestamp: Date.now(),
+                },
+              ],
+              odometryPositions: [[10, 0, 0] as Vector3],
+              odometryRotations: [[0, 0, 0, 1]],
+            },
+            odometryPath: { positions: [], rotations: [] },
+          } as unknown as CombinedRootState['gpsData'],
+        })
+      );
+
+      const data = lastRenderData(depsWithFused);
+      expect(data.userHeadingDeg).not.toBeNull();
+      expect(data.userHeadingDeg!).toBeCloseTo(0, 3);
+    });
+
     it('renders an empty fused path when the alignment matrix is missing', () => {
       // Why: without alignment, the fused transform is undefined — skip.
       const depsWithFused: StoreSubscriberDeps = {

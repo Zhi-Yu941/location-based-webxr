@@ -62,6 +62,7 @@ import { toPlacementView } from "./placement-view.js";
 import { isFullySupported, capabilityMessage } from "./capability.js";
 import { getSeams } from "./seams.js";
 import { decideAnchorPlacement } from "./placement-decision.js";
+import { coldStartOverrideEnabledFromSearch } from "./cold-start-override-flag.js";
 import { type ReticleHandle } from "./reticle-hit-test.js";
 // --- your content here -----------------------------------------------------
 import { type MarkerOptions } from "./marker.js";
@@ -486,7 +487,13 @@ async function startAr(): Promise<void> {
   dom.startButton.disabled = true;
   dom.startButton.textContent = "Starting…";
 
-  store = createSlamAppStore({ storageBackend: new NullStorageBackend() });
+  store = createSlamAppStore({
+    storageBackend: new NullStorageBackend(),
+    // Stage-0 cold-start compass override ships ON; opt out via ?coldStartOverride=0.
+    enableCompassColdStartOverride: coldStartOverrideEnabledFromSearch(
+      window.location.search,
+    ),
+  });
   store.subscribe(onStoreChanged);
 
   // Tracking-state pipeline must be wired before initAR. The framework's

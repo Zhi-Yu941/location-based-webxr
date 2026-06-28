@@ -33,6 +33,13 @@ export {
   calcRelativeCoordsInMeters,
   isIdentityMatrix4,
 
+  // AbsoluteOrientationSensor heading kernels (Phase 1). magneticHeadingFromEnuQuat
+  // returns the same magnetic heading the v3 absolute-compass demo shows — used
+  // for the recorder's live AbsCompass HUD read-out.
+  magneticHeadingFromEnuQuat,
+  arNorthBearingDeg,
+  bearingDeltaDeg,
+
   // Actions
   odometryTrackingRestarted,
 

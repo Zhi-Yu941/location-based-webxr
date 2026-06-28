@@ -13,9 +13,6 @@
  *     (only `gpsData/recordGpsEvent` is persisted) and therefore we must
  *     synthesise pose actions from the bundled `odomPosition`/`odomRotation`
  *     to drive the §4.7 phase gate during replay.
- *   - It pins the empirical fact that on shipped hardware
- *     `sensorOrientation.absolute === false`, which empirically confirms
- *     Finding 2 (compass sub-score will always be null in the field).
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -234,28 +231,6 @@ describe.runIf(fixturesAvailable)(
       it('final report exists for both recordings', () => {
         expect(outdoorResult.finalReport).not.toBeNull();
         expect(indoorResult.finalReport).not.toBeNull();
-      });
-    });
-
-    describe('F2 — compass sub-score is null in the field (compass deferred)', () => {
-      it('outdoor: compassAgreement is null at every captured snapshot', () => {
-        // Why: confirms Finding 2. Every payload had `absolute: false`,
-        // so `computeCompassAgreement` returns `{ score: null, ... }` by design.
-        // After the v1 removal lands, this assertion stays true (field becomes
-        // permanently null) or becomes structural (field removed).
-        for (const s of outdoorResult.snapshots) {
-          expect(s.report.subScores.compassAgreement).toBeNull();
-        }
-        expect(
-          outdoorResult.finalReport!.subScores.compassAgreement
-        ).toBeNull();
-      });
-
-      it('indoor: compassAgreement is null at every captured snapshot', () => {
-        for (const s of indoorResult.snapshots) {
-          expect(s.report.subScores.compassAgreement).toBeNull();
-        }
-        expect(indoorResult.finalReport!.subScores.compassAgreement).toBeNull();
       });
     });
 

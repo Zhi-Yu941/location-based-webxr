@@ -50,6 +50,10 @@
             <span class="text-gray-400">Sync:</span>
             <span id="sync-status" class="text-green-400">--</span>
           </div>
+          <div id="abs-compass-info" class="text-sm mt-1 hidden">
+            <span class="text-gray-400">🧭 AbsCompass:</span>
+            <span id="abs-compass-status" class="text-green-400">--</span>
+          </div>
           <div id="frame-count-info" class="text-sm mt-1 hidden">
             <span class="text-gray-400">📷 Frames:</span>
             <span id="frame-count" class="text-green-400">0</span>
@@ -961,6 +965,87 @@ No errors</pre
                   >Capture images during recording</span
                 >
               </label>
+              <!-- Blurry-frame motion gate (2026-06-23 motion-gating plan).    -->
+              <!-- Defers a due capture while the device is moving too fast and  -->
+              <!-- grabs the first calm frame, so the export has sharper frames  -->
+              <!-- for photogrammetry / Gaussian-splat reconstruction.          -->
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="images-motion-filter"
+                  class="w-4 h-4 accent-blue-500"
+                  checked
+                />
+                <span class="text-sm text-gray-200"
+                  >Skip blurry frames (motion)</span
+                >
+              </label>
+              <!-- Motion-gate thresholds (for on-device field tuning). Stored  -->
+              <!-- in rad/s and m/s; the rotation label also shows deg/s. Lower -->
+              <!-- = stricter (defer more / sharper); higher = looser.          -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs text-gray-400">
+                  <span>Max rotation speed</span>
+                  <span id="images-max-angular-value">0.60 rad/s (≈34°/s)</span>
+                </div>
+                <input
+                  type="range"
+                  id="images-max-angular"
+                  class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+              </div>
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs text-gray-400">
+                  <span>Max move speed</span>
+                  <span id="images-max-linear-value">0.50 m/s</span>
+                </div>
+                <input
+                  type="range"
+                  id="images-max-linear"
+                  class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+              </div>
+              <!-- Image-content gate (defocus / low-light blur + black frames),  -->
+              <!-- off by default until field-tuned. Runs off-thread on frames     -->
+              <!-- that already passed the motion gate.                            -->
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="images-quality-filter"
+                  class="w-4 h-4 accent-blue-500"
+                />
+                <span class="text-sm text-gray-200"
+                  >Skip blurry/black frames (image)</span
+                >
+              </label>
+              <!-- Image-quality thresholds (for on-device field tuning). Blur is -->
+              <!-- relative (fraction of the recent sharpness median); blackness  -->
+              <!-- is an absolute 0–255 luma cutoff (0 = off). Higher blur =       -->
+              <!-- stricter (drops more).                                          -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs text-gray-400">
+                  <span>Blur sensitivity</span>
+                  <span id="images-blur-threshold-value"
+                    >0.50 (drop &lt; 50% of median)</span
+                  >
+                </div>
+                <input
+                  type="range"
+                  id="images-blur-threshold"
+                  class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+              </div>
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs text-gray-400">
+                  <span>Black cutoff</span>
+                  <span id="images-min-luminance-value">10 / 255</span>
+                </div>
+                <input
+                  type="range"
+                  id="images-min-luminance"
+                  class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+              </div>
               <div class="space-y-1">
                 <div class="flex justify-between text-xs text-gray-400">
                   <span>Interval</span>
@@ -1094,6 +1179,24 @@ No errors</pre
                 cubes + COLMAP export). Smaller = finer detail but much heavier.
                 Applies the next time you enter AR or load a replay.
               </p>
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs text-gray-400">
+                  <span>Noise Filter (min confidence)</span>
+                  <span id="occupancy-min-confidence-value">3</span>
+                </div>
+                <input
+                  type="range"
+                  id="occupancy-min-confidence"
+                  aria-label="Noise Filter (min confidence)"
+                  class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+              </div>
+              <p class="text-[11px] text-gray-400">
+                How many times a voxel must be observed before it is drawn.
+                Higher hides single-frame depth noise (e.g. phantom voxels below
+                the floor) but may drop briefly-seen surfaces. 1 = unfiltered.
+                Applies the next time you enter AR or load a replay.
+              </p>
             </div>
           </div>
 
@@ -1203,6 +1306,59 @@ No errors</pre
                 />
                 <span class="text-sm text-gray-200"
                   >Compass orientation cubes</span
+                >
+              </label>
+            </div>
+          </div>
+
+          <!-- Compass alignment debug toggles (Phase-4: Stage 0 / Stage C / consistency gate) -->
+          <div class="mb-6">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-xl">🧭</span>
+              <span class="font-medium text-white"
+                >Compass alignment (debug)</span
+              >
+            </div>
+            <div class="bg-gray-700/50 rounded-lg p-3 space-y-3">
+              <p class="text-[11px] text-gray-400">
+                Feed the absolute-orientation compass into the live GPS
+                alignment. Stage 0 is ON by default (fixes initial rotation);
+                Stage C + the trust gate are experimental (off). Applies on the
+                next session / reload. These flags are recorded into the session
+                (replay re-enables them), so turn Stage 0 OFF for compass
+                calibration sets.
+              </p>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="compass-cold-start-override"
+                  class="w-4 h-4 accent-blue-500"
+                />
+                <span class="text-sm text-gray-200"
+                  >Stage 0 — cold-start override (on by default; fixes initial
+                  rotation jumping)</span
+                >
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="compass-rotation-prior"
+                  class="w-4 h-4 accent-blue-500"
+                />
+                <span class="text-sm text-gray-200"
+                  >Stage C — steady-state rotation prior (trust-gated
+                  vote)</span
+                >
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="compass-webxr-consistency"
+                  class="w-4 h-4 accent-blue-500"
+                />
+                <span class="text-sm text-gray-200"
+                  >Trust gate — only use compass when consistent with
+                  WebXR</span
                 >
               </label>
             </div>

@@ -24,5 +24,6 @@ export {
   type FailureTrackerConfig,
 } from './failure-tracker.js';
 export { mapWithConcurrencyLimit } from './concurrency.js';
+export { geodesicAngleRad } from './geodesic-angle.js';
 export { formatFileSize } from './format-file-size.js';
 export { listFormatter } from './list-formatter.js';

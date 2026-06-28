@@ -73,12 +73,15 @@ describe('Recording Options Integration', () => {
           intervalMs: 3000,
           quality: 0.8,
           resolutionDivisor: 1,
+          motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+          qualityFilter: { ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter },
         },
         arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
         occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
         frameTileDisplay: { ...DEFAULT_RECORDING_OPTIONS.frameTileDisplay },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
         qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
+        compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
       };
 
       store.dispatch(
@@ -102,12 +105,15 @@ describe('Recording Options Integration', () => {
           intervalMs: 5000,
           quality: 0.5,
           resolutionDivisor: 1,
+          motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+          qualityFilter: { ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter },
         },
         arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
         occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
         frameTileDisplay: { ...DEFAULT_RECORDING_OPTIONS.frameTileDisplay },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
         qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
+        compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
       };
 
       store.dispatch(
@@ -317,12 +323,15 @@ describe('Recording Options Integration', () => {
           intervalMs: 2000,
           quality: 0.7,
           resolutionDivisor: 1,
+          motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+          qualityFilter: { ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter },
         },
         arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
         occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
         frameTileDisplay: { ...DEFAULT_RECORDING_OPTIONS.frameTileDisplay },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
         qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
+        compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
       };
 
       store.dispatch(
@@ -377,12 +386,15 @@ describe('Recording Options Integration', () => {
           intervalMs: 2000,
           quality: 0.7,
           resolutionDivisor: 1,
+          motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+          qualityFilter: { ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter },
         },
         arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
         occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
         frameTileDisplay: { ...DEFAULT_RECORDING_OPTIONS.frameTileDisplay },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
         qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
+        compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
       };
 
       store.dispatch(
@@ -436,12 +448,15 @@ describe('Recording Options Integration', () => {
           intervalMs: 2000,
           quality: 0.7,
           resolutionDivisor: 1,
+          motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+          qualityFilter: { ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter },
         },
         arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
         occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
         frameTileDisplay: { ...DEFAULT_RECORDING_OPTIONS.frameTileDisplay },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
         qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
+        compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
       };
 
       store.dispatch(

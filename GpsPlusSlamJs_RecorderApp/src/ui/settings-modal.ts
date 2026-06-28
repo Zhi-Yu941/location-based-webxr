@@ -12,6 +12,8 @@ import {
   cloneRecordingOptions,
   DEPTH_CONSTRAINTS,
   IMAGE_CONSTRAINTS,
+  MOTION_FILTER_CONSTRAINTS,
+  QUALITY_FILTER_CONSTRAINTS,
   OCCUPANCY_CONSTRAINTS,
   FRAME_TILE_DISPLAY_CONSTRAINTS,
   QR_CONSTRAINTS,
@@ -50,6 +52,16 @@ let imagesQualitySlider: HTMLInputElement | null = null;
 let imagesQualityValue: HTMLElement | null = null;
 let imagesResolutionDivisorSlider: HTMLInputElement | null = null;
 let imagesResolutionDivisorValue: HTMLElement | null = null;
+let imagesMotionFilterCheckbox: HTMLInputElement | null = null;
+let imagesQualityFilterCheckbox: HTMLInputElement | null = null;
+let imagesBlurThresholdSlider: HTMLInputElement | null = null;
+let imagesBlurThresholdValue: HTMLElement | null = null;
+let imagesMinLuminanceSlider: HTMLInputElement | null = null;
+let imagesMinLuminanceValue: HTMLElement | null = null;
+let imagesMaxAngularSlider: HTMLInputElement | null = null;
+let imagesMaxAngularValue: HTMLElement | null = null;
+let imagesMaxLinearSlider: HTMLInputElement | null = null;
+let imagesMaxLinearValue: HTMLElement | null = null;
 let arDomOverlayEnabledCheckbox: HTMLInputElement | null = null;
 let arCameraAccessEnabledCheckbox: HTMLInputElement | null = null;
 let arDepthSensingEnabledCheckbox: HTMLInputElement | null = null;
@@ -58,12 +70,17 @@ let arCameraTextureEnabledCheckbox: HTMLInputElement | null = null;
 let arChromiumProjectionLayerWorkaroundCheckbox: HTMLInputElement | null = null;
 let occupancyCellSizeSlider: HTMLInputElement | null = null;
 let occupancyCellSizeValue: HTMLElement | null = null;
+let occupancyMinConfidenceSlider: HTMLInputElement | null = null;
+let occupancyMinConfidenceValue: HTMLElement | null = null;
 let frameTileDisplayDivisorSlider: HTMLInputElement | null = null;
 let frameTileDisplayDivisorValue: HTMLElement | null = null;
 let vizFrameTilesCheckbox: HTMLInputElement | null = null;
 let vizOccupancyCubesCheckbox: HTMLInputElement | null = null;
 let vizGpsAlignmentMarkersCheckbox: HTMLInputElement | null = null;
 let vizCompassCubesCheckbox: HTMLInputElement | null = null;
+let compassColdStartOverrideCheckbox: HTMLInputElement | null = null;
+let compassRotationPriorCheckbox: HTMLInputElement | null = null;
+let compassWebXRConsistencyCheckbox: HTMLInputElement | null = null;
 let qrEnabledCheckbox: HTMLInputElement | null = null;
 let qrIntervalSlider: HTMLInputElement | null = null;
 let qrIntervalValue: HTMLElement | null = null;
@@ -131,6 +148,32 @@ export function initSettingsModal(
   imagesResolutionDivisorValue = document.getElementById(
     'images-resolution-divisor-value'
   );
+  imagesMotionFilterCheckbox = document.getElementById(
+    'images-motion-filter'
+  ) as HTMLInputElement;
+  imagesQualityFilterCheckbox = document.getElementById(
+    'images-quality-filter'
+  ) as HTMLInputElement;
+  imagesBlurThresholdSlider = document.getElementById(
+    'images-blur-threshold'
+  ) as HTMLInputElement;
+  imagesBlurThresholdValue = document.getElementById(
+    'images-blur-threshold-value'
+  );
+  imagesMinLuminanceSlider = document.getElementById(
+    'images-min-luminance'
+  ) as HTMLInputElement;
+  imagesMinLuminanceValue = document.getElementById(
+    'images-min-luminance-value'
+  );
+  imagesMaxAngularSlider = document.getElementById(
+    'images-max-angular'
+  ) as HTMLInputElement;
+  imagesMaxAngularValue = document.getElementById('images-max-angular-value');
+  imagesMaxLinearSlider = document.getElementById(
+    'images-max-linear'
+  ) as HTMLInputElement;
+  imagesMaxLinearValue = document.getElementById('images-max-linear-value');
   arDomOverlayEnabledCheckbox = document.getElementById(
     'ar-dom-overlay-enabled'
   ) as HTMLInputElement;
@@ -153,6 +196,12 @@ export function initSettingsModal(
     'occupancy-cell-size'
   ) as HTMLInputElement;
   occupancyCellSizeValue = document.getElementById('occupancy-cell-size-value');
+  occupancyMinConfidenceSlider = document.getElementById(
+    'occupancy-min-confidence'
+  ) as HTMLInputElement;
+  occupancyMinConfidenceValue = document.getElementById(
+    'occupancy-min-confidence-value'
+  );
   frameTileDisplayDivisorSlider = document.getElementById(
     'frame-tile-display-divisor'
   ) as HTMLInputElement;
@@ -170,6 +219,15 @@ export function initSettingsModal(
   ) as HTMLInputElement;
   vizCompassCubesCheckbox = document.getElementById(
     'viz-compass-cubes'
+  ) as HTMLInputElement;
+  compassColdStartOverrideCheckbox = document.getElementById(
+    'compass-cold-start-override'
+  ) as HTMLInputElement;
+  compassRotationPriorCheckbox = document.getElementById(
+    'compass-rotation-prior'
+  ) as HTMLInputElement;
+  compassWebXRConsistencyCheckbox = document.getElementById(
+    'compass-webxr-consistency'
   ) as HTMLInputElement;
   qrEnabledCheckbox = document.getElementById('qr-enabled') as HTMLInputElement;
   qrIntervalSlider = document.getElementById('qr-interval') as HTMLInputElement;
@@ -241,6 +299,24 @@ export function initSettingsModal(
     }
   });
 
+  // Motion-gate thresholds: stored in rad/s and m/s (the units the gate
+  // compares against), so the slider value IS the stored value.
+  imagesMaxAngularSlider?.addEventListener('input', () => {
+    if (workingOptions && imagesMaxAngularSlider && imagesMaxAngularValue) {
+      const value = parseFloat(imagesMaxAngularSlider.value);
+      workingOptions.images.motionFilter.maxAngularVelocity = value;
+      imagesMaxAngularValue.textContent = formatAngularVelocity(value);
+    }
+  });
+
+  imagesMaxLinearSlider?.addEventListener('input', () => {
+    if (workingOptions && imagesMaxLinearSlider && imagesMaxLinearValue) {
+      const value = parseFloat(imagesMaxLinearSlider.value);
+      workingOptions.images.motionFilter.maxLinearVelocity = value;
+      imagesMaxLinearValue.textContent = `${value.toFixed(2)} m/s`;
+    }
+  });
+
   // Voxel size slider operates in centimetres for readability; the stored
   // option (`occupancy.cellSizeM`) is in metres, so divide by 100 on the way in.
   occupancyCellSizeSlider?.addEventListener('input', () => {
@@ -248,6 +324,21 @@ export function initSettingsModal(
       const cm = parseInt(occupancyCellSizeSlider.value, 10);
       workingOptions.occupancy.cellSizeM = cm / 100;
       occupancyCellSizeValue.textContent = `${cm} cm`;
+    }
+  });
+
+  // Voxel noise filter: minimum observations before a cell is rendered.
+  // Integer count (occupancy.minConfidence); 1 = unfiltered.
+  occupancyMinConfidenceSlider?.addEventListener('input', () => {
+    if (
+      workingOptions &&
+      occupancyMinConfidenceSlider &&
+      occupancyMinConfidenceValue
+    ) {
+      const n = parseInt(occupancyMinConfidenceSlider.value, 10);
+      workingOptions.occupancy.minConfidence = n;
+      occupancyMinConfidenceValue.textContent =
+        n === 1 ? '1 (unfiltered)' : String(n);
     }
   });
 
@@ -284,6 +375,46 @@ export function initSettingsModal(
     if (workingOptions && imagesEnabledCheckbox) {
       workingOptions.images.enabled = imagesEnabledCheckbox.checked;
       updateImageControlsState();
+    }
+  });
+
+  imagesMotionFilterCheckbox?.addEventListener('change', () => {
+    if (workingOptions && imagesMotionFilterCheckbox) {
+      workingOptions.images.motionFilter.enabled =
+        imagesMotionFilterCheckbox.checked;
+      // The threshold sliders only matter while the gate is on.
+      updateImageControlsState();
+    }
+  });
+
+  imagesQualityFilterCheckbox?.addEventListener('change', () => {
+    if (workingOptions && imagesQualityFilterCheckbox) {
+      workingOptions.images.qualityFilter.enabled =
+        imagesQualityFilterCheckbox.checked;
+      // The threshold sliders only matter while the gate is on.
+      updateImageControlsState();
+    }
+  });
+
+  // Image-quality thresholds: stored exactly as the slider value (a 0–1 fraction
+  // for blur, a 0–255 luma cutoff for blackness), so no unit conversion.
+  imagesBlurThresholdSlider?.addEventListener('input', () => {
+    if (
+      workingOptions &&
+      imagesBlurThresholdSlider &&
+      imagesBlurThresholdValue
+    ) {
+      const value = parseFloat(imagesBlurThresholdSlider.value);
+      workingOptions.images.qualityFilter.blurRelativeThreshold = value;
+      imagesBlurThresholdValue.textContent = formatBlurThreshold(value);
+    }
+  });
+
+  imagesMinLuminanceSlider?.addEventListener('input', () => {
+    if (workingOptions && imagesMinLuminanceSlider && imagesMinLuminanceValue) {
+      const value = parseFloat(imagesMinLuminanceSlider.value);
+      workingOptions.images.qualityFilter.minMeanLuminance = value;
+      imagesMinLuminanceValue.textContent = formatMinLuminance(value);
     }
   });
 
@@ -358,6 +489,29 @@ export function initSettingsModal(
     if (workingOptions && vizCompassCubesCheckbox) {
       workingOptions.visualization.compassCubes =
         vizCompassCubesCheckbox.checked;
+    }
+  });
+
+  // Compass alignment debug toggles (Phase-4). Feed the absolute-orientation
+  // compass into the live GPS alignment; applied on the next session/reload.
+  compassColdStartOverrideCheckbox?.addEventListener('change', () => {
+    if (workingOptions && compassColdStartOverrideCheckbox) {
+      workingOptions.compassDebug.coldStartOverride =
+        compassColdStartOverrideCheckbox.checked;
+    }
+  });
+
+  compassRotationPriorCheckbox?.addEventListener('change', () => {
+    if (workingOptions && compassRotationPriorCheckbox) {
+      workingOptions.compassDebug.rotationPrior =
+        compassRotationPriorCheckbox.checked;
+    }
+  });
+
+  compassWebXRConsistencyCheckbox?.addEventListener('change', () => {
+    if (workingOptions && compassWebXRConsistencyCheckbox) {
+      workingOptions.compassDebug.webXRConsistency =
+        compassWebXRConsistencyCheckbox.checked;
     }
   });
 
@@ -495,6 +649,12 @@ function populateForm(options: RecordingOptions): void {
   if (imagesEnabledCheckbox) {
     imagesEnabledCheckbox.checked = options.images.enabled;
   }
+  if (imagesMotionFilterCheckbox) {
+    imagesMotionFilterCheckbox.checked = options.images.motionFilter.enabled;
+  }
+  if (imagesQualityFilterCheckbox) {
+    imagesQualityFilterCheckbox.checked = options.images.qualityFilter.enabled;
+  }
   if (imagesIntervalSlider) {
     imagesIntervalSlider.min = String(IMAGE_CONSTRAINTS.intervalMs.min);
     imagesIntervalSlider.max = String(IMAGE_CONSTRAINTS.intervalMs.max);
@@ -530,6 +690,82 @@ function populateForm(options: RecordingOptions): void {
   if (imagesResolutionDivisorValue) {
     imagesResolutionDivisorValue.textContent = formatResolutionDivisor(
       options.images.resolutionDivisor
+    );
+  }
+  if (imagesMaxAngularSlider) {
+    imagesMaxAngularSlider.min = String(
+      MOTION_FILTER_CONSTRAINTS.maxAngularVelocity.min
+    );
+    imagesMaxAngularSlider.max = String(
+      MOTION_FILTER_CONSTRAINTS.maxAngularVelocity.max
+    );
+    imagesMaxAngularSlider.step = String(
+      MOTION_FILTER_CONSTRAINTS.maxAngularVelocity.step
+    );
+    imagesMaxAngularSlider.value = String(
+      options.images.motionFilter.maxAngularVelocity
+    );
+  }
+  if (imagesMaxAngularValue) {
+    imagesMaxAngularValue.textContent = formatAngularVelocity(
+      options.images.motionFilter.maxAngularVelocity
+    );
+  }
+  if (imagesMaxLinearSlider) {
+    imagesMaxLinearSlider.min = String(
+      MOTION_FILTER_CONSTRAINTS.maxLinearVelocity.min
+    );
+    imagesMaxLinearSlider.max = String(
+      MOTION_FILTER_CONSTRAINTS.maxLinearVelocity.max
+    );
+    imagesMaxLinearSlider.step = String(
+      MOTION_FILTER_CONSTRAINTS.maxLinearVelocity.step
+    );
+    imagesMaxLinearSlider.value = String(
+      options.images.motionFilter.maxLinearVelocity
+    );
+  }
+  if (imagesMaxLinearValue) {
+    imagesMaxLinearValue.textContent = `${options.images.motionFilter.maxLinearVelocity.toFixed(
+      2
+    )} m/s`;
+  }
+  if (imagesBlurThresholdSlider) {
+    imagesBlurThresholdSlider.min = String(
+      QUALITY_FILTER_CONSTRAINTS.blurRelativeThreshold.min
+    );
+    imagesBlurThresholdSlider.max = String(
+      QUALITY_FILTER_CONSTRAINTS.blurRelativeThreshold.max
+    );
+    imagesBlurThresholdSlider.step = String(
+      QUALITY_FILTER_CONSTRAINTS.blurRelativeThreshold.step
+    );
+    imagesBlurThresholdSlider.value = String(
+      options.images.qualityFilter.blurRelativeThreshold
+    );
+  }
+  if (imagesBlurThresholdValue) {
+    imagesBlurThresholdValue.textContent = formatBlurThreshold(
+      options.images.qualityFilter.blurRelativeThreshold
+    );
+  }
+  if (imagesMinLuminanceSlider) {
+    imagesMinLuminanceSlider.min = String(
+      QUALITY_FILTER_CONSTRAINTS.minMeanLuminance.min
+    );
+    imagesMinLuminanceSlider.max = String(
+      QUALITY_FILTER_CONSTRAINTS.minMeanLuminance.max
+    );
+    imagesMinLuminanceSlider.step = String(
+      QUALITY_FILTER_CONSTRAINTS.minMeanLuminance.step
+    );
+    imagesMinLuminanceSlider.value = String(
+      options.images.qualityFilter.minMeanLuminance
+    );
+  }
+  if (imagesMinLuminanceValue) {
+    imagesMinLuminanceValue.textContent = formatMinLuminance(
+      options.images.qualityFilter.minMeanLuminance
     );
   }
 
@@ -577,6 +813,27 @@ function populateForm(options: RecordingOptions): void {
     occupancyCellSizeValue.textContent = `${Math.round(options.occupancy.cellSizeM * 100)} cm`;
   }
 
+  // Occupancy noise filter — integer observation count (no unit conversion).
+  if (occupancyMinConfidenceSlider) {
+    occupancyMinConfidenceSlider.min = String(
+      OCCUPANCY_CONSTRAINTS.minConfidence.min
+    );
+    occupancyMinConfidenceSlider.max = String(
+      OCCUPANCY_CONSTRAINTS.minConfidence.max
+    );
+    occupancyMinConfidenceSlider.step = String(
+      OCCUPANCY_CONSTRAINTS.minConfidence.step
+    );
+    occupancyMinConfidenceSlider.value = String(
+      options.occupancy.minConfidence
+    );
+  }
+  if (occupancyMinConfidenceValue) {
+    const n = options.occupancy.minConfidence;
+    occupancyMinConfidenceValue.textContent =
+      n === 1 ? '1 (unfiltered)' : String(n);
+  }
+
   // Frame-tile display-resolution divisor (D7-resolution)
   if (frameTileDisplayDivisorSlider) {
     frameTileDisplayDivisorSlider.min = String(
@@ -611,6 +868,19 @@ function populateForm(options: RecordingOptions): void {
   }
   if (vizCompassCubesCheckbox) {
     vizCompassCubesCheckbox.checked = options.visualization.compassCubes;
+  }
+
+  // Compass alignment debug toggles (Phase-4)
+  if (compassColdStartOverrideCheckbox) {
+    compassColdStartOverrideCheckbox.checked =
+      options.compassDebug.coldStartOverride;
+  }
+  if (compassRotationPriorCheckbox) {
+    compassRotationPriorCheckbox.checked = options.compassDebug.rotationPrior;
+  }
+  if (compassWebXRConsistencyCheckbox) {
+    compassWebXRConsistencyCheckbox.checked =
+      options.compassDebug.webXRConsistency;
   }
 
   // QR detection (opt-in). Interval slider in ms, capture-size slider in px.
@@ -666,6 +936,62 @@ function updateImageControlsState(): void {
   if (imagesResolutionDivisorSlider) {
     imagesResolutionDivisorSlider.disabled = !enabled;
   }
+  if (imagesMotionFilterCheckbox) {
+    // The motion gate only applies to captured images, so it is meaningless
+    // when capture is off — disable it alongside the other image sub-controls.
+    imagesMotionFilterCheckbox.disabled = !enabled;
+  }
+  if (imagesQualityFilterCheckbox) {
+    // Same rationale as the motion gate — the image-quality gate only acts on
+    // captured frames, so it is disabled when capture is off.
+    imagesQualityFilterCheckbox.disabled = !enabled;
+  }
+  // The motion threshold sliders require BOTH capture and the motion gate on.
+  const motionEnabled =
+    enabled && (imagesMotionFilterCheckbox?.checked ?? true);
+  if (imagesMaxAngularSlider) {
+    imagesMaxAngularSlider.disabled = !motionEnabled;
+  }
+  if (imagesMaxLinearSlider) {
+    imagesMaxLinearSlider.disabled = !motionEnabled;
+  }
+  // The quality threshold sliders require BOTH capture and the quality gate on.
+  const qualityEnabled =
+    enabled && (imagesQualityFilterCheckbox?.checked ?? false);
+  if (imagesBlurThresholdSlider) {
+    imagesBlurThresholdSlider.disabled = !qualityEnabled;
+  }
+  if (imagesMinLuminanceSlider) {
+    imagesMinLuminanceSlider.disabled = !qualityEnabled;
+  }
+}
+
+/**
+ * Format an angular-velocity threshold (rad/s) for display, adding the
+ * equivalent in deg/s in parentheses since degrees-per-second is the more
+ * intuitive unit for "how fast am I turning the phone".
+ */
+function formatAngularVelocity(radPerSec: number): string {
+  const degPerSec = Math.round((radPerSec * 180) / Math.PI);
+  return `${radPerSec.toFixed(2)} rad/s (≈${degPerSec}°/s)`;
+}
+
+/**
+ * Format the relative blur threshold `k` (a fraction of the recent sharpness
+ * median; a frame is dropped when sharpness < k·median). Higher = stricter
+ * (drops more), so label it as the percentage-of-median cutoff.
+ */
+function formatBlurThreshold(k: number): string {
+  return `${k.toFixed(2)} (drop < ${Math.round(k * 100)}% of median)`;
+}
+
+/**
+ * Format the absolute black cutoff (0–255 mean luma). 0 disables the black
+ * check, so call that out.
+ */
+function formatMinLuminance(luma: number): string {
+  const rounded = Math.round(luma);
+  return rounded === 0 ? '0 (off)' : `${rounded} / 255`;
 }
 
 function updateQrControlsState(): void {

@@ -21,12 +21,14 @@ import {
   extractOdomRotation,
   buildRawGpsPoint,
   buildRecordGpsEventPayload,
+  toRawAbsoluteOrientation,
   createGpsPositionHandler,
   updateDeviceOrientation,
   getLastDeviceOrientation,
   resetCoordinatorState,
   eulerToQuaternion,
 } from './gps-event-coordinator';
+import type { AbsoluteOrientationReading } from '../sensors/absolute-orientation';
 import type { ReducersMapObject } from '@reduxjs/toolkit';
 import { createSlamAppStore, type SlamAppStore } from './create-slam-app-store';
 import { startSession } from './recording-slice';
@@ -261,81 +263,14 @@ describe('Recording Coordinator', () => {
       expect(result.heading).toBeUndefined();
       expect(result.speed).toBeUndefined();
     });
-
-    /**
-     * Why this test matters:
-     * The DeviceOrientationEvent.absolute flag indicates whether compass alpha
-     * is relative to magnetic north (true) or an arbitrary reference (false).
-     * If false, compass-based drift correction is unreliable. Must be preserved.
-     */
-    it('preserves DeviceOrientation absolute flag as compassAbsolute', () => {
-      const gpsPosition: GpsPosition = {
-        lat: 48.8567,
-        lon: 2.3523,
-        altitude: null,
-        accuracy: 5.0,
-        altitudeAccuracy: null,
-        heading: null,
-        speed: null,
-        timestamp: Date.now(),
-      };
-
-      const orientation: RawDeviceOrientation = {
-        alpha: 90,
-        beta: 0,
-        gamma: 0,
-        absolute: true,
-      };
-
-      const result = buildRawGpsPoint(gpsPosition, orientation);
-      expect(result.compassAbsolute).toBe(true);
-    });
-
-    it('sets compassAbsolute to false when DeviceOrientation.absolute is false', () => {
-      const gpsPosition: GpsPosition = {
-        lat: 48.8567,
-        lon: 2.3523,
-        altitude: null,
-        accuracy: 5.0,
-        altitudeAccuracy: null,
-        heading: null,
-        speed: null,
-        timestamp: Date.now(),
-      };
-
-      const orientation: RawDeviceOrientation = {
-        alpha: 90,
-        beta: 0,
-        gamma: 0,
-        absolute: false,
-      };
-
-      const result = buildRawGpsPoint(gpsPosition, orientation);
-      expect(result.compassAbsolute).toBe(false);
-    });
-
-    it('leaves compassAbsolute undefined when no orientation available', () => {
-      const gpsPosition: GpsPosition = {
-        lat: 48.8567,
-        lon: 2.3523,
-        altitude: null,
-        accuracy: 5.0,
-        altitudeAccuracy: null,
-        heading: null,
-        speed: null,
-        timestamp: Date.now(),
-      };
-
-      const result = buildRawGpsPoint(gpsPosition, null);
-      expect(result.compassAbsolute).toBeUndefined();
-    });
   });
 
   describe('buildRecordGpsEventPayload', () => {
     /**
      * Why this test matters:
      * Verifies the library-compatible payload structure with raw-storage pattern.
-     * Payload stores rawGpsPoint (raw sensor data) and rawDeviceOrientation (Euler angles).
+     * Payload stores rawGpsPoint (raw sensor data); the legacy
+     * rawDeviceOrientation field is no longer populated.
      * Derived fields are computed by the reducer.
      */
     it('builds payload with odomPosition, odomRotation, and rawGpsPoint', () => {
@@ -362,7 +297,55 @@ describe('Recording Coordinator', () => {
       expect(result.odomRotation).toEqual([0, 0, 0, 1]);
       expect(result.rawGpsPoint.latitude).toBe(48.8567);
       expect(result.rawGpsPoint).not.toHaveProperty('zeroRef');
-      expect(result.rawDeviceOrientation).toBeUndefined();
+      // No AbsoluteOrientationSensor reading provided → field absent (back-compat).
+      expect(result.rawAbsoluteOrientation).toBeUndefined();
+    });
+
+    /**
+     * Why this test matters: Phase 1 of the AbsoluteOrientationSensor plan
+     * snapshots the sensor reading into the GPS-event payload so it pairs 1:1
+     * with the AR pose. The capture-module `timestamp` must map to the payload's
+     * `sampleTimestamp`, and the quaternion/frame/screen-angle pass through.
+     */
+    it('injects the absolute-orientation reading and maps timestamp → sampleTimestamp', () => {
+      const gpsPosition: GpsPosition = {
+        lat: 0,
+        lon: 0,
+        altitude: null,
+        accuracy: 5,
+        altitudeAccuracy: null,
+        heading: null,
+        speed: null,
+        timestamp: 1000,
+      };
+      const arPose: ARPose = {
+        position: { x: 0, y: 0, z: 0 },
+        orientation: { x: 0, y: 0, z: 0, w: 1 },
+      };
+      const reading: AbsoluteOrientationReading = {
+        quaternion: [0.1, 0.2, 0.3, 0.9],
+        referenceFrame: 'device',
+        screenAngleDeg: 90,
+        timestamp: 555,
+      };
+
+      const result = buildRecordGpsEventPayload(
+        gpsPosition,
+        arPose,
+        null,
+        reading
+      );
+
+      expect(result.rawAbsoluteOrientation).toEqual({
+        quaternion: [0.1, 0.2, 0.3, 0.9],
+        referenceFrame: 'device',
+        screenAngleDeg: 90,
+        sampleTimestamp: 555,
+      });
+    });
+
+    it('toRawAbsoluteOrientation returns undefined for a null reading', () => {
+      expect(toRawAbsoluteOrientation(null)).toBeUndefined();
     });
   });
 

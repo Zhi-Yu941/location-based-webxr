@@ -13,6 +13,16 @@ export {
   requestOrientationPermission as requestDeviceOrientationPermission,
 } from './gps.js';
 
+// --- absolute-orientation (AbsoluteOrientationSensor capture, Phase 1) ---
+export {
+  type AbsoluteOrientationReading,
+  type AbsoluteOrientationStatus,
+  isAbsoluteOrientationAvailable,
+  startAbsoluteOrientationWatch,
+  stopAbsoluteOrientationWatch,
+  getLatestAbsoluteOrientation,
+} from './absolute-orientation.js';
+
 // --- gps-error-handler ---
 export {
   GPS_ERROR_CODES,

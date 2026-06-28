@@ -52,13 +52,13 @@ Converts WebXR ARPose (object format) to store ArPose (array format).
 
 #### `buildGpsEventPayload(gpsPosition, arPose, deviceOrientation): GpsEventPayload`
 
-Builds a complete payload for the `recordGpsEvent` action. Returns `{ odomPosition, odomRotation, rawGpsPoint, rawDeviceOrientation? }` — raw sensor values only, no derived fields. The reducer computes `coordinates`, `weight`, `zeroRef`, and `deviceRotation` from the raw values + state.
+Builds a complete payload for the `recordGpsEvent` action. Returns `{ odomPosition, odomRotation, rawGpsPoint, rawAbsoluteOrientation? }` — raw sensor values only, no derived fields. The reducer computes `coordinates`, `weight`, and `zeroRef` from the raw values + state. The legacy `rawDeviceOrientation` field is no longer populated (§5b dead-code removal, 2026-06-28) — it was dead data on recorded GPS events; the live odometry-restart orientation snapshot reads the cached orientation via `getLastDeviceOrientation` instead.
 
 - **Input:**
   - `gpsPosition` - GpsPosition from Geolocation API
   - `arPose` - ARPose from WebXR
-  - `deviceOrientation` - Optional DeviceOrientation
-- **Output:** Payload ready for dispatch with `rawGpsPoint: RawGpsPoint` and optional `rawDeviceOrientation: RawDeviceOrientation`
+  - `deviceOrientation` - Optional DeviceOrientation (kept for the live orientation cache; no longer written into the payload)
+- **Output:** Payload ready for dispatch with `rawGpsPoint: RawGpsPoint` (and optional `rawAbsoluteOrientation` when an AbsoluteOrientationSensor reading is present)
 
 #### `createGpsPositionHandler(config): (position: GpsPosition) => void`
 
@@ -76,7 +76,7 @@ Creates a GPS callback function that dispatches combined events.
 3. **Recording state check** - Only dispatches when `isRecording` is true
 4. **Device orientation is optional** - Recorded if available, undefined otherwise
 5. **Coordinate convention — `extractOdomPosition`**: Returns raw WebXR `[x, y, z]` directly (identity pass-through). The reducer converts to NUE via `webxrToNUE()`. **Old recordings** (pre-2026-03-15 fix, no `odomCoordVersion` in session.json) also store raw WebXR positions; era-2 recordings (`odomCoordVersion: 2`) store NUE and require reverse-migration.
-6. **GPS field fidelity** - `buildRawGpsPoint()` preserves all Geolocation API fields: `altitudeAccuracy`, `heading`, `speed` (mapped from `null` → `undefined`). `compassAbsolute` is populated from `DeviceOrientationEvent.absolute` when device orientation is available. No derived fields (coordinates, weight, zeroRef) are computed — the reducer handles those.
+6. **GPS field fidelity** - `buildRawGpsPoint()` preserves all Geolocation API fields: `altitudeAccuracy`, `heading`, `speed` (mapped from `null` → `undefined`). The legacy `compassAbsolute` field is no longer populated (§5b dead-code removal, 2026-06-28). No derived fields (coordinates, weight, zeroRef) are computed — the reducer handles those.
 
 ## Examples
 
@@ -138,4 +138,4 @@ expect(store.getState().recorder.gpsEventCount).toBe(1);
   - Multiple sequential events
   - Device orientation caching
   - GPS field fidelity: heading, speed, altitudeAccuracy preserved (null→undefined)
-  - compassAbsolute populated from DeviceOrientationEvent.absolute
+  - legacy compassAbsolute / rawDeviceOrientation no longer populated

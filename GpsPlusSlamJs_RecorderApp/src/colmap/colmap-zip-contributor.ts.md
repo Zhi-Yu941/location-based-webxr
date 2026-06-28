@@ -18,6 +18,10 @@ Iter 3.
     intrinsics (wired to `state.recording.latestDepthSample?.projectionMatrix`).
   - `deps.getOccupancyGrid(): OccupancyGrid | null` — the shared live grid (Iter
     2.5 provider).
+  - `deps.getMinConfidence?(): number` — the recording's `occupancy.minConfidence`
+    (the SAME voxel-noise floor the live cube view applies), read live so a
+    changed value applies on the next sync/export. Omitted → floor **1**
+    (unfiltered/legacy).
   - Returns a contributor with `subdir: 'sparse'` that writes
     `0/cameras.txt`, `0/images.txt`, `0/points3D.txt` (file count 3), or **0
     files** when intrinsics are unavailable.
@@ -36,24 +40,37 @@ Iter 3.
   (`getCellPoint(cell) ?? getCellCenter(cell)`, follow-up Item A) — the
   running-average of the measured points in the cell, hugging the real surface
   instead of snapping to the 15 cm lattice.
-- **World frame:** points are passed to `points3D` untransformed — raw WebXR
-  world IS the COLMAP world (Iter-1 camera-only basis change), so points and
-  cameras stay registered.
+- **Confidence floor:** only cells observed `≥ getMinConfidence()` times are
+  exported (`getOccupiedCells(minConfidence)`). This is the same
+  `occupancy.minConfidence` lever the voxel view uses, applied here so
+  single-frame depth noise — in particular **behind-surface** phantoms that
+  free-space carving can never clear — is kept out of the reconstruction. See
+  [2026-06-22-occupancy-grid-behind-surface-noise-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-22-occupancy-grid-behind-surface-noise-plan.md).
+- **World frame:** points are run through `webxrToColmapWorldPoint` (the
+  `G = diag(1,−1,−1)` world basis change — negate Y,Z) before `points3D`, the
+  SAME `G` folded into the camera extrinsics by `webxrToColmapPose`. This flips
+  our WebXR Y-up world into the viewers' Y-down gravity world so the export loads
+  **upright**, while keeping points and cameras registered (follow-up Item B).
 - **Color fallback:** cells with no observed RGB (`getCellColor` → null) emit
   mid-gray `128 128 128` rather than black.
 - **Empty grid:** still emits a valid model (cameras + images) with an empty
   `points3D.txt`.
 
-## Known: scene loads upside-down (manual fix)
+## Orientation: upright by default (world flip applied)
 
-The exported world is raw-WebXR **+Y-up**; COLMAP/3DGS viewers (Lichtfeld
-Studio, etc.) conventionally treat the world as **+Y-down gravity**, so the
-reconstruction loads **upside-down** (otherwise consistent — not mirrored, not
-mis-scaled). **Fix in the viewer: rotate the splat 180° about the X axis.** This
-is a deliberate decision (follow-up Item B, Q-B1) to keep the export untouched
-rather than fold a world transform into every file; the analysis of the
-in-export fix (a shared `G = diag(1,−1,−1)` world basis change) is recorded in
-the follow-up plan should we ever want upright-by-default.
+COLMAP/3DGS viewers (Lichtfeld Studio, gsplat, Nerfstudio) treat the COLMAP
+world as **+Y-down gravity**, while our raw-WebXR world is **+Y-up**. The export
+therefore applies a shared world basis change `G = diag(1,−1,−1)` (a proper
+180°-about-X rotation, det = +1 → no mirroring) to **both** the points
+(`webxrToColmapWorldPoint`) and the camera extrinsics (`webxrToColmapPose`), so
+new ZIPs load **upright** and stay internally consistent (registered, not
+mirrored, correctly scaled).
+
+This reverses the earlier document-only decision (follow-up Item B / Q-B1, which
+had kept the export raw-WebXR and asked users to rotate 180° about X in the
+viewer). **Old ZIPs exported before this change still load upside-down** — only
+new exports are corrected; no migration is performed. The derivation is in
+[colmap-conversions.ts.md](colmap-conversions.ts.md) and follow-up Item B.
 
 ## Wiring
 
@@ -65,5 +82,7 @@ BOTH the periodic crash-safety sync (`syncToExternalZip`) and the final
 
 - `colmap-zip-contributor.test.ts` — happy path (3 files, PINHOLE dims, RGB
   point), bare-filename NAME (incl. legacy `frames/`), Q4 skips (no matrix / no
-  dims → 0 files), empty-grid valid model, gray fallback. Wiring is covered by
+  dims → 0 files), empty-grid valid model, gray fallback, and the confidence
+  floor (one-shot cell excluded above its count, well-observed cell survives,
+  default floor 1 when `getMinConfidence` omitted). Wiring is covered by
   the recording-session-handlers tests.

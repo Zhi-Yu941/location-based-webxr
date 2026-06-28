@@ -28,7 +28,6 @@ const mockGpsPoint: GpsPoint = {
   altitude: 100,
   latLongAccuracy: 5,
   altitudeAccuracy: 5,
-  deviceRotation: [0, 0, 0, 1],
   coordinates: [0, 0, 0],
   weight: 1,
   timestamp: Date.now(),

@@ -17,6 +17,7 @@ import { describe, it, expect } from 'vitest';
 import type { ArImageCapture, Matrix4 } from 'gps-plus-slam-app-framework/core';
 import { OccupancyGrid } from 'gps-plus-slam-app-framework/ar/occupancy-grid';
 import { createColmapZipContributor } from './colmap-zip-contributor';
+import { webxrToColmapWorldPoint } from './colmap-conversions';
 
 // A symmetric perspective matrix (column-major): fx=0.5·W·m00, etc.
 // m00=m11=1 → fx=W/2, fy=H/2; m20=m21=0 → cx=W/2, cy=H/2.
@@ -85,7 +86,7 @@ describe('createColmapZipContributor', () => {
     expect(pointLines[0]).toMatch(/^1 \S+ \S+ \S+ 10 20 30 \S+$/);
   });
 
-  it('emits the exact per-cell surface point, not the lattice center (Item A)', async () => {
+  it('emits the exact per-cell surface point, flipped into the COLMAP world frame (Items A+B)', async () => {
     const grid = new OccupancyGrid();
     // depth 2 at center screen → exact point [0,0,-2]; with 0.15 m cells the
     // lattice center is [0,0,-1.95], so exact ≠ center.
@@ -99,6 +100,10 @@ describe('createColmapZipContributor', () => {
     const cell = grid.getOccupiedCells()[0]!;
     const exact = grid.getCellPoint(cell)!;
     expect(exact).not.toEqual(grid.getCellCenter(cell)); // sanity
+    // The export applies the world basis change (Item B, upside-down fix) — the
+    // SAME flip folded into the camera extrinsics — so the written point is the
+    // exact surface point with Y and Z negated, keeping it registered.
+    const expected = webxrToColmapWorldPoint(exact);
 
     const { files } = await runContributor({
       getFrames: () => [frame()],
@@ -111,9 +116,9 @@ describe('createColmapZipContributor', () => {
       .find((l) => /^\d+ /.test(l))!
       .split(' ');
     // POINT3D_ID X Y Z R G B ERROR
-    expect(Number(xyz[1])).toBeCloseTo(exact[0], 5);
-    expect(Number(xyz[2])).toBeCloseTo(exact[1], 5);
-    expect(Number(xyz[3])).toBeCloseTo(exact[2], 5);
+    expect(Number(xyz[1])).toBeCloseTo(expected[0], 5);
+    expect(Number(xyz[2])).toBeCloseTo(expected[1], 5);
+    expect(Number(xyz[3])).toBeCloseTo(expected[2], 5);
   });
 
   it('uses the bare image filename as NAME (image_path → images/)', async () => {
@@ -166,6 +171,89 @@ describe('createColmapZipContributor', () => {
     expect(pointLines).toEqual([]);
     // images.txt still has the pose (two lines per image: pose + empty).
     expect(files.get('sparse/0/images.txt')).toMatch(/ frame-000001\.jpg/);
+  });
+
+  it('excludes a one-shot cell when getMinConfidence raises the floor above its count', async () => {
+    // Behind-surface depth noise lands in a cell ONCE (count 1) and free-space
+    // carving can never reach it (no ray traverses occluded space). The COLMAP
+    // export must honour the same `occupancy.minConfidence` floor the voxel view
+    // uses, or every single-frame phantom is baked into the reconstruction.
+    const grid = new OccupancyGrid();
+    grid.addSample({
+      timestamp: 0,
+      cameraPos: [0, 0, 0],
+      cameraRot: [0, 0, 0, 1],
+      projectionMatrix: PROJECTION,
+      points: [{ screenX: 0.5, screenY: 0.5, depthM: 2, rgb: [10, 20, 30] }],
+    });
+    expect(grid.getOccupiedCells(1)).toHaveLength(1); // sanity: one-shot cell exists
+
+    const { count, files } = await runContributor({
+      getFrames: () => [frame()],
+      getProjectionMatrix: () => PROJECTION,
+      getOccupancyGrid: () => grid,
+      getMinConfidence: () => 2, // floor above the cell's count of 1
+    });
+
+    // The model is still valid (3 files); points3D is empty — the phantom is gone.
+    expect(count).toBe(3);
+    const pointLines = files
+      .get('sparse/0/points3D.txt')!
+      .split('\n')
+      .filter((l) => l && !l.startsWith('#'));
+    expect(pointLines).toEqual([]);
+  });
+
+  it('keeps a well-observed cell at the same floor (real surfaces survive)', async () => {
+    // The same surface point seen across 3 samples reaches count 3, so a
+    // floor of 3 trusts it — the filter removes noise, not dwelt-on geometry.
+    const grid = new OccupancyGrid();
+    for (let i = 0; i < 3; i++) {
+      grid.addSample({
+        timestamp: i,
+        cameraPos: [0, 0, 0],
+        cameraRot: [0, 0, 0, 1],
+        projectionMatrix: PROJECTION,
+        points: [{ screenX: 0.5, screenY: 0.5, depthM: 2, rgb: [10, 20, 30] }],
+      });
+    }
+    expect(grid.getOccupiedCells(3)).toHaveLength(1); // sanity: count reached 3
+
+    const { files } = await runContributor({
+      getFrames: () => [frame()],
+      getProjectionMatrix: () => PROJECTION,
+      getOccupancyGrid: () => grid,
+      getMinConfidence: () => 3,
+    });
+    const pointLines = files
+      .get('sparse/0/points3D.txt')!
+      .split('\n')
+      .filter((l) => l && !l.startsWith('#'));
+    expect(pointLines.length).toBe(1);
+    expect(pointLines[0]).toMatch(/ 10 20 30 /); // carries its RGB
+  });
+
+  it('defaults to floor 1 (unfiltered) when getMinConfidence is not provided', async () => {
+    // Back-compat: existing call sites that omit the accessor keep today's
+    // behaviour — a single-observation cell is still exported.
+    const grid = new OccupancyGrid();
+    grid.addSample({
+      timestamp: 0,
+      cameraPos: [0, 0, 0],
+      cameraRot: [0, 0, 0, 1],
+      projectionMatrix: PROJECTION,
+      points: [{ screenX: 0.5, screenY: 0.5, depthM: 2 }],
+    });
+    const { files } = await runContributor({
+      getFrames: () => [frame()],
+      getProjectionMatrix: () => PROJECTION,
+      getOccupancyGrid: () => grid,
+    });
+    const pointLines = files
+      .get('sparse/0/points3D.txt')!
+      .split('\n')
+      .filter((l) => l && !l.startsWith('#'));
+    expect(pointLines.length).toBe(1);
   });
 
   it('falls back to gray for cells that were never observed with color', async () => {

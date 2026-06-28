@@ -7,7 +7,6 @@
  *
  *  - §4.1 matrix-history convergence  → {@link computeConvergence}
  *  - §4.2 per-observation residual    → {@link computeResidualConsensus}
- *  - §4.3 compass cross-check         → {@link computeCompassAgreement}
  *  - §4.4 GPS-accuracy budget         → {@link computeGpsAccuracy}
  *  - §4.5 baseline coverage           → {@link computeCoverage}
  *  - §4.6 GPS-vs-fused divergence     → {@link computeGpsVsFusedDivergence}
@@ -39,6 +38,7 @@ import { mat4, quat, vec3 } from 'gl-matrix';
 import type { ReadonlyMat4 } from 'gl-matrix';
 import type { GpsPoint, LatLong, Matrix4, Vector3 } from 'gps-plus-slam-js';
 import { calcGpsCoords, distanceInMeters } from 'gps-plus-slam-js';
+import { geodesicAngleRad } from '../utils/geodesic-angle.js';
 import type { CombinedRootState } from './combined-root-state';
 import {
   selectAlignmentMatrix,
@@ -46,13 +46,7 @@ import {
   selectOdometryPositions,
   selectZeroReference,
 } from './app-selectors';
-import {
-  selectLastSensorOrientation,
-  selectLastValidPose,
-  selectTrackingPhase,
-  type DeviceOrientation,
-} from './tracking-slice';
-import type { ARPose } from '../types/ar-types';
+import { selectTrackingPhase } from './tracking-slice';
 
 // ===========================================================================
 // Public types
@@ -67,8 +61,6 @@ export interface TrackingQualityReport {
   subScores: {
     convergence: number;
     residualConsensus: number;
-    /** `null` when the device cannot supply an absolute compass heading. */
-    compassAgreement: number | null;
     gpsAccuracy: number;
     coverage: number;
   };
@@ -88,9 +80,6 @@ export interface TrackingQualityReport {
     medianRecentGpsAccuracyM: number;
     walkedDistanceM: number;
     directionSpreadDeg: number;
-    /** `null` when §4.3 is unavailable (no absolute compass). */
-    headingDeltaDeg: number | null;
-    compassDriftDetected: boolean;
     observationsSeen: number;
     /** §4.6 — diagnostic only, never feeds the aggregate. */
     gpsVsFusedMaxDivergenceM: number;
@@ -114,10 +103,6 @@ export interface TrackingQualityOptions {
   convergenceRotationWarnDeg?: number;
   /** §4.1 ΣΔtranslation (m) at/below which convergence scores 1.0. Fail ramp ends at 4×. */
   convergenceTranslationWarnM?: number;
-  /** §4.3 EMA threshold (deg) below which compass scores 1.0. */
-  compassWarnDeg?: number;
-  /** §4.3 EMA threshold (deg) above which compass scores 0.0. */
-  compassFailDeg?: number;
   /** Minimum GPS observations before leaving `warming-up`. */
   warmupMinObservations?: number;
   /** Minimum coverage score before leaving `warming-up`. */
@@ -126,8 +111,6 @@ export interface TrackingQualityOptions {
   residualConfidenceTargetM?: number;
   /** §4.4 GPS-accuracy floor used to normalise residuals (m). */
   gpsAccuracyFloorM?: number;
-  /** §4.3 consecutive compass-agreeing observations for first agreement. */
-  firstAgreementMinStreak?: number;
   /** §4.8 consecutive sub-threshold observations before ok → degraded. */
   degradedHoldoff?: number;
   /**
@@ -149,13 +132,10 @@ export const DEFAULT_TRACKING_QUALITY_OPTIONS: Required<TrackingQualityOptions> 
     coverageDirectionSpreadDeg: 90,
     convergenceRotationWarnDeg: 6, // §4.1 — calibrated 2026-05-23, see computeConvergence
     convergenceTranslationWarnM: 2, // §4.1 — calibrated 2026-05-23, see computeConvergence
-    compassWarnDeg: 15,
-    compassFailDeg: 35,
     warmupMinObservations: 10,
     warmupMinCoverage: 0.5,
     residualConfidenceTargetM: 3,
     gpsAccuracyFloorM: 1,
-    firstAgreementMinStreak: 3,
     degradedHoldoff: 3,
     convergenceEmaAlpha: 0.3, // §4.8b — corpus-tunable, see Finding 4
   };
@@ -176,7 +156,6 @@ export interface AlignmentSnapshot {
 
 export interface TrackingQualitySliceState {
   recentAlignments: AlignmentSnapshot[];
-  firstAgreementObservationIndex: number | null;
   report: TrackingQualityReport | null;
   /** §4.8 — consecutive observations with raw confidence < degradedThreshold. */
   degradedConsecutiveCount: number;
@@ -191,7 +170,6 @@ export interface TrackingQualitySliceState {
 
 const initialState: TrackingQualitySliceState = {
   recentAlignments: [],
-  firstAgreementObservationIndex: null,
   report: null,
   degradedConsecutiveCount: 0,
   smoothedConvergence: null,
@@ -219,12 +197,6 @@ function emaBlend(prev: number | null, raw: number, alpha: number): number {
   if (prev === null) return raw;
   const a = Number.isFinite(alpha) ? alpha : 1;
   return prev + a * (raw - prev);
-}
-
-function wrapToHalfCircle(deg: number): number {
-  let d = ((deg + 180) % 360) - 180;
-  if (d < -180) d += 360;
-  return d;
 }
 
 function bearingDeg(north: number, east: number): number {
@@ -268,6 +240,14 @@ function rampUp(value: number, low: number, high: number): number {
   if (value <= low) return 0;
   if (value >= high) return 1;
   return (value - low) / (high - low);
+}
+
+/** True iff every element of the matrix is a finite number (no NaN/Infinity). */
+function isFiniteMatrix(m: readonly number[]): boolean {
+  for (let i = 0; i < m.length; i++) {
+    if (!Number.isFinite(m[i])) return false;
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -350,10 +330,22 @@ export function computeConvergence(
   let sumTransM = 0;
   let pairCount = 0;
   for (let i = 1; i < snapshots.length; i++) {
-    const { rotationDeltaDeg, translationDeltaM } = matrixDelta(
-      snapshots[i - 1]!.matrix,
-      snapshots[i]!.matrix
-    );
+    const prevM = snapshots[i - 1]!.matrix;
+    const currM = snapshots[i]!.matrix;
+    // A corrupt (non-finite) alignment matrix — a degenerate solve emitting
+    // NaN/Infinity — is NOT evidence of stability. `matrixDelta` finite-guards
+    // such input to ZERO deltas (so the score never becomes NaN), but a zero
+    // delta reads as "perfectly stable", which would let a corrupt snapshot
+    // *improve* convergence. Score the pair on the FAIL side instead so a bad
+    // matrix degrades (never inflates) the score. The thresholds are added so a
+    // single corrupt pair pushes the corresponding ramp to 0.
+    if (!isFiniteMatrix(prevM) || !isFiniteMatrix(currM)) {
+      sumRotDeg += rotFail;
+      sumTransM += transFail;
+      pairCount += 1;
+      continue;
+    }
+    const { rotationDeltaDeg, translationDeltaM } = matrixDelta(prevM, currM);
     sumRotDeg += Math.abs(rotationDeltaDeg);
     sumTransM += Math.abs(translationDeltaM);
     pairCount += 1;
@@ -374,7 +366,8 @@ export function computeConvergence(
  * the column-major layout that gl-matrix and the framework use.
  *
  * Rotation: extract the orientation quaternion with `mat4.getRotation`
- * and compute the relative angle via `quat.getAngle` (degrees).
+ * and compute the relative angle via the shared `geodesicAngleRad` kernel
+ * (radians, converted to degrees here).
  * Translation: extract the origin column with `mat4.getTranslation` and
  * compute the Euclidean distance.
  *
@@ -406,17 +399,28 @@ export function matrixDelta(
   mat4.getRotation(currQuat, currMat);
   quat.normalize(prevQuat, prevQuat);
   quat.normalize(currQuat, currQuat);
-  // quat.getAngle can return NaN when the quaternions are nearly identical
-  // (dot product slightly > 1.0 due to float precision → acos(>1) = NaN).
-  const angleRad = quat.getAngle(prevQuat, currQuat);
-  const rotationDeltaDeg = Number.isNaN(angleRad)
-    ? 0
-    : (angleRad * 180) / Math.PI;
+  // Shared geodesic-angle kernel: clamps before acos, so the near-identical
+  // case that made raw quat.getAngle return NaN now returns 0 directly (the
+  // explicit NaN guard this code used to carry is folded into the helper).
+  const angleRad = geodesicAngleRad(prevQuat, currQuat);
+  // Finite-guard both deltas: geodesicAngleRad's clamp only fixes near-identity
+  // round-off, NOT NaN/Infinity that a degenerate matrix feeds through
+  // getRotation/quat.normalize (and likewise getTranslation/vec3.distance). An
+  // unguarded NaN here propagates into computeConvergence and turns the whole
+  // tracking-quality score into NaN. Fall back to 0 (no delta) on bad input —
+  // the explicit guard this kernel used to carry before the shared-helper
+  // refactor folded the round-off case (but not the NaN case) into the clamp.
+  const rotationDeltaDeg = Number.isFinite(angleRad)
+    ? (angleRad * 180) / Math.PI
+    : 0;
   const prevT = vec3.create();
   const currT = vec3.create();
   mat4.getTranslation(prevT, prevMat);
   mat4.getTranslation(currT, currMat);
-  const translationDeltaM = vec3.distance(prevT, currT);
+  const rawTranslation = vec3.distance(prevT, currT);
+  const translationDeltaM = Number.isFinite(rawTranslation)
+    ? rawTranslation
+    : 0;
   return { rotationDeltaDeg, translationDeltaM };
 }
 
@@ -639,94 +643,6 @@ export function computeCoverage(
 }
 
 // ---------------------------------------------------------------------------
-// §4.3 compass / alignment heading cross-check
-// ---------------------------------------------------------------------------
-
-export interface CompassAgreementResult {
-  /** `null` when `absolute !== true` on the sensor orientation. */
-  score: number | null;
-  headingDeltaDeg: number | null;
-}
-
-/**
- * §4.3 — Compare the alignment matrix's mapping of AR-forward to ENU
- * against the device compass heading. Returns `score = null` whenever
- * the sensor's `absolute !== true` so the aggregate excludes the
- * sub-score (per Q2 in the plan).
- *
- * AR-forward in our `ARPose` convention is `(0, 0, -1)` (right-handed,
- * Y-up). We rotate that by the alignment's 3×3 rotation, take its
- * North/East components, and compare against the compass alpha.
- */
-export function computeCompassAgreement(
-  alignmentMatrix: Matrix4 | null,
-  sensorOrientation: DeviceOrientation | null,
-  arPose: ARPose | null,
-  options: { warnDeg?: number; failDeg?: number } = {}
-): CompassAgreementResult {
-  const warn =
-    options.warnDeg ?? DEFAULT_TRACKING_QUALITY_OPTIONS.compassWarnDeg;
-  const fail =
-    options.failDeg ?? DEFAULT_TRACKING_QUALITY_OPTIONS.compassFailDeg;
-  if (!alignmentMatrix || !sensorOrientation || !arPose) {
-    return { score: null, headingDeltaDeg: null };
-  }
-  if (sensorOrientation.absolute !== true) {
-    return { score: null, headingDeltaDeg: null };
-  }
-
-  // AR-camera forward direction in AR-local space: rotate (0, 0, -1) by
-  // the camera quaternion.
-  const q = arPose.orientation;
-  const fx = 0;
-  const fy = 0;
-  const fz = -1;
-  // v' = q * v * q^-1, with q = (x, y, z, w).
-  const x = q.x,
-    y = q.y,
-    z = q.z,
-    w = q.w;
-  const tx = 2 * (y * fz - z * fy);
-  const ty = 2 * (z * fx - x * fz);
-  const tz = 2 * (x * fy - y * fx);
-  const arForwardLocal: Vector3 = [
-    fx + w * tx + (y * tz - z * ty),
-    fy + w * ty + (z * tx - x * tz),
-    fz + w * tz + (x * ty - y * tx),
-  ];
-
-  // Transform by alignment rotation only (drop translation).
-  const m = alignmentMatrix;
-  const enuN =
-    m[0] * arForwardLocal[0] +
-    m[4] * arForwardLocal[1] +
-    m[8] * arForwardLocal[2];
-  const enuU =
-    m[1] * arForwardLocal[0] +
-    m[5] * arForwardLocal[1] +
-    m[9] * arForwardLocal[2];
-  const enuE =
-    m[2] * arForwardLocal[0] +
-    m[6] * arForwardLocal[1] +
-    m[10] * arForwardLocal[2];
-  void enuU;
-  const horiz = Math.hypot(enuN, enuE);
-  if (horiz < 1e-6) {
-    // AR forward is near-vertical — heading is undefined this frame.
-    return { score: null, headingDeltaDeg: null };
-  }
-  const alignmentHeadingDeg = bearingDeg(enuN, enuE);
-  const compassHeadingDeg = sensorOrientation.alpha;
-  const delta = Math.abs(
-    wrapToHalfCircle(alignmentHeadingDeg - compassHeadingDeg)
-  );
-  return {
-    score: rampDown(delta, warn, fail),
-    headingDeltaDeg: delta,
-  };
-}
-
-// ---------------------------------------------------------------------------
 // §4.6 GPS-vs-fused divergence (diagnostic only)
 // ---------------------------------------------------------------------------
 
@@ -797,9 +713,6 @@ const trackingQualitySlice = createSlice({
     reportUpdated(state, action: PayloadAction<TrackingQualityReport | null>) {
       state.report = action.payload;
     },
-    firstAgreementReached(state, action: PayloadAction<number>) {
-      state.firstAgreementObservationIndex = action.payload;
-    },
     /** §4.8 — update the hysteresis counter for ok → degraded holdoff. */
     degradedCountUpdated(state, action: PayloadAction<number>) {
       state.degradedConsecutiveCount = action.payload;
@@ -823,7 +736,6 @@ export const {
   snapshotPushed,
   snapshotsTrimmed,
   reportUpdated,
-  firstAgreementReached,
   degradedCountUpdated,
   resetTrackingQuality,
 } = trackingQualitySlice.actions;
@@ -853,12 +765,6 @@ export function selectRecentAlignments(
   state: RootWithTrackingQuality
 ): readonly AlignmentSnapshot[] {
   return state.trackingQuality?.recentAlignments ?? EMPTY_SNAPSHOTS;
-}
-
-export function selectFirstAgreementObservationIndex(
-  state: RootWithTrackingQuality
-): number | null {
-  return state.trackingQuality?.firstAgreementObservationIndex ?? null;
 }
 
 const EMPTY_SNAPSHOTS: readonly AlignmentSnapshot[] = Object.freeze([]);
@@ -893,10 +799,7 @@ export function computeTrackingQualityReport(
   const odometryPositions = selectOdometryPositions(rootState);
   const zeroRef = selectZeroReference(rootState);
   const trackingPhase = selectTrackingPhase(rootState);
-  const sensorOrientation = selectLastSensorOrientation(rootState);
-  const lastPose = selectLastValidPose(rootState);
   const snapshots = selectRecentAlignments(rootState);
-  const firstAgreementIdx = selectFirstAgreementObservationIndex(rootState);
 
   const coverage = computeCoverage(odometryPositions, {
     walkedDistanceM: opts.coverageWalkedDistanceM,
@@ -920,12 +823,6 @@ export function computeTrackingQualityReport(
     rotationWarnDeg: opts.convergenceRotationWarnDeg,
     translationWarnM: opts.convergenceTranslationWarnM,
   });
-  const compass = computeCompassAgreement(
-    alignmentMatrix,
-    sensorOrientation,
-    lastPose,
-    { warnDeg: opts.compassWarnDeg, failDeg: opts.compassFailDeg }
-  );
   const gpsVsFusedMaxDivergenceM = computeGpsVsFusedDivergence(
     alignmentMatrix,
     gpsPositions,
@@ -942,7 +839,6 @@ export function computeTrackingQualityReport(
       )
     ),
     residualConsensus: clamp01(residual.score),
-    compassAgreement: compass.score === null ? null : clamp01(compass.score),
     gpsAccuracy: clamp01(gpsAccuracy.score),
     coverage: clamp01(coverage.score),
   };
@@ -953,9 +849,6 @@ export function computeTrackingQualityReport(
     subScores.gpsAccuracy,
     subScores.coverage,
   ];
-  if (subScores.compassAgreement !== null) {
-    aggregateInputs.push(subScores.compassAgreement);
-  }
   const confidence = clamp01(Math.min(...aggregateInputs));
 
   const observationsSeen = gpsPositions.length;
@@ -985,11 +878,6 @@ export function computeTrackingQualityReport(
       medianRecentGpsAccuracyM: gpsAccuracy.medianM,
       walkedDistanceM: coverage.walkedDistanceM,
       directionSpreadDeg: coverage.directionSpreadDeg,
-      headingDeltaDeg: compass.headingDeltaDeg,
-      compassDriftDetected:
-        firstAgreementIdx !== null &&
-        compass.headingDeltaDeg !== null &&
-        compass.headingDeltaDeg > opts.compassWarnDeg,
       observationsSeen,
       gpsVsFusedMaxDivergenceM,
     },
@@ -1004,15 +892,14 @@ export function computeTrackingQualityReport(
  * Per-field tolerances for the {@link reportsEqual} dispatch gate.
  *
  * Why this exists: `tracking/poseReceived` fires on *every* XR frame
- * (30–60 fps). The §4.3 compass cross-check consumes the live AR pose
- * and sensor heading, so `subScores.compassAgreement` and
- * `diagnostics.headingDeltaDeg` (and, when compass is the minimum,
- * `confidence`) jitter by imperceptible floating-point amounts on a
- * held-still device. With a strict `!==` comparison every such frame
- * produced a fresh `reportUpdated` dispatch → high Redux churn and a
- * HUD re-render at frame rate. The tolerances below quantise those
- * sub-perceptual changes so the gate only fires when the user-visible
- * quality actually moved.
+ * (30–60 fps). The per-frame recompute reuses GPS/odometry windows that
+ * are unchanged between pose frames, so the float sub-scores and
+ * diagnostics (and `confidence`) jitter by imperceptible floating-point
+ * amounts on a held-still device. With a strict `!==` comparison every
+ * such frame produced a fresh `reportUpdated` dispatch → high Redux
+ * churn and a HUD re-render at frame rate. The tolerances below quantise
+ * those sub-perceptual changes so the gate only fires when the
+ * user-visible quality actually moved.
  *
  * The gate compares the freshly computed report against the *last
  * dispatched* report (the stored `prev`), not against the previous
@@ -1032,10 +919,9 @@ const REPORT_METRE_EPSILON_M = 1e-3;
  * (both `null` ⇒ equal; exactly one `null` ⇒ different) and otherwise
  * compares with an absolute epsilon. Non-finite values are compared with
  * {@link Object.is}, so a genuine finite↔NaN/Infinity transition still
- * fires a dispatch, but a *persistently* NaN diagnostic (the only
- * unguarded path is a NaN compass `alpha` leaking into
- * `diagnostics.headingDeltaDeg`) does NOT churn the gate every frame —
- * `Object.is(NaN, NaN)` is `true` whereas `NaN === NaN` is `false`.
+ * fires a dispatch, but a *persistently* NaN diagnostic does NOT churn
+ * the gate every frame — `Object.is(NaN, NaN)` is `true` whereas
+ * `NaN === NaN` is `false`.
  */
 function nearlyEqual(a: number | null, b: number | null, eps: number): boolean {
   if (a === null || b === null) return a === b;
@@ -1051,8 +937,8 @@ function nearlyEqual(a: number | null, b: number | null, eps: number): boolean {
  *
  * Float fields use the per-field tolerances above
  * ({@link REPORT_SCORE_EPSILON} et al.) so imperceptible per-frame
- * compass jitter does not churn the store — see the constants' doc
- * comment for the rationale.
+ * jitter does not churn the store — see the constants' doc comment for
+ * the rationale.
  */
 function reportsEqual(
   a: TrackingQualityReport | null,
@@ -1073,11 +959,6 @@ function reportsEqual(
       sb.residualConsensus,
       REPORT_SCORE_EPSILON
     ) ||
-    !nearlyEqual(
-      sa.compassAgreement,
-      sb.compassAgreement,
-      REPORT_SCORE_EPSILON
-    ) ||
     !nearlyEqual(sa.gpsAccuracy, sb.gpsAccuracy, REPORT_SCORE_EPSILON) ||
     !nearlyEqual(sa.coverage, sb.coverage, REPORT_SCORE_EPSILON)
   ) {
@@ -1086,7 +967,6 @@ function reportsEqual(
   const da = a.diagnostics;
   const db = b.diagnostics;
   return (
-    da.compassDriftDetected === db.compassDriftDetected &&
     da.observationsSeen === db.observationsSeen &&
     nearlyEqual(
       da.recentSumRotationDeltaDeg,
@@ -1096,11 +976,6 @@ function reportsEqual(
     nearlyEqual(
       da.directionSpreadDeg,
       db.directionSpreadDeg,
-      REPORT_ANGLE_EPSILON_DEG
-    ) &&
-    nearlyEqual(
-      da.headingDeltaDeg,
-      db.headingDeltaDeg,
       REPORT_ANGLE_EPSILON_DEG
     ) &&
     nearlyEqual(
@@ -1197,9 +1072,6 @@ export function createTrackingQualityListenerMiddleware(
     ...options,
   };
 
-  // §4.3 first-agreement streak counter (transient — resets on session reset).
-  let compassStreak = 0;
-
   // Use `isAnyOf` matcher equivalent via predicate.
   const listenerMiddleware = createListenerMiddleware();
   listenerMiddleware.startListening({
@@ -1211,13 +1083,11 @@ export function createTrackingQualityListenerMiddleware(
         action.type === TRACKING_QUALITY_INPUT_ACTIONS.startSession ||
         action.type === TRACKING_QUALITY_INPUT_ACTIONS.resetTracking
       ) {
-        compassStreak = 0;
         const tq = (state as unknown as RootWithTrackingQuality)
           .trackingQuality;
         if (
           tq &&
           (tq.recentAlignments.length > 0 ||
-            tq.firstAgreementObservationIndex !== null ||
             tq.report !== null ||
             tq.degradedConsecutiveCount > 0)
         ) {
@@ -1247,42 +1117,6 @@ export function createTrackingQualityListenerMiddleware(
               })
             );
             api.dispatch(snapshotsTrimmed({ size: opts.matrixHistorySize }));
-          }
-        }
-      }
-
-      // §4.3 first-agreement detector — track compass streak and dispatch
-      // firstAgreementReached once convergence is high and compass agrees
-      // for opts.firstAgreementMinStreak consecutive observations.
-      const midState = api.getState() as CombinedRootState;
-      const midTq = (midState as unknown as RootWithTrackingQuality)
-        .trackingQuality;
-      if (midTq && midTq.firstAgreementObservationIndex === null) {
-        const snapshots = selectRecentAlignments(midState);
-        if (snapshots.length >= 2) {
-          const conv = computeConvergence(snapshots, {
-            rotationWarnDeg: opts.convergenceRotationWarnDeg,
-            translationWarnM: opts.convergenceTranslationWarnM,
-          });
-          const sensorOr = selectLastSensorOrientation(midState);
-          const pose = selectLastValidPose(midState);
-          const alignment = selectAlignmentMatrix(midState);
-          const compass = computeCompassAgreement(alignment, sensorOr, pose, {
-            warnDeg: opts.compassWarnDeg,
-            failDeg: opts.compassFailDeg,
-          });
-          if (
-            conv.score >= 0.7 &&
-            compass.headingDeltaDeg !== null &&
-            compass.headingDeltaDeg <= opts.compassWarnDeg
-          ) {
-            compassStreak += 1;
-            if (compassStreak >= opts.firstAgreementMinStreak) {
-              const obsCount = selectGpsPositions(midState).length;
-              api.dispatch(firstAgreementReached(obsCount));
-            }
-          } else {
-            compassStreak = 0;
           }
         }
       }

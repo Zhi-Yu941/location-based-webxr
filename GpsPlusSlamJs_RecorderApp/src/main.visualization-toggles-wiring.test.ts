@@ -105,7 +105,7 @@ const {
       qr: { enabled: false, intervalMs: 125, captureSize: 1024 },
       images: { enabled: false, intervalMs: 1000, quality: 0.8 },
       depth: { enabled: false, intervalMs: 1000 },
-      occupancy: { cellSizeM: 0.15 },
+      occupancy: { cellSizeM: 0.15, minConfidence: 3 },
       frameTileDisplay: { divisor: 2 },
       visualization: {
         frameTiles: true,

@@ -29,6 +29,9 @@ import {
   sanitizeForDevTools,
   validateLicenseKey,
   setZeroPos,
+  setColdStartOverrideEnabled,
+  setCompassRotationPriorEnabled,
+  setCompassWebXRConsistencyEnabled,
   type RootState as LibraryRootState,
 } from 'gps-plus-slam-js';
 import { COMMUNITY_LICENSE_KEY } from 'gps-plus-slam-js/community-license-key';
@@ -50,6 +53,10 @@ import {
   createPersistenceMiddleware,
   slicePrefixOf,
 } from './persistence-middleware';
+import {
+  createSlamAppStoreListenerMiddleware,
+  type CompassOptIn,
+} from './slam-app-store-listener';
 
 /**
  * Slice prefixes the framework always persists, derived from the actual
@@ -139,6 +146,49 @@ export interface SlamAppStoreOptions<
    * @see docs/2026-05-16-tracking-quality-metrics-plan.md
    */
   trackingQualityOptions?: Partial<TrackingQualityOptions>;
+
+  /**
+   * Enable the library's Phase-4 **Stage-0** cold-start compass yaw override.
+   * **Default `true`** — Stage 0 is a field-validated, default-on feature: at
+   * cold start the GPS-derived yaw is unobservable (clustered fixes ⇒ a yaw set
+   * by noise that flips as the user looks around), so the compass heading gives
+   * a roughly-correct, stable orientation immediately ("open app, stand still,
+   * look around" works). It is an observability-gated handover — once a walked
+   * baseline conditions the GPS yaw, the solve hands back to GPS — so it does no
+   * harm once GPS is observable. Pass `false` to opt out (the recorder exposes
+   * this as a settings toggle).
+   *
+   * When enabled the factory dispatches `setColdStartOverrideEnabled(true)` the
+   * first time `gpsData` becomes non-null (right after the first `setZeroPos`,
+   * since the flag lives on that slice and cannot be set before it exists).
+   *
+   * Replay/determinism: the library's `DefaultAlignmentConfig` stays OFF, so
+   * historical recordings replay unchanged; default-on lives here as a recorded
+   * `gpsData` action. A recording made with this on therefore replays with the
+   * override on. **For Stage-A/§6a field-calibration recordings, turn this OFF**
+   * (recorder settings) so the captured compass behaviour is unmodified.
+   *
+   * @see GpsPlusSlamJs_Docs/docs/2026-06-26-stage0-field-collection-and-enablement.md
+   */
+  enableCompassColdStartOverride?: boolean;
+
+  /**
+   * **Debug/experiment flag** — enable the library's Phase-4 **Stage-C**
+   * trust-gated compass rotation prior (keeps a steady compass vote once GPS yaw
+   * is observable + the compass is trusted; supersedes Stage 0). Dispatches
+   * `setCompassRotationPriorEnabled(true)` once `gpsData` exists. Default `false`
+   * ⇒ byte-identical. Like the Stage-0 flag, the action persists into recordings.
+   */
+  enableCompassRotationPrior?: boolean;
+
+  /**
+   * **Debug/experiment flag** — enable the library's GPS-free compass↔WebXR
+   * consistency gate. When on, the compass override (Stage 0 / Stage C) abstains
+   * unless the compass is rotating in lock-step with the WebXR pose. Dispatches
+   * `setCompassWebXRConsistencyEnabled(true)` once `gpsData` exists. Default
+   * `false` ⇒ byte-identical. The action persists into recordings.
+   */
+  enableCompassWebXRConsistency?: boolean;
 }
 
 /**
@@ -189,6 +239,11 @@ export function createSlamAppStore<
     enableDevChecks = true,
     licenseKey = COMMUNITY_LICENSE_KEY,
     trackingQualityOptions,
+    // Stage 0 (cold-start compass override) ships ON by default; Stage C and the
+    // WebXR-consistency gate stay field-gated (default OFF).
+    enableCompassColdStartOverride = true,
+    enableCompassRotationPrior = false,
+    enableCompassWebXRConsistency = false,
   } = options;
 
   validateLicenseKey(licenseKey);
@@ -207,6 +262,52 @@ export function createSlamAppStore<
     trackingQualityOptions
   );
 
+  // Debug/experiment opt-ins for the compass alignment flags. They live on the
+  // `gpsData` slice, which is `null` until the first `setZeroPos`, so a listener
+  // middleware applies them once that slice exists. Each opt-in: a predicate
+  // reading whether the flag is already set, and the action that sets it.
+  //
+  // Why a listener middleware (not a `store.subscribe` dispatch): the apply must
+  // dispatch a follow-up action in reaction to `gpsData` appearing. A synchronous
+  // `store.subscribe` dispatch runs INSIDE the trigger's `next()`, and the
+  // persistence middleware assigns its replay index AFTER `next()` — so the opt-in
+  // would get a LOWER index than the `setZeroPos` that created `gpsData`, be
+  // recorded BEFORE its trigger, and be dropped on replay (field bug 2026-06-27,
+  // recordings 64c6a294 / e7431b85). A prepended listener-middleware effect runs
+  // after the trigger unwinds, so the opt-in is a top-level dispatch persisted
+  // AFTER setZeroPos — correct replay order by construction, no `queueMicrotask`
+  // / re-entrancy guard to hand-maintain. See `slam-app-store-listener.ts` and
+  // GpsPlusSlamJs_Docs/docs/2026-06-28-subscriber-dispatch-persistence-ordering-plan.md.
+  const compassOptIns: CompassOptIn[] = [];
+  if (enableCompassColdStartOverride) {
+    compassOptIns.push({
+      isSet: (s) => s.gpsData?.coldStartOverrideEnabled === true,
+      apply: (dispatch) => dispatch(setColdStartOverrideEnabled(true)),
+    });
+  }
+  if (enableCompassRotationPrior) {
+    compassOptIns.push({
+      isSet: (s) => s.gpsData?.compassRotationPriorEnabled === true,
+      apply: (dispatch) => dispatch(setCompassRotationPriorEnabled(true)),
+    });
+  }
+  if (enableCompassWebXRConsistency) {
+    compassOptIns.push({
+      isSet: (s) => s.gpsData?.compassWebXRConsistencyEnabled === true,
+      apply: (dispatch) => dispatch(setCompassWebXRConsistencyEnabled(true)),
+    });
+  }
+
+  // Listener middlewares are prepended (outermost) so their effects dispatch
+  // OUTSIDE the trigger's `next()` — the compass listener is only added when an
+  // opt-in is requested, so the common path keeps zero per-action overhead.
+  const prependedListeners: SlamAppMiddleware[] = [trackingQualityMiddleware];
+  if (compassOptIns.length > 0) {
+    prependedListeners.push(
+      createSlamAppStoreListenerMiddleware(compassOptIns)
+    );
+  }
+
   const store = configureStore({
     reducer,
     middleware: (getDefaultMiddleware) =>
@@ -214,7 +315,7 @@ export function createSlamAppStore<
         serializableCheck: enableDevChecks,
         immutableCheck: enableDevChecks,
       })
-        .prepend(trackingQualityMiddleware)
+        .prepend(...prependedListeners)
         .concat(
           createPersistenceMiddleware({
             storageBackend,

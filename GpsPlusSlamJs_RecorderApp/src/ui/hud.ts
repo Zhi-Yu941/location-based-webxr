@@ -564,6 +564,61 @@ export function updateSyncStatus(status: SyncStatusDisplay): void {
 }
 
 /**
+ * Lifecycle status for the AbsoluteOrientationSensor capture (plan §5).
+ * Structurally compatible with the framework's `AbsoluteOrientationStatus`.
+ */
+export interface AbsCompassStatusDisplay {
+  state: 'active' | 'unavailable' | 'error';
+  reason?: string;
+  /** Optional latest magnetic heading (deg) for the read-out. */
+  headingDeg?: number | null;
+}
+
+/**
+ * Update the AbsCompass (AbsoluteOrientationSensor) status row — the Phase-1
+ * presence indicator that lets a field tester confirm a recording is actually
+ * capturing the independent-north sensor before collecting many sessions
+ * (plan §5).
+ *
+ * When active with a live heading it shows the **magnetic heading the device
+ * points** as a degree value (0°=N, 90°=E), the same number the v3
+ * absolute-compass demo shows — so the tester can point the phone at a landmark
+ * and cross-check it against that demo on the spot. Falls back to "ok" while the
+ * phone is level (heading undefined), gray "unavailable", yellow "error".
+ */
+export function setAbsCompassStatus(status: AbsCompassStatusDisplay): void {
+  const info = document.getElementById('abs-compass-info');
+  const el = document.getElementById('abs-compass-status');
+  if (!info || !el) {
+    return;
+  }
+  info.classList.remove('hidden');
+  el.classList.remove('text-green-400', 'text-yellow-400', 'text-gray-400');
+  if (status.state === 'active') {
+    // typeof===number alone is insufficient: NaN/Infinity are typeof 'number'
+    // and would render "NaN°". Number.isFinite excludes both; the typeof keeps
+    // the value narrowed to number for Math.round. A degenerate heading → "ok".
+    el.textContent =
+      typeof status.headingDeg === 'number' &&
+      Number.isFinite(status.headingDeg)
+        ? `${Math.round(status.headingDeg)}°`
+        : 'ok';
+    el.classList.add('text-green-400');
+  } else if (status.state === 'unavailable') {
+    el.textContent = `unavailable${status.reason ? ` (${status.reason})` : ''}`;
+    el.classList.add('text-gray-400');
+  } else {
+    el.textContent = `⚠️ error${status.reason ? ` (${status.reason})` : ''}`;
+    el.classList.add('text-yellow-400');
+  }
+}
+
+/** Hide the AbsCompass status row (recording stopped). */
+export function hideAbsCompass(): void {
+  document.getElementById('abs-compass-info')?.classList.add('hidden');
+}
+
+/**
  * Hide the setup modal
  */
 function hideSetupModal(): void {

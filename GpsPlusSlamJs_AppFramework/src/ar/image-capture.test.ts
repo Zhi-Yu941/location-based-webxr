@@ -26,6 +26,7 @@ import {
   DEFAULT_CAPTURE_CONFIG,
   MIN_VALID_IMAGE_BYTES,
 } from './image-capture';
+import type { ARPose } from '../types/ar-types';
 
 describe('image-capture', () => {
   describe('DEFAULT_CAPTURE_CONFIG', () => {
@@ -112,6 +113,84 @@ describe('image-capture', () => {
       });
     });
 
+    it('does not save a frame whose encode completes after stop() (legacy path)', async () => {
+      // The default config has no quality gate, so a captured blob saves
+      // synchronously in the toBlob callback. If stop() lands while toBlob is
+      // still encoding (the common case — the gate is off by default), the late
+      // callback ran saveCapture → onCaptured on a stopped session, writing a
+      // frame after teardown that the recorded frameCount never saw.
+      manager = new ImageCaptureManager(mockCanvas, mockCallbacks);
+      manager.start();
+
+      manager.onFrame(1000); // schedules toBlob (callback deferred to a macrotask)
+      expect(mockCanvas.toBlob).toHaveBeenCalledTimes(1);
+      manager.stop(); // stop before the encode callback fires
+
+      await new Promise((r) => setTimeout(r, 0)); // toBlob callback fires now
+
+      expect(mockCallbacks.onCaptured).not.toHaveBeenCalled();
+      expect(manager.getFrameCount()).toBe(0);
+    });
+
+    it('re-arms the quality gate after a tracking-loss outage longer than maxWaitMs', async () => {
+      // Regression: `qualityDeadlineBase` (the never-good fallback clock) is
+      // measured from the FIRST quality attempt of an interval and only cleared
+      // on save. If tracking is lost for longer than `maxWaitMs` mid-retry, the
+      // clock stays stale, so the FIRST frame after recovery satisfies
+      // `time - base >= maxWaitMs` and is saved fail-open WITHOUT quality
+      // analysis — even if it is blurry/black. Tracking loss must reset the
+      // quality-gate retry state so recovery gets a fresh quality attempt.
+      const analyze = vi.fn().mockResolvedValue({ accept: false }); // always reject → retry
+      let pose: ARPose | null = {
+        position: { x: 0, y: 0, z: 0 },
+        orientation: { x: 0, y: 0, z: 0, w: 1 },
+      };
+      const callbacks: ImageCaptureCallbacks = {
+        getCurrentPose: () => pose,
+        getScreenRotation: () => 0,
+        onCaptured: vi.fn(),
+        analyzeFrame: analyze,
+      };
+      const config: ImageCaptureConfig = {
+        intervalMs: 2000,
+        quality: 0.8,
+        captureTimeoutMs: 10000,
+        resolutionDivisor: 1,
+        motionFilter: DEFAULT_CAPTURE_CONFIG.motionFilter,
+        qualityFilter: {
+          enabled: true,
+          blurRelativeThreshold: 0.5,
+          minMeanLuminance: 10,
+          maxWaitMs: 3000,
+        },
+      };
+      manager = new ImageCaptureManager(mockCanvas, callbacks, config);
+      manager.start();
+
+      // Initial capture at t=1000 → gate rejects → retryPending set, quality
+      // deadline clock armed at t=1000.
+      manager.onFrame(1000);
+      await vi.waitFor(() => expect(analyze).toHaveBeenCalledTimes(1));
+
+      // Tracking lost for an outage longer than maxWaitMs (no capture happens).
+      pose = null;
+      manager.onFrame(5000);
+
+      // Tracking recovers at t=5001 (4001 ms after the armed clock).
+      pose = {
+        position: { x: 0, y: 0, z: 0 },
+        orientation: { x: 0, y: 0, z: 0, w: 1 },
+      };
+      manager.onFrame(5001);
+      await new Promise((r) => setTimeout(r, 0)); // let the toBlob callback + analysis run
+
+      // The recovery frame must be quality-analyzed afresh, not blind-saved by
+      // the stale deadline. Without the reset, analyze stays at 1 and onCaptured
+      // fires (fail-open save); with it, analyze runs again and the frame is held.
+      expect(analyze).toHaveBeenCalledTimes(2);
+      expect(callbacks.onCaptured).not.toHaveBeenCalled();
+    });
+
     it('should not capture again before interval elapses', async () => {
       // Why this test matters: prevents excessive captures
       manager = new ImageCaptureManager(mockCanvas, mockCallbacks);
@@ -162,6 +241,8 @@ describe('image-capture', () => {
         quality: 0.8,
         captureTimeoutMs: 5000,
         resolutionDivisor: 1,
+        motionFilter: DEFAULT_CAPTURE_CONFIG.motionFilter,
+        qualityFilter: DEFAULT_CAPTURE_CONFIG.qualityFilter,
       };
       manager = new ImageCaptureManager(mockCanvas, mockCallbacks, config);
       manager.start();
@@ -196,6 +277,8 @@ describe('image-capture', () => {
         quality: 0.6,
         captureTimeoutMs: 5000,
         resolutionDivisor: 1,
+        motionFilter: DEFAULT_CAPTURE_CONFIG.motionFilter,
+        qualityFilter: DEFAULT_CAPTURE_CONFIG.qualityFilter,
       };
       manager = new ImageCaptureManager(mockCanvas, mockCallbacks, config);
       manager.start();

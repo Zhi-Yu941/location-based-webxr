@@ -1,6 +1,8 @@
 # Location-Based WebXR
 
-**Stable outdoor AR in the browser — no native app, no VPS, no signup, not even internet required**
+> [It was almost impossible because, because it was, the dream was so big.](https://www.youtube.com/watch?v=zhl-Cs1-sG4) -- Giorgio Moroder 🎶
+
+**Stable outdoor AR in the browser - no native app, no VPS, no signup, not even internet required**
 
 Three.js + GPS + WebXR sensor fusion that keeps 3D content pinned to real-world coordinates as the user walks.
 
@@ -21,15 +23,25 @@ Three.js + GPS + WebXR sensor fusion that keeps 3D content pinned to real-world 
 
 - A composable Redux-based app framework where you plug in extraReducers and a storage backend, and it handles WebXR sessions, GPS sensors, recording, and replay out of the box.
 
-- Ship location-based AR experiences as progressive web apps — no App Store review, no native SDK dependency, and a free community license key with zero signup
+- Ship location-based AR experiences as progressive web apps - no App Store review, no native SDK dependency, nothing for the user to install, and a free community license key with zero signup.
+
+## Zero-Install Onboarding
+
+Because everything runs in the browser, there is no native build to ship, no store review to wait on, and nothing for the user to download or sign up for - which removes most of the friction that normally sits between "interested" and "in the experience".
+
+The shortest path in is a single QR code: the user points their phone's camera at it and the AR scene opens **directly in the browser**. From there you have two ways to ground the content, and you can pick per experience:
+
+- **Use the QR code as a high-precision GPS fix.** A code placed at a known, surveyed spot can do double duty as a spatial anchor. The framework detects it in the camera feed, solves its pose, and feeds that in as an extremely accurate position observation into the **same** fusion pipeline as the phone's own GPS. It doesn't replace GPS - it seeds the GPS↔AR alignment correctly **from the first second** and then keeps fusing with the ordinary, noisier GPS readings the device collects as the user walks. So you get a correct anchor immediately *and* it stays robust as people roam away from the marker.
+- **Or let GPS+SLAM do the grounding.** Reusing the onboarding code as an anchor only works when it sits at a known, surveyed spot. Many experiences can't meet that - e.g. when the code lives on flyers the user carries around or you just dont want/need to run continuous detection of qr codes in your use case and this way can save some battery. So there are cases where the code is perfect for *opening* the experience but carries no reliable real-world pose, so you skip marker anchoring and rely only on the GPS+SLAM fusion the framework already provides. The GPS↔AR alignment converges over the first seconds of movement into a tight, world-anchored outdoor overlay - see [How It Works](#how-it-works-sensor-fusion--outdoor-stability) below.
 
 ## What You Can Build With It
 
-- **Outdoor AR navigation** — arrows and waypoints anchored to real-world GPS coordinates.
-- **GPS-anchored 3D content** — drop persistent 3D objects at lat/lon and have them stay put as the user walks.
-- **AR tour guides and museum trails** — content keyed to location, surfaced when the user is nearby.
-- **Location-based games** — geocaching, scavenger hunts, multi-player AR experiences tied to physical places.
-- **Field-data capture tools** — record synchronized GPS, AR poses, camera frames, and depth as reusable datasets for 3D reconstruction (COLMAP / Gaussian splatting), alignment-quality evaluation, desktop replay, geo-anchored site documentation, and ML training.
+- **Outdoor AR navigation** - arrows and waypoints anchored to real-world GPS coordinates.
+- **GPS-anchored 3D content** - drop persistent 3D objects at lat/lon and have them stay put as the user walks.
+- **AR tour guides and museum trails** - content keyed to location, surfaced when the user is nearby.
+- **Location-based games** - geocaching, scavenger hunts, multi-player AR experiences tied to physical places.
+- **Field-data capture tools** - record synchronized GPS, AR poses, camera frames, and depth as reusable datasets for 3D reconstruction (COLMAP / Gaussian splatting), alignment-quality evaluation, desktop replay, geo-anchored site documentation, and ML training.
+  - The recorded zips can be opened directly in third-party reconstruction tools such as [colmapview.github.io](https://colmapview.github.io/) or [LichtFeld-Studio](https://github.com/MrNeRF/LichtFeld-Studio).
 
 ## How It Works: Sensor Fusion & Outdoor Stability
 
@@ -37,9 +49,9 @@ A common assumption is that markerless WebXR will drift badly or make content "j
 
 - **Visual-inertial tracking is handled by the WebXR runtime (ARCore/ARKit), not by this library.** The device's own AR stack already fuses the camera with the IMU to produce local 6-DoF odometry, which stays usable through short stretches of sparse visual features. This framework **consumes** that odometry rather than re-implementing it.
 - **What this framework adds is GPS↔AR alignment.** `gps-plus-slam-js` continuously aligns the local AR odometry with GPS, refining the fit **live as the user moves** rather than re-snapping, so placed content does not teleport on every GPS update. Placement helpers (`createGpsAnchor`) can even defer small corrections until an object is off-screen, while still correcting if alignment drifts far enough that content would otherwise be left in a stale spot.
-- **Accuracy is sub-meter, not centimeter — and it improves with motion.** After roughly 15 seconds of walking in representative outdoor conditions, visible drift typically drops well below raw GPS and the fusion is what keeps locally-placed content sitting on its spot as the user walks around it.
+- **Accuracy is sub-meter, not centimeter - and it improves with motion.** After roughly 15 seconds of walking in representative outdoor conditions, visible drift typically drops well below raw GPS and the fusion is what keeps locally-placed content sitting on its spot as the user walks around it.
 
-This makes the framework well-suited to large-scale outdoor AR — a walking trail with arrows pointing the way, treasure-hunt markers hidden around a field, or info labels pinned to statues and buildings — provided you treat global placement as GPS-accurate and local stability as motion-dependent rather than guaranteed. For the full rationale, caveats, and the VPS-free positioning model, see the [framework's "Why use GPS+SLAM?" section](GpsPlusSlamJs_AppFramework/README.md). The fastest way to evaluate it is to open an example URL on your phone, step outside, drop an object, and walk around it.
+This makes the framework well-suited to large-scale outdoor AR - a walking trail with arrows pointing the way, treasure-hunt markers hidden around a field, or info labels pinned to statues and buildings - provided you treat global placement as GPS-accurate and local stability as motion-dependent rather than guaranteed. For the full rationale, caveats, and the VPS-free positioning model, see the [framework's "Why use GPS+SLAM?" section](GpsPlusSlamJs_AppFramework/README.md). The fastest way to evaluate it is to open an example URL on your phone, step outside, drop an object, and walk around it. If your use case needs accuracy from the very first frame rather than after a few seconds of walking, anchor the content to a printed QR reference instead - see [Zero-Install Onboarding](#zero-install-onboarding).
 
 ## Architecture
 
@@ -61,12 +73,10 @@ Your app composes its own state, screen flow, and visuals on top of the framewor
 
 ## Packages
 
-| Package                                                     | Description                                                                                                                               | License    |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| [`GpsPlusSlamJs_AppFramework`](GpsPlusSlamJs_AppFramework/) | Reusable AR+GPS app framework — WebXR session management, Three.js visualization, GPS sensors, OPFS+ZIP record/replay, composable store. | Apache-2.0 |
-| [`GpsPlusSlamJs_RecorderApp`](GpsPlusSlamJs_RecorderApp/)   | Full-featured recorder app: capture AR sessions on a phone, replay on a desktop, debug alignment, and contribute test data.              | Apache-2.0 |
-| [`GpsPlusSlamJs_AnchorStarter`](GpsPlusSlamJs_AnchorStarter/) | Persistent-anchor starter (the public "Demo"). GPS-anchored placement with URL-based persistence (`?show=`) and cross-device sharing.   | Apache-2.0 |
-| [`GpsPlusSlamJs_MinimalExample`](GpsPlusSlamJs_MinimalExample/) | Smallest possible consumer of the framework. A single-file GPS + AR hit-test demo (Enable GPS AR button → reticle → tap-to-place) that contrasts an uncompensated floater cube with a drift-corrected `createGpsAnchor` marker. Use this as your starting template. | Apache-2.0 |
+- [`GpsPlusSlamJs_AppFramework`](GpsPlusSlamJs_AppFramework/) — Reusable AR+GPS app framework - WebXR session management, Three.js visualization, GPS sensors, OPFS+ZIP record/replay, composable store.
+- [`GpsPlusSlamJs_RecorderApp`](GpsPlusSlamJs_RecorderApp/) — Full-featured recorder app: capture AR sessions on a phone, replay on a desktop, debug alignment, and contribute test data.
+- [`GpsPlusSlamJs_AnchorStarter`](GpsPlusSlamJs_AnchorStarter/) — Persistent-anchor starter (the public "Demo"). GPS-anchored placement with URL-based persistence (`?show=`) and cross-device sharing.
+- [`GpsPlusSlamJs_MinimalExample`](GpsPlusSlamJs_MinimalExample/) — Smallest possible consumer of the framework. A single-file GPS + AR hit-test demo (Enable GPS AR button → reticle → tap-to-place) that contrasts an uncompensated floater cube with a drift-corrected `createGpsAnchor` marker. Use this as your starting template.
 
 The recorder app at a glance:
 
@@ -78,16 +88,16 @@ The recorder app at a glance:
 
 The core alignment library ([`gps-plus-slam-js`](https://www.npmjs.com/package/gps-plus-slam-js)) is **closed-source** and distributed via npm under a proprietary license (EULA). It provides:
 
-- **Sub-meter positioning** — fuses high-frequency AR odometry with noisy GPS.
-- **Fully offline** — all computation runs on-device, no network requests.
-- **Framework-agnostic** — pure TypeScript with a Redux-based state store. 
-- **Incremental alignment** — the alignment matrix updates live as new observations arrive.
+- **Sub-meter positioning** - fuses high-frequency AR odometry with noisy GPS.
+- **Fully offline** - all computation runs on-device, no network requests.
+- **Framework-agnostic** - pure TypeScript with a Redux-based state store. 
+- **Incremental alignment** - the alignment matrix updates live as new observations arrive.
 
-A free license key is bundled with the framework, so you can start building right away — no signup or API key request process required, see the [EULA](https://www.npmjs.com/package/gps-plus-slam-js) for further details on how it works. The key is updated every time a new framework version is released and it's valid for a year so that updating to the latest framework version automatically updates to a new license key as well. 
+A free license key is bundled with the framework, so you can start building right away - no signup or API key request process required, see the [EULA](https://www.npmjs.com/package/gps-plus-slam-js) for further details on how it works. The key is updated every time a new framework version is released and it's valid for a year so that updating to the latest framework version automatically updates to a new license key as well. 
 
 ## Quick Start: Try the Recorder
 
-> **Live demo:** the apps are deployed at **<https://gps.csutil.com>** — a
+> **Live demo:** the apps are deployed at **<https://gps.csutil.com>** - a
 > landing page links to the **Demo** (persistent-anchor starter, `/starter/`)
 > and the **Example app to evaluate the tracking accuracy** (the recorder,
 > `/recorder/`). Open it on a WebXR-capable phone.

@@ -18,13 +18,18 @@ import {
   validateOccupancyOptions,
   validateFrameTileDisplayOptions,
   validateVisualizationOptions,
+  validateCompassDebugOptions,
   validateQrOptions,
+  validateMotionFilterOptions,
+  validateQualityFilterOptions,
   validateRecordingOptions,
   cloneRecordingOptions,
   DEFAULT_RECORDING_OPTIONS,
   STORAGE_KEY,
   DEPTH_CONSTRAINTS,
   IMAGE_CONSTRAINTS,
+  MOTION_FILTER_CONSTRAINTS,
+  QUALITY_FILTER_CONSTRAINTS,
   OCCUPANCY_CONSTRAINTS,
   FRAME_TILE_DISPLAY_CONSTRAINTS,
   QR_CONSTRAINTS,
@@ -177,7 +182,104 @@ describe('recording-options', () => {
         intervalMs: 5000,
         quality: 0.5,
         resolutionDivisor: 2,
+        // motionFilter / qualityFilter not supplied → default-filled (backward compat).
+        motionFilter: DEFAULT_RECORDING_OPTIONS.images.motionFilter,
+        qualityFilter: DEFAULT_RECORDING_OPTIONS.images.qualityFilter,
       });
+    });
+
+    it('default-fills motionFilter when missing (pre-feature persisted options)', () => {
+      // A persisted options object from before this feature lacks motionFilter
+      // entirely; it must load with the gate enabled rather than crash.
+      const result = validateImageOptions({ quality: 0.5 });
+      expect(result.motionFilter).toEqual(
+        DEFAULT_RECORDING_OPTIONS.images.motionFilter
+      );
+      expect(result.motionFilter.enabled).toBe(true);
+    });
+
+    it('preserves a valid motionFilter group', () => {
+      const result = validateImageOptions({
+        motionFilter: {
+          enabled: false,
+          maxAngularVelocity: 1.2,
+          maxLinearVelocity: 0.8,
+          maxWaitMs: 3000,
+        },
+      });
+      expect(result.motionFilter).toEqual({
+        enabled: false,
+        maxAngularVelocity: 1.2,
+        maxLinearVelocity: 0.8,
+        maxWaitMs: 3000,
+      });
+    });
+
+    it('clamps out-of-range motionFilter thresholds and rejects NaN', () => {
+      const result = validateImageOptions({
+        motionFilter: {
+          enabled: true,
+          maxAngularVelocity: 999, // above max
+          maxLinearVelocity: Number.NaN, // -> default
+          maxWaitMs: 1, // below min
+        },
+      });
+      expect(result.motionFilter.maxAngularVelocity).toBe(
+        MOTION_FILTER_CONSTRAINTS.maxAngularVelocity.max
+      );
+      expect(result.motionFilter.maxLinearVelocity).toBe(
+        DEFAULT_RECORDING_OPTIONS.images.motionFilter.maxLinearVelocity
+      );
+      expect(result.motionFilter.maxWaitMs).toBe(
+        MOTION_FILTER_CONSTRAINTS.maxWaitMs.min
+      );
+    });
+
+    it('default-fills qualityFilter when missing (pre-feature persisted options)', () => {
+      // A persisted options object from before this feature lacks qualityFilter
+      // entirely; it must load with the gate DISABLED (the safe default).
+      const result = validateImageOptions({ quality: 0.5 });
+      expect(result.qualityFilter).toEqual(
+        DEFAULT_RECORDING_OPTIONS.images.qualityFilter
+      );
+      expect(result.qualityFilter.enabled).toBe(false);
+    });
+
+    it('preserves a valid qualityFilter group', () => {
+      const result = validateImageOptions({
+        qualityFilter: {
+          enabled: true,
+          blurRelativeThreshold: 0.6,
+          minMeanLuminance: 12,
+          maxWaitMs: 3000,
+        },
+      });
+      expect(result.qualityFilter).toEqual({
+        enabled: true,
+        blurRelativeThreshold: 0.6,
+        minMeanLuminance: 12,
+        maxWaitMs: 3000,
+      });
+    });
+
+    it('clamps out-of-range qualityFilter thresholds and rejects NaN', () => {
+      const result = validateImageOptions({
+        qualityFilter: {
+          enabled: true,
+          blurRelativeThreshold: 5, // above max
+          minMeanLuminance: Number.NaN, // -> default
+          maxWaitMs: 1, // below min
+        },
+      });
+      expect(result.qualityFilter.blurRelativeThreshold).toBe(
+        QUALITY_FILTER_CONSTRAINTS.blurRelativeThreshold.max
+      );
+      expect(result.qualityFilter.minMeanLuminance).toBe(
+        DEFAULT_RECORDING_OPTIONS.images.qualityFilter.minMeanLuminance
+      );
+      expect(result.qualityFilter.maxWaitMs).toBe(
+        QUALITY_FILTER_CONSTRAINTS.maxWaitMs.min
+      );
     });
 
     it('clamps quality below minimum to minimum', () => {
@@ -279,6 +381,52 @@ describe('recording-options', () => {
         DEFAULT_RECORDING_OPTIONS.occupancy.cellSizeM
       );
     });
+
+    /**
+     * Why these matter: `minConfidence` is the voxel noise filter exposed as a
+     * recorder setting (2026-06-22 behind-surface-noise plan). It is forwarded
+     * to `getOccupiedCells(minObservations)`, which expects a positive integer,
+     * so validation must round, clamp to 1–10, and reject garbage to the
+     * default (default 3, not 1 — the filter is on out of the box).
+     */
+    it('defaults minConfidence to 3 for an empty object', () => {
+      expect(validateOccupancyOptions({}).minConfidence).toBe(3);
+    });
+
+    it('preserves a valid in-range minConfidence', () => {
+      expect(validateOccupancyOptions({ minConfidence: 5 }).minConfidence).toBe(
+        5
+      );
+    });
+
+    it('rounds a fractional minConfidence to an integer', () => {
+      expect(
+        validateOccupancyOptions({ minConfidence: 4.6 }).minConfidence
+      ).toBe(5);
+    });
+
+    it('clamps minConfidence below 1 up to 1 (1 = unfiltered floor)', () => {
+      expect(validateOccupancyOptions({ minConfidence: 0 }).minConfidence).toBe(
+        OCCUPANCY_CONSTRAINTS.minConfidence.min
+      );
+    });
+
+    it('clamps minConfidence above the ceiling down to max', () => {
+      expect(
+        validateOccupancyOptions({ minConfidence: 50 }).minConfidence
+      ).toBe(OCCUPANCY_CONSTRAINTS.minConfidence.max);
+    });
+
+    it('falls back to default for NaN/non-number minConfidence', () => {
+      expect(
+        validateOccupancyOptions({ minConfidence: NaN }).minConfidence
+      ).toBe(DEFAULT_RECORDING_OPTIONS.occupancy.minConfidence);
+      expect(
+        validateOccupancyOptions({
+          minConfidence: 'lots' as unknown as number,
+        }).minConfidence
+      ).toBe(DEFAULT_RECORDING_OPTIONS.occupancy.minConfidence);
+    });
   });
 
   describe('validateFrameTileDisplayOptions', () => {
@@ -326,6 +474,64 @@ describe('recording-options', () => {
           divisor: 'half' as unknown as number,
         }).divisor
       ).toBe(DEFAULT_RECORDING_OPTIONS.frameTileDisplay.divisor);
+    });
+  });
+
+  describe('validateCompassDebugOptions', () => {
+    // Why: each compass flag validates boolean-or-default. Stage 0
+    // (coldStartOverride) is a default-ON feature; Stage C + the consistency
+    // gate stay experimental (default OFF) so a corrupted or pre-feature
+    // persisted value can never silently turn those experimental overrides ON.
+    it('returns the per-field defaults when given empty object', () => {
+      const result = validateCompassDebugOptions({});
+      expect(result).toEqual(DEFAULT_RECORDING_OPTIONS.compassDebug);
+      expect(result).toEqual({
+        coldStartOverride: true,
+        rotationPrior: false,
+        webXRConsistency: false,
+      });
+    });
+
+    it('preserves valid boolean values', () => {
+      expect(
+        validateCompassDebugOptions({
+          coldStartOverride: false,
+          rotationPrior: true,
+          webXRConsistency: true,
+        })
+      ).toEqual({
+        coldStartOverride: false,
+        rotationPrior: true,
+        webXRConsistency: true,
+      });
+    });
+
+    it('falls back to each field default for non-boolean values', () => {
+      // Stage 0 falls back to its default-ON; the experimental flags fall back
+      // OFF — a garbage persisted value never silently enables Stage C / gate.
+      expect(
+        validateCompassDebugOptions({
+          coldStartOverride: 'no' as unknown as boolean,
+        }).coldStartOverride
+      ).toBe(true);
+      expect(
+        validateCompassDebugOptions({ rotationPrior: 1 as unknown as boolean })
+          .rotationPrior
+      ).toBe(false);
+    });
+
+    it('validateRecordingOptions + cloneRecordingOptions carry compassDebug (deep-cloned)', () => {
+      const opts = validateRecordingOptions({
+        compassDebug: { coldStartOverride: true },
+      });
+      expect(opts.compassDebug).toEqual({
+        coldStartOverride: true,
+        rotationPrior: false,
+        webXRConsistency: false,
+      });
+      const clone = cloneRecordingOptions(opts);
+      expect(clone.compassDebug).not.toBe(opts.compassDebug); // no aliasing
+      expect(clone.compassDebug).toEqual(opts.compassDebug);
     });
   });
 
@@ -561,12 +767,15 @@ describe('recording-options', () => {
           intervalMs: 3000,
           quality: 0.8,
           resolutionDivisor: 2,
+          motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+          qualityFilter: { ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter },
         },
         arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
         occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
         frameTileDisplay: { ...DEFAULT_RECORDING_OPTIONS.frameTileDisplay },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
         qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
+        compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
       };
       localStorageMock.getItem.mockReturnValueOnce(JSON.stringify(stored));
 
@@ -653,12 +862,15 @@ describe('recording-options', () => {
           intervalMs: 4000,
           quality: 0.6,
           resolutionDivisor: 1,
+          motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+          qualityFilter: { ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter },
         },
         arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
         occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
         frameTileDisplay: { ...DEFAULT_RECORDING_OPTIONS.frameTileDisplay },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
         qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
+        compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
       };
 
       saveRecordingOptions(options);
@@ -677,12 +889,15 @@ describe('recording-options', () => {
           intervalMs: 500,
           quality: 0.1,
           resolutionDivisor: 0,
+          motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+          qualityFilter: { ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter },
         }, // invalid
         arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
         occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
         frameTileDisplay: { ...DEFAULT_RECORDING_OPTIONS.frameTileDisplay },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
         qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
+        compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
       };
 
       saveRecordingOptions(options);
@@ -792,6 +1007,110 @@ describe('recording-options', () => {
           }
         ).arCrashIsolation.enableCss3dRenderer
       ).toBe(true);
+    });
+
+    /**
+     * Why this test matters: `images.motionFilter` is the FIRST nested object
+     * inside a group, so the shallow `{ ...options.images }` clone used for the
+     * flat groups would share its reference. The settings modal mutates it in
+     * place, which on the DEFAULT → clone → clone (no-storage/reset) path would
+     * otherwise poison DEFAULT_RECORDING_OPTIONS for the whole session. This
+     * pins that the clone owns an independent motionFilter.
+     */
+    it('deep-clones the nested images.motionFilter (no shared reference)', () => {
+      const original = cloneRecordingOptions(DEFAULT_RECORDING_OPTIONS);
+      const clone = cloneRecordingOptions(original);
+
+      expect(clone.images.motionFilter).not.toBe(original.images.motionFilter);
+
+      clone.images.motionFilter.enabled = false;
+      clone.images.motionFilter.maxAngularVelocity = 99;
+
+      expect(original.images.motionFilter.enabled).toBe(true);
+      expect(original.images.motionFilter.maxAngularVelocity).toBe(
+        DEFAULT_RECORDING_OPTIONS.images.motionFilter.maxAngularVelocity
+      );
+      // And the module-level default itself is untouched.
+      expect(DEFAULT_RECORDING_OPTIONS.images.motionFilter.enabled).toBe(true);
+    });
+
+    /**
+     * Why this test matters: `images.qualityFilter` is the SECOND nested object
+     * in the group (added with the image-quality gate). The clone branch must
+     * deep-copy it too, or the settings modal's in-place mutation would poison
+     * DEFAULT_RECORDING_OPTIONS on the DEFAULT → clone → clone path, exactly like
+     * the motionFilter case above.
+     */
+    it('deep-clones the nested images.qualityFilter (no shared reference)', () => {
+      const original = cloneRecordingOptions(DEFAULT_RECORDING_OPTIONS);
+      const clone = cloneRecordingOptions(original);
+
+      expect(clone.images.qualityFilter).not.toBe(
+        original.images.qualityFilter
+      );
+
+      clone.images.qualityFilter.enabled = true;
+      clone.images.qualityFilter.minMeanLuminance = 99;
+
+      expect(original.images.qualityFilter.enabled).toBe(false);
+      expect(original.images.qualityFilter.minMeanLuminance).toBe(
+        DEFAULT_RECORDING_OPTIONS.images.qualityFilter.minMeanLuminance
+      );
+      // And the module-level default itself is untouched.
+      expect(DEFAULT_RECORDING_OPTIONS.images.qualityFilter.enabled).toBe(
+        false
+      );
+    });
+  });
+
+  describe('validateQualityFilterOptions', () => {
+    it('returns defaults (gate DISABLED) for an empty object', () => {
+      expect(validateQualityFilterOptions({})).toEqual(
+        DEFAULT_RECORDING_OPTIONS.images.qualityFilter
+      );
+      expect(validateQualityFilterOptions({}).enabled).toBe(false);
+    });
+
+    it('honors an explicit enabled=true', () => {
+      expect(validateQualityFilterOptions({ enabled: true }).enabled).toBe(
+        true
+      );
+    });
+
+    it('clamps thresholds to QUALITY_FILTER_CONSTRAINTS', () => {
+      const tooHigh = validateQualityFilterOptions({
+        blurRelativeThreshold: 9,
+      });
+      expect(tooHigh.blurRelativeThreshold).toBe(
+        QUALITY_FILTER_CONSTRAINTS.blurRelativeThreshold.max
+      );
+      const tooLow = validateQualityFilterOptions({ minMeanLuminance: -5 });
+      expect(tooLow.minMeanLuminance).toBe(
+        QUALITY_FILTER_CONSTRAINTS.minMeanLuminance.min
+      );
+    });
+  });
+
+  describe('validateMotionFilterOptions', () => {
+    it('returns defaults (gate enabled) for an empty object', () => {
+      expect(validateMotionFilterOptions({})).toEqual(
+        DEFAULT_RECORDING_OPTIONS.images.motionFilter
+      );
+    });
+
+    it('honors an explicit enabled=false', () => {
+      expect(validateMotionFilterOptions({ enabled: false }).enabled).toBe(
+        false
+      );
+    });
+
+    it('clamps thresholds to MOTION_FILTER_CONSTRAINTS', () => {
+      const tooLow = validateMotionFilterOptions({ maxAngularVelocity: 0 });
+      expect(tooLow.maxAngularVelocity).toBe(
+        MOTION_FILTER_CONSTRAINTS.maxAngularVelocity.min
+      );
+      const tooHigh = validateMotionFilterOptions({ maxWaitMs: 999999 });
+      expect(tooHigh.maxWaitMs).toBe(MOTION_FILTER_CONSTRAINTS.maxWaitMs.max);
     });
   });
 
@@ -923,12 +1242,15 @@ describe('recording-options', () => {
           intervalMs: 5000,
           quality: 0.85,
           resolutionDivisor: 2,
+          motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+          qualityFilter: { ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter },
         },
         arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
-        occupancy: { cellSizeM: 0.1 },
+        occupancy: { cellSizeM: 0.1, minConfidence: 3 },
         frameTileDisplay: { divisor: 4 },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
         qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
+        compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
       };
 
       saveRecordingOptions(customOptions);
@@ -945,12 +1267,15 @@ describe('recording-options', () => {
           intervalMs: 2000,
           quality: 0.5,
           resolutionDivisor: 1,
+          motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+          qualityFilter: { ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter },
         },
         arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
         occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
         frameTileDisplay: { ...DEFAULT_RECORDING_OPTIONS.frameTileDisplay },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
         qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
+        compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
       };
 
       saveRecordingOptions(options1);
@@ -976,12 +1301,15 @@ describe('recording-options', () => {
           intervalMs: 10000,
           quality: 0.3,
           resolutionDivisor: 4,
+          motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+          qualityFilter: { ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter },
         },
         arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
         occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
         frameTileDisplay: { ...DEFAULT_RECORDING_OPTIONS.frameTileDisplay },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
         qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
+        compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
       });
 
       // Reset
@@ -1035,12 +1363,15 @@ describe('recording-options', () => {
           intervalMs: 3000,
           quality: 0.5,
           resolutionDivisor: 2,
+          motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+          qualityFilter: { ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter },
         },
         arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
         occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
         frameTileDisplay: { ...DEFAULT_RECORDING_OPTIONS.frameTileDisplay },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
         qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
+        compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
       };
       localStorageMock.setItem(CUSTOM_KEY, JSON.stringify(custom));
 

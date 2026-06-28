@@ -34,7 +34,6 @@ function makeReport(
     subScores: {
       convergence: 0.5,
       residualConsensus: 0.5,
-      compassAgreement: null,
       gpsAccuracy: 0.5,
       coverage,
     },
@@ -45,8 +44,6 @@ function makeReport(
       medianRecentGpsAccuracyM: 0,
       walkedDistanceM: 0,
       directionSpreadDeg: 0,
-      headingDeltaDeg: null,
-      compassDriftDetected: false,
       observationsSeen: 0,
       gpsVsFusedMaxDivergenceM: 0,
     },

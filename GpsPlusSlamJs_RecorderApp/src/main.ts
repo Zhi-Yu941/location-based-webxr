@@ -208,8 +208,14 @@ function handleWriteFailure(error: Error): void {
  * Centralizes store creation to ensure consistent options (DRY principle).
  */
 function createNewStore() {
+  // Compass alignment debug opt-ins from the persisted recording settings, so a
+  // new store (boot or per-session swap) picks up the operator's toggles.
+  const compass = recordingOptions?.compassDebug;
   return createRecorderStore({
     onWriteFailure: handleWriteFailure,
+    enableCompassColdStartOverride: compass?.coldStartOverride,
+    enableCompassRotationPrior: compass?.rotationPrior,
+    enableCompassWebXRConsistency: compass?.webXRConsistency,
   });
 }
 
@@ -220,11 +226,13 @@ function createNewStore() {
 // from 2026-05-26-tracking-quality-regression-and-replay-gaps-user-feedback.md)
 // must observe `storeRef` instead of capturing `store` in a closure, or they
 // silently freeze against the boot store after `Start Recording` / replay.
+// Recording options loaded at module init so the boot store — and every
+// `createNewStore` swap — can read `compassDebug` for the alignment opt-ins.
+// `main()` reloads it (harmless) before the rest of init.
+let recordingOptions: RecordingOptions = loadRecordingOptions();
+
 let store = createNewStore();
 const storeRef = createStoreRef(store);
-
-// Current recording options (loaded at startup)
-let recordingOptions: RecordingOptions;
 
 // Map overlay instance (created when AR session starts)
 let mapOverlay: LeafletMapOverlay | null = null;
@@ -1284,13 +1292,24 @@ async function handleEnterAR(): Promise<void> {
           clear(): void;
         } = viz.occupancyCubes
           ? (occupancyCubesVisualizer = new OccupancyCubesVisualizer(
-              arWorldGroup
+              arWorldGroup,
+              // Noise filter: only render voxels seen ≥ minConfidence times
+              // (recording-options `occupancy.minConfidence`, default 3). Read
+              // here so a changed value applies on the next Enter-AR, same as
+              // cellSizeM above.
+              { minObservations: recordingOptions.occupancy.minConfidence }
             ))
           : { refresh: () => {}, clear: () => {} };
         unsubscribeOccupancyGrid = wireOccupancyGridSubscribers({
           storeRef,
           grid: occupancyGrid,
           visualizer: occupancyVisualizerSink,
+          // Tie the cube-refresh throttle to the depth-sample cadence so a
+          // faster `depth.intervalMs` (e.g. 500 ms) isn't capped at the old
+          // hardcoded 1 Hz. At the default 1000 ms this equals the previous
+          // DEFAULT_REFRESH_INTERVAL_MS, so default recordings are unchanged
+          // (2026-06-22 cube cadence/locality plan §2).
+          refreshIntervalMs: recordingOptions.depth.intervalMs,
           onError: (err) => {
             log.warn('Occupancy grid update failed', err);
           },

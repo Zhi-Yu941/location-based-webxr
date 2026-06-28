@@ -223,6 +223,86 @@ describe('OccupancyCubesVisualizer', () => {
     visualizer.dispose();
   });
 
+  it('draws the cells nearest the viewer when over the cap and a pose is supplied (Issue B1)', () => {
+    // The defining B1 behavior: over cap, spend the budget on the local
+    // neighbourhood instead of a room-wide random scatter. Two near cells
+    // sit ~0.15 m from the eye; two far cells sit ~15 m away. With cap 2 and
+    // the eye at the origin, only the near pair must survive.
+    const scene = new THREE.Scene();
+    const visualizer = new OccupancyCubesVisualizer(scene, { maxInstances: 2 });
+    const near1: GridCell = [1, 0, 0];
+    const near2: GridCell = [0, 1, 0];
+    const far1: GridCell = [100, 0, 0];
+    const far2: GridCell = [0, 0, 100];
+    // Far cells listed first to prove ordering, not input position, decides.
+    const grid = makeGridSource([far1, near1, far2, near2], 0.15);
+
+    visualizer.refresh(grid, { cameraPos: [0, 0, 0] });
+    const mesh = findMesh(scene);
+    expect(mesh.count).toBe(2);
+
+    // Both drawn cubes belong to the near cluster (|pos| ≈ 0.15 m), so every
+    // far cell was dropped.
+    const matrix = new THREE.Matrix4();
+    const pos = new THREE.Vector3();
+    for (let i = 0; i < mesh.count; i++) {
+      mesh.getMatrixAt(i, matrix);
+      pos.setFromMatrixPosition(matrix);
+      expect(pos.length()).toBeLessThan(1);
+    }
+    visualizer.dispose();
+  });
+
+  it('ignores the pose and draws every cell while under the cap', () => {
+    // Locality only kicks in over the cap; under it, a supplied pose must not
+    // change the "draw everything" behavior.
+    const scene = new THREE.Scene();
+    const visualizer = new OccupancyCubesVisualizer(scene);
+    visualizer.refresh(
+      makeGridSource([
+        [0, 0, -1],
+        [5, 0, 0],
+      ]),
+      {
+        cameraPos: [0, 0, 0],
+      }
+    );
+    expect(visualizer.getCount()).toBe(2);
+    visualizer.dispose();
+  });
+
+  it('falls back to the random subset when the viewer pose is non-finite (Issue B1 guard)', () => {
+    // A tracking glitch can hand us a NaN pose. Ranking by NaN would silently
+    // produce garbage, so a non-finite pose must fall back to the legacy
+    // injected-RNG random subset (rng() === 0 → the first N cells).
+    const scene = new THREE.Scene();
+    const visualizer = new OccupancyCubesVisualizer(scene, {
+      maxInstances: 2,
+      rng: () => 0,
+    });
+    const grid = makeGridSource([
+      [1, 0, 0],
+      [2, 0, 0],
+      [3, 0, 0],
+      [4, 0, 0],
+    ]);
+
+    visualizer.refresh(grid, { cameraPos: [Number.NaN, 0, 0] });
+    const mesh = findMesh(scene);
+    expect(mesh.count).toBe(2);
+
+    const matrix = new THREE.Matrix4();
+    const pos = new THREE.Vector3();
+    mesh.getMatrixAt(0, matrix);
+    pos.setFromMatrixPosition(matrix);
+    expect(pos.x).toBeCloseTo(1 * 0.15);
+    mesh.getMatrixAt(1, matrix);
+    pos.setFromMatrixPosition(matrix);
+    expect(pos.x).toBeCloseTo(2 * 0.15);
+
+    visualizer.dispose();
+  });
+
   /**
    * Why this test matters (port plan Iter 8 — RGB voxel coloring):
    * When the grid carries a per-cell camera color, the cube must show it;

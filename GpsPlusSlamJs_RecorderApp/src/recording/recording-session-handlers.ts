@@ -51,16 +51,26 @@ import {
   startOrientationWatch,
   stopOrientationWatch,
 } from 'gps-plus-slam-app-framework/sensors/gps';
+import {
+  startAbsoluteOrientationWatch,
+  stopAbsoluteOrientationWatch,
+  getLatestAbsoluteOrientation,
+} from 'gps-plus-slam-app-framework/sensors/absolute-orientation';
 import { createGpsErrorHandler } from 'gps-plus-slam-app-framework/sensors/gps-error-handler';
 import {
   getCurrentArPose,
   startImageCapture,
   stopImageCapture,
+  setImageQualityAnalyzer,
   startDepthCapture,
   stopDepthCapture,
   getImageCaptureFrameCount,
   getDepthSampleCount,
 } from 'gps-plus-slam-app-framework/ar/webxr-session';
+import {
+  createImageQualityAnalyzer,
+  type ImageQualityClient,
+} from './image-quality-client';
 import {
   createWriteFailureTracker,
   type WriteFailureTracker,
@@ -78,6 +88,8 @@ import {
   hideFrameCount,
   hideTrackingQuality,
   updateSyncStatus,
+  setAbsCompassStatus,
+  hideAbsCompass,
 } from '../ui/hud';
 import {
   showSessionSummary,
@@ -99,13 +111,21 @@ import {
 } from 'gps-plus-slam-app-framework/geo';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
 import type { LatLong, Matrix4 } from 'gps-plus-slam-app-framework/core';
-import { calcGpsCoords } from 'gps-plus-slam-app-framework/core';
+import {
+  calcGpsCoords,
+  magneticHeadingFromEnuQuat,
+} from 'gps-plus-slam-app-framework/core';
 import type { LeafletMapOverlay } from 'gps-plus-slam-app-framework/visualization/leaflet-map-overlay';
 import type { MapData } from 'gps-plus-slam-app-framework/visualization/map-data';
 import { getBuildInfo } from '../utils/build-info';
 import { DEFAULT_SCENARIO } from '../ui/session-browser';
 
 const log = createLogger('RecordingSession');
+
+/** AbsCompass HUD refresh cadence. 5 Hz — readable, no DOM thrash. Immutable
+ *  config, so it is module-level; the timer *handle* it drives is per-instance
+ *  state owned by the factory closure (see `createRecordingSessionHandlers`). */
+const ABS_COMPASS_HUD_INTERVAL_MS = 200;
 
 /**
  * Single fallback used everywhere a scenario name is needed but unavailable.
@@ -231,8 +251,41 @@ export function createRecordingSessionHandlers(
   let stopInProgress = false;
   let unsubscribeStore: (() => void) | null = null;
   let unsubscribeRefPoints: (() => void) | null = null;
+  /** Off-thread blur/blackness analyzer worker for this recording (null when the
+   *  quality gate is disabled). Owned here: created on start, disposed on stop. */
+  let imageQualityClient: ImageQualityClient | null = null;
+  /**
+   * Live AbsCompass HUD refresh timer for THIS recording. The capture module
+   * surfaces lifecycle via its onStatus callback but not per-reading; this polls
+   * the latest reading a few times a second to show the live magnetic heading
+   * (the same number the v3 absolute-compass demo shows), so a field tester can
+   * point at a landmark and cross-check it on the spot. Armed on start, cleared
+   * on stop. Per-instance (not module-level) so independent handler instances do
+   * not share/overwrite each other's timer — the factory's "no module-level
+   * mutable state" invariant (see sidecar).
+   */
+  let absCompassHudTimer: ReturnType<typeof setInterval> | null = null;
 
   // --- Internal helpers ---
+
+  function startAbsCompassHudUpdates(): void {
+    stopAbsCompassHudUpdates();
+    absCompassHudTimer = setInterval(() => {
+      const reading = getLatestAbsoluteOrientation();
+      if (!reading) return; // unavailable / not warmed up → leave onStatus text
+      setAbsCompassStatus({
+        state: 'active',
+        headingDeg: magneticHeadingFromEnuQuat(reading.quaternion),
+      });
+    }, ABS_COMPASS_HUD_INTERVAL_MS);
+  }
+
+  function stopAbsCompassHudUpdates(): void {
+    if (absCompassHudTimer !== null) {
+      clearInterval(absCompassHudTimer);
+      absCompassHudTimer = null;
+    }
+  }
 
   /**
    * Build the ZIP export contributors for the current session. Used by BOTH
@@ -257,6 +310,11 @@ export function createRecordingSessionHandlers(
           deps.getStore().getState().recording.latestDepthSample
             ?.projectionMatrix,
         getOccupancyGrid,
+        // Same noise floor the voxel view uses (`occupancy.minConfidence`), read
+        // live so a changed value applies to the next crash-safety sync / export
+        // — keeps phantom behind-surface points out of the reconstruction.
+        getMinConfidence: () =>
+          deps.getRecordingOptions().occupancy.minConfidence,
       }),
     ];
   }
@@ -413,6 +471,13 @@ export function createRecordingSessionHandlers(
     // Start orientation watch
     startOrientationWatch(updateDeviceOrientation);
 
+    // Start the AbsoluteOrientationSensor capture (Phase 1 — independent north
+    // reference). Passive instrumentation: on-when-available, clean no-op off
+    // Chrome Android. The HUD row shows the live magnetic heading so a field
+    // tester can confirm capture is live and cross-check it against the v3 demo.
+    void startAbsoluteOrientationWatch(setAbsCompassStatus);
+    startAbsCompassHudUpdates();
+
     // Start periodic image/depth capture (if enabled). Forward the *whole*
     // validated options section (minus the recorder-only `enabled` gate) as a
     // single config object, so a newly-added tunable reaches the sampler
@@ -422,6 +487,34 @@ export function createRecordingSessionHandlers(
     if (recordingOptions.images.enabled) {
       const { enabled: _imagesEnabled, ...imageConfig } =
         recordingOptions.images;
+      // Off-thread blur/blackness gate (opt-in). Spawn the worker-backed
+      // analyzer ONLY when enabled — a disabled session never creates a worker —
+      // and inject it BEFORE startImageCapture (the manager reads the analyzer
+      // when constructed). Always (re)set the analyzer so a previous recording's
+      // worker can't leak into this one.
+      if (imageConfig.qualityFilter.enabled) {
+        try {
+          imageQualityClient = createImageQualityAnalyzer(
+            imageConfig.qualityFilter
+          );
+          setImageQualityAnalyzer(imageQualityClient.analyze);
+          log.info('Image-quality gate enabled (off-thread blur/blackness)');
+        } catch (err) {
+          // The worker is constructed synchronously; on a locked-down
+          // deployment (e.g. CSP `worker-src`) `new Worker` can throw. The gate
+          // is optional and fail-open everywhere, so disable it and keep
+          // recording rather than aborting a session whose GPS/orientation
+          // watches are already running.
+          imageQualityClient = null;
+          setImageQualityAnalyzer(null);
+          log.warn(
+            'Image-quality gate unavailable (worker init failed) — recording without it',
+            err
+          );
+        }
+      } else {
+        setImageQualityAnalyzer(null);
+      }
       startImageCapture(imageConfig);
       log.info(
         `Image capture started (interval: ${imageConfig.intervalMs}ms, quality: ${imageConfig.quality}, resolutionDivisor: ${imageConfig.resolutionDivisor})`
@@ -524,11 +617,19 @@ export function createRecordingSessionHandlers(
     const depthSampleCount = getDepthSampleCount();
 
     stopImageCapture();
+    // Tear down the off-thread quality analyzer (worker) for this recording and
+    // clear the injected callback so the next recording starts clean.
+    setImageQualityAnalyzer(null);
+    imageQualityClient?.dispose();
+    imageQualityClient = null;
     hideFrameCount();
     hideTrackingQuality();
     stopDepthCapture();
     stopGpsWatch();
     stopOrientationWatch();
+    stopAbsCompassHudUpdates();
+    stopAbsoluteOrientationWatch();
+    hideAbsCompass();
 
     // Capture authoritative end time immediately when recording stops,
     // before async operations (metadata write, sync, ZIP export) that

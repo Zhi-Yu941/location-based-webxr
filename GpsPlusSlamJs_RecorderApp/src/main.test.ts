@@ -290,6 +290,8 @@ vi.mock('./ui/hud', () => ({
   setNewRefPointButtonVisible: vi.fn(),
   updateTrackingQuality: vi.fn(),
   hideTrackingQuality: vi.fn(),
+  setAbsCompassStatus: vi.fn(),
+  hideAbsCompass: vi.fn(),
 }));
 
 // Mock session-browser for handleOpenFolder tests (Issue 1 — 2026-02-27 + 2026-03-01)
@@ -434,6 +436,7 @@ vi.mock('gps-plus-slam-app-framework/ar/webxr-session', () => ({
   getCurrentArPose: vi.fn().mockReturnValue(null),
   applyAlignmentMatrix: vi.fn(),
   setImageCaptureCallback: vi.fn(),
+  setImageQualityAnalyzer: vi.fn(),
   startImageCapture: vi.fn(),
   stopImageCapture: vi.fn(),
   setDepthCaptureCallback: vi.fn(),

@@ -8,6 +8,14 @@
  */
 
 import { createLogger } from '../utils/logger';
+import {
+  DEFAULT_MOTION_FILTER,
+  type MotionFilterConfig,
+} from '../ar/capture-motion-gate';
+import {
+  DEFAULT_QUALITY_FILTER,
+  type QualityFilterConfig,
+} from '../ar/image-quality';
 
 const log = createLogger('RecordingOptions');
 
@@ -25,6 +33,28 @@ export interface RecordingOptionsInput {
   frameTileDisplay?: Partial<FrameTileDisplayOptions>;
   visualization?: Partial<VisualizationOptions>;
   qr?: Partial<QrCaptureOptions>;
+  compassDebug?: Partial<CompassDebugOptions>;
+}
+
+/**
+ * Toggles for the library's Phase-4 compass alignment features (closed/internal
+ * `AlignmentConfig` flags exposed via narrow boolean actions). They change how
+ * the LIVE alignment is computed, so they sit with the other capture groups.
+ * **Stage 0 (`coldStartOverride`) defaults ON** (a field-validated production
+ * feature); Stage C + the WebXR-consistency gate stay experimental (default
+ * OFF) until the §6a field-data matrix is in.
+ *
+ * On-device caveat: the resulting `gpsData` actions persist into the recording,
+ * so a replay re-enables them. Record §6a field-calibration sets with
+ * `coldStartOverride` OFF so the captured compass behaviour is unmodified.
+ */
+export interface CompassDebugOptions {
+  /** Stage 0 — cold-start compass yaw override (`setColdStartOverrideEnabled`). Default ON. */
+  coldStartOverride: boolean;
+  /** Stage C — trust-gated compass rotation prior (`setCompassRotationPriorEnabled`). */
+  rotationPrior: boolean;
+  /** GPS-free compass↔WebXR consistency gate (`setCompassWebXRConsistencyEnabled`). */
+  webXRConsistency: boolean;
 }
 
 /**
@@ -91,6 +121,25 @@ export interface ImageCaptureOptions {
   quality: number;
   /** Resolution divisor: 1 = full native resolution, 2 = half, 4 = quarter. Default: 1 */
   resolutionDivisor: number;
+  /**
+   * Motion gate — skip motion-blurred frames by deferring a due capture until
+   * device motion settles. Mirrors `ImageCaptureConfig.motionFilter` (the type
+   * the capture manager consumes); the recorder destructures `images` and flows
+   * the rest, including this group, through the capture seam. Default: enabled.
+   * See `ar/capture-motion-gate.ts` and
+   * `GpsPlusSlamJs_Docs/docs/2026-06-23-blurry-frame-motion-gating-plan.md`.
+   */
+  motionFilter: MotionFilterConfig;
+  /**
+   * Image-quality gate — drop a blurry/black frame (judged off-thread) and retry
+   * the next acceptable frame. Mirrors `ImageCaptureConfig.qualityFilter`; flows
+   * through the same capture seam as `motionFilter`. **Default: disabled**
+   * pending field tuning of the relative blur threshold (a mis-tuned gate
+   * silently dropping good frames is worse than the motion gate's default-on).
+   * See `ar/image-quality.ts` and
+   * `GpsPlusSlamJs_Docs/docs/2026-06-24-image-quality-gate-plan.md`.
+   */
+  qualityFilter: QualityFilterConfig;
 }
 
 /**
@@ -110,6 +159,20 @@ export interface OccupancyOptions {
    * on the next session rather than mid-session.
    */
   cellSizeM: number;
+  /**
+   * Minimum observation count for a voxel to be trusted as occupied (the
+   * grid's `getOccupiedCells(minObservations)` floor, promoted to a user
+   * setting). A cell is marked occupied the instant one noisy depth point
+   * lands in it; raising this filters single-frame depth noise — in
+   * particular the **behind-surface** phantoms (e.g. below the floor) that
+   * free-space carving can never clear because no ray passes through occluded
+   * space. Default 3 (1 = unfiltered/legacy). Higher = less noise but
+   * briefly-glimpsed real surfaces may be dropped, so it is exposed for
+   * on-device tuning. Read once when the visualizer is constructed (Enter-AR
+   * / replay load). See
+   * `GpsPlusSlamJs_Docs/docs/2026-06-22-occupancy-grid-behind-surface-noise-plan.md`.
+   */
+  minConfidence: number;
 }
 
 /**
@@ -205,6 +268,8 @@ export interface RecordingOptions {
   visualization: VisualizationOptions;
   /** Live QR detection + RAW recording configuration (opt-in) */
   qr: QrCaptureOptions;
+  /** Compass alignment debug toggles (Stage 0 / Stage C / consistency gate) */
+  compassDebug: CompassDebugOptions;
 }
 
 // --- Constants ---
@@ -233,6 +298,12 @@ export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
     intervalMs: 2000, // 1 image every 2 seconds
     quality: 0.7, // 70% JPEG quality
     resolutionDivisor: 1, // Full native camera resolution
+    // Spread so this default object does not ALIAS DEFAULT_MOTION_FILTER /
+    // DEFAULT_CAPTURE_CONFIG.motionFilter — each default group must be its own
+    // object so an accidental in-place mutation cannot leak across them.
+    motionFilter: { ...DEFAULT_MOTION_FILTER }, // blurry-frame motion gate (on)
+    // Same spread/alias rationale — blur/blackness image gate (off by default).
+    qualityFilter: { ...DEFAULT_QUALITY_FILTER },
   },
   arCrashIsolation: {
     enableDomOverlay: true,
@@ -244,6 +315,7 @@ export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
   },
   occupancy: {
     cellSizeM: 0.15, // 15 cm voxels — matches OccupancyGrid's own default (Unity parity)
+    minConfidence: 3, // ≥3 observations to render a voxel — filters single-frame depth noise (1 = legacy/unfiltered)
   },
   frameTileDisplay: {
     // Half-resolution display texture by default (D7): a noticeable per-tile
@@ -265,6 +337,16 @@ export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
     intervalMs: 125, // ~8 Hz — the QR demo's DETECT_INTERVAL_MS
     captureSize: 1024, // long-edge px — the on-device-verified default
   },
+  compassDebug: {
+    // Stage 0 (cold-start compass yaw override) ships ON by default — it is a
+    // field-validated, observability-gated handover that orients the world
+    // immediately at cold start and hands back to GPS once the yaw is
+    // observable. Operator can turn it OFF (e.g. for §6a field-calibration
+    // recordings). Stage C + the WebXR-consistency gate stay experimental (OFF).
+    coldStartOverride: true,
+    rotationPrior: false,
+    webXRConsistency: false,
+  },
 };
 
 /** Validation constraints for depth options */
@@ -284,6 +366,43 @@ export const IMAGE_CONSTRAINTS = {
 } as const;
 
 /**
+ * Validation constraints for the motion-filter (blurry-frame gate) thresholds.
+ *
+ * The velocity ranges (0.05–5) bracket the plausible scanning regime: below
+ * ~0.05 the gate would reject almost everything; above ~5 rad/s ≈ 286°/s (or
+ * 5 m/s) it would never reject, so the gate would be inert. `maxWaitMs` is
+ * clamped to 0.5–20 s — the never-calm fallback must always be able to fire.
+ * All three back a (currently advanced/hidden) settings slider, so a corrupt
+ * stored value can never disable capture. The default thresholds themselves are
+ * placeholders pending on-device field tuning (plan §7).
+ */
+export const MOTION_FILTER_CONSTRAINTS = {
+  maxAngularVelocity: { min: 0.05, max: 5, step: 0.05 },
+  maxLinearVelocity: { min: 0.05, max: 5, step: 0.05 },
+  maxWaitMs: { min: 500, max: 20000, step: 500 },
+} as const;
+
+/**
+ * Validation constraints for the image-quality (blur/blackness) gate thresholds.
+ *
+ * `blurRelativeThreshold` (`k` in `sharpness < k·median`) is clamped to
+ * 0.05–0.95: it is a fraction of the recent sharpness median, so values must sit
+ * strictly inside (0, 1) — at ~0 the blur check never rejects, near 1 it rejects
+ * almost everything. `minMeanLuminance` (the absolute black cutoff on a 0–255
+ * luma scale) is clamped to 0–128: 0 disables the black check, and a cutoff
+ * above mid-grey would reject normally-lit frames. `maxWaitMs` mirrors the motion
+ * gate's range (0.5–20 s) so the never-good fallback can always fire. All back a
+ * (currently advanced/hidden) settings slider, so a corrupt stored value can
+ * never disable capture. The default thresholds are placeholders pending
+ * on-device field tuning (plan §5, §10).
+ */
+export const QUALITY_FILTER_CONSTRAINTS = {
+  blurRelativeThreshold: { min: 0.05, max: 0.95, step: 0.05 },
+  minMeanLuminance: { min: 0, max: 128, step: 1 },
+  maxWaitMs: { min: 500, max: 20000, step: 500 },
+} as const;
+
+/**
  * Validation constraints for occupancy options.
  *
  * `cellSizeM` is clamped to 1–20 cm. The floor exists because cell count (and
@@ -291,9 +410,15 @@ export const IMAGE_CONSTRAINTS = {
  * `points3D` row count) scales as 1/cellSize³ — sub-centimetre voxels are both
  * a memory/perf cliff on a phone and below the depth sensor's noise floor.
  * Step is 1 cm (the settings slider operates in cm).
+ *
+ * `minConfidence` is clamped to 1–10 (integer). 1 disables the filter (legacy
+ * behaviour: a single observation counts as occupied); the ceiling exists
+ * because real surfaces accumulate only a handful of observations per second
+ * of dwell, so a floor above ~10 would start hiding genuine geometry.
  */
 export const OCCUPANCY_CONSTRAINTS = {
   cellSizeM: { min: 0.01, max: 0.2, step: 0.01 },
+  minConfidence: { min: 1, max: 10, step: 1 },
 } as const;
 
 /**
@@ -355,6 +480,31 @@ export function validateArCrashIsolationOptions(
       typeof options.applyChromiumProjectionLayerWorkaround === 'boolean'
         ? options.applyChromiumProjectionLayerWorkaround
         : defaults.applyChromiumProjectionLayerWorkaround,
+  };
+}
+
+/**
+ * Validate and normalize the compass alignment debug toggles. Boolean-or-default
+ * per field; a missing/corrupted/pre-feature value falls back to the OFF default
+ * so a bad persisted value can never silently turn an alignment override ON.
+ */
+export function validateCompassDebugOptions(
+  options: Partial<CompassDebugOptions>
+): CompassDebugOptions {
+  const defaults = DEFAULT_RECORDING_OPTIONS.compassDebug;
+  return {
+    coldStartOverride:
+      typeof options.coldStartOverride === 'boolean'
+        ? options.coldStartOverride
+        : defaults.coldStartOverride,
+    rotationPrior:
+      typeof options.rotationPrior === 'boolean'
+        ? options.rotationPrior
+        : defaults.rotationPrior,
+    webXRConsistency:
+      typeof options.webXRConsistency === 'boolean'
+        ? options.webXRConsistency
+        : defaults.webXRConsistency,
   };
 }
 
@@ -466,6 +616,91 @@ export function validateDepthOptions(
 }
 
 /**
+ * Validate and normalize the motion-filter (blurry-frame gate) options.
+ * `enabled` is boolean-or-default; the three numeric thresholds are clamped to
+ * {@link MOTION_FILTER_CONSTRAINTS} with a `Number.isFinite` guard (a stored
+ * `NaN` is `typeof 'number'` and would survive `clamp`). A missing group
+ * default-fills entirely — a pre-feature persisted options object that lacks
+ * `motionFilter` therefore loads with the gate enabled rather than crashing.
+ */
+export function validateMotionFilterOptions(
+  options: Partial<MotionFilterConfig>
+): MotionFilterConfig {
+  const defaults = DEFAULT_RECORDING_OPTIONS.images.motionFilter;
+  return {
+    enabled:
+      typeof options.enabled === 'boolean' ? options.enabled : defaults.enabled,
+    maxAngularVelocity: clamp(
+      typeof options.maxAngularVelocity === 'number' &&
+        Number.isFinite(options.maxAngularVelocity)
+        ? options.maxAngularVelocity
+        : defaults.maxAngularVelocity,
+      MOTION_FILTER_CONSTRAINTS.maxAngularVelocity.min,
+      MOTION_FILTER_CONSTRAINTS.maxAngularVelocity.max
+    ),
+    maxLinearVelocity: clamp(
+      typeof options.maxLinearVelocity === 'number' &&
+        Number.isFinite(options.maxLinearVelocity)
+        ? options.maxLinearVelocity
+        : defaults.maxLinearVelocity,
+      MOTION_FILTER_CONSTRAINTS.maxLinearVelocity.min,
+      MOTION_FILTER_CONSTRAINTS.maxLinearVelocity.max
+    ),
+    maxWaitMs: clamp(
+      typeof options.maxWaitMs === 'number' &&
+        Number.isFinite(options.maxWaitMs)
+        ? options.maxWaitMs
+        : defaults.maxWaitMs,
+      MOTION_FILTER_CONSTRAINTS.maxWaitMs.min,
+      MOTION_FILTER_CONSTRAINTS.maxWaitMs.max
+    ),
+  };
+}
+
+/**
+ * Validate and normalize the image-quality (blur/blackness gate) options. Same
+ * policy as {@link validateMotionFilterOptions}: `enabled` is boolean-or-default;
+ * the three numeric thresholds are clamped to {@link QUALITY_FILTER_CONSTRAINTS}
+ * with a `Number.isFinite` guard (a stored `NaN` is `typeof 'number'` and would
+ * survive `clamp`). A missing group default-fills entirely — a pre-feature
+ * persisted options object that lacks `qualityFilter` loads with the gate
+ * disabled (the safe default) rather than crashing.
+ */
+export function validateQualityFilterOptions(
+  options: Partial<QualityFilterConfig>
+): QualityFilterConfig {
+  const defaults = DEFAULT_RECORDING_OPTIONS.images.qualityFilter;
+  return {
+    enabled:
+      typeof options.enabled === 'boolean' ? options.enabled : defaults.enabled,
+    blurRelativeThreshold: clamp(
+      typeof options.blurRelativeThreshold === 'number' &&
+        Number.isFinite(options.blurRelativeThreshold)
+        ? options.blurRelativeThreshold
+        : defaults.blurRelativeThreshold,
+      QUALITY_FILTER_CONSTRAINTS.blurRelativeThreshold.min,
+      QUALITY_FILTER_CONSTRAINTS.blurRelativeThreshold.max
+    ),
+    minMeanLuminance: clamp(
+      typeof options.minMeanLuminance === 'number' &&
+        Number.isFinite(options.minMeanLuminance)
+        ? options.minMeanLuminance
+        : defaults.minMeanLuminance,
+      QUALITY_FILTER_CONSTRAINTS.minMeanLuminance.min,
+      QUALITY_FILTER_CONSTRAINTS.minMeanLuminance.max
+    ),
+    maxWaitMs: clamp(
+      typeof options.maxWaitMs === 'number' &&
+        Number.isFinite(options.maxWaitMs)
+        ? options.maxWaitMs
+        : defaults.maxWaitMs,
+      QUALITY_FILTER_CONSTRAINTS.maxWaitMs.min,
+      QUALITY_FILTER_CONSTRAINTS.maxWaitMs.max
+    ),
+  };
+}
+
+/**
  * Validate and normalize image options.
  * Invalid values are clamped to valid ranges.
  */
@@ -495,6 +730,8 @@ export function validateImageOptions(
       IMAGE_CONSTRAINTS.resolutionDivisor.min,
       IMAGE_CONSTRAINTS.resolutionDivisor.max
     ),
+    motionFilter: validateMotionFilterOptions(options.motionFilter ?? {}),
+    qualityFilter: validateQualityFilterOptions(options.qualityFilter ?? {}),
   };
 }
 
@@ -519,6 +756,17 @@ export function validateOccupancyOptions(
         : defaults.cellSizeM,
       OCCUPANCY_CONSTRAINTS.cellSizeM.min,
       OCCUPANCY_CONSTRAINTS.cellSizeM.max
+    ),
+    // Round before clamping so a fractional stored value resolves to a valid
+    // integer threshold; NaN/non-finite falls back to the default (clamp would
+    // otherwise pass NaN straight through, and getOccupiedCells expects an int).
+    minConfidence: clamp(
+      typeof options.minConfidence === 'number' &&
+        Number.isFinite(options.minConfidence)
+        ? Math.round(options.minConfidence)
+        : defaults.minConfidence,
+      OCCUPANCY_CONSTRAINTS.minConfidence.min,
+      OCCUPANCY_CONSTRAINTS.minConfidence.max
     ),
   };
 }
@@ -564,6 +812,7 @@ export function validateRecordingOptions(
     ),
     visualization: validateVisualizationOptions(options.visualization ?? {}),
     qr: validateQrOptions(options.qr ?? {}),
+    compassDebug: validateCompassDebugOptions(options.compassDebug ?? {}),
   };
 }
 
@@ -636,11 +885,24 @@ export function cloneRecordingOptions(
 ): RecordingOptions {
   return {
     depth: { ...options.depth },
-    images: { ...options.images },
+    // `images` carries NESTED objects (`motionFilter`, `qualityFilter`) — the
+    // only group that does — so each needs a deeper clone than the other
+    // flat-primitive groups. A shallow `{ ...options.images }` would share the
+    // same nested references, and the settings modal mutates them in place
+    // (`workingOptions.images.motionFilter.enabled = …`,
+    // `…images.qualityFilter.enabled = …`); without this the write would reach
+    // straight back into DEFAULT_RECORDING_OPTIONS on the no-storage / reset path
+    // (DEFAULT → clone → clone), poisoning the default for the session.
+    images: {
+      ...options.images,
+      motionFilter: { ...options.images.motionFilter },
+      qualityFilter: { ...options.images.qualityFilter },
+    },
     arCrashIsolation: { ...options.arCrashIsolation },
     occupancy: { ...options.occupancy },
     frameTileDisplay: { ...options.frameTileDisplay },
     visualization: { ...options.visualization },
     qr: { ...options.qr },
+    compassDebug: { ...options.compassDebug },
   };
 }

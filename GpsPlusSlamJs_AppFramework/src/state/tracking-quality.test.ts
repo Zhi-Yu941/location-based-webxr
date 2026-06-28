@@ -15,7 +15,6 @@ import {
   computeGpsAccuracy,
   computeResidualConsensus,
   computeConvergence,
-  computeCompassAgreement,
   computeGpsVsFusedDivergence,
   computeTrackingQualityReport,
   matrixDelta,
@@ -29,7 +28,6 @@ import {
   createTrackingQualityListenerMiddleware,
   degradedCountUpdated,
   DEFAULT_TRACKING_QUALITY_OPTIONS,
-  selectFirstAgreementObservationIndex,
   type TrackingQualityReport,
   type AlignmentSnapshot,
 } from './tracking-quality';
@@ -147,6 +145,26 @@ describe('matrixDelta', () => {
     });
   });
 
+  it('returns finite zero deltas for a non-finite (NaN/Infinity) matrix', () => {
+    // A degenerate alignment solve can emit NaN/Infinity into the 16-element
+    // matrix. geodesicAngleRad's clamp only fixes near-identity round-off, not
+    // NaN propagation, so without an output finite-guard rotation/translation
+    // become NaN and poison the convergence score downstream. (Restores the
+    // explicit finite-guard the shared-kernel refactor folded away.)
+    const nanRotation = [...IDENTITY];
+    nanRotation[0] = Number.NaN; // NaN in the rotation block
+    const r1 = matrixDelta(nanRotation, IDENTITY);
+    expect(Number.isFinite(r1.rotationDeltaDeg)).toBe(true);
+    expect(Number.isFinite(r1.translationDeltaM)).toBe(true);
+    expect(r1).toEqual({ rotationDeltaDeg: 0, translationDeltaM: 0 });
+
+    const infTranslation = [...IDENTITY];
+    infTranslation[13] = Number.POSITIVE_INFINITY; // Infinity in the translation column
+    const r2 = matrixDelta(IDENTITY, infTranslation);
+    expect(Number.isFinite(r2.rotationDeltaDeg)).toBe(true);
+    expect(Number.isFinite(r2.translationDeltaM)).toBe(true);
+  });
+
   // Why this test matters: §11 (a) of the tracking-quality plan requires
   // matrixDelta to agree numerically with the gl-matrix-quat reference
   // kernel used by GpsPlusSlamJs_Investigation/src/investigation-helpers.ts
@@ -255,6 +273,44 @@ describe('computeConvergence', () => {
       { observationIndex: 2, matrix: [...rotY(Math.PI / 2)] }, // 90°
     ];
     expect(computeConvergence(snaps).score).toBe(0);
+  });
+
+  it('keeps the score finite when a snapshot matrix is non-finite', () => {
+    // A single NaN-bearing alignment matrix must not turn the whole convergence
+    // score into NaN (which would silently break the tracking-quality report).
+    const nanMatrix = [...IDENTITY];
+    nanMatrix[0] = Number.NaN;
+    const snaps: AlignmentSnapshot[] = [
+      { observationIndex: 1, matrix: [...IDENTITY] },
+      { observationIndex: 2, matrix: nanMatrix },
+    ];
+    const r = computeConvergence(snaps);
+    expect(Number.isFinite(r.score)).toBe(true);
+    expect(Number.isFinite(r.recentSumRotationDeltaDeg)).toBe(true);
+    expect(Number.isFinite(r.recentSumTranslationDeltaM)).toBe(true);
+  });
+
+  it('does not let a corrupt (non-finite) matrix improve the score', () => {
+    // Regression: matrixDelta finite-guards a non-finite (degenerate-solve)
+    // matrix to ZERO deltas so the score stays finite. But a zero delta reads as
+    // "perfectly stable", so a corrupt alignment snapshot scored as score 1 — it
+    // could *improve* convergence instead of degrading it. A corrupt matrix is
+    // not evidence of stability; it must score on the fail side.
+    const healthy = computeConvergence([
+      { observationIndex: 1, matrix: [...IDENTITY] },
+      { observationIndex: 2, matrix: [...IDENTITY] },
+    ]);
+    expect(healthy.score).toBe(1); // identical snapshots → perfectly stable
+
+    const nanMatrix = [...IDENTITY];
+    nanMatrix[0] = Number.NaN;
+    const corrupt = computeConvergence([
+      { observationIndex: 1, matrix: [...IDENTITY] },
+      { observationIndex: 2, matrix: nanMatrix },
+    ]);
+    // The corrupt pair must drag the score DOWN, never sit at the healthy 1.
+    expect(corrupt.score).toBeLessThan(healthy.score);
+    expect(corrupt.score).toBe(0);
   });
 });
 
@@ -374,48 +430,6 @@ describe('computeCoverage', () => {
 // §4.3 compass / heading
 // ---------------------------------------------------------------------------
 
-describe('computeCompassAgreement', () => {
-  it('returns null when sensor is not absolute', () => {
-    const r = computeCompassAgreement(
-      IDENTITY,
-      DEFAULT_ORIENTATION,
-      DEFAULT_POSE
-    );
-    expect(r.score).toBeNull();
-    expect(r.headingDeltaDeg).toBeNull();
-  });
-
-  it('returns null when any input is missing', () => {
-    expect(computeCompassAgreement(null, null, null).score).toBeNull();
-  });
-
-  it('returns score 1 when alignment heading matches compass', () => {
-    // AR-forward = (0,0,-1) at identity rotation; identity alignment →
-    // ENU forward = (0,0,-1), which under our (N,U,E) ENU labelling has
-    // N = 0, E = -1, bearing = 270°. Compass alpha = 270 ⇒ delta = 0.
-    const orientation: DeviceOrientation = {
-      alpha: 270,
-      beta: 0,
-      gamma: 0,
-      absolute: true,
-    };
-    const r = computeCompassAgreement(IDENTITY, orientation, DEFAULT_POSE);
-    expect(r.score).toBe(1);
-    expect(r.headingDeltaDeg).toBeCloseTo(0, 5);
-  });
-
-  it('drops score to 0 for >= failDeg disagreement', () => {
-    const orientation: DeviceOrientation = {
-      alpha: 0, // claims north, alignment says ~west
-      beta: 0,
-      gamma: 0,
-      absolute: true,
-    };
-    const r = computeCompassAgreement(IDENTITY, orientation, DEFAULT_POSE);
-    expect(r.score).toBe(0);
-  });
-});
-
 // ---------------------------------------------------------------------------
 // §4.6 GPS-vs-fused divergence
 // ---------------------------------------------------------------------------
@@ -471,7 +485,6 @@ function buildRootState(input: {
   snapshots?: readonly AlignmentSnapshot[];
   sensorOrientation?: DeviceOrientation;
   lastValidPose?: ARPose;
-  firstAgreementObservationIndex?: number | null;
   smoothedConvergence?: number | null;
 }): MinimalRoot {
   return {
@@ -495,8 +508,6 @@ function buildRootState(input: {
     },
     trackingQuality: {
       recentAlignments: [...(input.snapshots ?? [])],
-      firstAgreementObservationIndex:
-        input.firstAgreementObservationIndex ?? null,
       report: null,
       degradedConsecutiveCount: 0,
       smoothedConvergence: input.smoothedConvergence ?? null,
@@ -538,7 +549,7 @@ describe('computeTrackingQualityReport', () => {
 
   it('produces a confidence score from min(subScores)', () => {
     // Build a "happy path": good GPS, good coverage, good residuals,
-    // converged matrix snapshots; compass is null (absolute=false).
+    // converged matrix snapshots.
     const odom: Vector3[] = [];
     for (let i = 0; i <= 20; i++) odom.push([i, 0, 0]);
     for (let i = 1; i <= 20; i++) odom.push([20, 0, i]);
@@ -558,7 +569,6 @@ describe('computeTrackingQualityReport', () => {
       snapshots,
     });
     const report = computeTrackingQualityReport(root as never);
-    expect(report.subScores.compassAgreement).toBeNull();
     expect(report.subScores.convergence).toBeGreaterThan(0.95);
     expect(report.subScores.residualConsensus).toBeGreaterThan(0.95);
     expect(report.subScores.gpsAccuracy).toBe(1);
@@ -607,47 +617,18 @@ describe('computeTrackingQualityReport', () => {
     expect(report.subScores.coverage).toBe(0);
     expect(report.state).toBe('warming-up');
   });
-
-  // Anti-validation §6: 180°-flip compass disagreement degrades quality.
-  it('anti-validation: 180° heading disagreement drives compass score to 0', () => {
-    const odom: Vector3[] = [];
-    for (let i = 0; i <= 20; i++) odom.push([i, 0, 0]);
-    for (let i = 1; i <= 20; i++) odom.push([20, 0, i]);
-    const gpsPts = odom.map((p, i) => gps(i, p[0], p[2], 2));
-    const snapshots: AlignmentSnapshot[] = Array.from(
-      { length: 8 },
-      (_, i) => ({
-        observationIndex: i + 30,
-        matrix: [...IDENTITY],
-      })
-    );
-    // Identity alignment + AR-forward (0,0,-1) puts heading at 270°;
-    // a compass reporting 90° (the 180° flip) should fail.
-    const root = buildRootState({
-      alignmentMatrix: IDENTITY,
-      gpsPositions: gpsPts,
-      odometryPositions: odom,
-      zeroRef: ZERO_REF,
-      snapshots,
-      sensorOrientation: { alpha: 90, beta: 0, gamma: 0, absolute: true },
-    });
-    const report = computeTrackingQualityReport(root as never);
-    expect(report.subScores.compassAgreement).toBe(0);
-    expect(report.confidence).toBe(0);
-    expect(report.state).toBe('degraded');
-  });
 });
 
 // ---------------------------------------------------------------------------
-// Option forwarding from the aggregator to the §4.1 / §4.3 helpers
+// Option forwarding from the aggregator to the §4.1 helpers
 // ---------------------------------------------------------------------------
 
 describe('computeTrackingQualityReport — threshold forwarding', () => {
   // Why these tests matter: convergenceRotationWarnDeg / convergenceTranslationWarnM
-  // and compassWarnDeg / compassFailDeg were defined (or settable) but never
-  // forwarded from the aggregator to computeConvergence / computeCompassAgreement,
-  // so callers configuring the store/aggregator silently got the hardcoded
-  // defaults. These tests pin the wiring so a regression cannot reintroduce it.
+  // were defined (or settable) but never forwarded from the aggregator to
+  // computeConvergence, so callers configuring the store/aggregator silently
+  // got the hardcoded defaults. These tests pin the wiring so a regression
+  // cannot reintroduce it.
 
   /** Identity → Y-axis rotation snapshot pair producing ΣΔrot = angleDeg. */
   function rotationSnapshots(angleDeg: number): AlignmentSnapshot[] {
@@ -707,27 +688,6 @@ describe('computeTrackingQualityReport — threshold forwarding', () => {
       convergenceTranslationWarnM: 0.1,
     });
     expect(tight.subScores.convergence).toBe(0);
-  });
-
-  it('forwards compassWarnDeg / compassFailDeg to computeCompassAgreement', () => {
-    // Identity alignment + AR-forward (0,0,-1) → heading 270°.
-    // Compass alpha=250 ⇒ delta=20°. Default warn=15/fail=35 →
-    // rampDown(20,15,35)=0.75. Loosened warn=25/fail=45 → 20<25 ⇒ 1.0.
-    const base = {
-      alignmentMatrix: IDENTITY,
-      gpsPositions: [gps(0, 0, 0, 2)],
-      odometryPositions: [[0, 0, 0] as Vector3],
-      zeroRef: ZERO_REF,
-      sensorOrientation: { alpha: 250, beta: 0, gamma: 0, absolute: true },
-    };
-    const def = computeTrackingQualityReport(buildRootState(base) as never);
-    expect(def.subScores.compassAgreement).toBeCloseTo(0.75, 5);
-
-    const loose = computeTrackingQualityReport(buildRootState(base) as never, {
-      compassWarnDeg: 25,
-      compassFailDeg: 45,
-    });
-    expect(loose.subScores.compassAgreement).toBe(1);
   });
 });
 
@@ -875,7 +835,6 @@ describe('trackingQuality slice', () => {
       subScores: {
         convergence: 0.9,
         residualConsensus: 0.8,
-        compassAgreement: null,
         gpsAccuracy: 0.95,
         coverage: 0.85,
       },
@@ -886,8 +845,6 @@ describe('trackingQuality slice', () => {
         medianRecentGpsAccuracyM: 2,
         walkedDistanceM: 30,
         directionSpreadDeg: 180,
-        headingDeltaDeg: null,
-        compassDriftDetected: false,
         observationsSeen: 25,
         gpsVsFusedMaxDivergenceM: 1.5,
       },
@@ -1060,28 +1017,24 @@ describe('createTrackingQualityListenerMiddleware', () => {
     unsub();
   });
 
-  // Why this test matters: `poseReceived` fires on every XR frame. The
-  // compass cross-check (§4.3) consumes the live pose + sensor heading,
-  // so sub-perceptual per-frame jitter must NOT churn `reportUpdated` at
+  // Why this test matters: `poseReceived` fires on every XR frame and the
+  // per-frame recompute reuses the unchanged GPS/odometry windows, so
+  // sub-perceptual per-frame float jitter must NOT churn `reportUpdated` at
   // frame rate (high Redux dispatch volume + HUD re-renders). This test
   // reproduces the per-frame jitter scenario and asserts the dispatch
   // gate suppresses changes below the user-visible threshold.
   it('does not churn reportUpdated on sub-threshold per-frame pose jitter', () => {
     const store = makeListenerStore(snapshotGpsAfter(null, [], []));
 
-    // Active tracking + absolute compass so the compass sub-score is live.
-    const absolute: DeviceOrientation = {
-      alpha: 90,
-      beta: 0,
-      gamma: 0,
-      absolute: true,
-    };
     store.dispatch(
-      poseReceived({ pose: DEFAULT_POSE, sensorOrientation: absolute })
+      poseReceived({
+        pose: DEFAULT_POSE,
+        sensorOrientation: DEFAULT_ORIENTATION,
+      })
     );
 
     // Enough GPS observations + alignment to leave 'warming-up' and to
-    // activate the residual/compass paths.
+    // activate the residual path.
     const odom: Vector3[] = [];
     const gpsPts: GpsPoint[] = [];
     for (let i = 0; i < 4; i++) {
@@ -1120,7 +1073,7 @@ describe('createTrackingQualityListenerMiddleware', () => {
               w: Math.cos(theta / 2),
             },
           },
-          sensorOrientation: absolute,
+          sensorOrientation: DEFAULT_ORIENTATION,
         })
       );
     }
@@ -1128,73 +1081,6 @@ describe('createTrackingQualityListenerMiddleware', () => {
 
     // With the dispatch gate quantising sub-threshold changes, none of
     // these jitter frames should produce a fresh report reference.
-    expect(reportRefChanges).toBe(0);
-  });
-
-  // Why this test matters: a diagnostic field can become *persistently*
-  // NaN (the only unguarded path: a NaN compass `alpha` with
-  // `absolute: true` flows into `diagnostics.headingDeltaDeg` — the
-  // sub-score is clamped to 0 but the diagnostic is not). `NaN === NaN`
-  // is `false`, so a strict-identity gate would treat every frame as a
-  // change and churn `reportUpdated` at frame rate. The gate must treat
-  // two NaNs as equal (Object.is semantics) while still surfacing a
-  // finite↔NaN transition. This reproduces the persistent-NaN frame and
-  // asserts the gate does NOT churn.
-  it('does not churn reportUpdated when a diagnostic is persistently NaN', () => {
-    const store = makeListenerStore(snapshotGpsAfter(null, [], []));
-
-    // Absolute compass with a NaN heading — defends against a misbehaving
-    // sensor that reports `absolute: true` but a non-finite alpha.
-    const nanCompass: DeviceOrientation = {
-      alpha: NaN,
-      beta: 0,
-      gamma: 0,
-      absolute: true,
-    };
-    store.dispatch(
-      poseReceived({ pose: DEFAULT_POSE, sensorOrientation: nanCompass })
-    );
-
-    // Enough GPS observations + alignment so a report exists and the
-    // compass cross-check runs (IDENTITY alignment ⇒ non-vertical AR
-    // forward ⇒ headingDeltaDeg is computed, then poisoned by NaN alpha).
-    const odom: Vector3[] = [];
-    const gpsPts: GpsPoint[] = [];
-    for (let i = 0; i < 4; i++) {
-      odom.push([i, 0, 0]);
-      gpsPts.push(gps(i, i, 0));
-      store.dispatch({
-        type: 'gpsData/recordGpsEvent',
-        payload: snapshotGpsAfter(IDENTITY, [...gpsPts], [...odom]),
-      });
-    }
-
-    // Confirm the precondition: the diagnostic really is NaN.
-    expect(
-      Number.isNaN(
-        selectTrackingQuality(store.getState())?.diagnostics.headingDeltaDeg ??
-          0
-      )
-    ).toBe(true);
-
-    let reportRefChanges = 0;
-    let lastSeen = selectTrackingQuality(store.getState());
-    const unsub = store.subscribe(() => {
-      const report = selectTrackingQuality(store.getState());
-      if (report !== lastSeen) {
-        reportRefChanges += 1;
-        lastSeen = report;
-      }
-    });
-
-    // Repeated identical NaN-alpha frames must not produce a fresh report.
-    for (let frame = 1; frame <= 10; frame++) {
-      store.dispatch(
-        poseReceived({ pose: DEFAULT_POSE, sensorOrientation: nanCompass })
-      );
-    }
-    unsub();
-
     expect(reportRefChanges).toBe(0);
   });
 });
@@ -1214,9 +1100,7 @@ describe('§11 (d) corpus-derived defaults', () => {
     expect(DEFAULT_TRACKING_QUALITY_OPTIONS.gpsAccuracyWindowSize).toBe(30);
   });
 
-  it('compass and coverage thresholds are unchanged from initial seeds', () => {
-    expect(DEFAULT_TRACKING_QUALITY_OPTIONS.compassWarnDeg).toBe(15);
-    expect(DEFAULT_TRACKING_QUALITY_OPTIONS.compassFailDeg).toBe(35);
+  it('coverage thresholds are unchanged from initial seeds', () => {
     expect(DEFAULT_TRACKING_QUALITY_OPTIONS.coverageWalkedDistanceM).toBe(15);
     expect(DEFAULT_TRACKING_QUALITY_OPTIONS.coverageDirectionSpreadDeg).toBe(
       90
@@ -1228,208 +1112,6 @@ describe('§11 (d) corpus-derived defaults', () => {
     expect(DEFAULT_TRACKING_QUALITY_OPTIONS.convergenceTranslationWarnM).toBe(
       2
     );
-  });
-});
-
-// ---------------------------------------------------------------------------
-// §11 (e) — compassDriftDetected / first-agreement detector
-// ---------------------------------------------------------------------------
-
-describe('compassDriftDetected (§4.3 first-agreement)', () => {
-  // Why this test matters: compassDriftDetected should only fire after
-  // first-agreement has been established — it catches compass/alignment
-  // drift mid-session, not the initial convergence phase.
-  it('is false when firstAgreementObservationIndex is null', () => {
-    const odom: Vector3[] = [];
-    for (let i = 0; i <= 20; i++) odom.push([i, 0, 0]);
-    for (let i = 1; i <= 20; i++) odom.push([20, 0, i]);
-    const gpsPts = odom.map((p, i) => gps(i, p[0], p[2], 2));
-    const snapshots: AlignmentSnapshot[] = Array.from(
-      { length: 8 },
-      (_, i) => ({ observationIndex: i + 30, matrix: [...IDENTITY] })
-    );
-    // Compass disagrees (90° vs 270°) but first agreement never reached.
-    const root = buildRootState({
-      alignmentMatrix: IDENTITY,
-      gpsPositions: gpsPts,
-      odometryPositions: odom,
-      zeroRef: ZERO_REF,
-      snapshots,
-      sensorOrientation: { alpha: 90, beta: 0, gamma: 0, absolute: true },
-      firstAgreementObservationIndex: null,
-    });
-    const report = computeTrackingQualityReport(root as never);
-    expect(report.diagnostics.compassDriftDetected).toBe(false);
-  });
-
-  // Why this test matters: after first-agreement, if the compass heading
-  // diverges from the alignment beyond the warn threshold, drift is flagged.
-  it('is true when firstAgreement is set and heading diverges past warnDeg', () => {
-    const odom: Vector3[] = [];
-    for (let i = 0; i <= 20; i++) odom.push([i, 0, 0]);
-    for (let i = 1; i <= 20; i++) odom.push([20, 0, i]);
-    const gpsPts = odom.map((p, i) => gps(i, p[0], p[2], 2));
-    const snapshots: AlignmentSnapshot[] = Array.from(
-      { length: 8 },
-      (_, i) => ({ observationIndex: i + 30, matrix: [...IDENTITY] })
-    );
-    // Compass disagrees (90° off from alignment heading of 270°).
-    const root = buildRootState({
-      alignmentMatrix: IDENTITY,
-      gpsPositions: gpsPts,
-      odometryPositions: odom,
-      zeroRef: ZERO_REF,
-      snapshots,
-      sensorOrientation: { alpha: 90, beta: 0, gamma: 0, absolute: true },
-      firstAgreementObservationIndex: 5,
-    });
-    const report = computeTrackingQualityReport(root as never);
-    expect(report.diagnostics.compassDriftDetected).toBe(true);
-  });
-
-  // Why this test matters: when heading is within the warn threshold after
-  // first agreement, drift should NOT be flagged — the compass is fine.
-  it('is false when firstAgreement is set but heading agrees', () => {
-    const odom: Vector3[] = [];
-    for (let i = 0; i <= 20; i++) odom.push([i, 0, 0]);
-    for (let i = 1; i <= 20; i++) odom.push([20, 0, i]);
-    const gpsPts = odom.map((p, i) => gps(i, p[0], p[2], 2));
-    const snapshots: AlignmentSnapshot[] = Array.from(
-      { length: 8 },
-      (_, i) => ({ observationIndex: i + 30, matrix: [...IDENTITY] })
-    );
-    // Compass agrees (270° matches alignment heading for identity matrix).
-    const root = buildRootState({
-      alignmentMatrix: IDENTITY,
-      gpsPositions: gpsPts,
-      odometryPositions: odom,
-      zeroRef: ZERO_REF,
-      snapshots,
-      sensorOrientation: { alpha: 270, beta: 0, gamma: 0, absolute: true },
-      firstAgreementObservationIndex: 5,
-    });
-    const report = computeTrackingQualityReport(root as never);
-    expect(report.diagnostics.compassDriftDetected).toBe(false);
-  });
-});
-
-// Why this test matters: the middleware must detect when convergence is
-// high and compass agrees for enough consecutive observations, then
-// dispatch firstAgreementReached so that compassDriftDetected can fire.
-describe('first-agreement detector in listener middleware', () => {
-  function makeFirstAgreementStore() {
-    const gpsDataReducer = (
-      state: ListenerHarnessState['gpsData'] = {
-        gpsEvents: {
-          alignmentMatrix: null,
-          gpsPositions: [],
-          odometryPositions: [],
-          odometryRotations: [],
-        },
-        zero: ZERO_REF,
-      },
-      action: Action
-    ): ListenerHarnessState['gpsData'] => {
-      if (
-        action.type === 'gpsData/recordGpsEvent' ||
-        action.type === 'gpsData/setZeroPos'
-      ) {
-        return (
-          action as unknown as { payload: ListenerHarnessState['gpsData'] }
-        ).payload;
-      }
-      return state;
-    };
-
-    return configureStore({
-      reducer: {
-        gpsData: gpsDataReducer,
-        tracking: trackingReducer,
-        trackingQuality: trackingQualityReducer,
-      },
-      middleware: (getDefault) =>
-        getDefault({ serializableCheck: false }).prepend(
-          createTrackingQualityListenerMiddleware({
-            matrixHistorySize: 10,
-            warmupMinObservations: 2,
-            warmupMinCoverage: 0,
-            firstAgreementMinStreak: 3,
-          })
-        ),
-    });
-  }
-
-  // Helper: dispatch GPS observations with slightly varying matrices so
-  // the ring buffer collects ≥ 2 snapshots and convergence is non-zero.
-  function feedObservations(
-    store: ReturnType<typeof makeFirstAgreementStore>,
-    count: number,
-    matrix: Matrix4 = IDENTITY
-  ) {
-    const odom: Vector3[] = [];
-    const gpsPts: GpsPoint[] = [];
-    for (let i = 0; i < count; i++) {
-      odom.push([i, 0, 0]);
-      gpsPts.push(gps(i, i, 0, 2));
-      // First observation uses a tiny offset so a second unique snapshot
-      // is created when observation 1 switches to the real matrix.
-      const mat: Matrix4 = i === 0 ? shifted(0.001, 0, 0) : matrix;
-      store.dispatch({
-        type: 'gpsData/recordGpsEvent',
-        payload: {
-          gpsEvents: {
-            alignmentMatrix: mat,
-            gpsPositions: [...gpsPts],
-            odometryPositions: [...odom],
-            odometryRotations: [],
-          },
-          zero: ZERO_REF,
-        },
-      });
-    }
-  }
-
-  it('dispatches firstAgreementReached after 3 consecutive good observations', () => {
-    const store = makeFirstAgreementStore();
-    store.dispatch(
-      poseReceived({
-        pose: DEFAULT_POSE,
-        sensorOrientation: { alpha: 270, beta: 0, gamma: 0, absolute: true },
-      })
-    );
-    feedObservations(store, 8);
-
-    const idx = selectFirstAgreementObservationIndex(store.getState());
-    expect(idx).not.toBeNull();
-  });
-
-  it('does not fire firstAgreementReached when compass disagrees', () => {
-    const store = makeFirstAgreementStore();
-    store.dispatch(
-      poseReceived({
-        pose: DEFAULT_POSE,
-        sensorOrientation: { alpha: 90, beta: 0, gamma: 0, absolute: true },
-      })
-    );
-    feedObservations(store, 8);
-
-    expect(selectFirstAgreementObservationIndex(store.getState())).toBeNull();
-  });
-
-  it('resets firstAgreementObservationIndex on session reset', () => {
-    const store = makeFirstAgreementStore();
-    store.dispatch(
-      poseReceived({
-        pose: DEFAULT_POSE,
-        sensorOrientation: { alpha: 270, beta: 0, gamma: 0, absolute: true },
-      })
-    );
-    feedObservations(store, 6);
-    expect(
-      selectFirstAgreementObservationIndex(store.getState())
-    ).not.toBeNull();
-    store.dispatch({ type: 'recording/startSession' });
-    expect(selectFirstAgreementObservationIndex(store.getState())).toBeNull();
   });
 });
 

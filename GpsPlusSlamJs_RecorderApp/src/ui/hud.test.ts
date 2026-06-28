@@ -2659,7 +2659,6 @@ function makeReport(
     subScores: {
       convergence: 0.9,
       residualConsensus: 0.85,
-      compassAgreement: 0.95,
       gpsAccuracy: 0.88,
       coverage: 1.0,
     },
@@ -2670,8 +2669,6 @@ function makeReport(
       medianRecentGpsAccuracyM: 6.0,
       walkedDistanceM: 42,
       directionSpreadDeg: 120,
-      headingDeltaDeg: 5.0,
-      compassDriftDetected: false,
       observationsSeen: 25,
       gpsVsFusedMaxDivergenceM: 3.1,
     },
@@ -2764,16 +2761,16 @@ describe('updateTrackingQuality', () => {
   // Why: sub-scores must be visible in the expanded detail view.
   it('populates sub-score values in detail panel', () => {
     // Why: confirms the four sub-scores that survived the 2026-05-23
-    // field-test pruning (Findings 2, 3, 5) still render. compass /
-    // headingDelta / obs / walked were intentionally removed from the
-    // HUD; they remain on the report for background metrics + tests but
-    // are no longer in the detail panel.
+    // field-test pruning (Findings 2, 3, 5) still render. heading / obs /
+    // walked were intentionally removed from the HUD; they remain on the
+    // report for background metrics + tests but are no longer in the
+    // detail panel. (The compass sub-score was removed entirely on
+    // 2026-06-28 — it was inert dead code.)
     updateTrackingQuality(
       makeReport({
         subScores: {
           convergence: 0.91,
           residualConsensus: 0.72,
-          compassAgreement: 0.88,
           gpsAccuracy: 0.65,
           coverage: 1.0,
         },
@@ -2821,8 +2818,6 @@ describe('updateTrackingQuality', () => {
           medianRecentGpsAccuracyM: 5.0,
           walkedDistanceM: 42,
           directionSpreadDeg: 120,
-          headingDeltaDeg: null,
-          compassDriftDetected: false,
           observationsSeen: 25,
           gpsVsFusedMaxDivergenceM: 3.1,
         },
@@ -3143,5 +3138,96 @@ describe('updateRefPointHint', () => {
   it('index.html ships the hint element near the recording controls', () => {
     const full = loadFullIndexHtml();
     expect(full).toContain('id="ref-point-hint"');
+  });
+});
+
+/**
+ * Tests for the AbsCompass status row (AbsoluteOrientationSensor Phase 1, plan §5).
+ *
+ * Why these tests matter: this row is the field tester's only on-device signal
+ * that a recording is actually capturing the independent-north sensor before
+ * collecting many sessions. It must show a green "ok" when active, a gray
+ * "unavailable" with the reason off Chrome Android, and a yellow error — and the
+ * element must actually ship in index.html.
+ */
+describe('AbsCompass status row', () => {
+  function setupDOMWithAbsCompass(): void {
+    const hud = document.createElement('div');
+    hud.innerHTML = `
+      <div id="abs-compass-info" class="hidden">
+        <span id="abs-compass-status">--</span>
+      </div>
+    `;
+    document.body.appendChild(hud);
+  }
+
+  it('shows the live magnetic heading in degrees when active (matches v3 demo)', async () => {
+    setupDOMWithAbsCompass();
+    const { setAbsCompassStatus } = await import('./hud.js');
+    setAbsCompassStatus({ state: 'active', headingDeg: 123.4 });
+
+    const info = document.getElementById('abs-compass-info')!;
+    const status = document.getElementById('abs-compass-status')!;
+    expect(info.classList.contains('hidden')).toBe(false);
+    expect(status.textContent).toBe('123°');
+    expect(status.classList.contains('text-green-400')).toBe(true);
+  });
+
+  it('falls back to "ok" when active but the phone is level (heading undefined)', async () => {
+    setupDOMWithAbsCompass();
+    const { setAbsCompassStatus } = await import('./hud.js');
+    setAbsCompassStatus({ state: 'active', headingDeg: null });
+
+    const status = document.getElementById('abs-compass-status')!;
+    expect(status.textContent).toBe('ok');
+    expect(status.classList.contains('text-green-400')).toBe(true);
+  });
+
+  it('falls back to "ok" (not "NaN°") when active but the heading is NaN', async () => {
+    // `typeof NaN === 'number'` is true, so a guard on `typeof` alone would
+    // render `Math.round(NaN)` → "NaN°". A degenerate quaternion can yield a
+    // NaN heading; the row must degrade to "ok" rather than show "NaN°".
+    setupDOMWithAbsCompass();
+    const { setAbsCompassStatus } = await import('./hud.js');
+    setAbsCompassStatus({ state: 'active', headingDeg: Number.NaN });
+
+    const status = document.getElementById('abs-compass-status')!;
+    expect(status.textContent).toBe('ok');
+    expect(status.classList.contains('text-green-400')).toBe(true);
+  });
+
+  it('shows gray "unavailable" with the reason (iOS/Safari/desktop path)', async () => {
+    setupDOMWithAbsCompass();
+    const { setAbsCompassStatus } = await import('./hud.js');
+    setAbsCompassStatus({ state: 'unavailable', reason: 'no sensor' });
+
+    const status = document.getElementById('abs-compass-status')!;
+    expect(status.textContent).toBe('unavailable (no sensor)');
+    expect(status.classList.contains('text-gray-400')).toBe(true);
+  });
+
+  it('shows a yellow error with the reason', async () => {
+    setupDOMWithAbsCompass();
+    const { setAbsCompassStatus } = await import('./hud.js');
+    setAbsCompassStatus({ state: 'error', reason: 'NotReadableError' });
+
+    const status = document.getElementById('abs-compass-status')!;
+    expect(status.textContent).toContain('NotReadableError');
+    expect(status.classList.contains('text-yellow-400')).toBe(true);
+  });
+
+  it('hideAbsCompass hides the row', async () => {
+    setupDOMWithAbsCompass();
+    const { setAbsCompassStatus, hideAbsCompass } = await import('./hud.js');
+    setAbsCompassStatus({ state: 'active' });
+    hideAbsCompass();
+    expect(
+      document.getElementById('abs-compass-info')!.classList.contains('hidden')
+    ).toBe(true);
+  });
+
+  it('index.html ships the AbsCompass status element', () => {
+    const full = loadFullIndexHtml();
+    expect(full).toContain('id="abs-compass-status"');
   });
 });

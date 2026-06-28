@@ -33,7 +33,11 @@ import type {
 } from 'gps-plus-slam-app-framework/storage/zip-export';
 import type { ArImageCapture, Matrix4 } from 'gps-plus-slam-app-framework/core';
 import type { OccupancyGrid } from 'gps-plus-slam-app-framework/ar/occupancy-grid';
-import { webxrToColmapPose, pinholeFromProjection } from './colmap-conversions';
+import {
+  webxrToColmapPose,
+  webxrToColmapWorldPoint,
+  pinholeFromProjection,
+} from './colmap-conversions';
 import {
   serializeCamerasTxt,
   serializeImagesTxt,
@@ -69,6 +73,17 @@ export interface ColmapZipContributorDeps {
   getProjectionMatrix: () => Matrix4 | undefined;
   /** The live occupancy grid via the shared provider, or `null`. */
   getOccupancyGrid: () => OccupancyGrid | null;
+  /**
+   * Minimum observation count for a voxel to be exported — the recording's
+   * `occupancy.minConfidence` (the SAME floor the voxel view applies, so the
+   * export and the live cubes never silently diverge). Filters single-frame
+   * depth noise, in particular the **behind-surface** phantoms free-space
+   * carving can never clear (no ray traverses occluded space). Omitted →
+   * floor 1 (unfiltered/legacy) so callers that predate the setting are
+   * unchanged. See
+   * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-22-occupancy-grid-behind-surface-noise-plan.md.
+   */
+  getMinConfidence?: () => number;
 }
 
 /**
@@ -116,7 +131,10 @@ export function createColmapZipContributor(
         name: bareFilename(f.imageFile),
       }));
 
-      const points = collectPoints(deps.getOccupancyGrid());
+      const points = collectPoints(
+        deps.getOccupancyGrid(),
+        deps.getMinConfidence?.() ?? 1
+      );
 
       await addFile(
         '0/cameras.txt',
@@ -141,16 +159,26 @@ function firstPixelDimensions(
   return null;
 }
 
-/** Map occupancy-grid cells to COLMAP point records (raw-WebXR == COLMAP world). */
-function collectPoints(grid: OccupancyGrid | null): ColmapPoint3DRecord[] {
+/**
+ * Map occupancy-grid cells to COLMAP point records. The exact per-cell surface
+ * point (raw WebXR) is flipped into the COLMAP world frame with the SAME basis
+ * change the camera extrinsics use, so points and cameras stay registered and
+ * the reconstruction loads upright (follow-up Items A + B).
+ */
+function collectPoints(
+  grid: OccupancyGrid | null,
+  minConfidence: number
+): ColmapPoint3DRecord[] {
   if (!grid) return [];
-  const cells = grid.getOccupiedCells();
+  const cells = grid.getOccupiedCells(minConfidence);
   return cells.map((cell, i) => ({
     pointId: i + 1,
     // The exact per-cell surface point (follow-up Item A) — hugs the real
     // surface instead of snapping to the 15 cm lattice; falls back to the
-    // cell center defensively.
-    xyz: grid.getCellPoint(cell) ?? grid.getCellCenter(cell),
+    // cell center defensively — then flipped into the COLMAP world (Item B).
+    xyz: webxrToColmapWorldPoint(
+      grid.getCellPoint(cell) ?? grid.getCellCenter(cell)
+    ),
     rgb: grid.getCellColor(cell) ?? FALLBACK_RGB,
     error: POINT_ERROR,
   }));

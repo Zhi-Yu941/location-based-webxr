@@ -28,12 +28,17 @@ import {
   wireOccupancyGridSubscribers,
   type OccupancyGridSink,
 } from './wire-occupancy-grid-subscribers';
+import type { ViewerPose } from './occupancy-cubes-visualizer';
 
-function makeSample(timestamp = 1000): DepthSample {
+function makeSample(
+  timestamp = 1000,
+  cameraPos: DepthSample['cameraPos'] = [0, 0, 0],
+  cameraRot: DepthSample['cameraRot'] = [0, 0, 0, 1]
+): DepthSample {
   return {
     timestamp,
-    cameraPos: [0, 0, 0],
-    cameraRot: [0, 0, 0, 1],
+    cameraPos,
+    cameraRot,
     points: [{ screenX: 0.5, screenY: 0.5, depthM: 2 }],
   };
 }
@@ -47,7 +52,8 @@ function makeGridSpy() {
 
 function makeVisualizerSpy() {
   return {
-    refresh: vi.fn<(grid: OccupancyGridSink) => void>(),
+    refresh:
+      vi.fn<(grid: OccupancyGridSink, viewerPose?: ViewerPose) => void>(),
     clear: vi.fn<() => void>(),
   };
 }
@@ -113,10 +119,14 @@ describe('wireOccupancyGridSubscribers', () => {
       refreshIntervalMs: 1000,
     });
 
-    // First sample: immediate (leading-edge) refresh with the grid
+    // First sample: immediate (leading-edge) refresh with the grid and the
+    // sample's head pose (Issue B1 — forwarded for viewer-local selection).
     storeRef.get().dispatch(recordDepthSample(makeSample(1)));
     expect(visualizer.refresh).toHaveBeenCalledTimes(1);
-    expect(visualizer.refresh).toHaveBeenCalledWith(grid);
+    expect(visualizer.refresh).toHaveBeenCalledWith(grid, {
+      cameraPos: [0, 0, 0],
+      cameraRot: [0, 0, 0, 1],
+    });
 
     // Burst within the interval: no synchronous refresh...
     storeRef.get().dispatch(recordDepthSample(makeSample(2)));
@@ -132,6 +142,75 @@ describe('wireOccupancyGridSubscribers', () => {
     vi.advanceTimersByTime(2000);
     storeRef.get().dispatch(recordDepthSample(makeSample(4)));
     expect(visualizer.refresh).toHaveBeenCalledTimes(3);
+
+    dispose();
+  });
+
+  it('forwards the freshest sample pose to the trailing refresh of a burst (Issue B1)', () => {
+    // Why this matters: the wirer must remember the LAST sample's pose even
+    // while refreshes are throttled, so the single trailing refresh ranks
+    // cells against where the camera actually ended up — not the first
+    // sample of the burst.
+    const grid = makeGridSpy();
+    const visualizer = makeVisualizerSpy();
+    const dispose = wireOccupancyGridSubscribers({
+      storeRef,
+      grid,
+      visualizer,
+      refreshIntervalMs: 1000,
+    });
+
+    // Leading-edge refresh uses the first sample's pose.
+    storeRef.get().dispatch(recordDepthSample(makeSample(1, [1, 0, 0])));
+    expect(visualizer.refresh).toHaveBeenLastCalledWith(grid, {
+      cameraPos: [1, 0, 0],
+      cameraRot: [0, 0, 0, 1],
+    });
+
+    // Burst within the interval: poses keep updating, refresh is deferred.
+    storeRef.get().dispatch(recordDepthSample(makeSample(2, [2, 0, 0])));
+    storeRef.get().dispatch(recordDepthSample(makeSample(3, [9, 9, 9])));
+
+    // The trailing refresh fires with the LAST burst sample's pose.
+    vi.advanceTimersByTime(1000);
+    expect(visualizer.refresh).toHaveBeenCalledTimes(2);
+    expect(visualizer.refresh).toHaveBeenLastCalledWith(grid, {
+      cameraPos: [9, 9, 9],
+      cameraRot: [0, 0, 0, 1],
+    });
+
+    dispose();
+  });
+
+  it('does not leak the old store pose into the new store after a swap (Issue B1)', () => {
+    // Why this matters: the old recording's head pose is meaningless for the
+    // new store. The swap resets the remembered pose to null (defensive — a
+    // refresh is always preceded by a sample that overwrites it), and the
+    // first refresh on the new store must carry that store's OWN sample pose,
+    // never the stale one.
+    const grid = makeGridSpy();
+    const visualizer = makeVisualizerSpy();
+    const dispose = wireOccupancyGridSubscribers({
+      storeRef,
+      grid,
+      visualizer,
+    });
+
+    storeRef.get().dispatch(recordDepthSample(makeSample(1, [5, 5, 5])));
+    expect(visualizer.refresh).toHaveBeenLastCalledWith(grid, {
+      cameraPos: [5, 5, 5],
+      cameraRot: [0, 0, 0, 1],
+    });
+
+    const newStore = makeStore();
+    storeRef.set(newStore);
+    visualizer.refresh.mockClear();
+
+    newStore.dispatch(recordDepthSample(makeSample(2, [7, 8, 9])));
+    expect(visualizer.refresh).toHaveBeenLastCalledWith(grid, {
+      cameraPos: [7, 8, 9],
+      cameraRot: [0, 0, 0, 1],
+    });
 
     dispose();
   });

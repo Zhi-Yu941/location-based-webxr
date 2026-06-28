@@ -22,6 +22,7 @@
 import type { DepthSample } from '../state/recorder-store';
 import type { RecorderStore } from '../state/recorder-store';
 import type { StoreRef } from '../state/store-ref';
+import type { ViewerPose } from './occupancy-cubes-visualizer';
 
 /** Default minimum delay between two visualizer refreshes. */
 const DEFAULT_REFRESH_INTERVAL_MS = 1000;
@@ -41,7 +42,11 @@ export interface WireOccupancyGridSubscribersOptions<
   // widens it to the OccupancyGridSink constraint and rejects visualizers
   // whose refresh() needs the richer concrete grid type.
   readonly visualizer: {
-    refresh(grid: NoInfer<TGrid>): void;
+    // viewerPose: the latest depth sample's head pose (raw WebXR), so the
+    // visualizer can draw the cells nearest the user when over its instance
+    // cap (Issue B1). Optional — a sink/visualizer that ignores it still
+    // satisfies the type (fewer params is assignable).
+    refresh(grid: NoInfer<TGrid>, viewerPose?: ViewerPose): void;
     clear(): void;
   };
   /** Defaults to {@link DEFAULT_REFRESH_INTERVAL_MS}. */
@@ -67,6 +72,10 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
   let disposed = false;
   let lastRefreshTime = -Infinity;
   let pendingRefresh: ReturnType<typeof setTimeout> | null = null;
+  // The most recent depth sample's head pose (raw WebXR), forwarded to the
+  // visualizer so an over-cap refresh can pick the cells nearest the user
+  // (Issue B1). Null until the first sample, and reset on every store swap.
+  let lastViewerPose: ViewerPose | null = null;
 
   const cancelPendingRefresh = (): void => {
     if (pendingRefresh !== null) {
@@ -78,7 +87,7 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
   const refreshNow = (): void => {
     lastRefreshTime = Date.now();
     try {
-      visualizer.refresh(grid);
+      visualizer.refresh(grid, lastViewerPose ?? undefined);
     } catch (err) {
       onError?.(err);
     }
@@ -113,6 +122,13 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
       onError?.(err);
       return;
     }
+    // Remember where the camera was for this sample so the next refresh can
+    // rank cells by distance to the viewer (Issue B1). Updated even when the
+    // refresh is throttled, so the trailing refresh uses the freshest pose.
+    lastViewerPose = {
+      cameraPos: sample.cameraPos,
+      cameraRot: sample.cameraRot,
+    };
     scheduleRefresh();
   };
 
@@ -140,6 +156,9 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
     detach();
     cancelPendingRefresh();
     lastRefreshTime = -Infinity;
+    // Drop the stale pose: the new store's samples carry their own, and the
+    // old recording's head pose is meaningless for the new one.
+    lastViewerPose = null;
     // Independent best-effort: a throwing grid.clear() must not skip
     // visualizer.clear(), or the cube view keeps rendering the stale grid.
     try {

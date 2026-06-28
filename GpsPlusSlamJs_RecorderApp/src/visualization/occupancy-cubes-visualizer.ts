@@ -2,10 +2,12 @@
  * Occupancy-cubes visualizer — renders the AR-space occupancy grid as one
  * `THREE.InstancedMesh` of cubes (2026-06-11 depth occupancy-grid port
  * plan §3/Iter 5). The TS equivalent of the Unity debug cubes in
- * `ArCursorOnDepthSurface.cs`: refreshed at ~1 Hz by
- * `wireOccupancyGridSubscribers`, drawing all occupied cells when under
- * the instance cap and a random subset above it (the "randomly picking
- * points every second" behavior — no geometry-shader point billboard is
+ * `ArCursorOnDepthSurface.cs`: refreshed by `wireOccupancyGridSubscribers`
+ * at the depth-sample interval (`depth.intervalMs`; was a fixed ~1 Hz
+ * before Issue A), drawing all occupied cells when under the instance cap
+ * and, above it, the cells nearest the viewer when a pose is supplied
+ * (Issue B1) — otherwise a random subset (the original "randomly picking
+ * points every second" behavior; no geometry-shader point billboard is
  * ported, WebGL has none).
  *
  * Coloring: height-based per-instance color (HSL ramp over the cell's Y)
@@ -49,6 +51,22 @@ export interface OccupancyGridSource {
    * height ramp.
    */
   getCellColor(cell: GridCell): readonly [number, number, number] | null;
+}
+
+/**
+ * Where the viewer is, for viewer-local over-cap cube selection (Issue B
+ * of the 2026-06-22 cube cadence/locality plan). Raw WebXR — the **same
+ * frame** as `getCellPoint`/`getCellCenter`, so distances are computed in
+ * one consistent space with no basis change.
+ */
+export interface ViewerPose {
+  /** Camera position [x, y, z], raw WebXR. */
+  readonly cameraPos: readonly [number, number, number];
+  /**
+   * Camera rotation [x, y, z, w], raw WebXR. Carried for the **deferred**
+   * B2 in-front-of-viewer FOV pass; B1 (nearest-N) does not read it.
+   */
+  readonly cameraRot?: readonly [number, number, number, number];
 }
 
 export interface OccupancyCubesVisualizerOptions {
@@ -134,31 +152,56 @@ export class OccupancyCubesVisualizer {
 
   /**
    * Redraw from the grid: every sufficiently-observed cell when under the
-   * instance cap, otherwise a random subset of cap size.
+   * instance cap. Over cap, draw the cells **nearest the viewer** when a
+   * `viewerPose` is supplied (Issue B1 — keeps the local neighbourhood
+   * dense instead of a room-wide random scatter); fall back to the legacy
+   * random subset when no pose is given or the pose is non-finite (a
+   * tracking glitch), so older callers and deterministic tests are
+   * unchanged.
+   *
+   * Each chosen cell's draw position is computed exactly once (via
+   * `getCellPoint` ?? `getCellCenter`) and carried through to the draw
+   * loop — the over-cap ranking needs it one step earlier than the legacy
+   * code did.
    */
-  refresh(grid: OccupancyGridSource): void {
+  refresh(grid: OccupancyGridSource, viewerPose?: ViewerPose): void {
     if (this.disposed) return;
     const occupied = grid.getOccupiedCells(this.minObservations);
     const capacity = this.mesh.instanceMatrix.count;
-    const cells =
-      occupied.length <= capacity
-        ? occupied
-        : pickRandomSubset(occupied, capacity, this.rng);
+    // Draw at the exact per-cell surface point when available (Item A),
+    // falling back to the lattice center for grids without it.
+    const positionOf = (cell: GridCell): readonly [number, number, number] =>
+      grid.getCellPoint?.(cell) ?? grid.getCellCenter(cell);
+
+    let drawn: PlacedCell[];
+    if (occupied.length <= capacity) {
+      drawn = occupied.map((cell) => ({ cell, pos: positionOf(cell) }));
+    } else if (viewerPose && isFiniteVec3(viewerPose.cameraPos)) {
+      drawn = pickNearestSubset(
+        occupied,
+        capacity,
+        viewerPose.cameraPos,
+        positionOf
+      ).map(({ item, pos }) => ({ cell: item, pos }));
+    } else {
+      drawn = pickRandomSubset(occupied, capacity, this.rng).map((cell) => ({
+        cell,
+        pos: positionOf(cell),
+      }));
+    }
 
     const matrix = new THREE.Matrix4();
     const color = new THREE.Color();
-    for (let i = 0; i < cells.length; i++) {
-      const cell = cells[i];
-      if (cell === undefined) continue;
-      // Draw at the exact per-cell surface point when available (Item A),
-      // falling back to the lattice center for grids without it.
-      const [x, y, z] = grid.getCellPoint?.(cell) ?? grid.getCellCenter(cell);
+    for (let i = 0; i < drawn.length; i++) {
+      const placed = drawn[i];
+      if (placed === undefined) continue;
+      const [x, y, z] = placed.pos;
       matrix.makeScale(this.cubeSizeM, this.cubeSizeM, this.cubeSizeM);
       matrix.setPosition(x, y, z);
       this.mesh.setMatrixAt(i, matrix);
       // Iter 8: real camera color when the cell has one; height ramp for
       // color-less cells (rgb option off, pre-Iter-8 recordings).
-      const rgb = grid.getCellColor(cell);
+      const rgb = grid.getCellColor(placed.cell);
       this.mesh.setColorAt(
         i,
         rgb
@@ -166,7 +209,7 @@ export class OccupancyCubesVisualizer {
           : heightColor(color, y)
       );
     }
-    this.mesh.count = cells.length;
+    this.mesh.count = drawn.length;
     this.mesh.instanceMatrix.needsUpdate = true;
     if (this.mesh.instanceColor) {
       this.mesh.instanceColor.needsUpdate = true;
@@ -197,6 +240,52 @@ function heightColor(target: THREE.Color, y: number): THREE.Color {
   );
   // 0.66 (blue) down to 0 (red)
   return target.setHSL(0.66 * (1 - t), 1, 0.5);
+}
+
+/** A cell paired with its already-computed draw position (raw WebXR). */
+interface PlacedCell {
+  readonly cell: GridCell;
+  readonly pos: readonly [number, number, number];
+}
+
+/** True when every component of a 3-vector is a finite number. */
+function isFiniteVec3(v: readonly [number, number, number]): boolean {
+  return (
+    Number.isFinite(v[0]) && Number.isFinite(v[1]) && Number.isFinite(v[2])
+  );
+}
+
+/**
+ * Pick the `count` items nearest `eye`, ranked by squared distance to each
+ * item's draw position. Pure and deterministic: positions come from
+ * `positionOf` (computed exactly once per item) and are carried through on
+ * the result so the draw loop never re-fetches them. Ties keep input order
+ * (stable sort). Exported for the property tests in
+ * `occupancy-cubes-visualizer.property.test.ts`.
+ *
+ * Squared distance is sufficient — `sqrt` is monotonic, so it never changes
+ * the ranking, and skipping it avoids `count` square roots per repaint.
+ */
+export function pickNearestSubset<T>(
+  items: readonly T[],
+  count: number,
+  eye: readonly [number, number, number],
+  positionOf: (item: T) => readonly [number, number, number]
+): Array<{ item: T; pos: readonly [number, number, number] }> {
+  const scored = items.map((item) => {
+    const pos = positionOf(item);
+    const dx = pos[0] - eye[0];
+    const dy = pos[1] - eye[1];
+    const dz = pos[2] - eye[2];
+    return { item, pos, d2: dx * dx + dy * dy + dz * dz };
+  });
+  // Stable ascending sort by squared distance. At a few thousand cells and
+  // ~1–2 Hz this O(n log n) is negligible (plan §3 cost note); a coarse
+  // radius pre-filter is the escape hatch if a pathological grid makes it hot.
+  scored.sort((a, b) => a.d2 - b.d2);
+  return scored
+    .slice(0, Math.max(0, count))
+    .map(({ item, pos }) => ({ item, pos }));
 }
 
 /**

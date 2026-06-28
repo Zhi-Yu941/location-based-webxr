@@ -31,6 +31,10 @@ const entryFiles = [
   'src/ar/enable-gps-ar.ts',
   'src/ar/frame-loop.ts',
   'src/ar/image-capture.ts',
+  // Pure blur/blackness metrics + verdict policy — deep-imported by the
+  // recorder's image-quality.worker.ts (NOT via the `/ar` barrel). The `./ar/*`
+  // exports wildcard advertises this subpath, so it must be built per-file.
+  'src/ar/image-quality.ts',
   // QR detection + derive-on-read + debug viz — deep-imported by the recorder's
   // live-QR modules (NOT via the `/ar` barrel, which eagerly pulls
   // permission-checker into partially-mocked wiring tests). The `./ar/*` exports
@@ -66,6 +70,7 @@ const entryFiles = [
   'src/sensors/gps.ts',
   'src/sensors/gps-error-handler.ts',
   'src/sensors/permission-checker.ts',
+  'src/sensors/absolute-orientation.ts',
 
   // state/
   'src/state/index.ts',

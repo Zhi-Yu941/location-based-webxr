@@ -532,3 +532,158 @@ describe('slicePrefixOf', () => {
     expect(slicePrefixOf('a/b/c')).toBe('a');
   });
 });
+
+describe('persistence re-entrancy tripwire', () => {
+  // Why these tests matter: a persisted action dispatched re-entrantly (inside
+  // another dispatch's `next()`, e.g. from a synchronous `store.subscribe`
+  // listener) receives a LOWER replay index than its trigger and is dropped on
+  // replay — a SILENT, replay-only failure (the 2026-06-27 field bug). The
+  // tripwire turns that into a loud dev-time warning. These tests pin that it
+  // (a) fires on the re-entrant case naming the offending action, once;
+  // (b) stays silent for normal top-level dispatches; (c) is observational
+  // only (does not drop/reorder the recorded writes); and (d) does not
+  // false-positive on the middleware's own async `recordWriteFailure` dispatch.
+  // See 2026-06-28-subscriber-dispatch-persistence-ordering-review.md.
+
+  const gpsSlice = createSlice({
+    name: 'gpsData',
+    initialState: null as {
+      zero: { lat: number; lon: number };
+      flag?: boolean;
+    } | null,
+    reducers: {
+      setZeroPos(_s, a: PayloadAction<{ lat: number; lon: number }>) {
+        return { zero: a.payload };
+      },
+      setFlag(s, a: PayloadAction<boolean>) {
+        if (s) s.flag = a.payload;
+      },
+    },
+  });
+  const recSlice = createSlice({
+    name: 'recording',
+    initialState: { isRecording: false, failedWriteCount: 0 },
+    reducers: {
+      startSession(s) {
+        s.isRecording = true;
+      },
+      endSession(s) {
+        s.isRecording = false;
+      },
+      recordWriteFailure(s) {
+        s.failedWriteCount += 1;
+      },
+    },
+  });
+
+  function makeBackend() {
+    return {
+      createSession: vi.fn().mockResolvedValue({ sessionName: 'test' }),
+      listSessions: vi.fn().mockResolvedValue([]),
+      writeAction: vi.fn().mockResolvedValue(undefined),
+      writeFrame: vi.fn().mockResolvedValue(undefined),
+      writeSessionMetadata: vi.fn().mockResolvedValue(undefined),
+    } as unknown as StorageBackend & { writeAction: ReturnType<typeof vi.fn> };
+  }
+
+  function makeStore(backend: StorageBackend) {
+    return configureStore({
+      reducer: { recording: recSlice.reducer, gpsData: gpsSlice.reducer },
+      middleware: (getDefaultMiddleware) =>
+        getDefaultMiddleware({
+          serializableCheck: false,
+          immutableCheck: false,
+        }).concat(
+          createPersistenceMiddleware({
+            storageBackend: backend,
+            persistedPrefixes: ['gpsData', 'recording'],
+          })
+        ),
+    });
+  }
+
+  // Collect the warning lines (joined args) emitted by the tripwire. Typed
+  // against the call-args array (not the loosely-typed spy) to stay lint-clean.
+  const reentrantWarnings = (
+    calls: readonly (readonly unknown[])[]
+  ): string[] =>
+    calls
+      .map((args) =>
+        args.filter((a): a is string => typeof a === 'string').join(' ')
+      )
+      .filter((line) => line.includes('dispatched re-entrantly'));
+
+  it('warns once (naming the action) when a persisted action is dispatched re-entrantly from a subscriber, without dropping the recorded writes', () => {
+    const backend = makeBackend();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const store = makeStore(backend);
+
+    // The exact field-bug shape: a subscriber reacts to gpsData appearing by
+    // synchronously dispatching a follow-up persisted action (inside the
+    // setZeroPos dispatch's next()). Guarded to fire once (no loop).
+    let fired = false;
+    store.subscribe(() => {
+      if (store.getState().gpsData && !fired) {
+        fired = true;
+        store.dispatch(gpsSlice.actions.setFlag(true));
+      }
+    });
+
+    store.dispatch(recSlice.actions.startSession());
+    store.dispatch(gpsSlice.actions.setZeroPos({ lat: 1, lon: 2 }));
+
+    const warnings = reentrantWarnings(warnSpy.mock.calls);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]!).toContain('gpsData/setFlag');
+
+    // Observational only: both actions are still persisted — and with the
+    // inverted index the warning is diagnosing (the re-entrant setFlag lands
+    // BEFORE the setZeroPos that created the slice).
+    const calls = (
+      backend.writeAction as ReturnType<typeof vi.fn>
+    ).mock.calls.map((c) => ({
+      type: (c[0] as { type: string }).type,
+      index: c[1] as number,
+    }));
+    const zero = calls.find((c) => c.type === 'gpsData/setZeroPos');
+    const flag = calls.find((c) => c.type === 'gpsData/setFlag');
+    expect(zero).toBeDefined();
+    expect(flag).toBeDefined();
+    expect(flag!.index).toBeLessThan(zero!.index);
+
+    warnSpy.mockRestore();
+  });
+
+  it('does not warn for normal top-level persisted dispatches', () => {
+    const backend = makeBackend();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const store = makeStore(backend);
+
+    store.dispatch(recSlice.actions.startSession());
+    store.dispatch(gpsSlice.actions.setZeroPos({ lat: 1, lon: 2 }));
+    store.dispatch(gpsSlice.actions.setFlag(true));
+
+    expect(reentrantWarnings(warnSpy.mock.calls)).toHaveLength(0);
+    warnSpy.mockRestore();
+  });
+
+  it('does not false-positive on the async recordWriteFailure dispatch when a write fails', async () => {
+    const backend = makeBackend();
+    (backend.writeAction as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error('disk full')
+    );
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const store = makeStore(backend);
+
+    store.dispatch(recSlice.actions.startSession());
+    store.dispatch(gpsSlice.actions.setZeroPos({ lat: 1, lon: 2 }));
+    // Let the write queue reject and dispatch recordWriteFailure (top-level,
+    // in a later macrotask — depth 1 and excluded from persistence).
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(reentrantWarnings(warnSpy.mock.calls)).toHaveLength(0);
+    warnSpy.mockRestore();
+    errSpy.mockRestore();
+  });
+});

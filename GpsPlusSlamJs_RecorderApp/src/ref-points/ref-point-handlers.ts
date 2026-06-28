@@ -155,13 +155,12 @@ export function createRefPointHandlers(
       | undefined
   ): void {
     // Extract raw sensor fields from state-side GpsPoint for the action payload.
-    // Derived fields (coordinates, weight, zeroRef, deviceRotation) are
-    // recomputed by the reducer (raw-storage pattern).
+    // Derived fields (coordinates, weight, zeroRef) are recomputed by the
+    // reducer (raw-storage pattern).
     const {
       zeroRef: _z,
       coordinates: _c,
       weight: _w,
-      deviceRotation: _d,
       ...rawGpsPoint
     } = gpsPoint;
 

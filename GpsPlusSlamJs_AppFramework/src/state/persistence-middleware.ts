@@ -168,71 +168,111 @@ export function createPersistenceMiddleware(
   let actionIndex = 0;
   const writeQueue = new WriteQueue();
 
+  // Re-entrancy tripwire (guardrail for the subscriber-dispatch ordering trap).
+  // `dispatchDepth` counts how many of THIS middleware's invocations are
+  // currently on the stack: a top-level dispatch runs at depth 1, while a
+  // dispatch fired re-entrantly from inside another action's `next()` (e.g. a
+  // synchronous `store.subscribe` listener) runs at depth > 1. A re-entrant
+  // PERSISTED dispatch receives a LOWER replay index than its trigger (the index
+  // is assigned after `next()`), so it is recorded BEFORE the action that
+  // created the state it depends on and is dropped on replay — a silent,
+  // replay-only failure. We warn ONCE (per instance) to turn that into a loud
+  // dev-time signal even if the listener-middleware convention is bypassed.
+  // See GpsPlusSlamJs_Docs/docs/2026-06-28-subscriber-dispatch-persistence-ordering-review.md.
+  let dispatchDepth = 0;
+  let hasWarnedReentrant = false;
+
   const middleware: Middleware = (store) => (next) => (action: unknown) => {
-    const typedAction = action as UnknownAction;
-    const actionType =
-      typeof typedAction.type === 'string' ? typedAction.type : null;
+    // Increment at entry; the `finally` wraps the WHOLE handler body (not just
+    // `next`), because the depth check below runs after `next()` returns — a
+    // decrement scoped to `next` alone would make the check always read depth 0.
+    dispatchDepth += 1;
+    try {
+      const typedAction = action as UnknownAction;
+      const actionType =
+        typeof typedAction.type === 'string' ? typedAction.type : null;
 
-    // Capture recording state BEFORE reducer runs so we can detect
-    // endSession (which sets isRecording=false in the reducer).
-    const wasRecording = readIsRecording(store.getState());
+      // Capture recording state BEFORE reducer runs so we can detect
+      // endSession (which sets isRecording=false in the reducer).
+      const wasRecording = readIsRecording(store.getState());
 
-    // Let reducers handle the action first
-    const result = next(action);
+      // Let reducers handle the action first
+      const result = next(action);
 
-    if (!actionType) {
-      return result;
-    }
-
-    // Reset action index when a new session starts (Issue 4). The type is
-    // derived from the imported action creator (`startSession.type`) so a
-    // slice/action rename can't silently disable the per-session reset.
-    if (actionType === startSession.type) {
-      actionIndex = 0;
-    }
-
-    // Check recording state AFTER reducers ran (so startSession is included).
-    // Special-case endSession: wasRecording was true before the reducer,
-    // but isRecording is now false — still needs to be persisted (Issue 5).
-    const isRecording = readIsRecording(store.getState());
-
-    // Persist if actively recording, or if this is the endSession action
-    // that just flipped isRecording to false (Issue 5).
-    if (!isInPersistableSession(wasRecording, isRecording, actionType)) {
-      return result;
-    }
-
-    // Persist only actions whose slice prefix is whitelisted, always
-    // excluding recordWriteFailure (would recurse via the error handler).
-    const shouldPersistAction =
-      actionType !== excludedActionType &&
-      normalizedPrefixes.some((prefix) => actionType.startsWith(prefix));
-
-    if (!shouldPersistAction) {
-      return result;
-    }
-
-    // Use pre-increment for 1-based indexing (000001.json, 000002.json, etc.)
-    const index = ++actionIndex;
-    writeQueue.enqueue(async () => {
-      try {
-        await storageBackend.writeAction(typedAction, index);
-      } catch (err) {
-        // Normalize rejection to Error (JS allows rejecting with any value)
-        const normalized = err instanceof Error ? err : new Error(String(err));
-        log.error('Failed to persist action:', normalized);
-
-        // recordWriteFailure is excluded from persistence above,
-        // so this dispatch won't cause recursion
-        store.dispatch(recordWriteFailure(normalized.message));
-
-        if (onWriteFailure) {
-          onWriteFailure(normalized);
-        }
+      if (!actionType) {
+        return result;
       }
-    });
 
-    return result;
+      // Reset action index when a new session starts (Issue 4). The type is
+      // derived from the imported action creator (`startSession.type`) so a
+      // slice/action rename can't silently disable the per-session reset.
+      if (actionType === startSession.type) {
+        actionIndex = 0;
+      }
+
+      // Check recording state AFTER reducers ran (so startSession is included).
+      // Special-case endSession: wasRecording was true before the reducer,
+      // but isRecording is now false — still needs to be persisted (Issue 5).
+      const isRecording = readIsRecording(store.getState());
+
+      // Persist if actively recording, or if this is the endSession action
+      // that just flipped isRecording to false (Issue 5).
+      if (!isInPersistableSession(wasRecording, isRecording, actionType)) {
+        return result;
+      }
+
+      // Persist only actions whose slice prefix is whitelisted, always
+      // excluding recordWriteFailure (would recurse via the error handler).
+      const shouldPersistAction =
+        actionType !== excludedActionType &&
+        normalizedPrefixes.some((prefix) => actionType.startsWith(prefix));
+
+      if (!shouldPersistAction) {
+        return result;
+      }
+
+      // Use pre-increment for 1-based indexing (000001.json, 000002.json, etc.)
+      const index = ++actionIndex;
+
+      // Tripwire: a persisted action enqueued while nested inside another
+      // dispatch's `next()` will replay out of order. Warn once (the failure is
+      // otherwise silent and replay-only). Observational only — the recorded
+      // actions/indices are unchanged; we never throw (that could destabilise a
+      // live recording).
+      if (dispatchDepth > 1 && !hasWarnedReentrant) {
+        hasWarnedReentrant = true;
+        log.warn(
+          `Persisted action "${actionType}" was dispatched re-entrantly ` +
+            `(inside another dispatch's next()). Its recorded order can invert ` +
+            `on replay — react to actions via a prepended listener middleware, ` +
+            `not a synchronous store.subscribe dispatch. See ` +
+            `2026-06-28-subscriber-dispatch-persistence-ordering-review.md.`
+        );
+      }
+
+      writeQueue.enqueue(async () => {
+        try {
+          await storageBackend.writeAction(typedAction, index);
+        } catch (err) {
+          // Normalize rejection to Error (JS allows rejecting with any value)
+          const normalized =
+            err instanceof Error ? err : new Error(String(err));
+          log.error('Failed to persist action:', normalized);
+
+          // recordWriteFailure is excluded from persistence above,
+          // so this dispatch won't cause recursion
+          store.dispatch(recordWriteFailure(normalized.message));
+
+          if (onWriteFailure) {
+            onWriteFailure(normalized);
+          }
+        }
+      });
+
+      return result;
+    } finally {
+      dispatchDepth -= 1;
+    }
   };
 
   return middleware;

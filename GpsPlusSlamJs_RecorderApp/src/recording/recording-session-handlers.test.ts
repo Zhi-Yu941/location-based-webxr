@@ -37,6 +37,8 @@ const {
   mockStopGpsWatch,
   mockStartOrientationWatch,
   mockStopOrientationWatch,
+  mockStartAbsoluteOrientationWatch,
+  mockStopAbsoluteOrientationWatch,
   mockFormatTimestamp,
   mockStartStorageSession,
   mockGetCurrentScenarioHandle,
@@ -47,6 +49,9 @@ const {
   mockEndSession,
   mockStartImageCapture,
   mockStopImageCapture,
+  mockSetImageQualityAnalyzer,
+  mockCreateImageQualityAnalyzer,
+  mockImageQualityClientInstance,
   mockStartDepthCapture,
   mockStopDepthCapture,
   mockGetImageCaptureFrameCount,
@@ -106,7 +111,17 @@ const {
 
   const mockUnsubscribe = vi.fn();
 
+  const mockImageQualityClientInstance = {
+    analyze: vi.fn().mockResolvedValue({ accept: true, reason: null }),
+    dispose: vi.fn(),
+  };
+
   return {
+    mockSetImageQualityAnalyzer: vi.fn(),
+    mockCreateImageQualityAnalyzer: vi
+      .fn()
+      .mockReturnValue(mockImageQualityClientInstance),
+    mockImageQualityClientInstance,
     mockResetCoordinatorState: vi.fn(),
     mockCreateGpsPositionHandler: vi.fn().mockReturnValue(() => {}),
     mockUpdateDeviceOrientation: vi.fn(),
@@ -114,6 +129,8 @@ const {
     mockStopGpsWatch: vi.fn(),
     mockStartOrientationWatch: vi.fn(),
     mockStopOrientationWatch: vi.fn(),
+    mockStartAbsoluteOrientationWatch: vi.fn().mockResolvedValue(undefined),
+    mockStopAbsoluteOrientationWatch: vi.fn(),
     mockFormatTimestamp: vi.fn().mockReturnValue('2026-01-01_12-00-00'),
     mockStartStorageSession: vi.fn().mockResolvedValue(undefined),
     mockGetCurrentScenarioHandle: vi
@@ -209,6 +226,13 @@ vi.mock('gps-plus-slam-app-framework/sensors/gps', () => ({
   stopOrientationWatch: mockStopOrientationWatch,
 }));
 
+vi.mock('gps-plus-slam-app-framework/sensors/absolute-orientation', () => ({
+  startAbsoluteOrientationWatch: mockStartAbsoluteOrientationWatch,
+  stopAbsoluteOrientationWatch: mockStopAbsoluteOrientationWatch,
+  // null → the live-HUD poll is a no-op in tests (no leaked HUD writes).
+  getLatestAbsoluteOrientation: vi.fn().mockReturnValue(null),
+}));
+
 vi.mock('gps-plus-slam-app-framework/storage/file-system-utils', () => ({
   formatTimestamp: mockFormatTimestamp,
 }));
@@ -238,11 +262,16 @@ vi.mock('gps-plus-slam-app-framework/ar/capture-failure-tracker', () => ({
 vi.mock('gps-plus-slam-app-framework/ar/webxr-session', () => ({
   startImageCapture: mockStartImageCapture,
   stopImageCapture: mockStopImageCapture,
+  setImageQualityAnalyzer: mockSetImageQualityAnalyzer,
   startDepthCapture: mockStartDepthCapture,
   stopDepthCapture: mockStopDepthCapture,
   getImageCaptureFrameCount: mockGetImageCaptureFrameCount,
   getDepthSampleCount: mockGetDepthSampleCount,
   getCurrentArPose: mockGetCurrentArPose,
+}));
+
+vi.mock('./image-quality-client', () => ({
+  createImageQualityAnalyzer: mockCreateImageQualityAnalyzer,
 }));
 
 vi.mock('../storage/external-file-storage', () => ({
@@ -277,6 +306,8 @@ vi.mock('../ui/hud', () => ({
   hideTrackingQuality: vi.fn(),
   updateRefPointButtonLabel: vi.fn(),
   setNewRefPointButtonVisible: vi.fn(),
+  setAbsCompassStatus: vi.fn(),
+  hideAbsCompass: vi.fn(),
 }));
 
 vi.mock('../ui/session-summary', () => ({
@@ -305,6 +336,7 @@ vi.mock('gps-plus-slam-app-framework/sensors/gps-error-handler', () => ({
 
 vi.mock('gps-plus-slam-app-framework/core', () => ({
   calcGpsCoords: mockCalcGpsCoords,
+  magneticHeadingFromEnuQuat: vi.fn().mockReturnValue(0),
 }));
 
 vi.mock('../utils/build-info', () => ({
@@ -367,6 +399,8 @@ const defaultOptions: RecordingOptions = {
     intervalMs: 1000,
     quality: 0.8,
     resolutionDivisor: 1,
+    motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+    qualityFilter: { ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter },
   },
   depth: { enabled: false, intervalMs: 1000, gridSize: 3, rgb: true },
   arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
@@ -374,6 +408,7 @@ const defaultOptions: RecordingOptions = {
   frameTileDisplay: { ...DEFAULT_RECORDING_OPTIONS.frameTileDisplay },
   visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
   qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
+  compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
 };
 
 function createMockDeps(
@@ -646,6 +681,15 @@ describe('handleStartRecording', () => {
     expect(mockStartOrientationWatch).toHaveBeenCalled();
   });
 
+  it('should start the AbsoluteOrientationSensor capture (independent north, Phase 1)', async () => {
+    // Why: the GPS-independent magnetometer heading must be captured during the
+    // recording so it pairs with each GPS event (plan §5). Passive/no-op off
+    // Chrome Android; the HUD status callback is wired so a field tester can
+    // confirm capture is live.
+    await handlers.handleStartRecording();
+    expect(mockStartAbsoluteOrientationWatch).toHaveBeenCalled();
+  });
+
   it('should enable beforeunload warning', async () => {
     // Why: Prevents accidental data loss during recording
     await handlers.handleStartRecording();
@@ -683,6 +727,8 @@ describe('handleStartRecording', () => {
         intervalMs: 500,
         quality: 0.9,
         resolutionDivisor: 2,
+        motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+        qualityFilter: { ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter },
       },
       depth: { enabled: false, intervalMs: 1000, gridSize: 3, rgb: true },
       arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
@@ -690,6 +736,7 @@ describe('handleStartRecording', () => {
       frameTileDisplay: { ...DEFAULT_RECORDING_OPTIONS.frameTileDisplay },
       visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
       qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
+      compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
     };
     deps = createMockDeps({ getRecordingOptions: () => opts });
     handlers = createRecordingSessionHandlers(deps);
@@ -698,7 +745,151 @@ describe('handleStartRecording', () => {
       intervalMs: 500,
       quality: 0.9,
       resolutionDivisor: 2,
+      // motionFilter AND qualityFilter must forward through the seam too (the
+      // same "no dropped knobs" guarantee that resolutionDivisor pins) so the
+      // gates the user toggled actually reach ImageCaptureManager.
+      motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+      qualityFilter: { ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter },
     });
+  });
+
+  it('spawns + injects the off-thread quality analyzer only when qualityFilter is enabled', async () => {
+    // Why: the blur/blackness gate is opt-in and worker-backed. When enabled the
+    // recorder must create the analyzer and inject it via setImageQualityAnalyzer
+    // BEFORE startImageCapture (the manager reads it on construction); when
+    // disabled it must spawn no worker and clear the analyzer (so a previous
+    // recording's worker can't leak in).
+    const opts: RecordingOptions = {
+      images: {
+        enabled: true,
+        intervalMs: 2000,
+        quality: 0.7,
+        resolutionDivisor: 1,
+        motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+        qualityFilter: {
+          ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter,
+          enabled: true,
+        },
+      },
+      depth: { enabled: false, intervalMs: 1000, gridSize: 3, rgb: true },
+      arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
+      occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
+      frameTileDisplay: { ...DEFAULT_RECORDING_OPTIONS.frameTileDisplay },
+      visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
+      qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
+      compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
+    };
+    deps = createMockDeps({ getRecordingOptions: () => opts });
+    handlers = createRecordingSessionHandlers(deps);
+    await handlers.handleStartRecording();
+
+    expect(mockCreateImageQualityAnalyzer).toHaveBeenCalledWith(
+      opts.images.qualityFilter
+    );
+    expect(mockSetImageQualityAnalyzer).toHaveBeenCalledWith(
+      mockImageQualityClientInstance.analyze
+    );
+  });
+
+  it('continues recording (fails open) when the quality-gate worker cannot be created', async () => {
+    // The analyzer's worker is constructed synchronously (`new Worker`). On a
+    // locked-down deployment (e.g. CSP `worker-src 'none'`) that constructor can
+    // throw. Previously the throw propagated out of handleStartRecording AFTER
+    // the GPS/orientation/compass watches had already started, leaving a
+    // half-initialized session (image capture never started, controls never
+    // shown). The gate is optional and fail-open everywhere, so a worker-create
+    // failure must disable the gate and let recording proceed.
+    const opts: RecordingOptions = {
+      images: {
+        enabled: true,
+        intervalMs: 2000,
+        quality: 0.7,
+        resolutionDivisor: 1,
+        motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+        qualityFilter: {
+          ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter,
+          enabled: true,
+        },
+      },
+      depth: { enabled: false, intervalMs: 1000, gridSize: 3, rgb: true },
+      arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
+      occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
+      frameTileDisplay: { ...DEFAULT_RECORDING_OPTIONS.frameTileDisplay },
+      visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
+      qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
+      compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
+    };
+    deps = createMockDeps({ getRecordingOptions: () => opts });
+    handlers = createRecordingSessionHandlers(deps);
+    mockCreateImageQualityAnalyzer.mockImplementationOnce(() => {
+      throw new Error('Worker blocked by CSP');
+    });
+
+    await expect(handlers.handleStartRecording()).resolves.toBeUndefined();
+
+    // Gate disabled (cleared), but recording still proceeded to image capture.
+    expect(mockSetImageQualityAnalyzer).toHaveBeenCalledWith(null);
+    expect(mockStartImageCapture).toHaveBeenCalled();
+  });
+
+  it('disposes the quality analyzer and clears the callback on stop', async () => {
+    const opts: RecordingOptions = {
+      images: {
+        enabled: true,
+        intervalMs: 2000,
+        quality: 0.7,
+        resolutionDivisor: 1,
+        motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+        qualityFilter: {
+          ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter,
+          enabled: true,
+        },
+      },
+      depth: { enabled: false, intervalMs: 1000, gridSize: 3, rgb: true },
+      arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
+      occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
+      frameTileDisplay: { ...DEFAULT_RECORDING_OPTIONS.frameTileDisplay },
+      visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
+      qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
+      compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
+    };
+    deps = createMockDeps({ getRecordingOptions: () => opts });
+    handlers = createRecordingSessionHandlers(deps);
+    await handlers.handleStartRecording();
+    await handlers.handleStopRecording();
+
+    expect(mockImageQualityClientInstance.dispose).toHaveBeenCalledTimes(1);
+    // Cleared on stop (null), in addition to being set on start.
+    expect(mockSetImageQualityAnalyzer).toHaveBeenCalledWith(null);
+  });
+
+  it('does NOT spawn the analyzer when qualityFilter is disabled, but still clears it', async () => {
+    // Image capture ON but the quality gate OFF (the default): no worker is
+    // spawned, and the analyzer is explicitly cleared so a previous recording's
+    // worker can't leak into this one.
+    const opts: RecordingOptions = {
+      images: {
+        enabled: true,
+        intervalMs: 2000,
+        quality: 0.7,
+        resolutionDivisor: 1,
+        motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+        qualityFilter: { ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter },
+      },
+      depth: { enabled: false, intervalMs: 1000, gridSize: 3, rgb: true },
+      arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
+      occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
+      frameTileDisplay: { ...DEFAULT_RECORDING_OPTIONS.frameTileDisplay },
+      visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
+      qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
+      compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
+    };
+    deps = createMockDeps({ getRecordingOptions: () => opts });
+    handlers = createRecordingSessionHandlers(deps);
+    await handlers.handleStartRecording();
+
+    expect(mockCreateImageQualityAnalyzer).not.toHaveBeenCalled();
+    expect(mockSetImageQualityAnalyzer).toHaveBeenCalledWith(null);
   });
 
   it('should NOT start image capture when disabled in options', async () => {
@@ -721,6 +912,8 @@ describe('handleStartRecording', () => {
         intervalMs: 1000,
         quality: 0.8,
         resolutionDivisor: 1,
+        motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+        qualityFilter: { ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter },
       },
       depth: { enabled: true, intervalMs: 500, gridSize: 3, rgb: false },
       arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
@@ -728,6 +921,7 @@ describe('handleStartRecording', () => {
       frameTileDisplay: { ...DEFAULT_RECORDING_OPTIONS.frameTileDisplay },
       visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
       qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
+      compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
     };
     deps = createMockDeps({ getRecordingOptions: () => opts });
     handlers = createRecordingSessionHandlers(deps);
@@ -889,6 +1083,8 @@ describe('handleStopRecording', () => {
     await handlers.handleStopRecording();
     expect(mockStopGpsWatch).toHaveBeenCalled();
     expect(mockStopOrientationWatch).toHaveBeenCalled();
+    // The AbsoluteOrientationSensor watch must also be torn down (no leak).
+    expect(mockStopAbsoluteOrientationWatch).toHaveBeenCalled();
   });
 
   it('should write session metadata', async () => {
@@ -1518,5 +1714,50 @@ describe('tracker proxy methods', () => {
 
     handlers.recordCaptureFailure();
     expect(mockCaptureFailureTrackerInstance.recordFailure).toHaveBeenCalled();
+  });
+});
+
+describe('AbsCompass HUD timer — factory-pattern isolation (PR #126)', () => {
+  // The sidecar documents the factory invariant: "Each call to
+  // createRecordingSessionHandlers returns independent state. No module-level
+  // mutable state." The live AbsCompass HUD refresh timer must therefore be
+  // per-instance. When the timer handle lives in a module-level variable shared
+  // across instances, a SECOND handlers instance starting recording runs
+  // startAbsCompassHudUpdates() → stopAbsCompassHudUpdates(), which — reading the
+  // shared module variable — clears the FIRST instance's still-live HUD interval.
+  // Two concurrent sessions then collapse onto a single timer (cross-session
+  // interference / timer leak). This test pins the isolation.
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('a second instance starting recording must not clear the first instance HUD timer', async () => {
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
+
+    const handlersA = createRecordingSessionHandlers(createMockDeps());
+    await handlersA.handleStartRecording();
+
+    // createSyncManager and every sensor watch are mocked, so the only timer the
+    // start flow arms is the AbsCompass HUD refresh interval. Capture its id.
+    expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+    const aHudIntervalId = setIntervalSpy.mock.results[0]?.value;
+
+    clearIntervalSpy.mockClear();
+
+    const handlersB = createRecordingSessionHandlers(createMockDeps());
+    await handlersB.handleStartRecording();
+
+    // With shared module state, B's start cleared A's interval. With per-instance
+    // state, B's own (null) timer means nothing of A's is touched.
+    const clearedAsTimer = clearIntervalSpy.mock.calls.some(
+      ([id]) => id === aHudIntervalId
+    );
+    expect(clearedAsTimer).toBe(false);
   });
 });

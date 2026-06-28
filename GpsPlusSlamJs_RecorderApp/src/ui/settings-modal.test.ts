@@ -115,6 +115,12 @@ describe('settings-modal', () => {
       expect(html).toContain('id="depth-grid"');
       expect(html).toContain('id="depth-rgb"');
       expect(html).toContain('id="images-enabled"');
+      expect(html).toContain('id="images-motion-filter"');
+      expect(html).toContain('id="images-quality-filter"');
+      expect(html).toContain('id="images-blur-threshold"');
+      expect(html).toContain('id="images-min-luminance"');
+      expect(html).toContain('id="images-max-angular"');
+      expect(html).toContain('id="images-max-linear"');
       expect(html).toContain('id="images-interval"');
       expect(html).toContain('id="images-quality"');
     });
@@ -146,6 +152,14 @@ describe('settings-modal', () => {
       const html = loadSettingsModalHtml();
       expect(html).toContain('id="occupancy-cell-size"');
       expect(html).toContain('id="occupancy-cell-size-value"');
+    });
+
+    it('includes the occupancy noise-filter (min-confidence) slider and value display', () => {
+      // 2026-06-22 behind-surface-noise plan: the voxel noise filter
+      // (occupancy.minConfidence) must be user-tunable from this modal.
+      const html = loadSettingsModalHtml();
+      expect(html).toContain('id="occupancy-min-confidence"');
+      expect(html).toContain('id="occupancy-min-confidence-value"');
     });
 
     it('includes the frame-tile display-resolution slider and value display', () => {
@@ -322,6 +336,36 @@ describe('settings-modal', () => {
       const valueDisplay = document.getElementById('occupancy-cell-size-value');
       expect(slider.value).toBe('3');
       expect(valueDisplay?.textContent).toBe('3 cm');
+    });
+
+    it('populates the noise-filter slider from saved options', () => {
+      localStorageMock.getItem.mockReturnValueOnce(
+        JSON.stringify({ occupancy: { minConfidence: 5 } })
+      );
+
+      showSettingsModal();
+
+      const slider = document.getElementById(
+        'occupancy-min-confidence'
+      ) as HTMLInputElement;
+      const valueDisplay = document.getElementById(
+        'occupancy-min-confidence-value'
+      );
+      expect(slider.value).toBe('5');
+      expect(valueDisplay?.textContent).toBe('5');
+    });
+
+    it('labels min-confidence 1 as unfiltered', () => {
+      localStorageMock.getItem.mockReturnValueOnce(
+        JSON.stringify({ occupancy: { minConfidence: 1 } })
+      );
+
+      showSettingsModal();
+
+      const valueDisplay = document.getElementById(
+        'occupancy-min-confidence-value'
+      );
+      expect(valueDisplay?.textContent).toBe('1 (unfiltered)');
     });
 
     it('populates AR crash isolation checkbox from saved options', () => {
@@ -545,6 +589,239 @@ describe('settings-modal', () => {
     });
   });
 
+  describe('blurry-frame motion gate toggle (2026-06-23 motion-gating plan)', () => {
+    // Why these tests matter: the gate is enabled by default and is the user's
+    // only control over blurry-frame skipping. A dead checkbox would silently
+    // keep (or disable) the gate regardless of the toggle. Round-trip the
+    // control: default on, persists when unchecked, and disabled when capture
+    // itself is off (a sub-control of image capture).
+    beforeEach(() => {
+      initSettingsModal();
+      showSettingsModal();
+    });
+
+    it('is present and defaults to on', () => {
+      const cb = document.getElementById(
+        'images-motion-filter'
+      ) as HTMLInputElement | null;
+      expect(cb).not.toBeNull();
+      expect(cb!.checked).toBe(true);
+    });
+
+    it('persists motionFilter.enabled = false when unchecked', () => {
+      const cb = document.getElementById(
+        'images-motion-filter'
+      ) as HTMLInputElement;
+
+      cb.checked = false;
+      cb.dispatchEvent(new Event('change'));
+
+      document.getElementById('btn-settings-save')?.click();
+
+      expect(loadRecordingOptions().images.motionFilter.enabled).toBe(false);
+    });
+
+    it('disables the motion-filter checkbox while image capture is off', () => {
+      const imagesEnabled = document.getElementById(
+        'images-enabled'
+      ) as HTMLInputElement;
+      const motionFilter = document.getElementById(
+        'images-motion-filter'
+      ) as HTMLInputElement;
+
+      imagesEnabled.checked = false;
+      imagesEnabled.dispatchEvent(new Event('change'));
+      expect(motionFilter.disabled).toBe(true);
+
+      imagesEnabled.checked = true;
+      imagesEnabled.dispatchEvent(new Event('change'));
+      expect(motionFilter.disabled).toBe(false);
+    });
+
+    it('exposes the threshold sliders, populated from the defaults', () => {
+      const angular = document.getElementById(
+        'images-max-angular'
+      ) as HTMLInputElement | null;
+      const linear = document.getElementById(
+        'images-max-linear'
+      ) as HTMLInputElement | null;
+      expect(angular).not.toBeNull();
+      expect(linear).not.toBeNull();
+      // Defaults from DEFAULT_MOTION_FILTER (0.6 rad/s, 0.5 m/s).
+      expect(parseFloat(angular!.value)).toBeCloseTo(0.6, 6);
+      expect(parseFloat(linear!.value)).toBeCloseTo(0.5, 6);
+    });
+
+    it('persists edited threshold values through save/load', () => {
+      const angular = document.getElementById(
+        'images-max-angular'
+      ) as HTMLInputElement;
+      const linear = document.getElementById(
+        'images-max-linear'
+      ) as HTMLInputElement;
+
+      angular.value = '1.2';
+      angular.dispatchEvent(new Event('input'));
+      linear.value = '0.8';
+      linear.dispatchEvent(new Event('input'));
+
+      document.getElementById('btn-settings-save')?.click();
+
+      const saved = loadRecordingOptions().images.motionFilter;
+      expect(saved.maxAngularVelocity).toBeCloseTo(1.2, 6);
+      expect(saved.maxLinearVelocity).toBeCloseTo(0.8, 6);
+    });
+
+    it('disables the threshold sliders when the gate (or capture) is off', () => {
+      const imagesEnabled = document.getElementById(
+        'images-enabled'
+      ) as HTMLInputElement;
+      const motionFilter = document.getElementById(
+        'images-motion-filter'
+      ) as HTMLInputElement;
+      const angular = document.getElementById(
+        'images-max-angular'
+      ) as HTMLInputElement;
+      const linear = document.getElementById(
+        'images-max-linear'
+      ) as HTMLInputElement;
+
+      // Gate off → sliders disabled.
+      motionFilter.checked = false;
+      motionFilter.dispatchEvent(new Event('change'));
+      expect(angular.disabled).toBe(true);
+      expect(linear.disabled).toBe(true);
+
+      // Gate back on → sliders enabled.
+      motionFilter.checked = true;
+      motionFilter.dispatchEvent(new Event('change'));
+      expect(angular.disabled).toBe(false);
+      expect(linear.disabled).toBe(false);
+
+      // Capture off overrides → sliders disabled regardless of the gate.
+      imagesEnabled.checked = false;
+      imagesEnabled.dispatchEvent(new Event('change'));
+      expect(angular.disabled).toBe(true);
+      expect(linear.disabled).toBe(true);
+    });
+  });
+
+  describe('image-quality gate toggle (blur/blackness)', () => {
+    beforeEach(() => {
+      initSettingsModal();
+      showSettingsModal();
+    });
+
+    it('is present and defaults to OFF (opt-in until field-tuned)', () => {
+      const cb = document.getElementById(
+        'images-quality-filter'
+      ) as HTMLInputElement | null;
+      expect(cb).not.toBeNull();
+      expect(cb!.checked).toBe(false);
+    });
+
+    it('persists qualityFilter.enabled = true when checked', () => {
+      const cb = document.getElementById(
+        'images-quality-filter'
+      ) as HTMLInputElement;
+
+      cb.checked = true;
+      cb.dispatchEvent(new Event('change'));
+
+      document.getElementById('btn-settings-save')?.click();
+
+      expect(loadRecordingOptions().images.qualityFilter.enabled).toBe(true);
+    });
+
+    it('disables the quality-filter checkbox while image capture is off', () => {
+      const imagesEnabled = document.getElementById(
+        'images-enabled'
+      ) as HTMLInputElement;
+      const qualityFilter = document.getElementById(
+        'images-quality-filter'
+      ) as HTMLInputElement;
+
+      imagesEnabled.checked = false;
+      imagesEnabled.dispatchEvent(new Event('change'));
+      expect(qualityFilter.disabled).toBe(true);
+
+      imagesEnabled.checked = true;
+      imagesEnabled.dispatchEvent(new Event('change'));
+      expect(qualityFilter.disabled).toBe(false);
+    });
+
+    it('exposes the threshold sliders, populated from the defaults', () => {
+      const blur = document.getElementById(
+        'images-blur-threshold'
+      ) as HTMLInputElement | null;
+      const luma = document.getElementById(
+        'images-min-luminance'
+      ) as HTMLInputElement | null;
+      expect(blur).not.toBeNull();
+      expect(luma).not.toBeNull();
+      // Defaults from DEFAULT_QUALITY_FILTER (k=0.5, minMeanLuminance=10).
+      expect(parseFloat(blur!.value)).toBeCloseTo(0.5, 6);
+      expect(parseFloat(luma!.value)).toBeCloseTo(10, 6);
+    });
+
+    it('persists edited threshold values through save/load (gate on)', () => {
+      const qualityFilter = document.getElementById(
+        'images-quality-filter'
+      ) as HTMLInputElement;
+      const blur = document.getElementById(
+        'images-blur-threshold'
+      ) as HTMLInputElement;
+      const luma = document.getElementById(
+        'images-min-luminance'
+      ) as HTMLInputElement;
+
+      qualityFilter.checked = true;
+      qualityFilter.dispatchEvent(new Event('change'));
+      blur.value = '0.35';
+      blur.dispatchEvent(new Event('input'));
+      luma.value = '25';
+      luma.dispatchEvent(new Event('input'));
+
+      document.getElementById('btn-settings-save')?.click();
+
+      const saved = loadRecordingOptions().images.qualityFilter;
+      expect(saved.enabled).toBe(true);
+      expect(saved.blurRelativeThreshold).toBeCloseTo(0.35, 6);
+      expect(saved.minMeanLuminance).toBeCloseTo(25, 6);
+    });
+
+    it('disables the threshold sliders when the gate (or capture) is off', () => {
+      const imagesEnabled = document.getElementById(
+        'images-enabled'
+      ) as HTMLInputElement;
+      const qualityFilter = document.getElementById(
+        'images-quality-filter'
+      ) as HTMLInputElement;
+      const blur = document.getElementById(
+        'images-blur-threshold'
+      ) as HTMLInputElement;
+      const luma = document.getElementById(
+        'images-min-luminance'
+      ) as HTMLInputElement;
+
+      // Gate off (the default) → sliders disabled.
+      expect(blur.disabled).toBe(true);
+      expect(luma.disabled).toBe(true);
+
+      // Gate on → sliders enabled.
+      qualityFilter.checked = true;
+      qualityFilter.dispatchEvent(new Event('change'));
+      expect(blur.disabled).toBe(false);
+      expect(luma.disabled).toBe(false);
+
+      // Capture off overrides → sliders disabled regardless of the gate.
+      imagesEnabled.checked = false;
+      imagesEnabled.dispatchEvent(new Event('change'));
+      expect(blur.disabled).toBe(true);
+      expect(luma.disabled).toBe(true);
+    });
+  });
+
   describe('live debug-overlay toggles (Finding B)', () => {
     // Why these tests matter: each toggle gates a live overlay (frame tiles,
     // occupancy cubes, GPS+VIO alignment spheres, compass cubes). All four
@@ -601,6 +878,92 @@ describe('settings-modal', () => {
       showSettingsModal();
 
       const cb = document.getElementById(id) as HTMLInputElement | null;
+      expect(cb?.checked).toBe(false);
+    });
+  });
+
+  describe('compass alignment toggles (Phase-4)', () => {
+    // Why: the three compass alignment flags must round-trip through the settings
+    // UI (populate from saved options + persist a change). Stage 0
+    // (coldStartOverride) is a default-ON feature; Stage C + the consistency gate
+    // stay experimental (default OFF) so a stray persisted value can't silently
+    // enable them.
+    const COMPASS_IDS = [
+      ['compass-cold-start-override', 'coldStartOverride'],
+      ['compass-rotation-prior', 'rotationPrior'],
+      ['compass-webxr-consistency', 'webXRConsistency'],
+    ] as const;
+
+    const COMPASS_DEFAULT_CHECKED: Record<
+      (typeof COMPASS_IDS)[number][1],
+      boolean
+    > = {
+      coldStartOverride: true,
+      rotationPrior: false,
+      webXRConsistency: false,
+    };
+
+    it('default checkbox states match the per-flag defaults (Stage 0 on, others off)', () => {
+      initSettingsModal();
+      showSettingsModal();
+      for (const [id, key] of COMPASS_IDS) {
+        const cb = document.getElementById(id) as HTMLInputElement | null;
+        expect(cb, id).not.toBeNull();
+        expect(cb!.checked, id).toBe(COMPASS_DEFAULT_CHECKED[key]);
+      }
+    });
+
+    it.each(COMPASS_IDS)(
+      'persists a toggle of %s independently of the other flags',
+      (id, key) => {
+        initSettingsModal();
+        showSettingsModal();
+
+        const cb = document.getElementById(id) as HTMLInputElement;
+        const target = !COMPASS_DEFAULT_CHECKED[key];
+        expect(cb.checked).toBe(COMPASS_DEFAULT_CHECKED[key]);
+        cb.checked = target;
+        cb.dispatchEvent(new Event('change'));
+
+        document.getElementById('btn-settings-save')?.click();
+
+        const saved = loadRecordingOptions().compassDebug;
+        expect(saved[key]).toBe(target);
+        // The other compass flags stay at their defaults — toggles are independent.
+        for (const [otherId, otherKey] of COMPASS_IDS) {
+          if (otherKey === key) continue;
+          expect(saved[otherKey], otherId).toBe(
+            COMPASS_DEFAULT_CHECKED[otherKey]
+          );
+        }
+      }
+    );
+
+    it.each(COMPASS_IDS)('populates %s from a saved ON value', (id, key) => {
+      localStorageMock.getItem.mockReturnValueOnce(
+        JSON.stringify({ compassDebug: { [key]: true } })
+      );
+
+      initSettingsModal();
+      showSettingsModal();
+
+      const cb = document.getElementById(id) as HTMLInputElement | null;
+      expect(cb?.checked).toBe(true);
+    });
+
+    it('populates compass-cold-start-override UNCHECKED from a saved OFF value (opt-out round-trip)', () => {
+      // The recorder off-toggle: a persisted coldStartOverride:false must survive
+      // load → populate as an unchecked box so the operator can disable Stage 0.
+      localStorageMock.getItem.mockReturnValueOnce(
+        JSON.stringify({ compassDebug: { coldStartOverride: false } })
+      );
+
+      initSettingsModal();
+      showSettingsModal();
+
+      const cb = document.getElementById(
+        'compass-cold-start-override'
+      ) as HTMLInputElement | null;
       expect(cb?.checked).toBe(false);
     });
   });
@@ -852,6 +1215,21 @@ describe('settings-modal', () => {
 
       expect(valueDisplay?.textContent).toBe('5 cm');
       expect(getWorkingOptions()?.occupancy.cellSizeM).toBeCloseTo(0.05);
+    });
+
+    it('updates the noise-filter (min-confidence) working option', () => {
+      const slider = document.getElementById(
+        'occupancy-min-confidence'
+      ) as HTMLInputElement;
+      const valueDisplay = document.getElementById(
+        'occupancy-min-confidence-value'
+      );
+
+      slider.value = '6';
+      slider.dispatchEvent(new Event('input'));
+
+      expect(valueDisplay?.textContent).toBe('6');
+      expect(getWorkingOptions()?.occupancy.minConfidence).toBe(6);
     });
   });
 

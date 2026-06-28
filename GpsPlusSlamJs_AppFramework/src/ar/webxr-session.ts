@@ -25,6 +25,7 @@ import {
   type ImageCaptureCallbacks,
   type CapturedImage,
   type CapturedFrame,
+  type FrameQualityVerdict,
   type ImageCaptureConfig,
   DEFAULT_CAPTURE_CONFIG,
 } from './image-capture';
@@ -301,6 +302,17 @@ let onSuspiciousImage: ((blobSize: number, frameIndex: number) => void) | null =
  * Screen rotation getter (set via setImageCaptureCallback)
  */
 let getScreenRotation: (() => number) | null = null;
+
+/**
+ * Off-thread image-quality analyzer (set via {@link setImageQualityAnalyzer}).
+ * Device-specific (a Web Worker in the recorder), so it is INJECTED rather than
+ * built here. Forwarded to `ImageCaptureManager` as its `analyzeFrame` callback;
+ * the manager only invokes it when `config.qualityFilter.enabled`. `null` ⇒ the
+ * legacy save-immediately path.
+ */
+let imageQualityAnalyzer:
+  | ((frame: CapturedFrame) => Promise<FrameQualityVerdict>)
+  | null = null;
 
 /**
  * Redux store injected by the host (`setTrackingStore`). When present
@@ -1448,6 +1460,21 @@ export function setImageCaptureCallback(
 }
 
 /**
+ * Inject (or clear) the off-thread image-quality analyzer used by the blur/
+ * blackness drop+retry gate. Pass the recorder's Web Worker-backed analyzer to
+ * enable the gate, or `null` to clear it (legacy save-immediately path). Must be
+ * set BEFORE {@link startImageCapture} for the active recording — the manager
+ * reads it once when constructed. The analyzer only runs when the capture
+ * config's `qualityFilter.enabled` is true, so injecting it is harmless when the
+ * gate is off. Ownership/disposal of the worker is the caller's responsibility.
+ */
+export function setImageQualityAnalyzer(
+  analyzer: ((frame: CapturedFrame) => Promise<FrameQualityVerdict>) | null
+): void {
+  imageQualityAnalyzer = analyzer;
+}
+
+/**
  * Start capturing images during recording.
  * Must call setImageCaptureCallback first.
  *
@@ -1485,6 +1512,9 @@ export function startImageCapture(config?: Partial<ImageCaptureConfig>): void {
     onCaptured: onImageCaptured,
     onCaptureFailed: onCaptureFailed ?? undefined,
     onSuspiciousImage: onSuspiciousImage ?? undefined,
+    // Off-thread blur/blackness gate (no-op unless qualityFilter.enabled). The
+    // manager calls this after a motion-calm frame is encoded.
+    analyzeFrame: imageQualityAnalyzer ?? undefined,
   };
 
   // Merge provided config with defaults up front so the blit pipeline and

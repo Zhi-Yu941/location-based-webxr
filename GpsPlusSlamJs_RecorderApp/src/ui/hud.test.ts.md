@@ -104,20 +104,17 @@ Tests callback invocation and transition handling.
 
 Tests the tracking quality badge and detail panel rendering.
 
-| Test                                                  | Why It Matters                                                   |
-| ----------------------------------------------------- | ---------------------------------------------------------------- |
-| shows state label for each TrackingQualityState       | Verifies all 4 state labels render correctly                     |
-| applies correct color class for each state            | Color-coded state feedback (green/yellow/gray/red)               |
-| shows confidence as percentage                        | Converts 0..1 float to "XX%" string                              |
-| populates all five sub-scores                         | Detail panel shows convergence, residual, compass, GPS, coverage |
-| populates diagnostic fields                           | Observation count, walked distance, heading delta                |
-| shows COMPASS DRIFT when detected                     | Red warning text for compass drift diagnostic                    |
-| hides COMPASS DRIFT when not detected                 | Clears text when drift resolves                                  |
-| handles null sub-scores as n/a                        | Graceful display when a sub-score is not yet available           |
-| no-op when tracking-quality container is missing      | Graceful degradation if HTML element absent                      |
-| handles null headingDeltaDeg                          | Displays "n/a" when heading delta not yet computed               |
-| re-attaches click listener when badge element changes | Ensures tap-to-expand works across DOM rebuilds                  |
-| resets expanded state when badge element changes      | Clean slate after DOM rebuild prevents stale expansion state     |
+| Test                                                  | Why It Matters                                               |
+| ----------------------------------------------------- | ------------------------------------------------------------ |
+| shows state label for each TrackingQualityState       | Verifies all 4 state labels render correctly                 |
+| applies correct color class for each state            | Color-coded state feedback (green/yellow/gray/red)           |
+| shows confidence as percentage                        | Converts 0..1 float to "XX%" string                          |
+| populates sub-score values in detail panel            | Detail panel shows convergence, residual, GPS, coverage      |
+| renders ΣΔrot and ΣΔpos sums from diagnostics         | Finding 6 raw alignment-motion sums next to Conv:            |
+| does not render compass, heading, obs, or walked      | Guards the HUD pruning so a careless re-add is caught        |
+| no-op when tracking-quality container is missing      | Graceful degradation if HTML element absent                  |
+| re-attaches click listener when badge element changes | Ensures tap-to-expand works across DOM rebuilds              |
+| resets expanded state when badge element changes      | Clean slate after DOM rebuild prevents stale expansion state |
 
 ### Tracking quality badge tap to expand/collapse
 

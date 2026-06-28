@@ -290,8 +290,10 @@ vi.mock('gps-plus-slam-app-framework/state/recording-options', () => ({
   loadRecordingOptions: vi.fn().mockReturnValue({
     qr: { enabled: false, intervalMs: 125, captureSize: 1024 },
     images: { enabled: false, intervalMs: 1000, quality: 0.8 },
-    depth: { enabled: false, intervalMs: 1000 },
-    occupancy: { cellSizeM: 0.15 },
+    // Deliberately NOT the 1000 ms hardcoded default — proves the cube
+    // refresh throttle is sourced from depth.intervalMs, not the fallback.
+    depth: { enabled: false, intervalMs: 500 },
+    occupancy: { cellSizeM: 0.15, minConfidence: 3 },
     frameTileDisplay: { divisor: 2 },
     visualization: {
       frameTiles: true,
@@ -463,7 +465,12 @@ describe('Occupancy-grid cube wiring in live AR', () => {
     // grid's cells are raw-WebXR coordinates that only register with the
     // real world when they ride the alignment matrix like the camera does
     // (port plan Iter 7 reparenting fix).
-    expect(mockVisualizerCtor).toHaveBeenCalledWith(mockGetArWorldGroup());
+    // arWorldGroup as parent, plus the noise filter forwarded from the
+    // recorder setting (occupancy.minConfidence → visualizer.minObservations,
+    // 2026-06-22 behind-surface-noise plan).
+    expect(mockVisualizerCtor).toHaveBeenCalledWith(mockGetArWorldGroup(), {
+      minObservations: 3,
+    });
     expect(mockVisualizerCtor).not.toHaveBeenCalledWith(mockGetScene());
     expect(mockWireOccupancyGridSubscribers).toHaveBeenCalledTimes(1);
 
@@ -471,10 +478,16 @@ describe('Occupancy-grid cube wiring in live AR', () => {
       storeRef: unknown;
       grid: unknown;
       visualizer: unknown;
+      refreshIntervalMs: unknown;
     };
     expect(options.grid).toBe(mockOccupancyGridInstance);
     expect(options.visualizer).toBe(mockVisualizerInstance);
     expect(options.storeRef).toBeDefined();
+    // Issue A (2026-06-22 cube cadence/locality plan §2): the cube-refresh
+    // throttle is wired from depth.intervalMs (500 ms in the mock), not the
+    // visualizer's hardcoded 1000 ms fallback. This pins the one thing that
+    // can silently regress — the call site dropping the option again.
+    expect(options.refreshIntervalMs).toBe(500);
   });
 
   it('resetMainState disposes the wiring and the visualizer', async () => {

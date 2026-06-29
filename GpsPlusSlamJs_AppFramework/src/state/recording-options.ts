@@ -173,6 +173,19 @@ export interface OccupancyOptions {
    * `GpsPlusSlamJs_Docs/docs/2026-06-22-occupancy-grid-behind-surface-noise-plan.md`.
    */
   minConfidence: number;
+  /**
+   * Render a **persistent depth-only occlusion mesh** of the occupancy grid:
+   * the grid's occupied cells are meshed (`meshOccupiedCells`) and drawn
+   * invisible-but-depth-writing under `arWorldGroup`, so real geometry the
+   * camera saw earlier hides virtual objects placed behind it — including
+   * out-of-view surfaces a live depth occluder cannot remember. Default
+   * **false**: it is an extra GPU/CPU cost, and on-device verification that the
+   * persisted occluder helps (vs. drifting out of registration as alignment
+   * updates) is still pending. Read once when the mesh is wired (Enter-AR /
+   * replay load), like the other occupancy knobs. See
+   * `GpsPlusSlamJs_Docs/docs/2026-06-13-occupancy-mesh-options-plan.md`.
+   */
+  occlusionMeshEnabled: boolean;
 }
 
 /**
@@ -324,6 +337,7 @@ export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
   occupancy: {
     cellSizeM: 0.15, // 15 cm voxels — matches OccupancyGrid's own default (Unity parity)
     minConfidence: 3, // ≥3 observations to render a voxel — filters single-frame depth noise (1 = legacy/unfiltered)
+    occlusionMeshEnabled: false, // persistent depth-only occluder OFF by default (extra cost; on-device gate pending)
   },
   frameTileDisplay: {
     // Half-resolution display texture by default (D7): a noticeable per-tile
@@ -782,6 +796,10 @@ export function validateOccupancyOptions(
       OCCUPANCY_CONSTRAINTS.minConfidence.min,
       OCCUPANCY_CONSTRAINTS.minConfidence.max
     ),
+    occlusionMeshEnabled:
+      typeof options.occlusionMeshEnabled === 'boolean'
+        ? options.occlusionMeshEnabled
+        : defaults.occlusionMeshEnabled,
   };
 }
 

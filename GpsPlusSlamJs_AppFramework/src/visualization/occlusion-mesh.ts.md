@@ -1,0 +1,49 @@
+# occlusion-mesh.ts
+
+## Purpose
+
+Reusable THREE adapter that turns the pure {@link meshOccupiedCells} output into
+a **persistent depth-only occlusion mesh** of the occupancy grid: an invisible
+`THREE.Mesh` that writes depth but no color, drawn before virtual content, so
+real geometry the camera saw earlier hides virtual objects placed behind it
+(including out-of-view surfaces a live depth occluder cannot remember). Lives in
+the framework so every consumer app (AnchorStarter / MinimalExample / recorder)
+can use it; the recorder owns only the off-by-default toggle + scene wiring. See
+`GpsPlusSlamJs_Docs/docs/2026-06-13-occupancy-mesh-options-plan.md` §4.
+
+## Public API
+
+- `new OcclusionMesh(arSpaceNode: THREE.Object3D, options?: OcclusionMeshOptions)`
+  - `arSpaceNode` — the AR-odometry-NUE node that receives the alignment matrix (`arWorldGroup` live, `replaySceneState.arWorldGroup` in replay). The mesh is added to it on construction.
+  - `options.greedy` — merge coplanar faces (default **true**; the occluder is invisible so coarser triangulation is free).
+  - `options.renderOrder` — depth-only draw order (default **−1**, before virtual content ≥ 0).
+- `update(cells: Iterable<GridCell>, cellSizeM: number): void` — re-mesh from a fresh snapshot (pass `grid.getOccupiedCells(occupancy.minConfidence)`); disposes the previous geometry.
+- `getTriangleCount(): number` — triangles currently drawn.
+- `getAabbs(): readonly Aabb[]` — the AABB list from the last `update` (physics-export hook).
+- `clear(): void` — empty the geometry; node stays attached (e.g. on store swap).
+- `dispose(): void` — detach the mesh and free GPU resources; idempotent; `update` is a no-op afterwards.
+
+## Invariants & assumptions
+
+- **Depth-only material:** `MeshBasicMaterial({ colorWrite: false, depthWrite: true })`. This is what makes it occlude rather than render — a visible/transparent material would not write depth and would not occlude.
+- **Basis:** the mesh's local matrix is `WEBXR_TO_NUE` (`matrixAutoUpdate = false`), identical to `OccupancyCubesVisualizer`, so raw-WebXR positions ride the parent's `alignment × WEBXR_TO_NUE` chain. Parenting at the scene root would leave it axis-swapped/unaligned.
+- **`frustumCulled = false`** — the surface spans the whole room.
+- **Full rebuild:** `update` re-meshes the entire snapshot and swaps the geometry. The chunked dirty-remesh perf layer (plan §7) is a follow-on; throttle `update` at the call site (the recorder reuses the cubes' `wireOccupancyGridSubscribers` cadence).
+- **Greedy default + T-junctions:** greedy merge is on by default; its T-junctions are harmless for a depth-only occluder (see `occupancy-mesher.ts.md`).
+
+## Examples
+
+```ts
+import { OcclusionMesh } from 'gps-plus-slam-app-framework/visualization';
+
+const occluder = new OcclusionMesh(arWorldGroup); // greedy depth-only, renderOrder −1
+// each refresh (throttled), from the same snapshot the cubes use:
+occluder.update(grid.getOccupiedCells(occupancy.minConfidence), grid.cellSizeM);
+// later:
+occluder.dispose();
+```
+
+## Tests
+
+- `occlusion-mesh.test.ts` — depth-only material (colorWrite false / depthWrite true), negative renderOrder, WEBXR_TO_NUE local matrix, empty-until-update, single-voxel → 12 tris, greedy slab reduction (12 vs 140 tris) with AABBs unchanged, `clear` empties but keeps node, `dispose` detaches + idempotent.
+- Geometry counts rely on the proven `meshOccupiedCells` invariants (`occupancy-mesher.*.test.ts`); on-device occlusion correctness is the separate gate (plan §4).

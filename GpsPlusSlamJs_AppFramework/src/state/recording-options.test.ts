@@ -427,6 +427,31 @@ describe('recording-options', () => {
         }).minConfidence
       ).toBe(DEFAULT_RECORDING_OPTIONS.occupancy.minConfidence);
     });
+
+    /**
+     * Why these matter (2026-06-13-occupancy-mesh-options-plan.md): the
+     * persistent occluder is an extra-cost, on-device-gated feature, so it must
+     * default OFF and round-trip as a boolean — a corrupted stored value must
+     * not silently switch it on.
+     */
+    it('defaults occlusionMeshEnabled to false for an empty object', () => {
+      expect(validateOccupancyOptions({}).occlusionMeshEnabled).toBe(false);
+    });
+
+    it('preserves a boolean occlusionMeshEnabled', () => {
+      expect(
+        validateOccupancyOptions({ occlusionMeshEnabled: true })
+          .occlusionMeshEnabled
+      ).toBe(true);
+    });
+
+    it('falls back to the default for a non-boolean occlusionMeshEnabled', () => {
+      expect(
+        validateOccupancyOptions({
+          occlusionMeshEnabled: 'yes' as unknown as boolean,
+        }).occlusionMeshEnabled
+      ).toBe(DEFAULT_RECORDING_OPTIONS.occupancy.occlusionMeshEnabled);
+    });
   });
 
   describe('validateFrameTileDisplayOptions', () => {
@@ -1256,7 +1281,11 @@ describe('recording-options', () => {
           qualityFilter: { ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter },
         },
         arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
-        occupancy: { cellSizeM: 0.1, minConfidence: 3 },
+        occupancy: {
+          cellSizeM: 0.1,
+          minConfidence: 3,
+          occlusionMeshEnabled: true,
+        },
         frameTileDisplay: { divisor: 4 },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
         qr: { ...DEFAULT_RECORDING_OPTIONS.qr },

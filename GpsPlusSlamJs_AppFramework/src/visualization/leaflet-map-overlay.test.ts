@@ -1007,4 +1007,129 @@ describe('LeafletMapOverlay', () => {
       document.body.removeChild(customRoot);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // 11. Heading-up rotation (2026-06-29 plan)
+  // ---------------------------------------------------------------------------
+
+  describe('heading-up rotation', () => {
+    /**
+     * The map's north edge (local +Y) in world space. At the north-up baseline
+     * (tilt only) it points world −Z; a heading H yaws it to (sin H, 0, −cos H).
+     * Tests assert on this direction so they exercise the real CSS3DObject
+     * orientation, not internal state.
+     */
+    function northEdge(obj: THREE.Object3D): THREE.Vector3 {
+      return new THREE.Vector3(0, 1, 0).applyQuaternion(obj.quaternion);
+    }
+
+    function sampleMapData(): MapData {
+      return {
+        userPosition: { lat: 50.0, lng: 8.0 },
+        rawGpsPath: [{ lat: 50.0, lng: 8.0 }],
+        fusedPath: [],
+        alignmentSnapshots: [],
+      };
+    }
+
+    function showOverlayWithParent(headingUp: boolean) {
+      const scene = createScene();
+      const camera = createCamera();
+      const parent = new THREE.Object3D();
+      const overlay = new LeafletMapOverlay(scene, camera, {
+        mapParent: parent,
+        headingUp,
+      });
+      overlay.setGpsPosition(50.0, 8.0);
+      overlay.show();
+      return { overlay, parent };
+    }
+
+    // Why: default is north-up — a head turn must NOT rotate the map unless the
+    // operator opted in. The CSS3DObject keeps the baseline tilt regardless of
+    // the heading carried by MapData.
+    it('stays north-up (no yaw) when heading-up is disabled (default)', () => {
+      const { overlay, parent } = showOverlayWithParent(false);
+      overlay.render({ ...sampleMapData(), userHeadingDeg: 90 });
+      overlay.updatePosition(1);
+
+      const edge = northEdge(parent.children[0]);
+      expect(edge.x).toBeCloseTo(0, 5);
+      expect(edge.y).toBeCloseTo(0, 5);
+      expect(edge.z).toBeCloseTo(-1, 5);
+      overlay.dispose();
+    });
+
+    // Why: with heading-up on, the map's north edge must rotate to the user's
+    // heading (90° → world +X), so the heading points "up" on the minimap.
+    it('rotates the map to the user heading when enabled (90° → +X)', () => {
+      const { overlay, parent } = showOverlayWithParent(true);
+      overlay.render({ ...sampleMapData(), userHeadingDeg: 90 });
+      overlay.updatePosition(1); // first sample snaps to target
+
+      const edge = northEdge(parent.children[0]);
+      expect(edge.x).toBeCloseTo(1, 5);
+      expect(edge.y).toBeCloseTo(0, 5);
+      expect(edge.z).toBeCloseTo(0, 5);
+      overlay.dispose();
+    });
+
+    // Why: when the heading becomes undefined (camera near-vertical), the map
+    // must HOLD its last orientation, not snap back to north (which would look
+    // like a glitch every time the user tilts the phone up).
+    it('holds the last orientation when the target heading becomes null', () => {
+      const { overlay, parent } = showOverlayWithParent(true);
+      overlay.render({ ...sampleMapData(), userHeadingDeg: 90 });
+      overlay.updatePosition(1);
+
+      // Heading now undefined.
+      overlay.render({ ...sampleMapData(), userHeadingDeg: null });
+      overlay.updatePosition(1);
+
+      const edge = northEdge(parent.children[0]);
+      expect(edge.x).toBeCloseTo(1, 5); // still at the 90° orientation
+      expect(edge.z).toBeCloseTo(0, 5);
+      overlay.dispose();
+    });
+
+    // Why: the cadence decision (2026-06-29) is "snap the first sample, then
+    // lerp toward subsequent ~1 Hz targets each frame". A small dt must move
+    // the map only PART of the way to the new target, not jump to it.
+    it('snaps the first sample then lerps partway toward a new target', () => {
+      const { overlay, parent } = showOverlayWithParent(true);
+      overlay.render({ ...sampleMapData(), userHeadingDeg: 0 });
+      overlay.updatePosition(0.001); // snap to 0° (north-up edge = −Z)
+
+      const snapped = northEdge(parent.children[0]);
+      expect(snapped.x).toBeCloseTo(0, 4);
+      expect(snapped.z).toBeCloseTo(-1, 4);
+
+      // New target 90°, one short (60 fps) frame: edge should move toward +X
+      // but not reach it.
+      overlay.render({ ...sampleMapData(), userHeadingDeg: 90 });
+      overlay.updatePosition(0.016);
+
+      const partway = northEdge(parent.children[0]);
+      expect(partway.x).toBeGreaterThan(0);
+      expect(partway.x).toBeLessThan(1); // has NOT snapped to the target
+      expect(partway.z).toBeGreaterThan(-1);
+      expect(partway.z).toBeLessThan(0);
+      overlay.dispose();
+    });
+
+    // Why: toggling the flag off mid-session must return the map to north-up
+    // immediately (operator turned it off in settings → next Enter-AR / runtime).
+    it('snaps back to north-up when disabled at runtime', () => {
+      const { overlay, parent } = showOverlayWithParent(true);
+      overlay.render({ ...sampleMapData(), userHeadingDeg: 90 });
+      overlay.updatePosition(1);
+      expect(northEdge(parent.children[0]).x).toBeCloseTo(1, 5);
+
+      overlay.setHeadingUpEnabled(false);
+      const edge = northEdge(parent.children[0]);
+      expect(edge.x).toBeCloseTo(0, 5);
+      expect(edge.z).toBeCloseTo(-1, 5);
+      overlay.dispose();
+    });
+  });
 });

@@ -1367,7 +1367,7 @@ async function handleEnterAR(): Promise<void> {
       }
 
       if (mapOverlay?.isVisible()) {
-        mapOverlay.updatePosition();
+        mapOverlay.updatePosition(dt);
       }
     });
 
@@ -1520,6 +1520,9 @@ function handleToggleMap(): void {
 
     mapOverlay = new LeafletMapOverlay(scene, camera, {
       mapParent: cameraFollower?.object3D,
+      // Heading-up minimap rotation: live-only preference (default on), read
+      // here at overlay creation. Replay keeps north-up. See the 2026-06-29 plan.
+      headingUp: recordingOptions.visualization.headingUpMap,
     });
     log.info('Map overlay created lazily on first toggle');
   }

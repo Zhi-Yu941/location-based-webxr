@@ -540,10 +540,11 @@ describe('recording-options', () => {
      * Why these tests matter (Finding B / DB-1b of
      * 2026-06-14-followup-frame-tile-legacy-aspect-and-live-toggle.md): the new
      * `visualization` group gates the four live debug overlays (frame tiles,
-     * occupancy cubes, GPS+VIO alignment markers, compass cubes). All four MUST
-     * default ON so the change is purely additive (no behaviour change), and
-     * each field is validated boolean-or-default — a corrupted or pre-feature
-     * persisted value must fall back to ON, never silently disable an overlay.
+     * occupancy cubes, GPS+VIO alignment markers, compass cubes) plus the
+     * heading-up minimap preference (2026-06-29). All MUST default ON so the
+     * change is purely additive (no behaviour change), and each field is
+     * validated boolean-or-default — a corrupted or pre-feature persisted value
+     * must fall back to ON, never silently disable a feature.
      */
     it('returns all-true defaults when given empty object', () => {
       const result = validateVisualizationOptions({});
@@ -553,6 +554,7 @@ describe('recording-options', () => {
         occupancyCubes: true,
         gpsAlignmentMarkers: true,
         compassCubes: true,
+        headingUpMap: true,
       });
     });
 
@@ -562,12 +564,14 @@ describe('recording-options', () => {
         occupancyCubes: false,
         gpsAlignmentMarkers: false,
         compassCubes: false,
+        headingUpMap: false,
       });
       expect(result).toEqual({
         frameTiles: false,
         occupancyCubes: false,
         gpsAlignmentMarkers: false,
         compassCubes: false,
+        headingUpMap: false,
       });
     });
 
@@ -587,9 +591,14 @@ describe('recording-options', () => {
           gpsAlignmentMarkers: null as unknown as boolean,
         }).gpsAlignmentMarkers
       ).toBe(true);
+      // A pre-feature persisted value (heading-up flag absent) falls back to ON.
+      expect(validateVisualizationOptions({}).headingUpMap).toBe(true);
       // A genuine false must survive (not be treated as "missing").
       expect(
         validateVisualizationOptions({ compassCubes: false }).compassCubes
+      ).toBe(false);
+      expect(
+        validateVisualizationOptions({ headingUpMap: false }).headingUpMap
       ).toBe(false);
     });
   });
@@ -1150,6 +1159,7 @@ describe('recording-options', () => {
         occupancyCubes: true,
         gpsAlignmentMarkers: true,
         compassCubes: true,
+        headingUpMap: true,
       });
     });
   });

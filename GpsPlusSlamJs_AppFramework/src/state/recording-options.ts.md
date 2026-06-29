@@ -14,7 +14,7 @@ User-configurable recording options for controlling high-frequency data streams 
 | `ImageCaptureOptions`     | Config for image capture: `enabled`, `intervalMs`, `quality`, `resolutionDivisor`, `motionFilter` (nested blurry-frame gate, see `ar/capture-motion-gate.ts`), `qualityFilter` (nested blur/blackness gate, see `ar/image-quality.ts`) |
 | `OccupancyOptions`        | Config for the derived occupancy grid: `cellSizeM` (voxel edge length, metres), `minConfidence` (noise filter, min observations to render)                                                                                             |
 | `FrameTileDisplayOptions` | Frame-tile display-texture resolution: `divisor` (1=full…8=eighth, default 2). Display-only, distinct from capture                                                                                                                     |
-| `VisualizationOptions`    | Live debug-overlay toggles: `frameTiles`, `occupancyCubes`, `gpsAlignmentMarkers`, `compassCubes` (all default ON)                                                                                                                     |
+| `VisualizationOptions`    | Live overlay/map toggles: `frameTiles`, `occupancyCubes`, `gpsAlignmentMarkers`, `compassCubes`, `headingUpMap` (rotate minimap to user heading) — all default ON; live-only, never affect replay                                      |
 | `QrCaptureOptions`        | Live QR detection + RAW recording: `enabled` (default **OFF**, opt-in), `intervalMs`, `captureSize`                                                                                                                                    |
 | `RecordingOptions`        | Combined config: `depth`, `images`, `arCrashIsolation`, `occupancy`, `frameTileDisplay`, `visualization`, `qr`                                                                                                                         |
 
@@ -67,7 +67,7 @@ User-configurable recording options for controlling high-frequency data streams 
             qualityFilter: { enabled: false, blurRelativeThreshold: 0.5, minMeanLuminance: 10, maxWaitMs: 4000 } },
   occupancy: { cellSizeM: 0.15, minConfidence: 3 },
   frameTileDisplay: { divisor: 2 },
-  visualization: { frameTiles: true, occupancyCubes: true, gpsAlignmentMarkers: true, compassCubes: true },
+  visualization: { frameTiles: true, occupancyCubes: true, gpsAlignmentMarkers: true, compassCubes: true, headingUpMap: true },
   qr: { enabled: false, intervalMs: 125, captureSize: 1024 }
 }
 ```

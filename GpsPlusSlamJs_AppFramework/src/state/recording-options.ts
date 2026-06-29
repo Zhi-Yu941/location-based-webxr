@@ -219,6 +219,14 @@ export interface VisualizationOptions {
   gpsAlignmentMarkers: boolean;
   /** N/E/S/W compass orientation cubes (`createGpsCompassCubes`). Default: true */
   compassCubes: boolean;
+  /**
+   * Rotate the live in-AR minimap so the user's view direction always points
+   * up/forward (heading-up) instead of fixed north-up. Unlike the other flags
+   * in this group this is a map-orientation preference, not a show/hide — but it
+   * shares their live-only semantics (read at Enter-AR, never affects replay).
+   * Default: true. See the 2026-06-29 heading-up plan.
+   */
+  headingUpMap: boolean;
 }
 
 /**
@@ -329,6 +337,8 @@ export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
     occupancyCubes: true,
     gpsAlignmentMarkers: true,
     compassCubes: true,
+    // Heading-up minimap ON by default in live (2026-06-29 user decision).
+    headingUpMap: true,
   },
   qr: {
     // OFF by default (§0): QR capture/detection is opt-in so existing
@@ -535,6 +545,10 @@ export function validateVisualizationOptions(
       typeof options.compassCubes === 'boolean'
         ? options.compassCubes
         : defaults.compassCubes,
+    headingUpMap:
+      typeof options.headingUpMap === 'boolean'
+        ? options.headingUpMap
+        : defaults.headingUpMap,
   };
 }
 

@@ -19,3 +19,28 @@ export const DEFAULT_LERP_RATE = 8;
 export function clampedAlpha(lerpRate: number, dt: number): number {
   return Math.min(lerpRate * dt, 1.0);
 }
+
+/**
+ * Interpolate between two angles (degrees) along the SHORTEST arc.
+ *
+ * Used by the heading-up minimap to smooth the map's yaw toward a ~1 Hz target
+ * heading every frame without spinning the long way across the 0°/360° seam
+ * (e.g. 350° → 10° goes +20° through 0°, not −340° through 180°).
+ *
+ * @param current Current angle in degrees (any range; normalized internally).
+ * @param target  Target angle in degrees (any range).
+ * @param alpha   Interpolation factor — 0 returns `current`, 1 returns `target`.
+ *                Values outside [0, 1] extrapolate; callers should clamp (see
+ *                {@link clampedAlpha}).
+ * @returns The interpolated angle normalized to `[0, 360)`.
+ */
+export function lerpAngleDeg(
+  current: number,
+  target: number,
+  alpha: number
+): number {
+  // Shortest signed delta in (−180, 180].
+  const delta = ((((target - current) % 360) + 540) % 360) - 180;
+  const result = current + delta * alpha;
+  return ((result % 360) + 360) % 360;
+}

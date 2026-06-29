@@ -7,7 +7,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { DEFAULT_LERP_RATE, clampedAlpha } from './lerp-utils';
+import fc from 'fast-check';
+import { DEFAULT_LERP_RATE, clampedAlpha, lerpAngleDeg } from './lerp-utils';
 
 describe('lerp-utils', () => {
   describe('DEFAULT_LERP_RATE', () => {
@@ -34,6 +35,69 @@ describe('lerp-utils', () => {
 
     it('returns 0 when dt is 0', () => {
       expect(clampedAlpha(8, 0)).toBe(0);
+    });
+  });
+
+  // Why this matters: the heading-up minimap (2026-06-29 plan) interpolates the
+  // map's yaw toward a ~1 Hz target every frame. A naive numeric lerp would spin
+  // the "long way" across the 0°/360° seam (e.g. 350°→10° going down through
+  // 180°). lerpAngleDeg must always take the shortest arc and stay in [0, 360).
+  describe('lerpAngleDeg', () => {
+    it('returns the (normalized) current value at alpha 0', () => {
+      expect(lerpAngleDeg(350, 10, 0)).toBeCloseTo(350, 6);
+    });
+
+    it('returns the (normalized) target value at alpha 1', () => {
+      expect(lerpAngleDeg(350, 10, 1)).toBeCloseTo(10, 6);
+    });
+
+    it('takes the SHORT arc across the 360°/0° seam (350°→10° via 0°)', () => {
+      // Shortest path 350°→10° is +20° (through 0°), so the midpoint is 0°,
+      // NOT 180° (the long way).
+      expect(lerpAngleDeg(350, 10, 0.5)).toBeCloseTo(0, 6);
+    });
+
+    it('takes the short arc in the other direction (10°→350° via 0°)', () => {
+      expect(lerpAngleDeg(10, 350, 0.5)).toBeCloseTo(0, 6);
+    });
+
+    it('interpolates linearly within a non-wrapping span', () => {
+      expect(lerpAngleDeg(0, 90, 0.25)).toBeCloseTo(22.5, 6);
+    });
+
+    it('normalizes the result into [0, 360)', () => {
+      // current just below the seam, target just above → result wraps to ~0.
+      const out = lerpAngleDeg(-10, 10, 0.5);
+      expect(out).toBeGreaterThanOrEqual(0);
+      expect(out).toBeLessThan(360);
+      expect(out).toBeCloseTo(0, 6);
+    });
+
+    it('property: result is always in [0, 360) and within the short arc of both endpoints', () => {
+      expect(() =>
+        fc.assert(
+          fc.property(
+            fc.double({ min: -720, max: 720, noNaN: true }),
+            fc.double({ min: -720, max: 720, noNaN: true }),
+            fc.double({ min: 0, max: 1, noNaN: true }),
+            (current, target, alpha) => {
+              const out = lerpAngleDeg(current, target, alpha);
+              if (out < 0 || out >= 360) return false;
+              // The result must never be farther from either endpoint than the
+              // full short-arc gap between them (i.e. it stays on the short arc).
+              const shortDiff = (a: number, b: number): number => {
+                const d = (((a - b) % 360) + 360) % 360;
+                return Math.min(d, 360 - d);
+              };
+              const gap = shortDiff(current, target);
+              return (
+                shortDiff(out, current) <= gap + 1e-6 &&
+                shortDiff(out, target) <= gap + 1e-6
+              );
+            }
+          )
+        )
+      ).not.toThrow();
     });
   });
 });

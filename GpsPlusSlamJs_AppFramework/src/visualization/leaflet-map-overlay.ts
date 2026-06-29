@@ -32,6 +32,8 @@ import type { LatLong } from 'gps-plus-slam-js';
 import { VIS_COLORS } from './vis-colors';
 import type { MapData } from './map-data';
 import { drawMapData } from './map-overlay-draw';
+import { headingUpQuat } from './heading-up-rotation';
+import { clampedAlpha, DEFAULT_LERP_RATE, lerpAngleDeg } from './lerp-utils';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('LeafletMapOverlay');
@@ -103,6 +105,14 @@ export interface LeafletMapOverlayOptions {
    * pass a scoped element to avoid injecting nodes into `<body>`.
    */
   readonly offscreenRoot?: HTMLElement;
+  /**
+   * Start in heading-up mode: rotate the whole map so the user's view direction
+   * always points up/forward (car-navigation style) instead of the fixed
+   * north-up. Default `false` (north-up). Can be toggled later via
+   * {@link LeafletMapOverlay.setHeadingUpEnabled}. See the
+   * 2026-06-29 heading-up plan.
+   */
+  readonly headingUp?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -123,6 +133,15 @@ export class LeafletMapOverlay {
   private zoomLevel: number;
   private gpsPosition: LatLong | null = null;
   private visible = false;
+
+  // Heading-up rotation state. When enabled, the CSS3DObject is yawed each
+  // frame so `currentHeadingDeg` (smoothed toward the ~1 Hz `targetHeadingDeg`)
+  // points up. `null` current = not yet sampled (snap on first update); `null`
+  // target = heading undefined (hold the last orientation). See the 2026-06-29
+  // heading-up plan.
+  private headingUp: boolean;
+  private targetHeadingDeg: number | null = null;
+  private currentHeadingDeg: number | null = null;
 
   // Leaflet state
   private mapContainer: HTMLDivElement | null = null;
@@ -166,6 +185,7 @@ export class LeafletMapOverlay {
       options.tileServerUrl ?? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
     this.onTileError = options.onTileError;
     this.offscreenRoot = options.offscreenRoot ?? document.body;
+    this.headingUp = options.headingUp ?? false;
   }
 
   // -------------------------------------------------------------------------
@@ -245,6 +265,10 @@ export class LeafletMapOverlay {
    */
   render(data: MapData): void {
     this.latestMapData = data;
+    // Cache the heading-up rotation target (~1 Hz). `updatePosition` smooths
+    // the actual map yaw toward it each frame. `undefined`/absent → null = the
+    // heading is currently undefined (hold the last orientation).
+    this.targetHeadingDeg = data.userHeadingDeg ?? null;
     if (this.leafletMap) {
       this.drawTrajectory();
     }
@@ -337,12 +361,58 @@ export class LeafletMapOverlay {
   }
 
   /**
-   * No-op — kept for backward compatibility with the frame-loop call
-   * in main.ts. The CSS3DObject is a child of the parent, so Three.js
-   * scene graph propagation handles positioning automatically.
+   * Enable/disable heading-up rotation at runtime (e.g. from a settings flag
+   * read at Enter-AR). When disabled, the map snaps back to the north-up
+   * baseline immediately. Position follows the parent via the scene graph, so
+   * this only governs the in-plane yaw.
    */
-  updatePosition(): void {
-    // No-op
+  setHeadingUpEnabled(enabled: boolean): void {
+    this.headingUp = enabled;
+    if (!enabled) {
+      this.currentHeadingDeg = null;
+      // Restore the north-up baseline tilt (no yaw).
+      this.cssObject?.rotation.set(-Math.PI / 2, 0, 0);
+    }
+  }
+
+  /** Whether heading-up rotation is currently enabled. */
+  isHeadingUpEnabled(): boolean {
+    return this.headingUp;
+  }
+
+  /**
+   * Per-frame update. Positioning is handled by Three.js scene-graph
+   * propagation (the CSS3DObject is a child of the parent), so this only drives
+   * the heading-up rotation: it smooths the map's yaw toward the latest ~1 Hz
+   * `targetHeadingDeg` and applies it to the CSS3DObject. A no-op when
+   * heading-up is disabled, the map is not shown, or the heading is undefined
+   * (in which case the last orientation is held).
+   *
+   * @param dtSeconds Seconds since the previous frame (drives the smoothing
+   *   rate). Defaults to 0 — a frame with `dt = 0` makes no rotation progress.
+   */
+  updatePosition(dtSeconds = 0): void {
+    if (!this.headingUp || !this.cssObject) {
+      return;
+    }
+    const target = this.targetHeadingDeg;
+    if (target === null) {
+      // Heading undefined (e.g. camera near-vertical / before first solve):
+      // hold the current orientation rather than snapping to north.
+      return;
+    }
+    if (this.currentHeadingDeg === null) {
+      // First sample — snap so the map doesn't spin up from north on show.
+      this.currentHeadingDeg = target;
+    } else {
+      const alpha = clampedAlpha(DEFAULT_LERP_RATE, dtSeconds);
+      this.currentHeadingDeg = lerpAngleDeg(
+        this.currentHeadingDeg,
+        target,
+        alpha
+      );
+    }
+    this.cssObject.quaternion.set(...headingUpQuat(this.currentHeadingDeg));
   }
 
   // -------------------------------------------------------------------------
@@ -357,6 +427,8 @@ export class LeafletMapOverlay {
     this.latestMapData = null;
     this.trajectoryLayers = [];
     this.namedMarkers = [];
+    this.targetHeadingDeg = null;
+    this.currentHeadingDeg = null;
 
     this.cssObject = null;
 

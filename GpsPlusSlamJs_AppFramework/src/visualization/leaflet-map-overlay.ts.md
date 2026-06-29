@@ -18,16 +18,17 @@ Constructor — creates an overlay instance (does not show it yet).
 
 ### `LeafletMapOverlayOptions`
 
-| Field           | Type                       | Default         | Description                                      |
-| --------------- | -------------------------- | --------------- | ------------------------------------------------ |
-| `mapSizePx`     | `number`                   | `600`           | Pixel dimensions of the Leaflet container        |
-| `worldSize`     | `number`                   | `10`            | World-space size in meters                       |
-| `heightOffset`  | `number`                   | `-4`            | Height below parent in meters                    |
-| `zoomLevel`     | `number`                   | `17`            | Initial Leaflet zoom level                       |
-| `tileServerUrl` | `string`                   | OSM URL         | Tile server URL template                         |
-| `mapParent`     | `THREE.Object3D`           | `camera`        | Parent node for the CSS3DObject                  |
-| `onTileError`   | `(error: unknown) => void` | `undefined`     | Callback when tile loading fails (e.g., offline) |
-| `offscreenRoot` | `HTMLElement`              | `document.body` | DOM node for off-screen Leaflet container append |
+| Field           | Type                       | Default         | Description                                                             |
+| --------------- | -------------------------- | --------------- | ----------------------------------------------------------------------- |
+| `mapSizePx`     | `number`                   | `600`           | Pixel dimensions of the Leaflet container                               |
+| `worldSize`     | `number`                   | `10`            | World-space size in meters                                              |
+| `heightOffset`  | `number`                   | `-4`            | Height below parent in meters                                           |
+| `zoomLevel`     | `number`                   | `17`            | Initial Leaflet zoom level                                              |
+| `tileServerUrl` | `string`                   | OSM URL         | Tile server URL template                                                |
+| `mapParent`     | `THREE.Object3D`           | `camera`        | Parent node for the CSS3DObject                                         |
+| `onTileError`   | `(error: unknown) => void` | `undefined`     | Callback when tile loading fails (e.g., offline)                        |
+| `offscreenRoot` | `HTMLElement`              | `document.body` | DOM node for off-screen Leaflet container append                        |
+| `headingUp`     | `boolean`                  | `false`         | Start in heading-up mode (rotate the map so the user heading points up) |
 
 ### Key Methods
 
@@ -46,7 +47,9 @@ Constructor — creates an overlay instance (does not show it yet).
 | `zoomIn()`                         | Increment zoom by 1 (clamped at max)                                                                                                                                                                                                                                                                                                                                                                                                |
 | `zoomOut()`                        | Decrement zoom by 1 (clamped at min)                                                                                                                                                                                                                                                                                                                                                                                                |
 | `getLeafletMap()`                  | Returns the Leaflet `L.Map` instance or `null`                                                                                                                                                                                                                                                                                                                                                                                      |
-| `updatePosition()`                 | No-op (backward compat with frame-loop call)                                                                                                                                                                                                                                                                                                                                                                                        |
+| `setHeadingUpEnabled(enabled)`     | Enable/disable heading-up rotation at runtime. Disabling snaps the map back to the north-up baseline immediately.                                                                                                                                                                                                                                                                                                                   |
+| `isHeadingUpEnabled()`             | Whether heading-up rotation is currently enabled.                                                                                                                                                                                                                                                                                                                                                                                   |
+| `updatePosition(dtSeconds?)`       | Per-frame hook. Position follows the parent via the scene graph; this drives the heading-up rotation only — smooths the map yaw toward the latest ~1 Hz `MapData.userHeadingDeg` and applies it. No-op when heading-up is disabled, not shown, or the heading is undefined (holds the last orientation). `dtSeconds` drives the smoothing rate (default 0 = no progress).                                                           |
 | `dispose()`                        | Full cleanup — hides, destroys map, clears buffers                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ### Exported Constants
@@ -66,6 +69,7 @@ Constructor — creates an overlay instance (does not show it yet).
 - Trajectory colors (raw GPS yellow, fused cyan, snapshot red, user-position blue) live in the shared `map-overlay-draw.ts` / `VIS_COLORS` palette — the overlay no longer draws them itself.
 - CSS3DObject scale = `worldSize / mapSizePx` so the DOM map appears at the configured world size.
 - CSS3DObject is parented to `mapParent` (default: camera), positioned at `(0, heightOffset, -0.5)`, rotated `−π/2` on X to lie in the XZ plane.
+- **Heading-up rotation (2026-06-29 plan).** Off by default (north-up). When enabled, `updatePosition(dt)` smooths the map's in-plane yaw toward the latest `MapData.userHeadingDeg` (a ~1 Hz target) every frame via `lerpAngleDeg` + `clampedAlpha`, and applies `headingUpQuat` (yaw about world-up composed with the baseline tilt — see `heading-up-rotation.ts`). The first sample snaps (no spin-up from north); a `null` heading holds the last orientation; disabling restores the baseline tilt. The parent (`CameraFollower`) is rotation-identity so the yaw is about true world up. Live-only by convention (replay stays north-up). The perceived rotation **sign** is an open device spot-check (see the 2026-06-29 plan).
 
 ## Examples
 

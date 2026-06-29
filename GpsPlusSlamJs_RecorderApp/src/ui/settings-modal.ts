@@ -78,6 +78,7 @@ let vizFrameTilesCheckbox: HTMLInputElement | null = null;
 let vizOccupancyCubesCheckbox: HTMLInputElement | null = null;
 let vizGpsAlignmentMarkersCheckbox: HTMLInputElement | null = null;
 let vizCompassCubesCheckbox: HTMLInputElement | null = null;
+let vizHeadingUpMapCheckbox: HTMLInputElement | null = null;
 let compassColdStartOverrideCheckbox: HTMLInputElement | null = null;
 let compassRotationPriorCheckbox: HTMLInputElement | null = null;
 let compassWebXRConsistencyCheckbox: HTMLInputElement | null = null;
@@ -219,6 +220,9 @@ export function initSettingsModal(
   ) as HTMLInputElement;
   vizCompassCubesCheckbox = document.getElementById(
     'viz-compass-cubes'
+  ) as HTMLInputElement;
+  vizHeadingUpMapCheckbox = document.getElementById(
+    'viz-heading-up-map'
   ) as HTMLInputElement;
   compassColdStartOverrideCheckbox = document.getElementById(
     'compass-cold-start-override'
@@ -489,6 +493,13 @@ export function initSettingsModal(
     if (workingOptions && vizCompassCubesCheckbox) {
       workingOptions.visualization.compassCubes =
         vizCompassCubesCheckbox.checked;
+    }
+  });
+
+  vizHeadingUpMapCheckbox?.addEventListener('change', () => {
+    if (workingOptions && vizHeadingUpMapCheckbox) {
+      workingOptions.visualization.headingUpMap =
+        vizHeadingUpMapCheckbox.checked;
     }
   });
 
@@ -868,6 +879,9 @@ function populateForm(options: RecordingOptions): void {
   }
   if (vizCompassCubesCheckbox) {
     vizCompassCubesCheckbox.checked = options.visualization.compassCubes;
+  }
+  if (vizHeadingUpMapCheckbox) {
+    vizHeadingUpMapCheckbox.checked = options.visualization.headingUpMap;
   }
 
   // Compass alignment debug toggles (Phase-4)

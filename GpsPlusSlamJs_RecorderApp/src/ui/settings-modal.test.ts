@@ -185,16 +185,18 @@ describe('settings-modal', () => {
       expect(html).toContain('id="btn-ar-minimal-baseline"');
     });
 
-    it('includes the four live debug-overlay toggles (Finding B)', () => {
+    it('includes the live debug-overlay toggles (Finding B) + heading-up map', () => {
       // Why this test matters: the `visualization` group must be operable from
-      // the settings modal — one checkbox per live overlay, with the DB-3
-      // section heading + note so users know it is live-only.
+      // the settings modal — one checkbox per live overlay (plus the heading-up
+      // minimap preference), with the DB-3 section heading + note so users know
+      // it is live-only.
       const html = loadSettingsModalHtml();
       expect(html).toContain('Show during recording (3D debug overlays)');
       expect(html).toContain('id="viz-frame-tiles"');
       expect(html).toContain('id="viz-occupancy-cubes"');
       expect(html).toContain('id="viz-gps-alignment-markers"');
       expect(html).toContain('id="viz-compass-cubes"');
+      expect(html).toContain('id="viz-heading-up-map"');
     });
 
     it('includes "Clear Reference Point Cache" button', () => {
@@ -823,18 +825,20 @@ describe('settings-modal', () => {
   });
 
   describe('live debug-overlay toggles (Finding B)', () => {
-    // Why these tests matter: each toggle gates a live overlay (frame tiles,
-    // occupancy cubes, GPS+VIO alignment spheres, compass cubes). All four
-    // default ON (purely additive). The settings UI must round-trip each:
-    // populate from saved options and persist a change back to storage.
+    // Why these tests matter: each toggle gates a live feature (frame tiles,
+    // occupancy cubes, GPS+VIO alignment spheres, compass cubes, heading-up
+    // minimap). All default ON (purely additive). The settings UI must
+    // round-trip each: populate from saved options and persist a change back to
+    // storage.
     const TOGGLE_IDS = [
       ['viz-frame-tiles', 'frameTiles'],
       ['viz-occupancy-cubes', 'occupancyCubes'],
       ['viz-gps-alignment-markers', 'gpsAlignmentMarkers'],
       ['viz-compass-cubes', 'compassCubes'],
+      ['viz-heading-up-map', 'headingUpMap'],
     ] as const;
 
-    it('all four default to checked (ON) — purely additive', () => {
+    it('all default to checked (ON) — purely additive', () => {
       initSettingsModal();
       showSettingsModal();
 

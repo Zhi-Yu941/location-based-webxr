@@ -638,6 +638,18 @@ export interface SessionFeatureOptions {
    * existing recorder/anchor sessions are unaffected.
    */
   requestHitTest?: boolean;
+  /**
+   * Request `depth-sensing` (cpu-optimized) for the **live depth occluder**
+   * even when crash-isolation's `enableDepthSensingFeature` is off. Consumer
+   * apps (AnchorStarter / MinimalExample) want occlusion without the recorder's
+   * depth-capture wiring, so the occluder owns its own session-feature switch.
+   * Both flags resolve the **same** cpu-optimized usage — setting both is valid
+   * (no conflict, no throw): the grid sampler and the occluder are two consumers
+   * of one depth read. Default `false`.
+   *
+   * @see GpsPlusSlamJs_Docs/docs/2026-06-14-webxr-depth-occlusion-plan.md §6/§8
+   */
+  requestDepthOcclusion?: boolean;
 }
 
 /**
@@ -648,7 +660,7 @@ export interface SessionFeatureOptions {
  * @param isolationOptions - Crash-isolation diagnostic flags (DOM overlay,
  *   depth-sensing, camera-access)
  * @param sessionFeatures - Opt-in standard WebXR features that are independent
- *   of crash isolation (currently `requestHitTest`)
+ *   of crash isolation (`requestHitTest`, `requestDepthOcclusion`)
  * @returns XRSessionInit options
  * @throws Error if rootElement is null
  */
@@ -671,14 +683,27 @@ export function buildSessionOptions(
     sessionOptions.domOverlay = { root: rootElement };
   }
 
-  if (normalizedOptions.enableDepthSensingFeature) {
+  // Request depth-sensing if EITHER the recorder's depth-capture flag OR the
+  // live occluder's `requestDepthOcclusion` is set. Both resolve the same
+  // cpu-optimized stream, so they coexist — request the feature exactly once.
+  if (
+    normalizedOptions.enableDepthSensingFeature ||
+    sessionFeatures.requestDepthOcclusion
+  ) {
     optionalFeatures.push('depth-sensing');
     Object.assign(sessionOptions, {
-      // Required when requesting depth-sensing feature, otherwise Chrome/ARCore throws TypeError
-      // Note: Only 'cpu-optimized' is used to avoid a Three.js bug where glBinding.getDepthInformation()
-      // is called without null-checking glBinding when 'gpu-optimized' is active.
-      // See: https://github.com/mrdoob/three.js/issues/... (Three.js WebXRManager race condition)
-      // Our DepthSampler uses XRFrame.getDepthInformation() which works with cpu-optimized.
+      // `depthSensing` is REQUIRED whenever `depth-sensing` is requested,
+      // otherwise Chrome/ARCore throws a TypeError.
+      //
+      // We deliberately pin `cpu-optimized` as the single source of truth: the
+      // `XRCPUDepthInformation` it yields feeds BOTH the OccupancyGrid / COLMAP
+      // export (via DepthSampler.getDepthInMeters) AND the live depth occluder
+      // (which uploads the raw `data` buffer + `normDepthBufferFromNormView` /
+      // `rawValueToMeters` metadata each frame). `gpu-optimized` would surrender
+      // that CPU buffer and is therefore rejected — not (any longer) merely to
+      // dodge the old three.js `getDepthInformation` null-deref (fixed in r184),
+      // but because cpu-optimized is what every depth consumer here is built on.
+      // See 2026-06-14-webxr-depth-occlusion-plan.md §1.
       depthSensing: {
         usagePreference: ['cpu-optimized'],
         dataFormatPreference: ['luminance-alpha', 'float32'],

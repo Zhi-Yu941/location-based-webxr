@@ -239,6 +239,68 @@ describe('buildSessionOptions', () => {
 
     expect(options.optionalFeatures).toBeUndefined();
   });
+
+  /**
+   * Why these tests matter (live depth occluder, Iter 1 —
+   * 2026-06-14-webxr-depth-occlusion-plan.md §6/§8):
+   * The live CPU-depth occluder is a consumer of the SAME cpu-optimized depth
+   * stream the grid uses, but consumer apps want occlusion WITHOUT the
+   * recorder's depth-capture crash-isolation flag. So `requestDepthOcclusion`
+   * must request `depth-sensing` (cpu-optimized) independently of
+   * `enableDepthSensingFeature`. Crucially, BOTH flags resolving the same
+   * cpu-optimized usage is valid — there is no conflict and no throw (this is
+   * the key difference from the deleted gpu-optimized plan, which had to throw
+   * when both were requested).
+   */
+  it('requests cpu-optimized depth-sensing when requestDepthOcclusion is true even if depth capture is off', () => {
+    const mockElement = document.createElement('div');
+
+    const options = buildSessionOptions(
+      mockElement,
+      { enableDepthSensingFeature: false },
+      { requestDepthOcclusion: true }
+    ) as XRSessionInit & {
+      depthSensing?: { usagePreference?: string[] };
+    };
+
+    expect(options.optionalFeatures).toContain('depth-sensing');
+    expect(options.depthSensing?.usagePreference).toContain('cpu-optimized');
+    expect(options.depthSensing?.usagePreference).not.toContain(
+      'gpu-optimized'
+    );
+  });
+
+  it('requests depth-sensing exactly once (no conflict/throw) when BOTH depth flags are set', () => {
+    const mockElement = document.createElement('div');
+
+    const options = buildSessionOptions(
+      mockElement,
+      { enableDepthSensingFeature: true },
+      { requestDepthOcclusion: true }
+    ) as XRSessionInit & {
+      depthSensing?: { usagePreference?: string[] };
+    };
+
+    // Coexist on the same cpu-optimized stream — requested once, not duplicated.
+    const depthEntries = (options.optionalFeatures ?? []).filter(
+      (f) => f === 'depth-sensing'
+    );
+    expect(depthEntries).toHaveLength(1);
+    expect(options.depthSensing?.usagePreference).toContain('cpu-optimized');
+  });
+
+  it('keeps depth-sensing off when both depth flags are off', () => {
+    const mockElement = document.createElement('div');
+
+    const options = buildSessionOptions(
+      mockElement,
+      { enableDepthSensingFeature: false },
+      { requestDepthOcclusion: false }
+    ) as XRSessionInit & { depthSensing?: unknown };
+
+    expect(options.optionalFeatures ?? []).not.toContain('depth-sensing');
+    expect(options.depthSensing).toBeUndefined();
+  });
 });
 
 describe('extractPoseFromViewer', () => {

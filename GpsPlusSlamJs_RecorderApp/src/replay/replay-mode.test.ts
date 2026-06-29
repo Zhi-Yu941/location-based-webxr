@@ -238,6 +238,29 @@ describe('replay-mode', () => {
     );
   });
 
+  it('creates the replay store with compass opt-ins disabled (replay-fidelity)', async () => {
+    // Why (PR #128 review): only ENABLED compass opt-ins are persisted as
+    // actions (the framework's listener middleware dispatches them after the
+    // first setZeroPos). A recording captured with cold-start override OFF — e.g.
+    // a §6a field-calibration capture — therefore has NO opt-in action in its
+    // stream. If the replay store re-derives the opt-in from the framework
+    // default (override defaults ON), replay incorrectly ENABLES the override the
+    // session was recorded WITHOUT. Replay's source of truth is the recorded
+    // action stream alone (a recording made WITH the override on already carries
+    // the setColdStartOverrideEnabled(true) action), so the replay store must be
+    // built with the opt-ins disabled to replay both cases faithfully.
+    const config = makeConfig();
+    await startReplayMode(fakeZipData, config);
+
+    expect(createRecorderStore).toHaveBeenCalledWith(
+      expect.objectContaining({
+        enableCompassColdStartOverride: false,
+        enableCompassRotationPrior: false,
+        enableCompassWebXRConsistency: false,
+      })
+    );
+  });
+
   // --- Scene initialization ---
 
   it('initializes replay scene with the provided container', async () => {

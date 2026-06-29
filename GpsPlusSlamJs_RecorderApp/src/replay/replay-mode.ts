@@ -130,9 +130,23 @@ export async function startReplayMode(
   const actions: ReplayAction[] = recording.actions.map((e) => e.action);
   log.info(`Loaded ${actions.length} actions from zip`);
 
-  // Create store with NullStorageBackend (no persistence side effects)
+  // Create store with NullStorageBackend (no persistence side effects).
+  //
+  // Compass opt-ins are DISABLED for replay: the framework would otherwise
+  // re-derive them from its defaults (cold-start override defaults ON) and
+  // auto-dispatch `setColdStartOverrideEnabled(true)` on the first replayed
+  // `setZeroPos`. But only ENABLED opt-ins are persisted as actions, so a
+  // recording captured with the override OFF (e.g. a §6a calibration capture)
+  // carries no opt-in action — re-deriving the default would enable an override
+  // the session was recorded WITHOUT. Replay's source of truth is the recorded
+  // action stream alone (a session recorded WITH the override on already carries
+  // the `setColdStartOverrideEnabled(true)` action, which replay re-applies), so
+  // disabling the auto-apply makes both cases replay faithfully.
   const store = createRecorderStore({
     storageBackend: new NullStorageBackend(),
+    enableCompassColdStartOverride: false,
+    enableCompassRotationPrior: false,
+    enableCompassWebXRConsistency: false,
   });
 
   // Initialize Three.js replay scene (no WebXR)

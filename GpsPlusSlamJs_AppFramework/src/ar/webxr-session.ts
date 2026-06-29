@@ -1251,12 +1251,18 @@ function getDepthInfoFromFrame(
   }
 
   // XRFrame may have getDepthInformation method if depth-sensing feature is enabled
-  // TypeScript doesn't have full types for this yet
+  // TypeScript doesn't have full types for this yet. The `data` /
+  // `rawValueToMeters` / `normDepthBufferFromNormView` fields exist on
+  // XRCPUDepthInformation and are forwarded to the live depth occluder via
+  // wrapXRDepthInfo (the sparse grid sampler reads only getDepthInMeters).
   const xrFrame = frame as XRFrame & {
     getDepthInformation?: (view: XRView) => {
       width: number;
       height: number;
       getDepthInMeters: (x: number, y: number) => number;
+      data?: ArrayBuffer;
+      rawValueToMeters?: number;
+      normDepthBufferFromNormView?: { matrix?: Float32Array } | null;
     } | null;
   };
 

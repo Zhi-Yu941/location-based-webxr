@@ -714,6 +714,105 @@ describe('wrapXRDepthInfo', () => {
     withNaN[5] = NaN;
     expect(wrapXRDepthInfo(raw, withNaN).projectionMatrix).toBeUndefined();
   });
+
+  /**
+   * Why these tests matter (live depth occluder, Iter 1 —
+   * 2026-06-14-webxr-depth-occlusion-plan.md §2/§8):
+   * The live occluder is a SECOND consumer of the same per-frame
+   * XRCPUDepthInformation. It needs three fields the sparse sampler never read:
+   * the raw `data` buffer, `rawValueToMeters`, and the `normDepthBufferFromNormView`
+   * UV transform. The wrapper must now carry them — `data` by LIVE reference (the
+   * per-frame buffer is too large to clone and is uploaded synchronously),
+   * `rawValueToMeters` validated finite, and the UV transform's `.matrix` copied
+   * + validated exactly like `projectionMatrix`. Missing/invalid fields must
+   * degrade to absent, never throw, so the existing grid path is unaffected.
+   */
+  it('preserves the raw depth `data` buffer by reference (not copied)', () => {
+    const data = new ArrayBuffer(160 * 90 * 2);
+    const wrapped = wrapXRDepthInfo(
+      { ...createRawDepthInformation(), data },
+      undefined
+    );
+    // Same buffer instance — the occluder uploads it in-place this frame.
+    expect(wrapped.data).toBe(data);
+  });
+
+  it('omits `data` when the source has none or it is not an ArrayBuffer', () => {
+    expect(
+      wrapXRDepthInfo(createRawDepthInformation(), undefined).data
+    ).toBeUndefined();
+    expect(
+      wrapXRDepthInfo(
+        { ...createRawDepthInformation(), data: 'not-a-buffer' as never },
+        undefined
+      ).data
+    ).toBeUndefined();
+  });
+
+  it('preserves `rawValueToMeters` only when it is a finite number', () => {
+    expect(
+      wrapXRDepthInfo(
+        { ...createRawDepthInformation(), rawValueToMeters: 0.001 },
+        undefined
+      ).rawValueToMeters
+    ).toBe(0.001);
+    expect(
+      wrapXRDepthInfo(
+        { ...createRawDepthInformation(), rawValueToMeters: NaN },
+        undefined
+      ).rawValueToMeters
+    ).toBeUndefined();
+    expect(
+      wrapXRDepthInfo(createRawDepthInformation(), undefined).rawValueToMeters
+    ).toBeUndefined();
+  });
+
+  it('copies the normDepthBufferFromNormView matrix into a serializable tuple', () => {
+    const matrix = new Float32Array(TEST_PROJECTION_MATRIX);
+    const wrapped = wrapXRDepthInfo(
+      {
+        ...createRawDepthInformation(),
+        normDepthBufferFromNormView: { matrix },
+      },
+      undefined
+    );
+
+    expect(wrapped.normDepthBufferFromNormView).toEqual(TEST_PROJECTION_MATRIX);
+    expect(Array.isArray(wrapped.normDepthBufferFromNormView)).toBe(true);
+    // Copy, not a view aliasing the (UA-reused) backing array.
+    matrix[0] = 999;
+    expect(wrapped.normDepthBufferFromNormView?.[0]).toBe(
+      TEST_PROJECTION_MATRIX[0]
+    );
+  });
+
+  it('omits normDepthBufferFromNormView when absent, null, wrong-length, or non-finite', () => {
+    const raw = createRawDepthInformation();
+    expect(
+      wrapXRDepthInfo(raw, undefined).normDepthBufferFromNormView
+    ).toBeUndefined();
+    expect(
+      wrapXRDepthInfo({ ...raw, normDepthBufferFromNormView: null }, undefined)
+        .normDepthBufferFromNormView
+    ).toBeUndefined();
+    expect(
+      wrapXRDepthInfo(
+        {
+          ...raw,
+          normDepthBufferFromNormView: { matrix: new Float32Array(9) },
+        },
+        undefined
+      ).normDepthBufferFromNormView
+    ).toBeUndefined();
+    const withNaN = new Float32Array(TEST_PROJECTION_MATRIX);
+    withNaN[3] = Infinity;
+    expect(
+      wrapXRDepthInfo(
+        { ...raw, normDepthBufferFromNormView: { matrix: withNaN } },
+        undefined
+      ).normDepthBufferFromNormView
+    ).toBeUndefined();
+  });
 });
 
 /**

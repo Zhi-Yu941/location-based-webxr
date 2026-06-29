@@ -19,13 +19,13 @@ Samples sparse depth points from the WebXR depth sensing API at a configurable i
 
 ### `wrapXRDepthInfo(raw, projectionMatrix)` (function)
 
-Wraps a raw browser `XRDepthInformation` object into a `DepthInfo`: copies `width`/`height`, binds `getDepthInMeters` to the source object (browser implementations are this-sensitive), and defensively copies the capturing view's projection matrix (`XRView.projectionMatrix`) into a plain serializable 16-tuple. Invalid matrix input (missing, wrong length, non-finite entries) yields a `DepthInfo` without a matrix — never an error. Called by `webxr-session.ts` in the frame loop.
+Wraps a raw browser `XRDepthInformation` object into a `DepthInfo`: copies `width`/`height`, binds `getDepthInMeters` to the source object (browser implementations are this-sensitive), and defensively copies the capturing view's projection matrix (`XRView.projectionMatrix`) into a plain serializable 16-tuple. Invalid matrix input (missing, wrong length, non-finite entries) yields a `DepthInfo` without a matrix — never an error. It additionally preserves the **live-occluder metadata** when the source carries it: `data` (the raw `XRCPUDepthInformation` buffer) by **live reference** (NOT cloned — too large; valid only this frame), `rawValueToMeters` only when finite, and `normDepthBufferFromNormView.matrix` copied + validated exactly like `projectionMatrix`. The sparse sampler ignores all three; sources lacking them wrap exactly as before. Live-occluder Iter 1 ([2026-06-14-webxr-depth-occlusion-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-14-webxr-depth-occlusion-plan.md) §2). Called by `webxr-session.ts` in the frame loop.
 
 ### Interfaces
 
 - **`DepthSamplerConfig`** — `{ intervalMs, gridSize, unavailabilityThresholdMs, rgb }`; `rgb` (default **true**) gates the Iter-8 per-point color enrichment and accepts boolean overrides via `updateConfig`.
 - **`DepthSamplerCallbacks`** — `{ onSampleCaptured, getCurrentPose, onDepthUnavailable?, acquireRgbLookup? }`; `acquireRgbLookup` lazily provides a camera-color lookup for the CURRENT frame — invoked at most once per **emitted** sample (never per frame/point; acquisition is a GPU-stall blit+readback) and only while `config.rgb` is true. Null/throwing acquisition degrades to color-less points (occupancy-grid port plan Iter 8).
-- **`DepthInfo`** — subset of `XRDepthInformation`: `{ width, height, getDepthInMeters, projectionMatrix? }`
+- **`DepthInfo`** — subset of `XRDepthInformation`: `{ width, height, getDepthInMeters, projectionMatrix?, data?, rawValueToMeters?, normDepthBufferFromNormView? }`. The last three are occluder-only plumbing (the sampler reads only `getDepthInMeters`/`projectionMatrix`); `data` is a live per-frame reference, the other two are validated copies.
 
 ## Invariants & Assumptions
 

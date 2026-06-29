@@ -169,6 +169,13 @@ describe('settings-modal', () => {
       expect(html).toContain('id="occupancy-persistent-occlusion"');
     });
 
+    it('includes the live depth-occluder checkbox', () => {
+      // 2026-06-29 two-composable-occlusion-toggles: the live CPU-depth occluder
+      // (occupancy.liveOcclusion) is the second, independent checkbox.
+      const html = loadSettingsModalHtml();
+      expect(html).toContain('id="occupancy-live-occlusion"');
+    });
+
     it('includes the frame-tile display-resolution slider and value display', () => {
       // D7-resolution, 2026-06-16 user feedback: the in-AR/replay tile display
       // resolution (frameTileDisplay.divisor) must be user-configurable here,
@@ -405,6 +412,56 @@ describe('settings-modal', () => {
         'occupancy-persistent-occlusion'
       ) as HTMLInputElement;
       expect(checkbox.checked).toBe(false);
+    });
+
+    it('populates the live-occluder checkbox from saved options and updates the working copy', () => {
+      localStorageMock.getItem.mockReturnValueOnce(
+        JSON.stringify({ occupancy: { liveOcclusion: true } })
+      );
+
+      showSettingsModal();
+
+      const checkbox = document.getElementById(
+        'occupancy-live-occlusion'
+      ) as HTMLInputElement;
+      expect(checkbox.checked).toBe(true);
+
+      // Toggling it off mutates the working options (persisted on Save).
+      checkbox.checked = false;
+      checkbox.dispatchEvent(new Event('change'));
+      expect(getWorkingOptions()?.occupancy.liveOcclusion).toBe(false);
+    });
+
+    it('defaults the live-occluder checkbox to off (feature off by default)', () => {
+      localStorageMock.getItem.mockReturnValueOnce(JSON.stringify({}));
+      showSettingsModal();
+      const checkbox = document.getElementById(
+        'occupancy-live-occlusion'
+      ) as HTMLInputElement;
+      expect(checkbox.checked).toBe(false);
+    });
+
+    it('lets the live and persistent occluders be ticked together (they compose)', () => {
+      localStorageMock.getItem.mockReturnValueOnce(
+        JSON.stringify({
+          occupancy: { liveOcclusion: true, persistentOcclusion: true },
+        })
+      );
+      showSettingsModal();
+      expect(
+        (
+          document.getElementById(
+            'occupancy-live-occlusion'
+          ) as HTMLInputElement
+        ).checked
+      ).toBe(true);
+      expect(
+        (
+          document.getElementById(
+            'occupancy-persistent-occlusion'
+          ) as HTMLInputElement
+        ).checked
+      ).toBe(true);
     });
 
     it('populates AR crash isolation checkbox from saved options', () => {

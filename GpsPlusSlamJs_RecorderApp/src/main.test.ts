@@ -957,12 +957,53 @@ describe('AR Partial Init Failure Cleanup (Issue #10)', () => {
         enableDepthSensingFeature: true,
         enableCss3dRenderer: true,
         enableCameraTextureAcquisition: true,
-      })
+      }),
+      // Live occluder OFF in the default mock options → depth occlusion not
+      // requested as a session feature (2026-06-29 two-occlusion-toggles).
+      expect.objectContaining({ requestDepthOcclusion: false })
     );
 
     // endARSession should be called to clean up the XR session
     expect(endARSession).toHaveBeenCalled();
     expect(showError).toHaveBeenCalled();
+  });
+
+  /**
+   * Why this test matters (2026-06-29 two-composable-occlusion-toggles):
+   * the "Live depth occluder" checkbox (occupancy.liveOcclusion) must request
+   * the `requestDepthOcclusion` session feature so the session negotiates the
+   * `cpu-optimized` depth stream the live occluder consumes — even when depth
+   * *recording* is independent. This is the CI-testable half of the live
+   * wiring; the render-side integration is device-gated (see the follow-ups).
+   */
+  it('requests depth occlusion as a session feature when liveOcclusion is on', async () => {
+    const { initAR } =
+      await import('gps-plus-slam-app-framework/ar/webxr-session');
+    const { loadRecordingOptions } =
+      await import('gps-plus-slam-app-framework/state/recording-options');
+    const { handleEnterARForTesting, setRecordingOptionsForTesting } =
+      await import('./main');
+
+    vi.clearAllMocks();
+    document.body.innerHTML = '<div id="app"></div>';
+    vi.mocked(initAR).mockResolvedValue(undefined);
+
+    // Turn the live occluder ON for this one Enter-AR by overriding the
+    // module-level recording options (spread the default mock so every other
+    // field main.ts reads stays intact).
+    const base = vi.mocked(loadRecordingOptions)();
+    setRecordingOptionsForTesting({
+      ...base,
+      occupancy: { ...base.occupancy, liveOcclusion: true },
+    });
+
+    await handleEnterARForTesting();
+
+    expect(initAR).toHaveBeenCalledWith(
+      expect.any(HTMLElement),
+      expect.any(Object),
+      expect.objectContaining({ requestDepthOcclusion: true })
+    );
   });
 });
 

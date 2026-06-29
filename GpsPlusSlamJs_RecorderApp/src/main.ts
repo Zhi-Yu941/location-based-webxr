@@ -1164,7 +1164,15 @@ async function handleEnterAR(): Promise<void> {
     if (!appContainer) {
       throw new Error('Missing #app container element');
     }
-    await initAR(appContainer, recordingOptions.arCrashIsolation);
+    // Live depth occluder (opt-in, off by default): request the
+    // `cpu-optimized` depth-sensing feature for the live occluder even when
+    // depth *recording* is off, so the session negotiates the depth stream the
+    // occluder consumes. The render-side integration (DepthOccluder material
+    // patching + per-frame update) is the device-gated next step — see
+    // 2026-06-29-occupancy-live-occluder-followups.md.
+    await initAR(appContainer, recordingOptions.arCrashIsolation, {
+      requestDepthOcclusion: recordingOptions.occupancy.liveOcclusion === true,
+    });
 
     // Set up image capture callback (must be done after AR init)
     // Issue #11: Pass onCaptureFailed callback to track capture failures
@@ -1610,6 +1618,17 @@ export function handleStopRecordingForTesting(): Promise<void> {
  */
 export function handleEnterARForTesting(): Promise<void> {
   return handleEnterAR();
+}
+
+/**
+ * Exported for testing purposes.
+ * Overrides the module-level recording options (normally loaded once at
+ * bootstrap / reloaded in `main()`), so a test can exercise an Enter-AR path
+ * under a specific option set (e.g. `occupancy.liveOcclusion`) without
+ * re-importing the module.
+ */
+export function setRecordingOptionsForTesting(options: RecordingOptions): void {
+  recordingOptions = options;
 }
 
 /**

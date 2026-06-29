@@ -1200,6 +1200,23 @@ No errors</pre
               <label class="flex items-center gap-2 cursor-pointer mt-1">
                 <input
                   type="checkbox"
+                  id="occupancy-live-occlusion"
+                  class="w-4 h-4 accent-blue-500"
+                />
+                <span class="text-sm text-gray-200"
+                  >Live depth occluder (experimental)</span
+                >
+              </label>
+              <p class="text-[11px] text-gray-400">
+                Hide virtual objects behind the real surface the camera sees
+                right now (sharp, no memory). Negotiates the depth stream on
+                Enter-AR; the on-device occlusion render is still being brought
+                up. Off by default. Tick together with the persistent mesh below
+                to combine live + remembered occlusion.
+              </p>
+              <label class="flex items-center gap-2 cursor-pointer mt-1">
+                <input
+                  type="checkbox"
                   id="occupancy-persistent-occlusion"
                   class="w-4 h-4 accent-blue-500"
                 />

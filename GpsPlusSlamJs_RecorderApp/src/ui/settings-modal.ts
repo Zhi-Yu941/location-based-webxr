@@ -72,6 +72,7 @@ let occupancyCellSizeSlider: HTMLInputElement | null = null;
 let occupancyCellSizeValue: HTMLElement | null = null;
 let occupancyMinConfidenceSlider: HTMLInputElement | null = null;
 let occupancyMinConfidenceValue: HTMLElement | null = null;
+let occupancyLiveOcclusionCheckbox: HTMLInputElement | null = null;
 let occupancyPersistentOcclusionCheckbox: HTMLInputElement | null = null;
 let frameTileDisplayDivisorSlider: HTMLInputElement | null = null;
 let frameTileDisplayDivisorValue: HTMLElement | null = null;
@@ -200,6 +201,9 @@ export function initSettingsModal(
   occupancyCellSizeValue = document.getElementById('occupancy-cell-size-value');
   occupancyMinConfidenceSlider = document.getElementById(
     'occupancy-min-confidence'
+  ) as HTMLInputElement;
+  occupancyLiveOcclusionCheckbox = document.getElementById(
+    'occupancy-live-occlusion'
   ) as HTMLInputElement;
   occupancyPersistentOcclusionCheckbox = document.getElementById(
     'occupancy-persistent-occlusion'
@@ -332,6 +336,15 @@ export function initSettingsModal(
       const cm = parseInt(occupancyCellSizeSlider.value, 10);
       workingOptions.occupancy.cellSizeM = cm / 100;
       occupancyCellSizeValue.textContent = `${cm} cm`;
+    }
+  });
+
+  // Live CPU-depth occluder (occupancy.liveOcclusion). Live-AR only; applies on
+  // the next Enter-AR. Composes with the persistent mesh below (both can be on).
+  occupancyLiveOcclusionCheckbox?.addEventListener('change', () => {
+    if (workingOptions && occupancyLiveOcclusionCheckbox) {
+      workingOptions.occupancy.liveOcclusion =
+        occupancyLiveOcclusionCheckbox.checked;
     }
   });
 
@@ -856,6 +869,9 @@ function populateForm(options: RecordingOptions): void {
     const n = options.occupancy.minConfidence;
     occupancyMinConfidenceValue.textContent =
       n === 1 ? '1 (unfiltered)' : String(n);
+  }
+  if (occupancyLiveOcclusionCheckbox) {
+    occupancyLiveOcclusionCheckbox.checked = options.occupancy.liveOcclusion;
   }
   if (occupancyPersistentOcclusionCheckbox) {
     occupancyPersistentOcclusionCheckbox.checked =

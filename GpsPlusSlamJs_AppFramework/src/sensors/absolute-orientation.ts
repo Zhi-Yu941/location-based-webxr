@@ -99,13 +99,22 @@ function currentScreenAngleDeg(): number {
 async function sensorPermissionsUsable(): Promise<boolean> {
   const permissions = navigator.permissions;
   if (!permissions || typeof permissions.query !== 'function') return true;
+  const queryState = async (name: string): Promise<PermissionState> => {
+    // Some browsers/webviews throw a SYNCHRONOUS TypeError for an unsupported
+    // permission name (e.g. 'magnetometer') instead of rejecting the promise.
+    // Wrapping the call (not just chaining `.catch`) keeps the best-effort
+    // 'granted' fallback for both the sync-throw and async-rejection cases, so
+    // an unsupported name never aborts the whole watch — the constructor still
+    // surfaces any real denial.
+    try {
+      const p = await permissions.query({ name: name as PermissionName });
+      return p.state;
+    } catch {
+      return 'granted';
+    }
+  };
   const states = await Promise.all(
-    (['accelerometer', 'gyroscope', 'magnetometer'] as const).map((name) =>
-      permissions
-        .query({ name: name as PermissionName })
-        .then((p): PermissionState => p.state)
-        .catch((): PermissionState => 'granted')
-    )
+    ['accelerometer', 'gyroscope', 'magnetometer'].map(queryState)
   );
   return states.every((s) => s === 'granted' || s === 'prompt');
 }

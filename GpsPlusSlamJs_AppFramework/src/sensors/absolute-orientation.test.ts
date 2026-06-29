@@ -210,6 +210,32 @@ describe('AbsoluteOrientationSensor capture', () => {
       await startAbsoluteOrientationWatch();
       expect(FakeAbsoluteOrientationSensor.lastInstance).not.toBeNull();
     });
+
+    // Why this matters (PR #129 review): some browsers/webviews throw a
+    // SYNCHRONOUS TypeError from `permissions.query({name:'magnetometer'})`
+    // because the permission name is unsupported, instead of returning a
+    // rejected promise. A synchronous throw bypasses the per-query `.catch()`
+    // best-effort 'granted' fallback, so the watch would abort with `error` and
+    // never construct the sensor — even though the sensor itself may work fine.
+    // It must be tolerated exactly like a rejected query (best-effort proceed).
+    it('tolerates a synchronous throw from permissions.query (still constructs)', async () => {
+      Object.defineProperty(navigator, 'permissions', {
+        value: {
+          query: vi.fn(() => {
+            throw new TypeError(
+              "'magnetometer' is not a valid permission name"
+            );
+          }),
+        },
+        configurable: true,
+      });
+      const onStatus = vi.fn();
+      await startAbsoluteOrientationWatch(onStatus);
+      expect(FakeAbsoluteOrientationSensor.lastInstance).not.toBeNull();
+      expect(onStatus).not.toHaveBeenCalledWith(
+        expect.objectContaining({ state: 'error' })
+      );
+    });
   });
 
   describe('construction failure', () => {

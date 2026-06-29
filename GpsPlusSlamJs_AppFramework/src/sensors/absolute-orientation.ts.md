@@ -37,6 +37,11 @@ referenceFrame:'device', screenAngleDeg, timestamp }`. The raw device frame +
 - Defensive: feature-detected; readings with a missing/short quaternion are
   ignored; permission denial / construction error degrade to a clean no-op so
   iOS/Safari/desktop keep working unchanged.
+- **Best-effort permission gate**: each `permissions.query` is wrapped so a
+  failed query — whether an async rejection OR a **synchronous** `TypeError`
+  (some browsers throw for an unsupported permission name like `'magnetometer'`)
+  — falls back to `'granted'` rather than aborting the whole watch. The sensor
+  constructor still surfaces any real denial.
 - The non-standard sensor is locally typed (minimal ambient interface) — no
   dependency on `@types/w3c-generic-sensor`.
 - **Stale-start safety**: the start does its real work only after awaiting the
@@ -59,7 +64,8 @@ const reading = getLatestAbsoluteOrientation(); // → embed in RecordGpsEventPa
 `absolute-orientation.test.ts` (jsdom) drives a **fake** `AbsoluteOrientationSensor`:
 reading caches quaternion + screen angle; construction options; activate/error
 status; missing-quaternion guard; permission-denied & no-Permissions-API paths;
-constructor-throws path; `stop` idempotency; restart-without-leak; stale-start
-abort when `stop()` lands during the async permission check. The real
+synchronous-throw-from-`permissions.query` tolerance; constructor-throws path;
+`stop` idempotency; restart-without-leak; stale-start abort when `stop()` lands
+during the async permission check. The real
 sensor (Chrome-Android device seam) is not e2e-tested — mirrors the image-quality
 worker decision.

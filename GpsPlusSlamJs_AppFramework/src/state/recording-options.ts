@@ -205,6 +205,18 @@ export interface OccupancyOptions {
    * device-gated/unverified. Read once when the AR session is wired (Enter-AR).
    */
   liveOcclusion: boolean;
+  /**
+   * Render the persistent occluder mesh with a **visible debug material** (a
+   * shiny, semi-transparent matcap) instead of the invisible depth-only one, so
+   * the operator can see the mesh shape/quality on-device. The mesh **still
+   * writes depth**, so it keeps occluding while visible. Only has an effect when
+   * {@link persistentOcclusion} is on (the debug mesh is the persistent
+   * occluder's mesh); ticking it alone is a harmless no-op. Default **false**.
+   * Read once when the mesh is wired (Enter-AR / replay load), like the other
+   * occupancy knobs. See
+   * `GpsPlusSlamJs_Docs/docs/2026-06-29-occlusion-debug-viz-and-live-occluder-user-feedback.md`.
+   */
+  occluderDebugViz: boolean;
 }
 
 /**
@@ -358,6 +370,7 @@ export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
     minConfidence: 3, // ≥3 observations to render a voxel — filters single-frame depth noise (1 = legacy/unfiltered)
     persistentOcclusion: false, // persistent depth-only mesh occluder OFF by default (extra cost; on-device gate pending)
     liveOcclusion: false, // live CPU-depth occluder OFF by default (device-gated quality; replay no-op)
+    occluderDebugViz: false, // matcap debug visualization of the persistent occluder mesh OFF by default
   },
   frameTileDisplay: {
     // Half-resolution display texture by default (D7): a noticeable per-tile
@@ -844,6 +857,12 @@ export function validateOccupancyOptions(
       typeof options.liveOcclusion === 'boolean'
         ? options.liveOcclusion
         : defaults.liveOcclusion,
+    // Brand-new field — no migration; boolean-or-default (a corrupt stored value
+    // never silently turns the debug rendering on).
+    occluderDebugViz:
+      typeof options.occluderDebugViz === 'boolean'
+        ? options.occluderDebugViz
+        : defaults.occluderDebugViz,
   };
 }
 

@@ -493,6 +493,31 @@ describe('recording-options', () => {
       } as unknown as Partial<OccupancyOptions>);
       expect(out.persistentOcclusion).toBe(false);
     });
+
+    /**
+     * Debug-visualization toggle (2026-06-29 testing feedback): renders the
+     * persistent occluder mesh as a visible (matcap) surface so its shape can be
+     * judged on-device. A new, independent boolean — default OFF, boolean-or-
+     * default like the two occluder flags, and no migration (brand-new field).
+     */
+    it('defaults occluderDebugViz to false for an empty object', () => {
+      expect(validateOccupancyOptions({}).occluderDebugViz).toBe(false);
+    });
+
+    it('preserves a boolean occluderDebugViz', () => {
+      expect(
+        validateOccupancyOptions({ occluderDebugViz: true }).occluderDebugViz
+      ).toBe(true);
+    });
+
+    it('falls back to the default for a non-boolean occluderDebugViz', () => {
+      const out = validateOccupancyOptions({
+        occluderDebugViz: 'yes' as unknown as boolean,
+      });
+      expect(out.occluderDebugViz).toBe(
+        DEFAULT_RECORDING_OPTIONS.occupancy.occluderDebugViz
+      );
+    });
   });
 
   describe('validateFrameTileDisplayOptions', () => {
@@ -1327,6 +1352,7 @@ describe('recording-options', () => {
           minConfidence: 3,
           persistentOcclusion: true,
           liveOcclusion: true,
+          occluderDebugViz: true,
         },
         frameTileDisplay: { divisor: 4 },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },

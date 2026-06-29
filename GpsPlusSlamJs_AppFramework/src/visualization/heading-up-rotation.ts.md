@@ -52,7 +52,14 @@ camera)`), so the camera already rotates the map's on-screen appearance as the
 import { headingUpQuat, viewAzimuthDeg } from './heading-up-rotation';
 camera.updateMatrixWorld();
 const viewAz = viewAzimuthDeg(camera.matrixWorld.elements);
-cssObject.quaternion.set(...headingUpQuat(viewAz - (userHeadingDeg ?? viewAz)));
+// Heading undefined (null) → HOLD the last orientation: do NOT update the
+// quaternion. (Using `userHeadingDeg ?? viewAz` would compute `viewAz - viewAz
+// = 0` and wrongly snap the map back to north-up — that violates the live
+// overlay's `updatePosition` contract, which returns early when the heading is
+// null.)
+if (userHeadingDeg !== null) {
+  cssObject.quaternion.set(...headingUpQuat(viewAz - userHeadingDeg));
+}
 ```
 
 ## Tests

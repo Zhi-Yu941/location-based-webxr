@@ -35,8 +35,10 @@ alignment matrix. Feeds the live/replay map overlay's view-direction line
   carry the true bearing, so reading `atan2(East, North)` directly is simpler
   **and** undistorted.
 - **Returns `null` when:** no rotation yet, no alignment matrix yet (before the
-  first solve), the camera points within ~85° of vertical (`VERTICAL_GUARD =
-0.08`, mirroring the library's guard) where a 2D bearing is meaningless, **or any
+  first solve), the camera points within ~4.6° of straight up/down
+  (`VERTICAL_GUARD = 0.08`; `horiz/len = sin(angle from vertical)` so the cutoff
+  is `asin(0.08) ≈ 4.6°` — equivalently pitched more than ~85° from horizontal —
+  mirroring the library's guard) where a 2D bearing is meaningless, **or any
   input is non-finite** — a `NaN`/`Infinity` quaternion or alignment-matrix
   component propagates into the derived `len`/`horiz`, whose finiteness is guarded
   so a bad sensor sample degrades to `null` instead of emitting a `NaN` bearing

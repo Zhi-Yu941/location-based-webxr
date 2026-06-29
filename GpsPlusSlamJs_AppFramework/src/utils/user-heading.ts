@@ -41,9 +41,11 @@ const NUE_CAMERA_FORWARD: vec3 = [1, 0, 0];
 
 /**
  * Minimum horizontal fraction of the (unit) forward direction below which the
- * heading is treated as undefined. `horiz/len < GUARD` means the camera points
- * within ~85° of straight up/down, where a 2D map bearing is meaningless and
- * jittery. Mirrors the rationale of the library's `VERTICAL_GUARD` (0.08).
+ * heading is treated as undefined. Because `horiz/len = sin(angle from
+ * vertical)`, `horiz/len < GUARD` means the camera points within
+ * `asin(0.08) ≈ 4.6°` of straight up/down (equivalently, pitched more than ~85°
+ * from horizontal), where a 2D map bearing is meaningless and jittery. Mirrors
+ * the rationale of the library's `VERTICAL_GUARD` (0.08).
  */
 const VERTICAL_GUARD = 0.08;
 

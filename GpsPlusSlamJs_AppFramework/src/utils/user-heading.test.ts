@@ -139,6 +139,35 @@ describe('computeUserHeadingDeg', () => {
     ).toBeNull();
   });
 
+  // Why this test matters (PR #132 review): pins the actual VERTICAL_GUARD
+  // geometry. `horiz/len < 0.08` where `horiz/len = sin(angleFromVertical)`, so
+  // the guard rejects only a TINY cone — within asin(0.08) ≈ 4.6° of straight
+  // up/down — NOT the "~85° of vertical" the prose used to claim. A direction
+  // just inside that cone is undefined; just outside it yields a bearing.
+  it('rejects only within ~4.6° of vertical (asin(0.08)), accepts steeper headings', () => {
+    const deg2rad = Math.PI / 180;
+    // dir = [sin φ, cos φ, 0]: φ is the angle from the +Up axis; horiz/len = sin φ.
+    const dirFromVertical = (phiDeg: number): vec3 => [
+      Math.sin(phiDeg * deg2rad),
+      Math.cos(phiDeg * deg2rad),
+      0,
+    ];
+    // 4° from vertical → sin 4° = 0.0698 < 0.08 → heading undefined (null).
+    expect(
+      computeUserHeadingDeg({
+        odometryRotation: quatForwardTo(dirFromVertical(4)),
+        alignmentMatrix: IDENTITY_MAT4,
+      })
+    ).toBeNull();
+    // 6° from vertical → sin 6° = 0.1045 > 0.08 → a bearing is defined.
+    expect(
+      computeUserHeadingDeg({
+        odometryRotation: quatForwardTo(dirFromVertical(6)),
+        alignmentMatrix: IDENTITY_MAT4,
+      })
+    ).not.toBeNull();
+  });
+
   // Why this test matters: the function's contract is `number | null`, and the
   // map overlay only treats `null` as "heading unavailable". A single non-finite
   // sensor sample (NaN/Infinity in the odometry quaternion or alignment matrix)

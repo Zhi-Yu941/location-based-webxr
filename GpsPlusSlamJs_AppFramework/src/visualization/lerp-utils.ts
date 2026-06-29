@@ -12,12 +12,19 @@ export const DEFAULT_LERP_RATE = 8;
 /**
  * Compute a frame-rate-independent lerp/slerp factor clamped to [0, 1].
  *
+ * Both bounds are clamped: the upper bound caps an overlong frame at a full
+ * (instant) step, and the lower bound rejects a negative `dt` (system clock
+ * adjustment, a frame loop whose timestamp runs backward, or a paused-then-
+ * resumed tab). Without the lower clamp a negative `dt` would yield a negative
+ * alpha and the angle/quaternion lerp would extrapolate BACKWARD, away from the
+ * target — a visible heading/alignment jump.
+ *
  * @param lerpRate Speed multiplier (higher = faster convergence).
  * @param dt       Delta time in seconds since last frame.
- * @returns The interpolation alpha, guaranteed ≤ 1.0.
+ * @returns The interpolation alpha, guaranteed within [0, 1].
  */
 export function clampedAlpha(lerpRate: number, dt: number): number {
-  return Math.min(lerpRate * dt, 1.0);
+  return Math.min(Math.max(lerpRate * dt, 0), 1.0);
 }
 
 /**

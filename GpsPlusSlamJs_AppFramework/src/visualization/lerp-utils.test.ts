@@ -36,6 +36,34 @@ describe('lerp-utils', () => {
     it('returns 0 when dt is 0', () => {
       expect(clampedAlpha(8, 0)).toBe(0);
     });
+
+    // Why this matters: the docstring promises a result in [0, 1], but the
+    // original `Math.min(lerpRate * dt, 1)` only clamped the UPPER bound. A
+    // negative dt (system clock adjustment / a frame loop whose timestamp goes
+    // backward / a paused-then-resumed tab) would yield a NEGATIVE alpha, and
+    // lerpAngleDeg/slerp then extrapolate BACKWARD — away from the target —
+    // producing a visible heading/alignment jump. The lower clamp keeps the
+    // shared smoothing factor inside its documented domain for all three
+    // callers (alignment-lerper, camera-follower, leaflet-map-overlay).
+    it('clamps to 0 when dt is negative (lower-bound guard)', () => {
+      expect(clampedAlpha(8, -0.1)).toBe(0);
+      expect(clampedAlpha(8, -1000)).toBe(0);
+    });
+
+    it('property: result is always within [0, 1] for any finite rate/dt', () => {
+      expect(() =>
+        fc.assert(
+          fc.property(
+            fc.double({ min: -1000, max: 1000, noNaN: true }),
+            fc.double({ min: -1000, max: 1000, noNaN: true }),
+            (lerpRate, dt) => {
+              const a = clampedAlpha(lerpRate, dt);
+              return a >= 0 && a <= 1;
+            }
+          )
+        )
+      ).not.toThrow();
+    });
   });
 
   // Why this matters: the heading-up minimap (2026-06-29 plan) interpolates the

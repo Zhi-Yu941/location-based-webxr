@@ -35,8 +35,13 @@ alignment matrix. Feeds the live/replay map overlay's view-direction line
   carry the true bearing, so reading `atan2(East, North)` directly is simpler
   **and** undistorted.
 - **Returns `null` when:** no rotation yet, no alignment matrix yet (before the
-  first solve), or the camera points within ~85° of vertical (`VERTICAL_GUARD =
-0.08`, mirroring the library's guard) where a 2D bearing is meaningless.
+  first solve), the camera points within ~85° of vertical (`VERTICAL_GUARD =
+0.08`, mirroring the library's guard) where a 2D bearing is meaningless, **or any
+  input is non-finite** — a `NaN`/`Infinity` quaternion or alignment-matrix
+  component propagates into the derived `len`/`horiz`, whose finiteness is guarded
+  so a bad sensor sample degrades to `null` instead of emitting a `NaN` bearing
+  that would poison `headingUpQuat`. The guard is on the derived values (not a
+  per-element input scan) to avoid a per-frame closure allocation at 30–60 Hz.
 - **Position-independent.** The heading is a pure direction; the consumer draws
   the line only when it also has a user-position dot to anchor it to.
 - **Lives in the app-framework, NOT the library's `orientation-heading.ts`** —
@@ -67,8 +72,9 @@ computeUserHeadingDeg({
 
 - [`user-heading.test.ts`](user-heading.test.ts) — cardinal-direction bearings,
   alignment-rotation application, camera+alignment composition, null cases
-  (no rotation / no matrix / near-vertical), plus property tests
-  (range `[0,360)` and yaw-equivariance).
+  (no rotation / no matrix / near-vertical), non-finite-input degradation to
+  `null` (NaN/±Infinity in the quaternion or matrix, incl. the translation
+  column), plus property tests (range `[0,360)` and yaw-equivariance).
 - Consumed via `buildMapData` ([`map-data.test.ts`](../visualization/map-data.test.ts))
   and rendered via `drawMapData`
   ([`map-overlay-draw.test.ts`](../visualization/map-overlay-draw.test.ts)).

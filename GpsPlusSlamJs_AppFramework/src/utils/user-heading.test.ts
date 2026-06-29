@@ -138,6 +138,45 @@ describe('computeUserHeadingDeg', () => {
       })
     ).toBeNull();
   });
+
+  // Why this test matters: the function's contract is `number | null`, and the
+  // map overlay only treats `null` as "heading unavailable". A single non-finite
+  // sensor sample (NaN/Infinity in the odometry quaternion or alignment matrix)
+  // must NOT propagate a NaN bearing into `headingUpQuat`, which would poison the
+  // CSS3D quaternion. Such samples must degrade to `null`. (PR #131 review.)
+  describe('non-finite inputs degrade to null (never NaN)', () => {
+    const NON_FINITE = [NaN, Infinity, -Infinity];
+
+    for (const bad of NON_FINITE) {
+      it(`returns null when the odometry quaternion contains ${bad}`, () => {
+        const heading = computeUserHeadingDeg({
+          odometryRotation: [bad, 0, 0, 1],
+          alignmentMatrix: IDENTITY_MAT4,
+        });
+        expect(heading).toBeNull();
+      });
+
+      it(`returns null when the alignment matrix contains ${bad}`, () => {
+        const badMatrix: number[] = [...IDENTITY_MAT4];
+        badMatrix[0] = bad;
+        const heading = computeUserHeadingDeg({
+          odometryRotation: [0, 0, 0, 1],
+          alignmentMatrix: badMatrix as unknown as Matrix4,
+        });
+        expect(heading).toBeNull();
+      });
+
+      it(`returns null when a non-finite value lands in the matrix translation column (${bad})`, () => {
+        const badMatrix: number[] = [...IDENTITY_MAT4];
+        badMatrix[12] = bad;
+        const heading = computeUserHeadingDeg({
+          odometryRotation: [0, 0, 0, 1],
+          alignmentMatrix: badMatrix as unknown as Matrix4,
+        });
+        expect(heading).toBeNull();
+      });
+    }
+  });
 });
 
 describe('computeUserHeadingDeg — properties', () => {

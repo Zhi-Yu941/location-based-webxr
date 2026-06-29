@@ -107,7 +107,19 @@ export function computeUserHeadingDeg(input: UserHeadingInput): number | null {
   const east = _dir[2];
   const len = Math.hypot(_dir[0], _dir[1], _dir[2]);
   const horiz = Math.hypot(north, east);
-  if (len < 1e-9 || horiz / len < VERTICAL_GUARD) {
+  // A non-finite sensor sample (NaN/Infinity in the quaternion or alignment
+  // matrix) propagates through the math above into `len`/`horiz`. Guarding their
+  // finiteness here rejects every such sample as "heading undefined" (null)
+  // without the per-frame closure allocation that an explicit `.some()` input
+  // scan would cost — `computeUserHeadingDeg` runs at 30–60 Hz. Without this,
+  // `len`/`horiz` are NaN (so the magnitude guards pass) and a NaN bearing would
+  // leak into `headingUpQuat`, poisoning the CSS3D quaternion.
+  if (
+    !Number.isFinite(len) ||
+    !Number.isFinite(horiz) ||
+    len < 1e-9 ||
+    horiz / len < VERTICAL_GUARD
+  ) {
     return null;
   }
 

@@ -46,18 +46,22 @@ const _yaw = quat.create();
 const _out = quat.create();
 
 /**
- * Quaternion (`[x, y, z, w]`) for the `CSS3DObject` so the flat minimap shows
- * `headingDeg` (clockwise from geographic north) pointing up.
+ * Quaternion (`[x, y, z, w]`) for the `CSS3DObject`: the baseline −π/2 tilt plus
+ * an in-plane yaw of `azimuthDeg` about world-up.
  *
- * `headingDeg = 0` returns the baseline tilt-only orientation (north-up).
+ * `azimuthDeg` is the yaw to apply, NOT a heading: the consumer passes
+ * `viewAzimuth(camera) − userHeading` (camera-relative — see the file header and
+ * `viewAzimuthDeg`). `azimuthDeg = 0` returns the baseline tilt-only orientation
+ * (north-up); the map's north edge ends up pointing along scene azimuth
+ * `azimuthDeg` (atan2(x, −z) convention).
  *
- * @param headingDeg Absolute view bearing in degrees clockwise from north.
+ * @param azimuthDeg In-plane yaw to apply, degrees, atan2(x, −z) convention.
  * @returns A unit quaternion as a 4-tuple `[x, y, z, w]`.
  */
 export function headingUpQuat(
-  headingDeg: number
+  azimuthDeg: number
 ): [number, number, number, number] {
-  quat.setAxisAngle(_yaw, [0, 1, 0], YAW_SIGN * headingDeg * DEG_TO_RAD);
+  quat.setAxisAngle(_yaw, [0, 1, 0], YAW_SIGN * azimuthDeg * DEG_TO_RAD);
   // Apply tilt first, then yaw: q = yaw · tilt.
   quat.multiply(_out, _yaw, TILT);
   return [_out[0], _out[1], _out[2], _out[3]];

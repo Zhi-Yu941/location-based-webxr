@@ -9,13 +9,13 @@ fixed north-up baseline. See the
 
 ## Public API
 
-- `headingUpQuat(deg: number): [x, y, z, w]`
+- `headingUpQuat(azimuthDeg: number): [x, y, z, w]`
   - Input: the in-plane yaw to apply, in degrees, in the atan2(x,−z) azimuth
     convention (0° = the map's north edge points along world −Z; +90° = +X).
     **The consumer passes `viewAzimuth − userHeading`, NOT the absolute heading**
     (see the camera-relative note below). Any range is accepted (`deg` ≡ `deg+360`).
-  - Output: a unit quaternion `yaw(−deg about +Y) · tilt(−π/2 about +X)`.
-  - `deg = 0` returns the baseline tilt-only orientation (north-up).
+  - Output: a unit quaternion `yaw(−azimuthDeg about +Y) · tilt(−π/2 about +X)`.
+  - `azimuthDeg = 0` returns the baseline tilt-only orientation (north-up).
   - No error modes — pure numeric function, no allocation per call beyond the
     returned tuple (uses module-scoped scratch quaternions).
 - `viewAzimuthDeg(matrixWorldElements: ArrayLike<number>): number`

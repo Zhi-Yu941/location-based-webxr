@@ -20,6 +20,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import fc from 'fast-check';
 import * as THREE from 'three';
 // Resolves to the mocked leaflet (see `vi.mock('leaflet')` below); used to
 // inspect `divIcon` call args in the F5-A marker-prominence tests.
@@ -1159,6 +1160,46 @@ describe('LeafletMapOverlay', () => {
       const az = northEdgeAzDeg(parent.children[0]);
       expect(az).toBeGreaterThan(270); // = 360 − partway
       expect(az).toBeLessThan(360);
+      overlay.dispose();
+    });
+
+    // Why (the regression guard for the whole bug class): across the FULL input
+    // space, the applied yaw must be camera-RELATIVE — north-edge azimuth =
+    // (viewAzimuth − heading) — and, crucially, the heading line (drawn at
+    // `heading` inside the divIcon) must land at the camera-forward azimuth so
+    // the live camera projects it to screen-up at EVERY heading. The original bug
+    // (absolute heading) failed this everywhere except one heading; a sign/rate
+    // regression in either the rotation or the line would break the second
+    // assertion. `dt = 1` clamps the lerp alpha to 1, so the heading snaps to the
+    // target each iteration (one reused overlay, no per-run churn).
+    it('property: north-edge = viewAzimuth − heading, and the heading line lands at camera-forward (→ up)', () => {
+      const circDiff = (a: number, b: number): number => {
+        const d = (((a - b) % 360) + 360) % 360;
+        return Math.min(d, 360 - d);
+      };
+      const { overlay, parent, camera } = showOverlayWithParent(true);
+      expect(() =>
+        fc.assert(
+          fc.property(
+            fc.double({ min: 0, max: 359.999, noNaN: true }),
+            fc.double({ min: 0, max: 359.999, noNaN: true }),
+            (viewAz, heading) => {
+              aimCamera(camera, viewAz);
+              overlay.render({ ...sampleMapData(), userHeadingDeg: heading });
+              overlay.updatePosition(1, camera);
+
+              const ne = northEdgeAzDeg(parent.children[0]);
+              const wantNe = (((viewAz - heading) % 360) + 360) % 360;
+              // Tiles: north edge is rotated camera-relative.
+              if (circDiff(ne, wantNe) > 0.5) return false;
+              // Line: north-edge + its DOM angle (= heading) = the camera-forward
+              // azimuth, which the live camera projects to screen-up.
+              return circDiff(ne + heading, viewAz) <= 0.5;
+            }
+          ),
+          { numRuns: 50 }
+        )
+      ).not.toThrow();
       overlay.dispose();
     });
 

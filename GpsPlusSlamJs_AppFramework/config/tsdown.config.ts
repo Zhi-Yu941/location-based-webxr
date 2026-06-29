@@ -28,6 +28,9 @@ const entryFiles = [
   'src/ar/depth-sampler.ts',
   'src/ar/depth-unprojection.ts',
   'src/ar/occupancy-grid.ts',
+  // Pure voxel→surface mesher — deep-importable (the `./ar/*` wildcard
+  // advertises this subpath), so it must be built per-file.
+  'src/ar/occupancy-mesher.ts',
   'src/ar/enable-gps-ar.ts',
   'src/ar/frame-loop.ts',
   'src/ar/image-capture.ts',
@@ -133,6 +136,7 @@ const entryFiles = [
   'src/visualization/gps-anchor.ts',
   'src/visualization/gps-compass-cubes.ts',
   'src/visualization/gps-event-markers.ts',
+  'src/visualization/occlusion-mesh.ts',
   'src/visualization/hit-test-reticle.ts',
   'src/visualization/leaflet-map-overlay.ts',
   'src/visualization/lerp-utils.ts',

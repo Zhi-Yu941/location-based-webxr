@@ -72,6 +72,7 @@ let occupancyCellSizeSlider: HTMLInputElement | null = null;
 let occupancyCellSizeValue: HTMLElement | null = null;
 let occupancyMinConfidenceSlider: HTMLInputElement | null = null;
 let occupancyMinConfidenceValue: HTMLElement | null = null;
+let occupancyOcclusionMeshCheckbox: HTMLInputElement | null = null;
 let frameTileDisplayDivisorSlider: HTMLInputElement | null = null;
 let frameTileDisplayDivisorValue: HTMLElement | null = null;
 let vizFrameTilesCheckbox: HTMLInputElement | null = null;
@@ -199,6 +200,9 @@ export function initSettingsModal(
   occupancyCellSizeValue = document.getElementById('occupancy-cell-size-value');
   occupancyMinConfidenceSlider = document.getElementById(
     'occupancy-min-confidence'
+  ) as HTMLInputElement;
+  occupancyOcclusionMeshCheckbox = document.getElementById(
+    'occupancy-occlusion-mesh'
   ) as HTMLInputElement;
   occupancyMinConfidenceValue = document.getElementById(
     'occupancy-min-confidence-value'
@@ -328,6 +332,15 @@ export function initSettingsModal(
       const cm = parseInt(occupancyCellSizeSlider.value, 10);
       workingOptions.occupancy.cellSizeM = cm / 100;
       occupancyCellSizeValue.textContent = `${cm} cm`;
+    }
+  });
+
+  // Persistent depth-only occlusion mesh (occupancy.occlusionMeshEnabled).
+  // Applies on the next Enter-AR / replay load, like the voxel-size knobs.
+  occupancyOcclusionMeshCheckbox?.addEventListener('change', () => {
+    if (workingOptions && occupancyOcclusionMeshCheckbox) {
+      workingOptions.occupancy.occlusionMeshEnabled =
+        occupancyOcclusionMeshCheckbox.checked;
     }
   });
 
@@ -843,6 +856,10 @@ function populateForm(options: RecordingOptions): void {
     const n = options.occupancy.minConfidence;
     occupancyMinConfidenceValue.textContent =
       n === 1 ? '1 (unfiltered)' : String(n);
+  }
+  if (occupancyOcclusionMeshCheckbox) {
+    occupancyOcclusionMeshCheckbox.checked =
+      options.occupancy.occlusionMeshEnabled;
   }
 
   // Frame-tile display-resolution divisor (D7-resolution)

@@ -49,6 +49,7 @@ import { wireFrameTileSubscribers } from '../visualization/wire-frame-tile-subsc
 import { OccupancyGrid } from 'gps-plus-slam-app-framework/ar/occupancy-grid';
 import { loadRecordingOptions } from 'gps-plus-slam-app-framework/state/recording-options';
 import { OccupancyCubesVisualizer } from '../visualization/occupancy-cubes-visualizer';
+import { OcclusionMesh } from 'gps-plus-slam-app-framework/visualization';
 import { wireOccupancyGridSubscribers } from '../visualization/wire-occupancy-grid-subscribers';
 import { createZipFrameBlobSource } from '../storage/zip-frame-blob-source';
 import * as THREE from 'three';
@@ -200,6 +201,7 @@ export async function startReplayMode(
   // Best-effort like the frame tiles above.
   let unsubscribeOccupancyGrid: (() => void) | null = null;
   let occupancyCubesVisualizer: OccupancyCubesVisualizer | null = null;
+  let occlusionMesh: OcclusionMesh | null = null;
   try {
     // Re-derive the grid from the recorded depth points at the user's current
     // voxel size (recording-options `occupancy.cellSizeM`, clamped 1–20 cm).
@@ -218,10 +220,24 @@ export async function startReplayMode(
       replaySceneState.arWorldGroup,
       { minObservations: occupancyOptions.minConfidence }
     );
+    // Persistent depth-only occluder (opt-in, off by default), re-quantizable
+    // per replay like the cubes. Snapshots the same minConfidence floor.
+    const occluderSink = occupancyOptions.occlusionMeshEnabled
+      ? ((occlusionMesh = new OcclusionMesh(replaySceneState.arWorldGroup)),
+        {
+          refresh: (g: OccupancyGrid) =>
+            occlusionMesh?.update(
+              g.getOccupiedCells(occupancyOptions.minConfidence),
+              g.cellSizeM
+            ),
+          clear: () => occlusionMesh?.clear(),
+        })
+      : undefined;
     unsubscribeOccupancyGrid = wireOccupancyGridSubscribers({
       storeRef: createStoreRef(store),
       grid: occupancyGrid,
       visualizer: occupancyCubesVisualizer,
+      occluder: occluderSink,
       // Coalesce the replay burst to the user's current `depth.intervalMs`
       // rather than a fixed 1 s — re-quantization parity with cellSizeM /
       // minConfidence above (the same global setting re-read per replay),
@@ -369,6 +385,7 @@ export async function startReplayMode(
       frameTileVisualizer?.dispose();
       unsubscribeOccupancyGrid?.();
       occupancyCubesVisualizer?.dispose();
+      occlusionMesh?.dispose();
       disposeReplayScene();
       log.info('Replay mode disposed');
     },

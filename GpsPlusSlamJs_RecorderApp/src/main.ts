@@ -151,6 +151,7 @@ import { wireFrameTileSubscribers } from './visualization/wire-frame-tile-subscr
 import { FrameBlobCache } from './visualization/frame-blob-cache';
 import { OccupancyGrid } from 'gps-plus-slam-app-framework/ar/occupancy-grid';
 import { OccupancyCubesVisualizer } from './visualization/occupancy-cubes-visualizer';
+import { OcclusionMesh } from 'gps-plus-slam-app-framework/visualization';
 import { wireOccupancyGridSubscribers } from './visualization/wire-occupancy-grid-subscribers';
 import { setOccupancyGrid } from './state/occupancy-grid-provider';
 import { SESSION_IMAGES_DIR } from 'gps-plus-slam-app-framework/storage/file-system-utils';
@@ -267,6 +268,8 @@ let unsubscribeFrameTiles: (() => void) | null = null;
 // in the live AR scene at ~1 Hz.
 let occupancyGrid: OccupancyGrid | null = null;
 let occupancyCubesVisualizer: OccupancyCubesVisualizer | null = null;
+// Persistent depth-only occluder (off by default — occupancy.occlusionMeshEnabled).
+let occlusionMesh: OcclusionMesh | null = null;
 let unsubscribeOccupancyGrid: (() => void) | null = null;
 
 // Live QR recording (opt-in, recording-options `qr`). The thin RAW producer
@@ -599,6 +602,10 @@ export function resetMainState(): void {
   if (occupancyCubesVisualizer) {
     occupancyCubesVisualizer.dispose();
     occupancyCubesVisualizer = null;
+  }
+  if (occlusionMesh) {
+    occlusionMesh.dispose();
+    occlusionMesh = null;
   }
   occupancyGrid = null;
   setOccupancyGrid(null);
@@ -1267,6 +1274,8 @@ async function handleEnterAR(): Promise<void> {
         unsubscribeOccupancyGrid = null;
         occupancyCubesVisualizer?.dispose();
         occupancyCubesVisualizer = null;
+        occlusionMesh?.dispose();
+        occlusionMesh = null;
         occupancyGrid = null;
         setOccupancyGrid(null);
 
@@ -1300,10 +1309,29 @@ async function handleEnterAR(): Promise<void> {
               { minObservations: recordingOptions.occupancy.minConfidence }
             ))
           : { refresh: () => {}, clear: () => {} };
+
+        // Persistent depth-only occluder (opt-in, off by default). When on, it
+        // re-meshes the grid on the same throttle as the cubes and writes depth
+        // (no color) under arWorldGroup so real geometry hides virtual content
+        // placed behind it. The adapter snapshots the SAME minConfidence floor
+        // the cubes/COLMAP use, so the three consumers can't silently diverge.
+        const minConfidence = recordingOptions.occupancy.minConfidence;
+        const occluderSink = recordingOptions.occupancy.occlusionMeshEnabled
+          ? ((occlusionMesh = new OcclusionMesh(arWorldGroup)),
+            {
+              refresh: (g: OccupancyGrid) =>
+                occlusionMesh?.update(
+                  g.getOccupiedCells(minConfidence),
+                  g.cellSizeM
+                ),
+              clear: () => occlusionMesh?.clear(),
+            })
+          : undefined;
         unsubscribeOccupancyGrid = wireOccupancyGridSubscribers({
           storeRef,
           grid: occupancyGrid,
           visualizer: occupancyVisualizerSink,
+          occluder: occluderSink,
           // Tie the cube-refresh throttle to the depth-sample cadence so a
           // faster `depth.intervalMs` (e.g. 500 ms) isn't capped at the old
           // hardcoded 1 Hz. At the default 1000 ms this equals the previous

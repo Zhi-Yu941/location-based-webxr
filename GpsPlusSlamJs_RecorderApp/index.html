@@ -1197,6 +1197,23 @@ No errors</pre
                 the floor) but may drop briefly-seen surfaces. 1 = unfiltered.
                 Applies the next time you enter AR or load a replay.
               </p>
+              <label class="flex items-center gap-2 cursor-pointer mt-1">
+                <input
+                  type="checkbox"
+                  id="occupancy-occlusion-mesh"
+                  class="w-4 h-4 accent-blue-500"
+                />
+                <span class="text-sm text-gray-200"
+                  >Persistent occlusion mesh (experimental)</span
+                >
+              </label>
+              <p class="text-[11px] text-gray-400">
+                Mesh the occupancy grid into an invisible depth-only surface so
+                real geometry hides virtual objects placed behind it — including
+                surfaces you already walked past. Off by default (extra cost;
+                still being tuned on device). Applies the next time you enter AR
+                or load a replay.
+              </p>
             </div>
           </div>
 

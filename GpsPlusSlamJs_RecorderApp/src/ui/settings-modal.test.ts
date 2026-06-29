@@ -162,6 +162,13 @@ describe('settings-modal', () => {
       expect(html).toContain('id="occupancy-min-confidence-value"');
     });
 
+    it('includes the persistent occlusion-mesh checkbox', () => {
+      // 2026-06-13 occupancy-mesh-options plan: the persistent depth-only
+      // occluder (occupancy.occlusionMeshEnabled) must be toggleable here.
+      const html = loadSettingsModalHtml();
+      expect(html).toContain('id="occupancy-occlusion-mesh"');
+    });
+
     it('includes the frame-tile display-resolution slider and value display', () => {
       // D7-resolution, 2026-06-16 user feedback: the in-AR/replay tile display
       // resolution (frameTileDisplay.divisor) must be user-configurable here,
@@ -368,6 +375,33 @@ describe('settings-modal', () => {
         'occupancy-min-confidence-value'
       );
       expect(valueDisplay?.textContent).toBe('1 (unfiltered)');
+    });
+
+    it('populates the occlusion-mesh checkbox from saved options and updates the working copy', () => {
+      localStorageMock.getItem.mockReturnValueOnce(
+        JSON.stringify({ occupancy: { occlusionMeshEnabled: true } })
+      );
+
+      showSettingsModal();
+
+      const checkbox = document.getElementById(
+        'occupancy-occlusion-mesh'
+      ) as HTMLInputElement;
+      expect(checkbox.checked).toBe(true);
+
+      // Toggling it off mutates the working options (persisted on Save).
+      checkbox.checked = false;
+      checkbox.dispatchEvent(new Event('change'));
+      expect(getWorkingOptions()?.occupancy.occlusionMeshEnabled).toBe(false);
+    });
+
+    it('defaults the occlusion-mesh checkbox to off (feature off by default)', () => {
+      localStorageMock.getItem.mockReturnValueOnce(JSON.stringify({}));
+      showSettingsModal();
+      const checkbox = document.getElementById(
+        'occupancy-occlusion-mesh'
+      ) as HTMLInputElement;
+      expect(checkbox.checked).toBe(false);
     });
 
     it('populates AR crash isolation checkbox from saved options', () => {

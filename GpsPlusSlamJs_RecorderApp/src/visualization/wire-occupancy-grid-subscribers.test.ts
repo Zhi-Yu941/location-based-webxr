@@ -58,6 +58,13 @@ function makeVisualizerSpy() {
   };
 }
 
+function makeOccluderSpy() {
+  return {
+    refresh: vi.fn<(grid: OccupancyGridSink) => void>(),
+    clear: vi.fn<() => void>(),
+  };
+}
+
 function makeStore() {
   return createRecorderStore({ storageBackend: new NullStorageBackend() });
 }
@@ -323,5 +330,74 @@ describe('wireOccupancyGridSubscribers', () => {
     expect(grid.addSample).toHaveBeenCalledTimes(1);
 
     dispose();
+  });
+
+  describe('optional occluder (occupancy.occlusionMeshEnabled)', () => {
+    it('refreshes the occluder on the same throttle as the visualizer', () => {
+      const grid = makeGridSpy();
+      const visualizer = makeVisualizerSpy();
+      const occluder = makeOccluderSpy();
+      const dispose = wireOccupancyGridSubscribers({
+        storeRef,
+        grid,
+        visualizer,
+        occluder,
+        refreshIntervalMs: 1000,
+      });
+
+      // Leading-edge refresh hits both sinks with the live grid.
+      storeRef.get().dispatch(recordDepthSample(makeSample(1)));
+      expect(visualizer.refresh).toHaveBeenCalledTimes(1);
+      expect(occluder.refresh).toHaveBeenCalledTimes(1);
+      expect(occluder.refresh).toHaveBeenCalledWith(grid);
+
+      // Burst coalesces to a single trailing refresh on BOTH sinks.
+      storeRef.get().dispatch(recordDepthSample(makeSample(2)));
+      expect(occluder.refresh).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(1000);
+      expect(occluder.refresh).toHaveBeenCalledTimes(2);
+
+      dispose();
+    });
+
+    it('clears the occluder on store swap', () => {
+      const grid = makeGridSpy();
+      const occluder = makeOccluderSpy();
+      const dispose = wireOccupancyGridSubscribers({
+        storeRef,
+        grid,
+        visualizer: makeVisualizerSpy(),
+        occluder,
+      });
+
+      storeRef.set(makeStore());
+      expect(occluder.clear).toHaveBeenCalledTimes(1);
+
+      dispose();
+    });
+
+    it('reports an occluder failure via onError without breaking the visualizer', () => {
+      const grid = makeGridSpy();
+      const visualizer = makeVisualizerSpy();
+      const occluder = makeOccluderSpy();
+      occluder.refresh.mockImplementation(() => {
+        throw new Error('mesh boom');
+      });
+      const onError = vi.fn();
+      const dispose = wireOccupancyGridSubscribers({
+        storeRef,
+        grid,
+        visualizer,
+        occluder,
+        onError,
+      });
+
+      storeRef.get().dispatch(recordDepthSample(makeSample(1)));
+      // Occluder threw, but the visualizer still refreshed and the error surfaced.
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(visualizer.refresh).toHaveBeenCalledTimes(1);
+
+      dispose();
+    });
   });
 });

@@ -49,6 +49,17 @@ export interface WireOccupancyGridSubscribersOptions<
     refresh(grid: NoInfer<TGrid>, viewerPose?: ViewerPose): void;
     clear(): void;
   };
+  /**
+   * Optional persistent depth-only occluder (the `OccupancyMesh` adapter),
+   * refreshed on the **same** throttle as the cube visualizer. `refresh` gets
+   * the live grid so the adapter can snapshot `getOccupiedCells(minConfidence)`;
+   * `clear` empties it on store swap. Absent unless the
+   * `occupancy.occlusionMeshEnabled` setting is on (off by default).
+   */
+  readonly occluder?: {
+    refresh(grid: NoInfer<TGrid>): void;
+    clear(): void;
+  };
   /** Defaults to {@link DEFAULT_REFRESH_INTERVAL_MS}. */
   readonly refreshIntervalMs?: number;
   readonly onError?: (err: unknown) => void;
@@ -65,6 +76,7 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
     storeRef,
     grid,
     visualizer,
+    occluder,
     refreshIntervalMs = DEFAULT_REFRESH_INTERVAL_MS,
     onError,
   } = options;
@@ -90,6 +102,15 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
       visualizer.refresh(grid, lastViewerPose ?? undefined);
     } catch (err) {
       onError?.(err);
+    }
+    // Independent best-effort: a throwing visualizer must not skip the
+    // occluder re-mesh, and vice versa.
+    if (occluder) {
+      try {
+        occluder.refresh(grid);
+      } catch (err) {
+        onError?.(err);
+      }
     }
   };
 
@@ -170,6 +191,13 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
       visualizer.clear();
     } catch (err) {
       onError?.(err);
+    }
+    if (occluder) {
+      try {
+        occluder.clear();
+      } catch (err) {
+        onError?.(err);
+      }
     }
     detach = attach(nextStore);
   });

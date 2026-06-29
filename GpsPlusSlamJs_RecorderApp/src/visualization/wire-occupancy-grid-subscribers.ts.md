@@ -12,6 +12,7 @@ Plan: `GpsPlusSlamJs_Docs/docs/2026-06-11-depth-occupancy-grid-port-plan.md` §3
   - `storeRef: StoreRef<RecorderStore>` — re-attaches on store swap (Start Recording / Replay); on swap both grid and visualizer are cleared and the throttle resets.
   - `grid: TGrid extends OccupancyGridSink` — `{ addSample(sample), clear() }`.
   - `visualizer: { refresh(grid: TGrid, viewerPose?: ViewerPose), clear() }` — injected, typically `OccupancyCubesVisualizer`. The `viewerPose` arg is optional, so a sink that ignores it (the no-op overlay-off sink in `main.ts`) still satisfies the type.
+  - `occluder?: { refresh(grid: TGrid), clear() }` — optional persistent depth-only occluder (the `OcclusionMesh` adapter), refreshed on the **same** throttle as the visualizer. Present only when `occupancy.occlusionMeshEnabled` is on (off by default). `refresh` gets the live grid so the adapter snapshots `getOccupiedCells(minConfidence)`; independent best-effort like the visualizer (a throwing occluder still lets the visualizer refresh, and vice versa).
   - `refreshIntervalMs?` — minimum delay between refreshes; default 1000. Live and replay both pass `depth.intervalMs` here (Issue A).
   - `onError?(err)` — receives grid/visualizer failures; the subscription itself never breaks.
 - **`OccupancyGridSink`** — the grid surface this wirer needs.

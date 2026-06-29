@@ -32,7 +32,7 @@ import type { LatLong } from 'gps-plus-slam-js';
 import { VIS_COLORS } from './vis-colors';
 import type { MapData } from './map-data';
 import { drawMapData } from './map-overlay-draw';
-import { headingUpQuat } from './heading-up-rotation';
+import { headingUpQuat, viewAzimuthDeg } from './heading-up-rotation';
 import { clampedAlpha, DEFAULT_LERP_RATE, lerpAngleDeg } from './lerp-utils';
 import { createLogger } from '../utils/logger';
 
@@ -381,18 +381,28 @@ export class LeafletMapOverlay {
   }
 
   /**
-   * Per-frame update. Positioning is handled by Three.js scene-graph
-   * propagation (the CSS3DObject is a child of the parent), so this only drives
-   * the heading-up rotation: it smooths the map's yaw toward the latest ~1 Hz
-   * `targetHeadingDeg` and applies it to the CSS3DObject. A no-op when
-   * heading-up is disabled, the map is not shown, or the heading is undefined
-   * (in which case the last orientation is held).
+   * Per-frame update driving the heading-up rotation. Positioning is handled by
+   * Three.js scene-graph propagation (the CSS3DObject is a child of the parent),
+   * so this only sets the in-plane yaw.
    *
-   * @param dtSeconds Seconds since the previous frame (drives the smoothing
-   *   rate). Defaults to 0 — a frame with `dt = 0` makes no rotation progress.
+   * The minimap is world-locked but composited through the **live head-tracked
+   * camera**, so the camera already rotates the map's on-screen appearance as
+   * the user turns. The local yaw must therefore be expressed RELATIVE to the
+   * camera — `headingUpQuat(viewAzimuth − userHeading)` — otherwise the camera's
+   * rotation is double-counted and the GPS↔scene alignment offset leaks in (the
+   * map then only points forward at a single heading). `userHeading` is smoothed
+   * toward the latest ~1 Hz target; `viewAzimuth` is read live from the camera
+   * each frame so the projection cancels exactly (no lag).
+   *
+   * A no-op when heading-up is disabled, the map is not shown, the camera is
+   * absent, or the heading is undefined (the last orientation is held).
+   *
+   * @param dtSeconds Seconds since the previous frame (drives heading smoothing).
+   * @param camera The live render camera (the same one compositing the CSS3D
+   *   overlay). Required for heading-up; omitted callers leave the map as-is.
    */
-  updatePosition(dtSeconds = 0): void {
-    if (!this.headingUp || !this.cssObject) {
+  updatePosition(dtSeconds = 0, camera?: THREE.Camera): void {
+    if (!this.headingUp || !this.cssObject || !camera) {
       return;
     }
     const target = this.targetHeadingDeg;
@@ -412,7 +422,13 @@ export class LeafletMapOverlay {
         alpha
       );
     }
-    this.cssObject.quaternion.set(...headingUpQuat(this.currentHeadingDeg));
+    // Live camera azimuth (raw, not smoothed) so the camera's own on-screen
+    // rotation cancels exactly; the smoothed heading removes the alignment offset.
+    camera.updateMatrixWorld();
+    const viewAz = viewAzimuthDeg(camera.matrixWorld.elements);
+    this.cssObject.quaternion.set(
+      ...headingUpQuat(viewAz - this.currentHeadingDeg)
+    );
   }
 
   // -------------------------------------------------------------------------

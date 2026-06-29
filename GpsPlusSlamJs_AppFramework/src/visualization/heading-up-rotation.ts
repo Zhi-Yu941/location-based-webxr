@@ -38,6 +38,7 @@ const TILT_X_RAD = -Math.PI / 2;
 const YAW_SIGN = -1;
 
 const DEG_TO_RAD = Math.PI / 180;
+const RAD_TO_DEG = 180 / Math.PI;
 
 // Baseline tilt quaternion, computed once (no per-call allocation churn).
 const TILT = quat.setAxisAngle(quat.create(), [1, 0, 0], TILT_X_RAD);
@@ -61,4 +62,32 @@ export function headingUpQuat(
   // Apply tilt first, then yaw: q = yaw · tilt.
   quat.multiply(_out, _yaw, TILT);
   return [_out[0], _out[1], _out[2], _out[3]];
+}
+
+/**
+ * Azimuth (degrees clockwise, `[0, 360)`) that the camera is looking, measured
+ * in the same scene frame and convention as {@link headingUpQuat}'s input
+ * (0° = looking along world −Z, +90° = looking along world +X).
+ *
+ * Why this is needed for heading-up: the minimap is world-locked (its parent is
+ * rotation-identity) but it is composited through the **live head-tracked
+ * camera**, so the camera already rotates the map's on-screen appearance as the
+ * user turns. The map's local heading-up yaw must therefore be expressed
+ * RELATIVE to the camera, not in absolute GPS-north terms — otherwise the
+ * camera's rotation is double-counted and the result is only correct at a single
+ * heading (the difference being the GPS↔scene alignment yaw). The consumer rolls
+ * the alignment offset out by feeding `headingUpQuat(viewAzimuth − userHeading)`.
+ *
+ * @param matrixWorldElements The camera's `matrixWorld.elements` (column-major).
+ *   The camera looks down its local −Z, so world-forward = −(3rd column).
+ * @returns The camera's horizontal viewing azimuth in `[0, 360)` degrees.
+ */
+export function viewAzimuthDeg(matrixWorldElements: ArrayLike<number>): number {
+  // world-forward = −(local +Z column) = (−m[8], −m[9], −m[10]); azimuth uses the
+  // horizontal components in the atan2(x, −z) convention (0 at −Z, +90 at +X).
+  // `?? 0` satisfies noUncheckedIndexedAccess (a real Matrix4 always has 16).
+  const m8 = matrixWorldElements[8] ?? 0;
+  const m10 = matrixWorldElements[10] ?? 0;
+  const deg = Math.atan2(-m8, m10) * RAD_TO_DEG;
+  return ((deg % 360) + 360) % 360;
 }

@@ -10,9 +10,10 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import * as THREE from 'three';
 import { quat, vec3 } from 'gl-matrix';
 import fc from 'fast-check';
-import { headingUpQuat } from './heading-up-rotation';
+import { headingUpQuat, viewAzimuthDeg } from './heading-up-rotation';
 
 /** Rotate a vector by a heading-up quaternion (as the CSS3DObject would). */
 function applied(headingDeg: number, v: vec3): vec3 {
@@ -94,5 +95,51 @@ describe('headingUpQuat', () => {
         })
       )
     ).not.toThrow();
+  });
+});
+
+describe('viewAzimuthDeg', () => {
+  // Build a camera looking at `target` from the origin and read its azimuth.
+  // A THREE camera looks down its local −Z, so world-forward = direction to
+  // target — exactly the vector viewAzimuthDeg reconstructs from matrixWorld.
+  function azimuthLookingAt(target: [number, number, number]): number {
+    const cam = new THREE.PerspectiveCamera();
+    cam.position.set(0, 0, 0);
+    cam.lookAt(new THREE.Vector3(...target));
+    cam.updateMatrixWorld(true);
+    return viewAzimuthDeg(cam.matrixWorld.elements);
+  }
+
+  it('returns 0° when looking along world −Z (matches headingUpQuat baseline)', () => {
+    expect(azimuthLookingAt([0, 0, -1])).toBeCloseTo(0, 3);
+  });
+
+  it('returns 90° when looking along world +X', () => {
+    expect(azimuthLookingAt([1, 0, 0])).toBeCloseTo(90, 3);
+  });
+
+  it('returns 180° when looking along world +Z', () => {
+    expect(azimuthLookingAt([0, 0, 1])).toBeCloseTo(180, 3);
+  });
+
+  it('returns 270° when looking along world −X', () => {
+    expect(azimuthLookingAt([-1, 0, 0])).toBeCloseTo(270, 3);
+  });
+
+  it('ignores pitch — a downward-tilted camera reports its horizontal azimuth', () => {
+    // Looking mostly +X but tilted down: azimuth should still read ~90°.
+    expect(azimuthLookingAt([1, -1, 0])).toBeCloseTo(90, 2);
+  });
+
+  it('always returns a value in [0, 360)', () => {
+    for (const t of [
+      [0.3, 0, -0.7],
+      [-0.5, -0.2, 0.5],
+      [2, 1, -3],
+    ] as Array<[number, number, number]>) {
+      const az = azimuthLookingAt(t);
+      expect(az).toBeGreaterThanOrEqual(0);
+      expect(az).toBeLessThan(360);
+    }
   });
 });

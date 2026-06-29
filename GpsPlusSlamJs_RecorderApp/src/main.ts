@@ -1367,7 +1367,10 @@ async function handleEnterAR(): Promise<void> {
       }
 
       if (mapOverlay?.isVisible()) {
-        mapOverlay.updatePosition(dt);
+        // Pass the live render camera so heading-up rotation is computed
+        // relative to where the user is actually looking (the same camera the
+        // CSS3D overlay is composited through). See the 2026-06-29 plan.
+        mapOverlay.updatePosition(dt, camera ?? undefined);
       }
     });
 

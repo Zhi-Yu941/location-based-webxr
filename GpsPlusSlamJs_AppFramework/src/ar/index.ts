@@ -238,6 +238,7 @@ export { OccupancyGrid, type OccupancyGridOptions } from './occupancy-grid.js';
 export {
   type Aabb,
   type OccupancyMeshResult,
+  type MeshOccupiedCellsOptions,
   meshOccupiedCells,
 } from './occupancy-mesher.js';
 

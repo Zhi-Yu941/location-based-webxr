@@ -121,4 +121,33 @@ describe('meshOccupiedCells', () => {
     expect(faceCount(result.indices)).toBe(6); // only the valid voxel
     expect(result.aabbs).toHaveLength(1);
   });
+
+  describe('greedy merge', () => {
+    it('keeps a single voxel at 6 quads (nothing to merge)', () => {
+      const culled = meshOccupiedCells([[0, 0, 0]], 0.15);
+      const greedy = meshOccupiedCells([[0, 0, 0]], 0.15, { greedy: true });
+      expect(faceCount(greedy.indices)).toBe(6);
+      expect(faceCount(greedy.indices)).toBe(faceCount(culled.indices));
+    });
+
+    it('collapses a flat 5×5×1 slab from 70 faces to 6 quads', () => {
+      const cells: GridCell[] = [];
+      for (let x = 0; x < 5; x++)
+        for (let y = 0; y < 5; y++) cells.push([x, y, 0]);
+      const culled = meshOccupiedCells(cells, 0.15);
+      const greedy = meshOccupiedCells(cells, 0.15, { greedy: true });
+      // Culled: 25 top + 25 bottom + 4 sides × 5 = 70 unit faces.
+      expect(faceCount(culled.indices)).toBe(70);
+      // Greedy: top + bottom (1 each) + 4 side strips (1 each) = 6 quads.
+      expect(faceCount(greedy.indices)).toBe(6);
+    });
+
+    it('still emits one AABB per cell (geometry merges, colliders do not)', () => {
+      const cells: GridCell[] = [];
+      for (let x = 0; x < 3; x++)
+        for (let y = 0; y < 3; y++) cells.push([x, y, 0]);
+      const greedy = meshOccupiedCells(cells, 0.15, { greedy: true });
+      expect(greedy.aabbs).toHaveLength(9);
+    });
+  });
 });

@@ -49,13 +49,43 @@ export interface Aabb {
  * to a Web Worker.
  */
 export interface OccupancyMeshResult {
-  /** Flat `[x0,y0,z0, x1,y1,z1, …]` vertex positions, 4 verts per emitted face. */
+  /** Flat `[x0,y0,z0, x1,y1,z1, …]` vertex positions, 4 verts per emitted quad. */
   readonly positions: Float32Array;
-  /** Triangle indices into `positions` (2 triangles / 6 indices per face). */
+  /** Triangle indices into `positions` (2 triangles / 6 indices per quad). */
   readonly indices: Uint32Array;
   /** One AABB per unique occupied cell. */
   readonly aabbs: readonly Aabb[];
 }
+
+/** Options for {@link meshOccupiedCells}. */
+export interface MeshOccupiedCellsOptions {
+  /**
+   * Merge coplanar adjacent exposed faces into larger quads (Minecraft-style
+   * greedy meshing) to cut the triangle count, often 5–20×. The merged surface
+   * covers the **exact same** set of unit faces as the default per-face output
+   * (same occluded volume) — only the triangulation is coarser. Default false.
+   *
+   * Note: this merges the **render/occluder geometry** only; the `aabbs` list
+   * stays one box per cell (a 3-D greedy box merge for fewer colliders is a
+   * separate follow-on — see the plan §3E).
+   */
+  readonly greedy?: boolean;
+}
+
+/** A coordinate-axis index into a {@link GridCell} / position triple. */
+type Axis = 0 | 1 | 2;
+
+/**
+ * Right-handed cyclic axis assignment per face-normal axis `d`: `(d, u, v)`
+ * with `eu × ev = ed`, so a `(uMin,vMin)→(uMax,vMin)→(uMax,vMax)→(uMin,vMax)`
+ * quad has the `+d` outward normal (and the reverse order has `−d`). Used by the
+ * greedy mesher to keep merged-quad winding consistent with the per-face path.
+ */
+const GREEDY_DIRS: readonly { d: Axis; u: Axis; v: Axis }[] = [
+  { d: 0, u: 1, v: 2 },
+  { d: 1, u: 2, v: 0 },
+  { d: 2, u: 0, v: 1 },
+];
 
 /** Unit-cube face: a neighbour offset (cull test) + 4 outward-CCW corner signs. */
 interface FaceSpec {
@@ -164,7 +194,8 @@ function isFiniteCell(cell: GridCell): boolean {
  */
 export function meshOccupiedCells(
   cells: Iterable<GridCell>,
-  cellSizeM: number
+  cellSizeM: number,
+  options?: MeshOccupiedCellsOptions
 ): OccupancyMeshResult {
   if (!Number.isFinite(cellSizeM) || cellSizeM <= 0) {
     throw new RangeError(
@@ -190,30 +221,17 @@ export function meshOccupiedCells(
     uniqueCells.push(cell);
   }
 
+  const aabbs: Aabb[] = uniqueCells.map(([x, y, z]) => ({
+    center: [x * cellSizeM, y * cellSizeM, z * cellSizeM],
+    halfExtents: [half, half, half],
+  }));
+
   const positions: number[] = [];
   const indices: number[] = [];
-  const aabbs: Aabb[] = [];
-
-  for (const [x, y, z] of uniqueCells) {
-    const cx = x * cellSizeM;
-    const cy = y * cellSizeM;
-    const cz = z * cellSizeM;
-    aabbs.push({ center: [cx, cy, cz], halfExtents: [half, half, half] });
-
-    for (const face of FACES) {
-      const nx = x + face.neighbour[0];
-      const ny = y + face.neighbour[1];
-      const nz = z + face.neighbour[2];
-      if (occupied.has(cellKey(nx, ny, nz))) {
-        continue; // shared interior face — cull it
-      }
-      const base = positions.length / 3;
-      for (const [sx, sy, sz] of face.corners) {
-        positions.push(cx + sx * half, cy + sy * half, cz + sz * half);
-      }
-      // Two triangles for the quad: (0,1,2) and (0,2,3).
-      indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
-    }
+  if (options?.greedy) {
+    buildGreedy(occupied, uniqueCells, cellSizeM, positions, indices);
+  } else {
+    buildCulled(occupied, uniqueCells, cellSizeM, positions, indices);
   }
 
   return {
@@ -221,4 +239,185 @@ export function meshOccupiedCells(
     indices: Uint32Array.from(indices),
     aabbs,
   };
+}
+
+/** Push a quad (4 corners, already ordered) as two triangles. */
+function pushQuad(
+  positions: number[],
+  indices: number[],
+  corners: readonly [number, number, number][]
+): void {
+  const base = positions.length / 3;
+  for (const [px, py, pz] of corners) {
+    positions.push(px, py, pz);
+  }
+  indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+}
+
+/** Per-face culling: emit each exposed unit face as its own quad. */
+function buildCulled(
+  occupied: Set<string>,
+  uniqueCells: readonly GridCell[],
+  cellSizeM: number,
+  positions: number[],
+  indices: number[]
+): void {
+  const half = cellSizeM / 2;
+  for (const [x, y, z] of uniqueCells) {
+    const cx = x * cellSizeM;
+    const cy = y * cellSizeM;
+    const cz = z * cellSizeM;
+    for (const face of FACES) {
+      const nx = x + face.neighbour[0];
+      const ny = y + face.neighbour[1];
+      const nz = z + face.neighbour[2];
+      if (occupied.has(cellKey(nx, ny, nz))) {
+        continue; // shared interior face — cull it
+      }
+      pushQuad(
+        positions,
+        indices,
+        face.corners.map(([sx, sy, sz]) => [
+          cx + sx * half,
+          cy + sy * half,
+          cz + sz * half,
+        ])
+      );
+    }
+  }
+}
+
+/**
+ * Greedy meshing: for each face-normal axis and side, sweep slices and merge
+ * adjacent coplanar exposed faces into maximal rectangles, emitting one quad
+ * per rectangle. The covered unit faces are identical to {@link buildCulled};
+ * only the triangle count drops.
+ */
+function buildGreedy(
+  occupied: Set<string>,
+  uniqueCells: readonly GridCell[],
+  cellSizeM: number,
+  positions: number[],
+  indices: number[]
+): void {
+  const half = cellSizeM / 2;
+  for (const { d, u, v } of GREEDY_DIRS) {
+    for (const sign of [1, -1] as const) {
+      // Group exposed (iu,iv) cells by slice index k = cell[d].
+      const slices = new Map<number, Map<string, readonly [number, number]>>();
+      for (const cell of uniqueCells) {
+        const neighbour: [number, number, number] = [cell[0], cell[1], cell[2]];
+        neighbour[d] += sign;
+        if (occupied.has(cellKey(neighbour[0], neighbour[1], neighbour[2]))) {
+          continue; // interior face on this side
+        }
+        const k = cell[d];
+        const iu = cell[u];
+        const iv = cell[v];
+        let slice = slices.get(k);
+        if (!slice) {
+          slice = new Map();
+          slices.set(k, slice);
+        }
+        slice.set(`${iu},${iv}`, [iu, iv]);
+      }
+      for (const [k, slice] of [...slices.entries()].sort(
+        (a, b) => a[0] - b[0]
+      )) {
+        greedyMergeSlice(
+          slice,
+          half,
+          cellSizeM,
+          d,
+          u,
+          v,
+          k,
+          sign,
+          positions,
+          indices
+        );
+      }
+    }
+  }
+}
+
+/** Greedy-merge one slice's exposed (iu,iv) mask into maximal rectangles. */
+// eslint-disable-next-line max-params
+function greedyMergeSlice(
+  slice: ReadonlyMap<string, readonly [number, number]>,
+  half: number,
+  cellSizeM: number,
+  d: Axis,
+  u: Axis,
+  v: Axis,
+  k: number,
+  sign: number,
+  positions: number[],
+  indices: number[]
+): void {
+  const has = (iu: number, iv: number): boolean => slice.has(`${iu},${iv}`);
+  const used = new Set<string>();
+  // Deterministic order: by iv (outer) then iu (inner), both ascending.
+  const cells = [...slice.values()].sort((a, b) =>
+    a[1] !== b[1] ? a[1] - b[1] : a[0] - b[0]
+  );
+  for (const [iu, iv] of cells) {
+    const startKey = `${iu},${iv}`;
+    if (used.has(startKey)) {
+      continue;
+    }
+    // Grow width along +u while cells exist and are unused.
+    let w = 1;
+    while (has(iu + w, iv) && !used.has(`${iu + w},${iv}`)) {
+      w++;
+    }
+    // Grow height along +v while every cell of the next row is present/unused.
+    let h = 1;
+    let canGrow = true;
+    while (canGrow) {
+      for (let du = 0; du < w; du++) {
+        if (has(iu + du, iv + h) && !used.has(`${iu + du},${iv + h}`)) {
+          continue;
+        }
+        canGrow = false;
+        break;
+      }
+      if (canGrow) {
+        h++;
+      }
+    }
+    for (let dv = 0; dv < h; dv++) {
+      for (let du = 0; du < w; du++) {
+        used.add(`${iu + du},${iv + dv}`);
+      }
+    }
+    const plane = k * cellSizeM + sign * half;
+    const uMin = iu * cellSizeM - half;
+    const uMax = (iu + w - 1) * cellSizeM + half;
+    const vMin = iv * cellSizeM - half;
+    const vMax = (iv + h - 1) * cellSizeM + half;
+    const corner = (uVal: number, vVal: number): [number, number, number] => {
+      const p: [number, number, number] = [0, 0, 0];
+      p[d] = plane;
+      p[u] = uVal;
+      p[v] = vVal;
+      return p;
+    };
+    // +d side: CCW (uMin,vMin)→(uMax,vMin)→(uMax,vMax)→(uMin,vMax); −d reversed.
+    const corners: [number, number, number][] =
+      sign > 0
+        ? [
+            corner(uMin, vMin),
+            corner(uMax, vMin),
+            corner(uMax, vMax),
+            corner(uMin, vMax),
+          ]
+        : [
+            corner(uMin, vMin),
+            corner(uMin, vMax),
+            corner(uMax, vMax),
+            corner(uMax, vMin),
+          ];
+    pushQuad(positions, indices, corners);
+  }
 }

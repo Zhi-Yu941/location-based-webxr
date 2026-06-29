@@ -62,6 +62,49 @@ function halfIndex(coord: number): number {
   return Math.round(coord / (CELL_SIZE / 2));
 }
 
+/**
+ * Recover the set of covered **unit faces** from a mesh result. Each emitted
+ * quad is 4 consecutive vertices in `positions`; it lies in an axis-aligned
+ * plane (one axis constant). A merged greedy quad spans several unit faces; a
+ * per-face quad spans exactly one. Identifying each unit face by its (normal
+ * axis, plane half-index, and the two in-plane unit-centre half-indices) lets
+ * us assert greedy and culled outputs cover the identical surface.
+ */
+function recoverUnitFaces(positions: Float32Array): Set<string> {
+  const faces = new Set<string>();
+  const vertCount = positions.length / 3;
+  for (let q = 0; q < vertCount; q += 4) {
+    const verts: [number, number, number][] = [0, 1, 2, 3].map((i) => {
+      const o = (q + i) * 3;
+      return [positions[o]!, positions[o + 1]!, positions[o + 2]!];
+    });
+    let d = -1;
+    for (let axis = 0; axis < 3; axis++) {
+      if (verts.every((p) => p[axis] === verts[0]![axis])) {
+        d = axis;
+        break;
+      }
+    }
+    const planeIdx = halfIndex(verts[0]![d]!);
+    const others = [0, 1, 2].filter((a) => a !== d);
+    const a0 = others[0]!;
+    const a1 = others[1]!;
+    const a0vals = verts.map((p) => halfIndex(p[a0]!));
+    const a1vals = verts.map((p) => halfIndex(p[a1]!));
+    const a0min = Math.min(...a0vals);
+    const a0max = Math.max(...a0vals);
+    const a1min = Math.min(...a1vals);
+    const a1max = Math.max(...a1vals);
+    // Unit-cell centres are even half-indices strictly between the quad edges.
+    for (let c0 = a0min + 1; c0 < a0max; c0 += 2) {
+      for (let c1 = a1min + 1; c1 < a1max; c1 += 2) {
+        faces.add(`${d}:${planeIdx}:${a0}=${c0}:${a1}=${c1}`);
+      }
+    }
+  }
+  return faces;
+}
+
 describe('meshOccupiedCells — properties', () => {
   it('emits exactly one face per empty 6-neighbour', () => {
     fc.assert(
@@ -135,6 +178,23 @@ describe('meshOccupiedCells — properties', () => {
       fc.property(cellsArb, (cells) => {
         const { aabbs } = meshOccupiedCells(cells, CELL_SIZE);
         expect(aabbs.length).toBe(dedupeKeys(cells).size);
+      })
+    );
+  });
+
+  it('greedy merge covers the EXACT same unit faces as per-face culling', () => {
+    fc.assert(
+      fc.property(cellsArb, (cells) => {
+        const culled = meshOccupiedCells(cells, CELL_SIZE);
+        const greedy = meshOccupiedCells(cells, CELL_SIZE, { greedy: true });
+        const culledFaces = recoverUnitFaces(culled.positions);
+        const greedyFaces = recoverUnitFaces(greedy.positions);
+        // Same surface coverage…
+        expect(greedyFaces).toEqual(culledFaces);
+        // …and greedy never uses MORE triangles than per-face.
+        expect(greedy.indices.length).toBeLessThanOrEqual(
+          culled.indices.length
+        );
       })
     );
   });

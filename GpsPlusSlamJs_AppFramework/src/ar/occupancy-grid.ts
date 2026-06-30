@@ -62,7 +62,7 @@ interface CellRecord {
 export class OccupancyGrid {
   readonly cellSizeM: number;
   readonly carveStopCells: number;
-  private readonly cells = new Map<string, CellRecord>();
+  private readonly cells = new Map<number, CellRecord>();
 
   constructor(options?: OccupancyGridOptions) {
     const cellSizeM = options?.cellSizeM ?? 0.15;
@@ -129,6 +129,12 @@ export class OccupancyGrid {
         continue;
       }
       const cell = this.cellForPosition(world);
+      // Defensive: a corrupt projection can unproject to an absurd point whose
+      // cell falls outside the packable key range. Skip it (it cannot be a real
+      // ≤few-metre depth reading) rather than store a colliding key.
+      if (!cellInKeyRange(cell)) {
+        continue;
+      }
       if (!cellsEqual(cameraCell, cell)) {
         this.carve(cameraCell, cell);
       }
@@ -297,8 +303,32 @@ export class OccupancyGrid {
   }
 }
 
-function cellKey(cell: GridCell): string {
-  return `${cell[0]},${cell[1]},${cell[2]}`;
+// Numeric cell key — packs three integer coordinates into ONE safe-integer Map
+// key, avoiding the per-lookup string allocation in the addSample / carve hot
+// paths (one per point + one per carved cell). Three 17-bit fields keep the
+// packed key under 2^53, so `|coord|` must be `≤ CELL_KEY_LIMIT`; at the 0.15 m
+// default that spans ±9.8 km from the origin — far beyond any real session — and
+// `addSample` skips points whose cell falls outside it, so every stored key is
+// packable and collision-free.
+const CELL_KEY_LIMIT = 65535;
+const KEY_OFFSET = 65536; // 2^16 — shift a packable coordinate to non-negative
+const KEY_FIELD = 131072; // 2^17 — width of one packed field
+const KEY_FIELD_SQ = KEY_FIELD * KEY_FIELD; // 2^34
+
+function cellInKeyRange(cell: GridCell): boolean {
+  return (
+    Math.abs(cell[0]) <= CELL_KEY_LIMIT &&
+    Math.abs(cell[1]) <= CELL_KEY_LIMIT &&
+    Math.abs(cell[2]) <= CELL_KEY_LIMIT
+  );
+}
+
+function cellKey(cell: GridCell): number {
+  return (
+    (cell[0] + KEY_OFFSET) * KEY_FIELD_SQ +
+    (cell[1] + KEY_OFFSET) * KEY_FIELD +
+    (cell[2] + KEY_OFFSET)
+  );
 }
 
 function cellsEqual(a: GridCell, b: GridCell): boolean {

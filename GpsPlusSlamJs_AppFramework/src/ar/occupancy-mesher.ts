@@ -209,16 +209,38 @@ const FACES: readonly FaceSpec[] = [
   },
 ];
 
-function cellKey(x: number, y: number, z: number): string {
-  return `${x},${y},${z}`;
+// Numeric cell key — packs three integer coordinates into ONE safe-integer
+// Map/Set key, avoiding the per-lookup string allocation that dominated the
+// mesher hot loops (millions of neighbour tests + vertex-weld lookups). Valid
+// for `|coord| ≤ CELL_KEY_LIMIT`; that bound also keeps every DERIVED key in
+// range — neighbours (±1), dual-cell bases (−1) and corner-fit half-lattice keys
+// (`2·coord ± 1`, hence the 2× headroom in the field width) all stay inside one
+// 17-bit field, so the packed key never exceeds 2^53. At 0.15 m cells the limit
+// spans ±4.9 km — far beyond any real scene; `meshOccupiedCells` skips cells
+// outside it (alongside the non-finite skip), guaranteeing every internal key is
+// packable and collision-free.
+const CELL_KEY_LIMIT = 32767;
+const KEY_OFFSET = 65536; // 2^16 — shifts a packable field to non-negative
+const KEY_FIELD = 131072; // 2^17 — width of one packed coordinate field
+const KEY_FIELD_SQ = KEY_FIELD * KEY_FIELD; // 2^34
+
+function cellKey(x: number, y: number, z: number): number {
+  return (
+    (x + KEY_OFFSET) * KEY_FIELD_SQ +
+    (y + KEY_OFFSET) * KEY_FIELD +
+    (z + KEY_OFFSET)
+  );
 }
 
-function isFiniteCell(cell: GridCell): boolean {
-  return (
-    Number.isFinite(cell[0]) &&
-    Number.isFinite(cell[1]) &&
-    Number.isFinite(cell[2])
-  );
+/** Finite, integer, and within the packable key range on every axis. */
+function isPackableCell(cell: GridCell): boolean {
+  for (let i = 0; i < 3; i++) {
+    const c = cell[i]!;
+    if (!Number.isFinite(c) || Math.abs(c) > CELL_KEY_LIMIT) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /**
@@ -247,12 +269,12 @@ export function meshOccupiedCells(
   const half = cellSizeM / 2;
 
   // Snapshot into a Set for O(1) neighbour tests, de-duplicating and dropping
-  // non-finite cells. Keep the de-duplicated, finite cells in insertion order
-  // for deterministic AABB / face emission.
-  const occupied = new Set<string>();
+  // non-finite / out-of-range cells. Keep the de-duplicated cells in insertion
+  // order for deterministic AABB / face emission.
+  const occupied = new Set<number>();
   const uniqueCells: GridCell[] = [];
   for (const cell of cells) {
-    if (!isFiniteCell(cell)) {
+    if (!isPackableCell(cell)) {
       continue;
     }
     const key = cellKey(cell[0], cell[1], cell[2]);
@@ -263,9 +285,17 @@ export function meshOccupiedCells(
     uniqueCells.push(cell);
   }
 
+  // Every cell's halfExtents is identical (`[half, half, half]`); share one
+  // frozen instance instead of allocating it per cell (the `Aabb` contract is
+  // readonly, so sharing is safe). Halves the AABB-list allocations.
+  const sharedHalfExtents: readonly [number, number, number] = Object.freeze([
+    half,
+    half,
+    half,
+  ]);
   const aabbs: Aabb[] = uniqueCells.map(([x, y, z]) => ({
     center: [x * cellSizeM, y * cellSizeM, z * cellSizeM],
-    halfExtents: [half, half, half],
+    halfExtents: sharedHalfExtents,
   }));
 
   const positions: number[] = [];
@@ -317,7 +347,7 @@ function pushQuad(
 
 /** Per-face culling: emit each exposed unit face as its own quad. */
 function buildCulled(
-  occupied: Set<string>,
+  occupied: Set<number>,
   uniqueCells: readonly GridCell[],
   cellSizeM: number,
   positions: number[],
@@ -335,15 +365,15 @@ function buildCulled(
       if (occupied.has(cellKey(nx, ny, nz))) {
         continue; // shared interior face — cull it
       }
-      pushQuad(
-        positions,
-        indices,
-        face.corners.map(([sx, sy, sz]) => [
-          cx + sx * half,
-          cy + sy * half,
-          cz + sz * half,
-        ])
-      );
+      // Push the 4 corners directly (no per-face `.map()` array + sub-array
+      // allocations — this is the per-cell hot path).
+      const base = positions.length / 3;
+      const corners = face.corners;
+      for (let i = 0; i < 4; i++) {
+        const c = corners[i]!;
+        positions.push(cx + c[0] * half, cy + c[1] * half, cz + c[2] * half);
+      }
+      indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
     }
   }
 }
@@ -375,23 +405,54 @@ function buildCulled(
  * smoothest of the modes.
  */
 function buildSmooth(
-  occupied: Set<string>,
+  occupied: Set<number>,
   uniqueCells: readonly GridCell[],
   cellSizeM: number,
   getCellPoint: ((cell: GridCell) => Vector3 | null) | undefined,
   positions: number[],
   indices: number[]
 ): void {
-  const isOcc = (x: number, y: number, z: number): boolean =>
-    occupied.has(cellKey(x, y, z));
+  // Memoized per-cell surface point (measured centroid, or geometric centre as
+  // fallback), keyed by the numeric cell key. Each occupied cell is a corner of
+  // up to 8 dual cells, so without the cache `getCellPoint` would be re-invoked
+  // ~8× per cell (each call also allocating its arg tuple + result). Resolve once.
+  const pointCache = new Map<number, readonly [number, number, number]>();
+  const scratch: [number, number, number] = [0, 0, 0];
+  const cellPoint = (
+    ckey: number,
+    x: number,
+    y: number,
+    z: number
+  ): readonly [number, number, number] => {
+    const hit = pointCache.get(ckey);
+    if (hit !== undefined) {
+      return hit;
+    }
+    let p: readonly [number, number, number] = [
+      x * cellSizeM,
+      y * cellSizeM,
+      z * cellSizeM,
+    ];
+    if (getCellPoint) {
+      scratch[0] = x;
+      scratch[1] = y;
+      scratch[2] = z;
+      const cp = getCellPoint(scratch);
+      if (cp) {
+        p = [cp[0], cp[1], cp[2]];
+      }
+    }
+    pointCache.set(ckey, p);
+    return p;
+  };
 
   // One welded vertex per boundary dual cell (key = its min-corner cell `b`),
   // created lazily and positioned at the mean of its OCCUPIED corner cells'
   // measured surface points.
-  const vertexIndex = new Map<string, number>();
+  const vertexIndex = new Map<number, number>();
   const dualVertex = (bx: number, by: number, bz: number): number => {
-    const key = cellKey(bx, by, bz);
-    const existing = vertexIndex.get(key);
+    const dkey = cellKey(bx, by, bz);
+    const existing = vertexIndex.get(dkey);
     if (existing !== undefined) {
       return existing;
     }
@@ -405,13 +466,14 @@ function buildSmooth(
           const cx = bx + dx;
           const cy = by + dy;
           const cz = bz + dz;
-          if (!isOcc(cx, cy, cz)) {
+          const ckey = cellKey(cx, cy, cz);
+          if (!occupied.has(ckey)) {
             continue;
           }
-          const cp = getCellPoint ? getCellPoint([cx, cy, cz]) : null;
-          sx += cp ? cp[0] : cx * cellSizeM;
-          sy += cp ? cp[1] : cy * cellSizeM;
-          sz += cp ? cp[2] : cz * cellSizeM;
+          const p = cellPoint(ckey, cx, cy, cz);
+          sx += p[0];
+          sy += p[1];
+          sz += p[2];
           n += 1;
         }
       }
@@ -420,7 +482,7 @@ function buildSmooth(
     // construction has at least one occupied corner (the crossing's solid side).
     const idx = positions.length / 3;
     positions.push(sx / n, sy / n, sz / n);
-    vertexIndex.set(key, idx);
+    vertexIndex.set(dkey, idx);
     return idx;
   };
 
@@ -428,6 +490,9 @@ function buildSmooth(
   // For an occupied cell C with an empty neighbour along d·sgn, the four dual
   // cells sharing the (C, neighbour) edge have `base_d = (sgn>0 ? C_d : C_d−1)`
   // and `base_{u,v} ∈ {C−1, C}`; they are wound to face the empty side.
+  // Reused scratch dual-cell base — mutated per corner, read immediately by
+  // dualVertex, so no per-crossing array allocations in this hot loop.
+  const dualBase: [number, number, number] = [0, 0, 0];
   for (const cell of uniqueCells) {
     const cx = cell[0];
     const cy = cell[1];
@@ -435,36 +500,35 @@ function buildSmooth(
     const c: [number, number, number] = [cx, cy, cz];
     for (const { d, u, v } of GREEDY_DIRS) {
       for (const sgn of [1, -1] as const) {
-        const nb: [number, number, number] = [cx, cy, cz];
-        nb[d] += sgn;
-        if (isOcc(nb[0], nb[1], nb[2])) {
+        const nbd = c[d] + sgn;
+        // crossing iff the neighbour along d·sgn is empty
+        dualBase[d] = nbd;
+        dualBase[u] = c[u];
+        dualBase[v] = c[v];
+        if (occupied.has(cellKey(dualBase[0], dualBase[1], dualBase[2]))) {
           continue; // interior face — no crossing here
         }
         const baseD = sgn > 0 ? c[d] : c[d] - 1;
-        // (s,t) index the u,v base offsets {0→−1, 1→0}; ordered CCW facing +d,
-        // reversed for −d so the normal points at the empty side either way.
-        const order: readonly (readonly [number, number])[] =
-          sgn > 0
-            ? [
-                [0, 0],
-                [1, 0],
-                [1, 1],
-                [0, 1],
-              ]
-            : [
-                [0, 0],
-                [0, 1],
-                [1, 1],
-                [1, 0],
-              ];
-        const q = order.map(([s, t]) => {
-          const b: [number, number, number] = [0, 0, 0];
-          b[d] = baseD;
-          b[u] = c[u] - 1 + s;
-          b[v] = c[v] - 1 + t;
-          return dualVertex(b[0], b[1], b[2]);
-        });
-        indices.push(q[0]!, q[1]!, q[2]!, q[0]!, q[2]!, q[3]!);
+        const bu0 = c[u] - 1;
+        const bv0 = c[v] - 1;
+        // The four dual cells sharing this edge, at (u,v) base offsets A(0,0)
+        // B(1,0) C(1,1) D(0,1). dualBase is reused (d fixed, u,v set per corner).
+        dualBase[d] = baseD;
+        dualBase[u] = bu0;
+        dualBase[v] = bv0;
+        const iA = dualVertex(dualBase[0], dualBase[1], dualBase[2]);
+        dualBase[u] = bu0 + 1;
+        const iB = dualVertex(dualBase[0], dualBase[1], dualBase[2]);
+        dualBase[v] = bv0 + 1;
+        const iC = dualVertex(dualBase[0], dualBase[1], dualBase[2]);
+        dualBase[u] = bu0;
+        const iD = dualVertex(dualBase[0], dualBase[1], dualBase[2]);
+        // +d faces CCW as A→B→C→D; −d reverses to A→D→C→B.
+        if (sgn > 0) {
+          indices.push(iA, iB, iC, iA, iC, iD);
+        } else {
+          indices.push(iA, iD, iC, iA, iC, iB);
+        }
       }
     }
   }
@@ -496,7 +560,7 @@ function buildSmooth(
  * merging does not apply (displaced corners are non-coplanar).
  */
 function buildCornerFit(
-  occupied: Set<string>,
+  occupied: Set<number>,
   uniqueCells: readonly GridCell[],
   cellSizeM: number,
   getCellPoint: ((cell: GridCell) => Vector3 | null) | undefined,
@@ -512,7 +576,7 @@ function buildCornerFit(
   // from surface nets). Adding the offset to each corner's own geometric position
   // preserves the cube's thickness while still hugging the measured surface.
   const cornerSum = new Map<
-    string,
+    number,
     { x: number; y: number; z: number; n: number }
   >();
   for (const cell of uniqueCells) {
@@ -548,7 +612,7 @@ function buildCornerFit(
 
   // Welded vertex per corner key (lazy) — geometric corner + mean offset, or the
   // bare geometric corner when no cell contributed an offset (plain cubes).
-  const vertexIndex = new Map<string, number>();
+  const vertexIndex = new Map<number, number>();
   const cornerVertex = (kx: number, ky: number, kz: number): number => {
     const key = cellKey(kx, ky, kz);
     const existing = vertexIndex.get(key);
@@ -576,11 +640,21 @@ function buildCornerFit(
       if (occupied.has(cellKey(nx, ny, nz))) {
         continue; // shared interior face — cull it
       }
-      const v = face.corners.map(([sx, sy, sz]) =>
-        cornerVertex(2 * x + sx, 2 * y + sy, 2 * z + sz)
-      );
-      // Same winding as pushQuad: (0,1,2)+(0,2,3).
-      indices.push(v[0]!, v[1]!, v[2]!, v[0]!, v[2]!, v[3]!);
+      // Look up the 4 (displaced) corner vertices directly — no per-face `.map()`
+      // allocation. Same winding as pushQuad: (0,1,2)+(0,2,3).
+      const corners = face.corners;
+      const x2 = 2 * x;
+      const y2 = 2 * y;
+      const z2 = 2 * z;
+      const c0 = corners[0];
+      const c1 = corners[1];
+      const c2 = corners[2];
+      const c3 = corners[3];
+      const v0 = cornerVertex(x2 + c0[0], y2 + c0[1], z2 + c0[2]);
+      const v1 = cornerVertex(x2 + c1[0], y2 + c1[1], z2 + c1[2]);
+      const v2 = cornerVertex(x2 + c2[0], y2 + c2[1], z2 + c2[2]);
+      const v3 = cornerVertex(x2 + c3[0], y2 + c3[1], z2 + c3[2]);
+      indices.push(v0, v1, v2, v0, v2, v3);
     }
   }
 }
@@ -592,7 +666,7 @@ function buildCornerFit(
  * only the triangle count drops.
  */
 function buildGreedy(
-  occupied: Set<string>,
+  occupied: Set<number>,
   uniqueCells: readonly GridCell[],
   cellSizeM: number,
   positions: number[],
@@ -602,7 +676,7 @@ function buildGreedy(
   for (const { d, u, v } of GREEDY_DIRS) {
     for (const sign of [1, -1] as const) {
       // Group exposed (iu,iv) cells by slice index k = cell[d].
-      const slices = new Map<number, Map<string, readonly [number, number]>>();
+      const slices = new Map<number, Map<number, readonly [number, number]>>();
       for (const cell of uniqueCells) {
         const neighbour: [number, number, number] = [cell[0], cell[1], cell[2]];
         neighbour[d] += sign;
@@ -617,7 +691,7 @@ function buildGreedy(
           slice = new Map();
           slices.set(k, slice);
         }
-        slice.set(`${iu},${iv}`, [iu, iv]);
+        slice.set(cellKey(iu, iv, 0), [iu, iv]);
       }
       for (const [k, slice] of [...slices.entries()].sort(
         (a, b) => a[0] - b[0]
@@ -642,7 +716,7 @@ function buildGreedy(
 /** Greedy-merge one slice's exposed (iu,iv) mask into maximal rectangles. */
 // eslint-disable-next-line max-params
 function greedyMergeSlice(
-  slice: ReadonlyMap<string, readonly [number, number]>,
+  slice: ReadonlyMap<number, readonly [number, number]>,
   half: number,
   cellSizeM: number,
   d: Axis,
@@ -653,20 +727,22 @@ function greedyMergeSlice(
   positions: number[],
   indices: number[]
 ): void {
-  const has = (iu: number, iv: number): boolean => slice.has(`${iu},${iv}`);
-  const used = new Set<string>();
+  const has = (iu: number, iv: number): boolean =>
+    slice.has(cellKey(iu, iv, 0));
+  const used = new Set<number>();
+  const isUsed = (iu: number, iv: number): boolean =>
+    used.has(cellKey(iu, iv, 0));
   // Deterministic order: by iv (outer) then iu (inner), both ascending.
   const cells = [...slice.values()].sort((a, b) =>
     a[1] !== b[1] ? a[1] - b[1] : a[0] - b[0]
   );
   for (const [iu, iv] of cells) {
-    const startKey = `${iu},${iv}`;
-    if (used.has(startKey)) {
+    if (isUsed(iu, iv)) {
       continue;
     }
     // Grow width along +u while cells exist and are unused.
     let w = 1;
-    while (has(iu + w, iv) && !used.has(`${iu + w},${iv}`)) {
+    while (has(iu + w, iv) && !isUsed(iu + w, iv)) {
       w++;
     }
     // Grow height along +v while every cell of the next row is present/unused.
@@ -674,7 +750,7 @@ function greedyMergeSlice(
     let canGrow = true;
     while (canGrow) {
       for (let du = 0; du < w; du++) {
-        if (has(iu + du, iv + h) && !used.has(`${iu + du},${iv + h}`)) {
+        if (has(iu + du, iv + h) && !isUsed(iu + du, iv + h)) {
           continue;
         }
         canGrow = false;
@@ -686,7 +762,7 @@ function greedyMergeSlice(
     }
     for (let dv = 0; dv < h; dv++) {
       for (let du = 0; du < w; du++) {
-        used.add(`${iu + du},${iv + dv}`);
+        used.add(cellKey(iu + du, iv + dv, 0));
       }
     }
     const plane = k * cellSizeM + sign * half;

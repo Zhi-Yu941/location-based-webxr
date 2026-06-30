@@ -70,10 +70,13 @@ export interface OccupancyMeshResult {
  *   features (the floor) — not closed. Requires `getCellPoint` to hug the
  *   surface (falls back to the cell centre = plain surface nets without it).
  *
- * F2b adds a fourth value `'corner-fit'` (surface-hugging *and* watertight); the
- * union is designed to extend.
+ * - `'corner-fit'` — the per-face cube mesher with each shared lattice corner
+ *   moved to the mean of `getCellPoint` over the occupied cells touching it.
+ *   Surface-hugging like `'smooth'` but **watertight** (identical face topology
+ *   to `'per-face'`), at the per-face triangle cost. The "improve the cubes"
+ *   path; needs `getCellPoint` (falls back to plain cubes without it).
  */
-export type MeshMode = 'per-face' | 'greedy' | 'smooth';
+export type MeshMode = 'per-face' | 'greedy' | 'smooth' | 'corner-fit';
 
 /** Options for {@link meshOccupiedCells}. */
 export interface MeshOccupiedCellsOptions {
@@ -93,9 +96,10 @@ export interface MeshOccupiedCellsOptions {
   readonly mode?: MeshMode;
   /**
    * Per-cell measured surface point (the `OccupancyGrid.getCellPoint` bound
-   * method). Consumed by `mode: 'smooth'` to place each vertex at the cell's
-   * centroid instead of the lattice centre. Ignored by the cube modes. When
-   * absent under `'smooth'`, vertices fall back to the cell centre.
+   * method). Consumed by the surface-hugging modes `'smooth'` (vertex AT the
+   * centroid) and `'corner-fit'` (corners at the centroid mean) instead of the
+   * lattice centre. Ignored by `'per-face'`/`'greedy'`. When absent, `'smooth'`
+   * falls back to the cell centre and `'corner-fit'` to the geometric corner.
    */
   readonly getCellPoint?: (cell: GridCell) => Vector3 | null;
 }
@@ -276,6 +280,15 @@ export function meshOccupiedCells(
       positions,
       indices
     );
+  } else if (mode === 'corner-fit') {
+    buildCornerFit(
+      occupied,
+      uniqueCells,
+      cellSizeM,
+      options?.getCellPoint,
+      positions,
+      indices
+    );
   } else {
     buildCulled(occupied, uniqueCells, cellSizeM, positions, indices);
   }
@@ -445,6 +458,102 @@ function buildSmooth(
       } else {
         indices.push(i0, i3, i1, i0, i2, i3);
       }
+    }
+  }
+}
+
+/**
+ * 'corner-fit' mode — the per-face cube mesher with **displaced shared corners**.
+ *
+ * Keeps {@link buildCulled}'s exact face topology (same exposed faces), but each
+ * lattice corner — identified by its integer half-lattice key `(2x±1, 2y±1,
+ * 2z±1)` so every cell sharing it produces the SAME key — is moved to the
+ * **mean of `getCellPoint()` over the occupied cells touching it**. Vertices are
+ * welded by corner key, so adjacent faces reference the identical displaced
+ * position: seams stay coincident ⇒ the surface deforms to hug the measured
+ * points yet stays **watertight** (the even-edge-cover invariant `'smooth'`
+ * gives up). Without a `getCellPoint` provider every corner falls back to the
+ * geometric corner `key · cellSize/2`, i.e. plain cubes.
+ *
+ * Tradeoffs vs `'smooth'`: watertight and exact-cube topology, but corners are
+ * 8-way averages (so geometry only *approaches* the measured points, never lands
+ * on them) and the per-face O(surface-area) triangle cost is unchanged. Greedy
+ * merging does not apply (displaced corners are non-coplanar).
+ */
+function buildCornerFit(
+  occupied: Set<string>,
+  uniqueCells: readonly GridCell[],
+  cellSizeM: number,
+  getCellPoint: ((cell: GridCell) => Vector3 | null) | undefined,
+  positions: number[],
+  indices: number[]
+): void {
+  const half = cellSizeM / 2;
+  // Pass 1: accumulate the centroid mean per shared corner (half-lattice key).
+  const cornerSum = new Map<
+    string,
+    { x: number; y: number; z: number; n: number }
+  >();
+  for (const cell of uniqueCells) {
+    const cp = getCellPoint ? getCellPoint(cell) : null;
+    if (!cp) {
+      continue;
+    }
+    for (const sx of [-1, 1] as const) {
+      for (const sy of [-1, 1] as const) {
+        for (const sz of [-1, 1] as const) {
+          const key = cellKey(
+            2 * cell[0] + sx,
+            2 * cell[1] + sy,
+            2 * cell[2] + sz
+          );
+          let acc = cornerSum.get(key);
+          if (!acc) {
+            acc = { x: 0, y: 0, z: 0, n: 0 };
+            cornerSum.set(key, acc);
+          }
+          acc.x += cp[0];
+          acc.y += cp[1];
+          acc.z += cp[2];
+          acc.n += 1;
+        }
+      }
+    }
+  }
+
+  // Welded vertex per corner key (lazy) — displaced mean, or geometric fallback.
+  const vertexIndex = new Map<string, number>();
+  const cornerVertex = (kx: number, ky: number, kz: number): number => {
+    const key = cellKey(kx, ky, kz);
+    const existing = vertexIndex.get(key);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const acc = cornerSum.get(key);
+    const px = acc ? acc.x / acc.n : kx * half; // geometric corner = key · half
+    const py = acc ? acc.y / acc.n : ky * half;
+    const pz = acc ? acc.z / acc.n : kz * half;
+    const idx = positions.length / 3;
+    positions.push(px, py, pz);
+    vertexIndex.set(key, idx);
+    return idx;
+  };
+
+  // Pass 2: identical culling to buildCulled; emit each exposed face as a
+  // welded quad over its four (displaced) corner vertices.
+  for (const [x, y, z] of uniqueCells) {
+    for (const face of FACES) {
+      const nx = x + face.neighbour[0];
+      const ny = y + face.neighbour[1];
+      const nz = z + face.neighbour[2];
+      if (occupied.has(cellKey(nx, ny, nz))) {
+        continue; // shared interior face — cull it
+      }
+      const v = face.corners.map(([sx, sy, sz]) =>
+        cornerVertex(2 * x + sx, 2 * y + sy, 2 * z + sz)
+      );
+      // Same winding as pushQuad: (0,1,2)+(0,2,3).
+      indices.push(v[0]!, v[1]!, v[2]!, v[0]!, v[2]!, v[3]!);
     }
   }
 }

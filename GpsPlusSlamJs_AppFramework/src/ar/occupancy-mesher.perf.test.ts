@@ -35,10 +35,9 @@ import { buildSyntheticSurfaceGrid } from '../test-utils/synthetic-occupancy-gri
 import type { OccupancyGrid } from './occupancy-grid';
 
 /**
- * The selectable mesher strategies, as a function of the grid (so 'smooth' can
- * bind `getCellPoint`). Extend this as F2b ('corner-fit') lands so the bench
- * below auto-includes it; the per-face and greedy budgets stay the
- * deterministic gate.
+ * The selectable mesher strategies, as a function of the grid (so the
+ * centroid-consuming modes can bind `getCellPoint`). All four are benched
+ * side-by-side; the per-face and greedy budgets stay the deterministic gate.
  */
 const STRATEGIES: ReadonlyArray<{
   name: string;
@@ -50,6 +49,13 @@ const STRATEGIES: ReadonlyArray<{
     name: 'smooth',
     opts: (grid) => ({
       mode: 'smooth',
+      getCellPoint: (cell) => grid.getCellPoint(cell),
+    }),
+  },
+  {
+    name: 'corner-fit',
+    opts: (grid) => ({
+      mode: 'corner-fit',
       getCellPoint: (cell) => grid.getCellPoint(cell),
     }),
   },
@@ -202,6 +208,12 @@ describe('occupancy mesher — deterministic large-scene perf/memory harness', (
       const smooth = bench.find((b) => b.name === 'smooth')!.mesh;
       expect(triangleCount(smooth)).toBeGreaterThan(0);
       expect(triangleCount(smooth)).toBeLessThanOrEqual(triangleCount(perFace));
+      // Corner-fit keeps the per-face topology (F2b "same face set") so its
+      // triangle count equals per-face exactly — only the vertices are displaced
+      // (and welded, so its vertex buffer is smaller).
+      const cornerFit = bench.find((b) => b.name === 'corner-fit')!.mesh;
+      expect(triangleCount(cornerFit)).toBe(triangleCount(perFace));
+      expect(vertexCount(cornerFit)).toBeLessThan(vertexCount(perFace));
       // Absolute memory cap — catches a catastrophic blow-up at this scale.
       expect(byteSize(perFace)).toBeLessThan(8 * 1024 * 1024);
 

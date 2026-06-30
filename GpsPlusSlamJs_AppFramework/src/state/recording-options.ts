@@ -341,8 +341,9 @@ export const STORAGE_KEY = 'gps-plus-slam-recorder-options';
 export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
   depth: {
     enabled: true,
-    intervalMs: 1000, // 1 sample per second
-    gridSize: 16, // 16×16 = 256 points per sample (occupancy-grid density)
+    // 2026-06-30 occluder-tuning re-tune (coupled preset; see recording-options.ts.md):
+    intervalMs: 500, // 2 samples per second (was 1000) — denser temporal sampling
+    gridSize: 24, // 24×24 = 576 points per sample (was 16 = 256) — denser occupancy-grid fill; 24 hedges large-scene memory vs the slider max 32
     rgb: true, // RGB voxel coloring (Iter 8)
   },
   images: {
@@ -366,8 +367,8 @@ export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
     applyChromiumProjectionLayerWorkaround: true,
   },
   occupancy: {
-    cellSizeM: 0.15, // 15 cm voxels — matches OccupancyGrid's own default (Unity parity)
-    minConfidence: 3, // ≥3 observations to render a voxel — filters single-frame depth noise (1 = legacy/unfiltered)
+    cellSizeM: 0.15, // 15 cm voxels — matches OccupancyGrid's own default (Unity parity); confirmed unchanged in the 2026-06-30 re-tune
+    minConfidence: 5, // ≥5 observations to render a voxel (was 3) — stronger noise floor, reachable quickly thanks to the denser depth sampling above (2026-06-30 re-tune; 1 = legacy/unfiltered)
     persistentOcclusion: false, // persistent depth-only mesh occluder OFF by default (extra cost; on-device gate pending)
     liveOcclusion: false, // live CPU-depth occluder OFF by default (device-gated quality; replay no-op)
     occluderDebugViz: false, // matcap debug visualization of the persistent occluder mesh OFF by default

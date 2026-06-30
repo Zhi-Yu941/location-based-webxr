@@ -388,10 +388,12 @@ describe('recording-options', () => {
      * recorder setting (2026-06-22 behind-surface-noise plan). It is forwarded
      * to `getOccupiedCells(minObservations)`, which expects a positive integer,
      * so validation must round, clamp to 1–10, and reject garbage to the
-     * default (default 3, not 1 — the filter is on out of the box).
+     * default (default 5, not 1 — the filter is on out of the box; raised
+     * 3→5 in the 2026-06-30 occluder-tuning session for a more robust voxel
+     * noise floor, coupled with the denser depth sampling below).
      */
-    it('defaults minConfidence to 3 for an empty object', () => {
-      expect(validateOccupancyOptions({}).minConfidence).toBe(3);
+    it('defaults minConfidence to 5 for an empty object', () => {
+      expect(validateOccupancyOptions({}).minConfidence).toBe(5);
     });
 
     it('preserves a valid in-range minConfidence', () => {
@@ -1228,8 +1230,25 @@ describe('recording-options', () => {
     });
 
     it('has reasonable default intervals', () => {
-      expect(DEFAULT_RECORDING_OPTIONS.depth.intervalMs).toBe(1000);
+      expect(DEFAULT_RECORDING_OPTIONS.depth.intervalMs).toBe(500);
       expect(DEFAULT_RECORDING_OPTIONS.images.intervalMs).toBe(2000);
+    });
+
+    /**
+     * Why this matters: the 2026-06-30 occluder-tuning session re-tuned the
+     * depth/occupancy defaults as a coupled preset (denser + faster depth
+     * sampling makes the higher noise floor reachable quickly). These pin the
+     * locked decision: intervalMs 1000→500, gridSize 16→24, minConfidence 3→5;
+     * cellSizeM stays 0.15. See
+     * GpsPlusSlamJs_Docs/docs/2026-06-30-occluder-tuning-and-mesh-smoothness-user-feedback.md (F1).
+     * gridSize is 24 (not the slider max 32) to hedge the large-scene memory
+     * cost until the F3 perf harness measures it.
+     */
+    it('uses the 2026-06-30 re-tuned depth/occupancy defaults', () => {
+      expect(DEFAULT_RECORDING_OPTIONS.depth.intervalMs).toBe(500);
+      expect(DEFAULT_RECORDING_OPTIONS.depth.gridSize).toBe(24);
+      expect(DEFAULT_RECORDING_OPTIONS.occupancy.minConfidence).toBe(5);
+      expect(DEFAULT_RECORDING_OPTIONS.occupancy.cellSizeM).toBe(0.15);
     });
 
     it('has resolutionDivisor defaulting to 1 (full resolution)', () => {

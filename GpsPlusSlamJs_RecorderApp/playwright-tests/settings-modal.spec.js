@@ -96,14 +96,17 @@ test.describe('Settings Modal', () => {
 
     test('depth interval slider shows default value', async ({ page }) => {
       const valueDisplay = page.locator('#depth-interval-value');
-      await expect(valueDisplay).toHaveText('1.0s');
+      // 2026-06-30 occluder-tuning re-tune: depth sampling doubled to 0.5s.
+      await expect(valueDisplay).toHaveText('0.5s');
     });
 
     test('depth grid slider shows default value', async ({ page }) => {
       const valueDisplay = page.locator('#depth-grid-value');
-      // Default raised 3→16 with the occupancy-grid port (denser grid populates
-      // the AR-space occupancy grid fast enough for on-device verification).
-      await expect(valueDisplay).toHaveText('16×16');
+      // Default raised 16→24 in the 2026-06-30 occluder-tuning re-tune (denser
+      // occupancy-grid fill, coupled with the faster 0.5s cadence and the
+      // minConfidence 3→5 noise floor). 24, not the slider max 32, hedges the
+      // large-scene memory cost until the F3 perf harness measures it.
+      await expect(valueDisplay).toHaveText('24×24');
     });
 
     test('images interval slider shows default value', async ({ page }) => {

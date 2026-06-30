@@ -171,6 +171,12 @@ export function wrapXRDepthInfo(
   return wrapped;
 }
 
+// Library-level fallback used by consumers that do NOT supply a config
+// (MinimalExample / AnchorStarter). Intentionally NOT synced to the recorder's
+// 2026-06-30 re-tune (intervalMs 500 / gridSize 24) — those denser defaults are
+// a recorder-specific decision sourced from DEFAULT_RECORDING_OPTIONS; bumping
+// this library default would silently re-tune unrelated apps. See
+// recording-options.ts.md (F1) for the rationale.
 const DEFAULT_CONFIG: DepthSamplerConfig = {
   intervalMs: 1000,
   gridSize: 16,

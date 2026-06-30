@@ -61,16 +61,22 @@ User-configurable recording options for controlling high-frequency data streams 
 
 ```typescript
 {
-  depth: { enabled: true, intervalMs: 1000, gridSize: 16, rgb: true },
+  depth: { enabled: true, intervalMs: 500, gridSize: 24, rgb: true },
   images: { enabled: true, intervalMs: 2000, quality: 0.7, resolutionDivisor: 1,
             motionFilter: { enabled: true, maxAngularVelocity: 0.6, maxLinearVelocity: 0.5, maxWaitMs: 4000 },
             qualityFilter: { enabled: false, blurRelativeThreshold: 0.5, minMeanLuminance: 10, maxWaitMs: 4000 } },
-  occupancy: { cellSizeM: 0.15, minConfidence: 3, persistentOcclusion: false, liveOcclusion: false, occluderDebugViz: false },
+  occupancy: { cellSizeM: 0.15, minConfidence: 5, persistentOcclusion: false, liveOcclusion: false, occluderDebugViz: false },
   frameTileDisplay: { divisor: 2 },
   visualization: { frameTiles: true, occupancyCubes: true, gpsAlignmentMarkers: true, compassCubes: true, headingUpMap: true },
   qr: { enabled: false, intervalMs: 125, captureSize: 1024 }
 }
 ```
+
+### Depth/occupancy default re-tune (2026-06-30 occluder-tuning session)
+
+`depth.intervalMs` (1000→**500**), `depth.gridSize` (16→**24**) and `occupancy.minConfidence` (3→**5**) were re-tuned together as a **coupled preset**, not three independent knobs: the denser, faster depth sampling (≈`(24/16)² × (1000/500)` ≈ **4.5×** the depth-point throughput vs. the old defaults) is what makes the higher noise floor of `minConfidence: 5` reachable quickly. `occupancy.cellSizeM` stays **0.15** (confirmed unchanged). `gridSize` is **24**, not the slider max **32**, to hedge the unmeasured large-scene memory/rebuild cost (the F1↔F3 coupling) until the F3 perf/memory harness measures it; 32 stays reachable via the slider. Rationale + decision trail: [2026-06-30-occluder-tuning-and-mesh-smoothness-user-feedback.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-30-occluder-tuning-and-mesh-smoothness-user-feedback.md) (F1 / Finding 5).
+
+> **Not synced:** the library-level `DEFAULT_CONFIG` in [`ar/depth-sampler.ts`](../ar/depth-sampler.ts) intentionally keeps `intervalMs: 1000 / gridSize: 16`. That is the fallback for consumers that supply no config (MinimalExample / AnchorStarter); the re-tune is a recorder-specific decision sourced from `DEFAULT_RECORDING_OPTIONS`, so bumping the library default would silently re-tune unrelated apps.
 
 `qr.*` configure live QR detection + RAW recording (recorder live-QR §0). `enabled` defaults **OFF** — it is opt-in, mirroring how the heavy `depth`/`images` streams are operator-gated, so an existing recording never silently gains the per-frame `BarcodeDetector` cost. When ON, the recorder runs the thin RAW producer (`ar/qr-detection-controller.ts`) and persists one `qrDetected/recordQrDetection` action per accepted decode (size + pose are derived on read, never recorded). `intervalMs` (default 125 ms ≈ 8 Hz, the QR demo's `DETECT_INTERVAL_MS`) is the single capture/detection cadence; `captureSize` (default 1024 px long-edge) trades small-QR decode range against blit+decode cost. All three are surfaced as settings-modal controls. See [2026-06-17-followup-recorder-live-qr-next-steps.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-17-followup-recorder-live-qr-next-steps.md) (§0).
 

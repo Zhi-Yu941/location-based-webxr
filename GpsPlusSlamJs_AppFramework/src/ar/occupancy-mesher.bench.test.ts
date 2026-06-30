@@ -85,4 +85,47 @@ describe.skipIf(!RUN)('occupancy mesher — perf benchmark', () => {
     );
     expect(cells.length).toBeGreaterThan(0);
   });
+
+  it('long-session scaling: per-refresh cost + memory at ~100k cells', () => {
+    const RUNS = 8;
+    const heap0 = process.memoryUsage().heapUsed;
+    const { grid, cellSizeM } = buildSyntheticSurfaceGrid({
+      cellsX: 320,
+      cellsZ: 320,
+      thickness: 1,
+    }); // 102,400 cells
+    const heap1 = process.memoryUsage().heapUsed;
+    const cells = grid.getOccupiedCells(5);
+    const getCellPoint = (c: Parameters<OccupancyGrid['getCellPoint']>[0]) =>
+      grid.getCellPoint(c);
+
+    const occMs = timeMs(RUNS, () => grid.getOccupiedCells(5));
+    const perFaceMs = timeMs(RUNS, () =>
+      meshOccupiedCells(cells, cellSizeM, undefined)
+    );
+    const greedyMs = timeMs(RUNS, () =>
+      meshOccupiedCells(cells, cellSizeM, { greedy: true })
+    );
+    const smoothMs = timeMs(RUNS, () =>
+      meshOccupiedCells(cells, cellSizeM, { mode: 'smooth', getCellPoint })
+    );
+
+    // eslint-disable-next-line no-console
+    console.info(
+      '[long-session bench] ' +
+        JSON.stringify({
+          cells: cells.length,
+          gridHeapKiB: +((heap1 - heap0) / 1024).toFixed(0),
+          bytesPerCell: +((heap1 - heap0) / cells.length).toFixed(0),
+          getOccupiedCellsMs: occMs,
+          perFaceMs,
+          greedyMs,
+          smoothMs,
+          // A persistent-occluder refresh = getOccupiedCells + mesh, every
+          // depth.intervalMs (default 500 ms). This grows O(total cells).
+          refreshMs_perFace: +(occMs + perFaceMs).toFixed(1),
+        })
+    );
+    expect(cells.length).toBeGreaterThan(0);
+  });
 });

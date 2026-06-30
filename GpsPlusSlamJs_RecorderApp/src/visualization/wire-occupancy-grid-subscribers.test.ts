@@ -65,6 +65,19 @@ function makeOccluderSpy() {
   };
 }
 
+/** A grid spy exposing a controllable `getRevision` (settled-scene skip). */
+function makeRevisionGridSpy(initial = 0) {
+  let revision = initial;
+  return {
+    addSample: vi.fn<(sample: DepthSample) => number>(() => 1),
+    clear: vi.fn<() => void>(),
+    getRevision: vi.fn<() => number>(() => revision),
+    setRevision(r: number) {
+      revision = r;
+    },
+  };
+}
+
 function makeStore() {
   return createRecorderStore({ storageBackend: new NullStorageBackend() });
 }
@@ -149,6 +162,45 @@ describe('wireOccupancyGridSubscribers', () => {
     vi.advanceTimersByTime(2000);
     storeRef.get().dispatch(recordDepthSample(makeSample(4)));
     expect(visualizer.refresh).toHaveBeenCalledTimes(3);
+
+    dispose();
+  });
+
+  it('skips the cube/occluder refresh while the grid revision is unchanged (settled scene)', () => {
+    // Why this matters: a long session re-observes already-mapped surfaces for
+    // minutes. When the occupied set can no longer change, the O(cells) cube
+    // re-build + occluder re-mesh are pure waste — the wirer must skip them.
+    const grid = makeRevisionGridSpy(0);
+    const visualizer = makeVisualizerSpy();
+    const occluder = makeOccluderSpy();
+    const dispose = wireOccupancyGridSubscribers({
+      storeRef,
+      grid,
+      visualizer,
+      occluder,
+      refreshIntervalMs: 1000,
+    });
+
+    // First sample bumps the revision → leading-edge refresh of both sinks.
+    grid.setRevision(1);
+    storeRef.get().dispatch(recordDepthSample(makeSample(1)));
+    expect(visualizer.refresh).toHaveBeenCalledTimes(1);
+    expect(occluder.refresh).toHaveBeenCalledTimes(1);
+
+    // A later sample that does NOT change the revision (settled re-observation):
+    // the sample is still folded in, but neither sink re-derives.
+    vi.advanceTimersByTime(2000);
+    storeRef.get().dispatch(recordDepthSample(makeSample(2)));
+    expect(grid.addSample).toHaveBeenCalledTimes(2);
+    expect(visualizer.refresh).toHaveBeenCalledTimes(1);
+    expect(occluder.refresh).toHaveBeenCalledTimes(1);
+
+    // Once the revision changes again, refreshes resume.
+    grid.setRevision(2);
+    vi.advanceTimersByTime(2000);
+    storeRef.get().dispatch(recordDepthSample(makeSample(3)));
+    expect(visualizer.refresh).toHaveBeenCalledTimes(2);
+    expect(occluder.refresh).toHaveBeenCalledTimes(2);
 
     dispose();
   });

@@ -59,10 +59,30 @@ interface CellRecord {
   colorSum: [number, number, number];
 }
 
+/**
+ * Highest `minConfidence` a consumer can ask for (mirrors
+ * `OCCUPANCY_CONSTRAINTS.minConfidence.max`). Once a cell's count exceeds this,
+ * further observations can no longer change ANY consumer's occupied set, so they
+ * do not bump {@link OccupancyGrid.getRevision} — letting a settled scene skip
+ * redundant re-meshing.
+ */
+const MAX_RELEVANT_COUNT = 10;
+
 export class OccupancyGrid {
   readonly cellSizeM: number;
   readonly carveStopCells: number;
   private readonly cells = new Map<number, CellRecord>();
+  /**
+   * Monotonic counter bumped whenever the **occupied set** (at any
+   * `minConfidence ≤ MAX_RELEVANT_COUNT`) could have changed: a cell added, a
+   * cell removed by carving, a cell's count rising while still `≤
+   * MAX_RELEVANT_COUNT` (a possible threshold crossing), or `clear`. Re-observing
+   * an already-settled cell (count `> MAX_RELEVANT_COUNT`) does NOT bump it, so a
+   * consumer can cheaply skip a full re-derive (cube refresh / occluder re-mesh)
+   * when the revision is unchanged — the dominant idle-time saving over a long
+   * session (see `2026-06-30-occluder-tuning-followups.md`).
+   */
+  private revision = 0;
 
   constructor(options?: OccupancyGridOptions) {
     const cellSizeM = options?.cellSizeM ?? 0.15;
@@ -84,6 +104,17 @@ export class OccupancyGrid {
   /** Number of occupied cells. */
   get size(): number {
     return this.cells.size;
+  }
+
+  /**
+   * A monotonic version that changes only when the occupied set (at any
+   * `minConfidence ≤ 10`) could have changed. A consumer caches the value it
+   * last meshed/rendered and skips its full re-derive when it is unchanged — so
+   * a settled scene (already-observed cells being re-observed) costs nothing.
+   * See {@link revision}.
+   */
+  getRevision(): number {
+    return this.revision;
   }
 
   /**
@@ -249,6 +280,9 @@ export class OccupancyGrid {
 
   /** Remove all occupied cells (e.g. on store swap / new session). */
   clear(): void {
+    if (this.cells.size > 0) {
+      this.revision++;
+    }
     this.cells.clear();
   }
 
@@ -265,7 +299,10 @@ export class OccupancyGrid {
       pointCell,
       (cell) => {
         if (!cellsEqual(cell, pointCell)) {
-          this.cells.delete(cellKey(cell));
+          // A carve removes a cell from the occupied set → a meaningful change.
+          if (this.cells.delete(cellKey(cell))) {
+            this.revision++;
+          }
         }
         return true;
       },
@@ -287,6 +324,13 @@ export class OccupancyGrid {
       this.cells.set(key, record);
     }
     record.count++;
+    // Bump the revision while the cell could still cross some consumer's
+    // minConfidence threshold (count ≤ 10 = the max selectable). Once it is past
+    // that, re-observing it can change no occupied set, so it stays "settled" and
+    // costs no re-mesh — the key long-session idle saving.
+    if (record.count <= MAX_RELEVANT_COUNT) {
+      this.revision++;
+    }
     // Every observation carries a finite position (the unprojector guarantees
     // it), so it always feeds the running-average surface point.
     record.posSum[0] += world[0];

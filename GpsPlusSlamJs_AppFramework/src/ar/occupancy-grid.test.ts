@@ -364,4 +364,52 @@ describe('OccupancyGrid', () => {
       expect(grid.getOccupiedCells()).toEqual([]);
     });
   });
+
+  /**
+   * Why this matters: a long session re-observes already-mapped surfaces for
+   * minutes. `getRevision()` lets consumers (cube refresh / occluder re-mesh)
+   * skip their O(cells) re-derive when the occupied set can no longer change —
+   * the dominant idle-time saving. It must bump while a cell could still cross
+   * some `minConfidence` threshold (count ≤ 10), then go quiet.
+   */
+  describe('getRevision — settled-scene skip signal', () => {
+    it('starts at 0', () => {
+      expect(new OccupancyGrid().getRevision()).toBe(0);
+    });
+
+    it('bumps while count ≤ 10 (possible threshold crossings), then stays put', () => {
+      const grid = new OccupancyGrid();
+      expect(grid.getRevision()).toBe(0);
+
+      // 1st observation creates the cell (count 1) → bump.
+      grid.addSample(makeSample([0, 0, 0], [5.3]));
+      const r1 = grid.getRevision();
+      expect(r1).toBeGreaterThan(0);
+
+      // Observations 2..10 raise the count through 10 — each a possible
+      // threshold crossing → each bumps.
+      for (let i = 0; i < 9; i++) grid.addSample(makeSample([0, 0, 0], [5.3]));
+      const r10 = grid.getRevision();
+      expect(r10).toBe(r1 + 9);
+
+      // The 11th pushes count past 10; from here re-observing the SETTLED cell
+      // can change no consumer's occupied set → no more bumps.
+      grid.addSample(makeSample([0, 0, 0], [5.3]));
+      grid.addSample(makeSample([0, 0, 0], [5.3]));
+      grid.addSample(makeSample([0, 0, 0], [5.3]));
+      expect(grid.getRevision()).toBe(r10);
+    });
+
+    it('bumps on clear when non-empty (and not when already empty)', () => {
+      const grid = new OccupancyGrid();
+      expect(grid.getRevision()).toBe(0);
+      grid.clear(); // empty → no-op
+      expect(grid.getRevision()).toBe(0);
+
+      grid.addSample(makeSample([0, 0, 0], [5.3]));
+      const r = grid.getRevision();
+      grid.clear();
+      expect(grid.getRevision()).toBe(r + 1);
+    });
+  });
 });

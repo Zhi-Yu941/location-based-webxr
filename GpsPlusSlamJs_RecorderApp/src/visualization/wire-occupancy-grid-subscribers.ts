@@ -31,6 +31,14 @@ const DEFAULT_REFRESH_INTERVAL_MS = 1000;
 export interface OccupancyGridSink {
   addSample(sample: DepthSample): number;
   clear(): void;
+  /**
+   * Optional occupied-set version (see `OccupancyGrid.getRevision`). When
+   * present, the wirer **skips** a throttled refresh whose revision matches the
+   * last one it rendered — so re-observing an already-settled scene costs no
+   * cube re-build / occluder re-mesh (the dominant idle saving over a long
+   * session). A sink without it always refreshes (prior behaviour).
+   */
+  getRevision?(): number;
 }
 
 export interface WireOccupancyGridSubscribersOptions<
@@ -83,6 +91,9 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
 
   let disposed = false;
   let lastRefreshTime = -Infinity;
+  // Occupied-set revision last actually rendered. `null` forces the next refresh
+  // (start / after a store swap). Lets a settled grid skip the O(cells) refresh.
+  let lastRenderedRevision: number | null = null;
   let pendingRefresh: ReturnType<typeof setTimeout> | null = null;
   // The most recent depth sample's head pose (raw WebXR), forwarded to the
   // visualizer so an over-cap refresh can pick the cells nearest the user
@@ -97,6 +108,14 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
   };
 
   const refreshNow = (): void => {
+    // Skip the whole O(cells) re-derive when the occupied set is unchanged since
+    // the last render (a settled scene being re-observed) — cube re-build and
+    // occluder re-mesh both produce identical output. Cheap O(1) guard.
+    const revision = grid.getRevision?.();
+    if (revision !== undefined && revision === lastRenderedRevision) {
+      return;
+    }
+    lastRenderedRevision = revision ?? null;
     lastRefreshTime = Date.now();
     try {
       visualizer.refresh(grid, lastViewerPose ?? undefined);
@@ -177,6 +196,8 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
     detach();
     cancelPendingRefresh();
     lastRefreshTime = -Infinity;
+    // Force the first refresh of the new store's grid (its revision restarts).
+    lastRenderedRevision = null;
     // Drop the stale pose: the new store's samples carry their own, and the
     // old recording's head pose is meaningless for the new one.
     lastViewerPose = null;

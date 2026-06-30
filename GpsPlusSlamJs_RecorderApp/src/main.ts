@@ -1348,7 +1348,12 @@ async function handleEnterAR(): Promise<void> {
         // the cubes/COLMAP use, so the three consumers can't silently diverge.
         const minConfidence = recordingOptions.occupancy.minConfidence;
         const occluderSink = recordingOptions.occupancy.persistentOcclusion
-          ? ((occlusionMesh = new OcclusionMesh(arWorldGroup)),
+          ? ((occlusionMesh = new OcclusionMesh(arWorldGroup, {
+              // Mesher style (occupancy.occluderMeshMode): blocky greedy cubes by
+              // default; 'corner-fit'/'smooth' opt into the surface-hugging
+              // meshers so they can be A/B-tested on-device.
+              mode: recordingOptions.occupancy.occluderMeshMode,
+            })),
             // Debug viz (occupancy.occluderDebugViz): render the occluder mesh
             // as a visible shiny matcap so its shape can be judged on-device. No
             // effect on occlusion (additive skin); read here like the other
@@ -1357,10 +1362,13 @@ async function handleEnterAR(): Promise<void> {
               recordingOptions.occupancy.occluderDebugViz
             ),
             {
+              // Pass getCellPoint so the surface-hugging meshers can read each
+              // cell's measured centroid; the cube meshers ignore it.
               refresh: (g: OccupancyGrid) =>
                 occlusionMesh?.update(
                   g.getOccupiedCells(minConfidence),
-                  g.cellSizeM
+                  g.cellSizeM,
+                  (cell) => g.getCellPoint(cell)
                 ),
               clear: () => occlusionMesh?.clear(),
             })

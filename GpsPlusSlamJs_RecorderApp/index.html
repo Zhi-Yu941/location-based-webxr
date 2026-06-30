@@ -1231,6 +1231,28 @@ No errors</pre
                 still being tuned on device). Applies the next time you enter AR
                 or load a replay.
               </p>
+              <label class="flex items-center gap-2 mt-1">
+                <span class="text-sm text-gray-200">Occluder mesh style</span>
+                <select
+                  id="occupancy-occluder-mesh-mode"
+                  class="text-sm bg-gray-700 text-gray-200 rounded px-2 py-1"
+                >
+                  <option value="greedy">Cubes (blocky)</option>
+                  <option value="corner-fit">
+                    Corner-fit cubes (smoothed)
+                  </option>
+                  <option value="smooth">Surface nets (smoothest)</option>
+                </select>
+              </label>
+              <p class="text-[11px] text-gray-400">
+                How the persistent occluder mesh is built. “Cubes” is the blocky
+                default; “Corner-fit” pulls the cube corners onto the measured
+                surface (still gap-free); “Surface nets” is the smoothest (hugs
+                the floor, but an open sheet over thin features). Turn on
+                “Debug-visualize” below to see the shape. Only affects the
+                persistent mesh occluder above; applies the next time you enter
+                AR or load a replay.
+              </p>
               <label class="flex items-center gap-2 cursor-pointer mt-1">
                 <input
                   type="checkbox"

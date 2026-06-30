@@ -18,6 +18,7 @@ import {
   FRAME_TILE_DISPLAY_CONSTRAINTS,
   QR_CONSTRAINTS,
   type RecordingOptions,
+  type OccluderMeshMode,
 } from 'gps-plus-slam-app-framework/state/recording-options';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
 import { getBuildInfo } from '../utils/build-info';
@@ -75,6 +76,7 @@ let occupancyMinConfidenceValue: HTMLElement | null = null;
 let occupancyLiveOcclusionCheckbox: HTMLInputElement | null = null;
 let occupancyPersistentOcclusionCheckbox: HTMLInputElement | null = null;
 let occupancyOccluderDebugVizCheckbox: HTMLInputElement | null = null;
+let occupancyOccluderMeshModeSelect: HTMLSelectElement | null = null;
 let frameTileDisplayDivisorSlider: HTMLInputElement | null = null;
 let frameTileDisplayDivisorValue: HTMLElement | null = null;
 let vizFrameTilesCheckbox: HTMLInputElement | null = null;
@@ -212,6 +214,9 @@ export function initSettingsModal(
   occupancyOccluderDebugVizCheckbox = document.getElementById(
     'occupancy-occluder-debug-viz'
   ) as HTMLInputElement;
+  occupancyOccluderMeshModeSelect = document.getElementById(
+    'occupancy-occluder-mesh-mode'
+  ) as HTMLSelectElement;
   occupancyMinConfidenceValue = document.getElementById(
     'occupancy-min-confidence-value'
   );
@@ -368,6 +373,18 @@ export function initSettingsModal(
     if (workingOptions && occupancyOccluderDebugVizCheckbox) {
       workingOptions.occupancy.occluderDebugViz =
         occupancyOccluderDebugVizCheckbox.checked;
+    }
+  });
+
+  // Persistent-occluder mesher style (occupancy.occluderMeshMode): blocky cubes
+  // vs corner-fit cubes vs surface nets, so the surface-hugging meshers can be
+  // A/B-tested on-device. Validated on save; only one of OCCLUDER_MESH_MODES is
+  // accepted, so an unexpected <option> value still resolves to the default.
+  // Applies on the next Enter-AR / replay load.
+  occupancyOccluderMeshModeSelect?.addEventListener('change', () => {
+    if (workingOptions && occupancyOccluderMeshModeSelect) {
+      workingOptions.occupancy.occluderMeshMode =
+        occupancyOccluderMeshModeSelect.value as OccluderMeshMode;
     }
   });
 
@@ -894,6 +911,9 @@ function populateForm(options: RecordingOptions): void {
   if (occupancyOccluderDebugVizCheckbox) {
     occupancyOccluderDebugVizCheckbox.checked =
       options.occupancy.occluderDebugViz;
+  }
+  if (occupancyOccluderMeshModeSelect) {
+    occupancyOccluderMeshModeSelect.value = options.occupancy.occluderMeshMode;
   }
 
   // Frame-tile display-resolution divisor (D7-resolution)

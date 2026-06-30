@@ -184,6 +184,17 @@ describe('settings-modal', () => {
       expect(html).toContain('id="occupancy-occluder-debug-viz"');
     });
 
+    it('includes the occluder mesh-style selector with all three modes', () => {
+      // 2026-06-30 F2/F2b: a <select> (occupancy.occluderMeshMode) to switch the
+      // persistent-occluder mesher between blocky cubes, corner-fit cubes and
+      // surface nets so the surface-hugging meshers can be A/B-tested on-device.
+      const html = loadSettingsModalHtml();
+      expect(html).toContain('id="occupancy-occluder-mesh-mode"');
+      expect(html).toContain('value="greedy"');
+      expect(html).toContain('value="corner-fit"');
+      expect(html).toContain('value="smooth"');
+    });
+
     it('includes the frame-tile display-resolution slider and value display', () => {
       // D7-resolution, 2026-06-16 user feedback: the in-AR/replay tile display
       // resolution (frameTileDisplay.divisor) must be user-configurable here,
@@ -473,6 +484,35 @@ describe('settings-modal', () => {
         'occupancy-occluder-debug-viz'
       ) as HTMLInputElement;
       expect(checkbox.checked).toBe(false);
+    });
+
+    it('populates the occluder mesh-style select from saved options and updates the working copy', () => {
+      localStorageMock.getItem.mockReturnValueOnce(
+        JSON.stringify({ occupancy: { occluderMeshMode: 'smooth' } })
+      );
+
+      showSettingsModal();
+
+      const select = document.getElementById(
+        'occupancy-occluder-mesh-mode'
+      ) as HTMLSelectElement;
+      expect(select.value).toBe('smooth');
+
+      // Switch to the improved-cube ('corner-fit') mesher → working copy updates.
+      select.value = 'corner-fit';
+      select.dispatchEvent(new Event('change'));
+      expect(getWorkingOptions()?.occupancy.occluderMeshMode).toBe(
+        'corner-fit'
+      );
+    });
+
+    it("defaults the occluder mesh-style select to 'greedy' (blocky cubes, unchanged behaviour)", () => {
+      localStorageMock.getItem.mockReturnValueOnce(JSON.stringify({}));
+      showSettingsModal();
+      const select = document.getElementById(
+        'occupancy-occluder-mesh-mode'
+      ) as HTMLSelectElement;
+      expect(select.value).toBe('greedy');
     });
 
     it('lets the live and persistent occluders be ticked together (they compose)', () => {

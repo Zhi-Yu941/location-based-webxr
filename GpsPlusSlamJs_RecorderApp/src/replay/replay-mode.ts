@@ -225,16 +225,24 @@ export async function startReplayMode(
     // (Live occlusion is live-AR-only — replay has no live depth stream — so
     // only the persistent flag is honoured here.)
     const occluderSink = occupancyOptions.persistentOcclusion
-      ? ((occlusionMesh = new OcclusionMesh(replaySceneState.arWorldGroup)),
+      ? ((occlusionMesh = new OcclusionMesh(replaySceneState.arWorldGroup, {
+          // Mesher style (occupancy.occluderMeshMode), re-read per replay like
+          // the cubes — so the surface-hugging meshers can be inspected on a
+          // recorded session, not only live.
+          mode: occupancyOptions.occluderMeshMode,
+        })),
         // Debug viz (occupancy.occluderDebugViz): visible shiny matcap render of
         // the occluder mesh so its shape can be judged on replay too (additive
         // skin; occlusion unchanged), re-read per replay like the cubes.
         occlusionMesh.setDebugVisualization(occupancyOptions.occluderDebugViz),
         {
+          // Pass getCellPoint for the surface-hugging meshers (cube meshers
+          // ignore it).
           refresh: (g: OccupancyGrid) =>
             occlusionMesh?.update(
               g.getOccupiedCells(occupancyOptions.minConfidence),
-              g.cellSizeM
+              g.cellSizeM,
+              (cell) => g.getCellPoint(cell)
             ),
           clear: () => occlusionMesh?.clear(),
         })

@@ -149,6 +149,23 @@ export interface ImageCaptureOptions {
  * so they also apply when replaying an existing recording, letting the same
  * session be re-quantized at a different resolution.
  */
+/**
+ * Mesher strategy for the **persistent occluder** mesh, exposed as a recorder
+ * setting (2026-06-30 occluder-tuning, F2/F2b) so the two surface-hugging
+ * approaches can be A/B-tested on-device against the blocky baseline:
+ * - `'greedy'` — blocky greedy cubes (the existing default; fewest triangles).
+ * - `'corner-fit'` — cubes with corners pulled to the measured centroids
+ *   (surface-hugging **and** watertight).
+ * - `'smooth'` — surface nets: smoothest, hugs the measured surface, but an open
+ *   sheet over thin features.
+ *
+ * Maps directly onto `meshOccupiedCells` / `OcclusionMesh` `MeshMode` (a subset).
+ * `'per-face'` is intentionally not offered (same shape as `'greedy'`, more
+ * triangles — no on-device value).
+ */
+const OCCLUDER_MESH_MODES = ['greedy', 'corner-fit', 'smooth'] as const;
+export type OccluderMeshMode = (typeof OCCLUDER_MESH_MODES)[number];
+
 export interface OccupancyOptions {
   /**
    * Voxel edge length in metres. Drives the occupancy-grid quantization, the
@@ -217,6 +234,17 @@ export interface OccupancyOptions {
    * `GpsPlusSlamJs_Docs/docs/2026-06-29-occlusion-debug-viz-and-live-occluder-user-feedback.md`.
    */
   occluderDebugViz: boolean;
+  /**
+   * Which mesher builds the **persistent occluder** mesh (see
+   * {@link OccluderMeshMode}). Default `'greedy'` — the existing blocky cubes, so
+   * shipped behaviour is unchanged. Switch to `'corner-fit'` or `'smooth'` to
+   * test the surface-hugging meshers on-device (combine with
+   * {@link occluderDebugViz} to actually *see* the mesh shape). Only has an
+   * effect when {@link persistentOcclusion} is on. Read once when the mesh is
+   * wired (Enter-AR / replay load), like the other occupancy knobs. See
+   * `GpsPlusSlamJs_Docs/docs/2026-06-30-occluder-tuning-followups.md`.
+   */
+  occluderMeshMode: OccluderMeshMode;
 }
 
 /**
@@ -372,6 +400,7 @@ export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
     persistentOcclusion: false, // persistent depth-only mesh occluder OFF by default (extra cost; on-device gate pending)
     liveOcclusion: false, // live CPU-depth occluder OFF by default (device-gated quality; replay no-op)
     occluderDebugViz: false, // matcap debug visualization of the persistent occluder mesh OFF by default
+    occluderMeshMode: 'greedy', // persistent-occluder mesher: blocky greedy cubes by default (unchanged); 'corner-fit'/'smooth' opt in to surface-hugging
   },
   frameTileDisplay: {
     // Half-resolution display texture by default (D7): a noticeable per-tile
@@ -864,6 +893,13 @@ export function validateOccupancyOptions(
       typeof options.occluderDebugViz === 'boolean'
         ? options.occluderDebugViz
         : defaults.occluderDebugViz,
+    // Enum-or-default: only one of the known mesher modes is accepted; anything
+    // else (corrupt/legacy/missing) falls back to the default blocky cubes.
+    occluderMeshMode: (OCCLUDER_MESH_MODES as readonly string[]).includes(
+      options.occluderMeshMode as string
+    )
+      ? (options.occluderMeshMode as OccluderMeshMode)
+      : defaults.occluderMeshMode,
   };
 }
 

@@ -520,6 +520,40 @@ describe('recording-options', () => {
         DEFAULT_RECORDING_OPTIONS.occupancy.occluderDebugViz
       );
     });
+
+    /**
+     * Why these matter: `occluderMeshMode` (2026-06-30 F2/F2b) picks the
+     * persistent-occluder mesher so the surface-hugging approaches can be A/B
+     * tested on-device. It must default to the existing blocky cubes (`'greedy'`)
+     * so shipped behaviour is unchanged, preserve a known mode, and reject any
+     * corrupt/legacy/unknown value back to the default rather than crashing the
+     * mesher with a bad mode string.
+     */
+    it("defaults occluderMeshMode to 'greedy' for an empty object", () => {
+      expect(validateOccupancyOptions({}).occluderMeshMode).toBe('greedy');
+    });
+
+    it('preserves each known occluderMeshMode', () => {
+      for (const mode of ['greedy', 'corner-fit', 'smooth'] as const) {
+        expect(
+          validateOccupancyOptions({ occluderMeshMode: mode }).occluderMeshMode
+        ).toBe(mode);
+      }
+    });
+
+    it('falls back to the default for an unknown occluderMeshMode', () => {
+      const out = validateOccupancyOptions({
+        occluderMeshMode: 'per-face' as never, // not offered in the recorder
+      });
+      expect(out.occluderMeshMode).toBe(
+        DEFAULT_RECORDING_OPTIONS.occupancy.occluderMeshMode
+      );
+      expect(
+        validateOccupancyOptions({
+          occluderMeshMode: 42 as never,
+        }).occluderMeshMode
+      ).toBe('greedy');
+    });
   });
 
   describe('validateFrameTileDisplayOptions', () => {
@@ -1372,6 +1406,7 @@ describe('recording-options', () => {
           persistentOcclusion: true,
           liveOcclusion: true,
           occluderDebugViz: true,
+          occluderMeshMode: 'smooth',
         },
         frameTileDisplay: { divisor: 4 },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },

@@ -817,9 +817,11 @@ describe('settings-modal', () => {
       ) as HTMLInputElement | null;
       expect(angular).not.toBeNull();
       expect(linear).not.toBeNull();
-      // Defaults from DEFAULT_MOTION_FILTER (0.6 rad/s, 0.5 m/s).
+      // Defaults from DEFAULT_MOTION_FILTER (0.6 rad/s, 2.5 m/s — the linear
+      // threshold was raised 0.5 → 2.5 on 2026-07-02 to stop deferring walking;
+      // see 2026-07-02-image-capture-rate-motion-gate-finding.md).
       expect(parseFloat(angular!.value)).toBeCloseTo(0.6, 6);
-      expect(parseFloat(linear!.value)).toBeCloseTo(0.5, 6);
+      expect(parseFloat(linear!.value)).toBeCloseTo(2.5, 6);
     });
 
     it('persists edited threshold values through save/load', () => {

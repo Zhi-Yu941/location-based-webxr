@@ -18,6 +18,7 @@ Main-thread orchestration for the occluder Web Worker offload — the glue betwe
 - **Sync fallback delivers immediately** (no coalescing needed — each `request` completes before returning).
 - **Post-dispose safety:** a response arriving after `dispose()` (or with a stale id) is ignored; no callback fires.
 - The driver does not own the worker lifecycle — the consumer terminates the `Worker` (see the recorder's `occluder-mesh-worker-client.ts`).
+- **KNOWN GAP — no error recovery (freezes on worker failure).** The only thing that clears the in-flight slot is a successful response. If the worker throws (uncaught error in `runMeshRequest`) or its module fails to load, no response arrives, `busy` stays `true` forever, and every later `request` just overwrites `pending` → the occluder silently stops updating. There is no error seam on `MeshWorkerPoster` and no async-load fallback (the sync fallback only covers a synchronous `createWorker()` throw). Fix planned in `GpsPlusSlamJs_Docs/docs/2026-07-01-occluder-worker-and-chunked-remesh-plan.md` §"Phase 1 gap — worker-error recovery".
 
 ## Tests
 

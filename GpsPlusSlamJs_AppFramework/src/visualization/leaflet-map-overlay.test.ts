@@ -1127,6 +1127,29 @@ describe('LeafletMapOverlay', () => {
       overlay.dispose();
     });
 
+    // Why: `updatePosition` documents itself as "a no-op when ... the map is not
+    // shown", but `hide()` only DETACHES the CSS3DObject (`removeCssObject`) — it
+    // never nulls the field — so the old guard (which checked only `cssObject`)
+    // kept doing per-frame quaternion work while hidden. A consumer that drives
+    // the frame loop without gating on `isVisible()` (the framework is a library)
+    // would waste work and rotate a detached object. Assert the hidden no-op.
+    it('is a no-op when the map is hidden (honors the not-shown contract)', () => {
+      const { overlay, parent, camera } = showOverlayWithParent(true);
+      aimCamera(camera, 0);
+      overlay.render({ ...sampleMapData(), userHeadingDeg: 90 });
+      overlay.updatePosition(1, camera);
+      const css = parent.children[0] as THREE.Object3D; // the CSS3DObject
+      const before = css.quaternion.clone();
+
+      overlay.hide(); // detaches the CSS3DObject but keeps the field non-null
+
+      // Turning the head + updating while hidden must NOT touch the quaternion.
+      aimCamera(camera, 90);
+      overlay.updatePosition(1, camera);
+      expect(css.quaternion.equals(before)).toBe(true);
+      overlay.dispose();
+    });
+
     // Why: when the heading becomes undefined (camera near-vertical), the map
     // must HOLD its last orientation, not snap to north.
     it('holds the last orientation when the target heading becomes null', () => {

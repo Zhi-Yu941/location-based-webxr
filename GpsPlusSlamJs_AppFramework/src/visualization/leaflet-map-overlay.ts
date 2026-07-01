@@ -408,7 +408,12 @@ export class LeafletMapOverlay {
    *   overlay). Required for heading-up; omitted callers leave the map as-is.
    */
   updatePosition(dtSeconds = 0, camera?: THREE.Camera): void {
-    if (!this.headingUp || !this.cssObject || !camera) {
+    // `hide()` only detaches the CSS3DObject (`removeCssObject`) — it never nulls
+    // `cssObject` — so `!this.cssObject` alone does not honor the documented
+    // "no-op when the map is not shown" contract. Guard on `visible` too, or a
+    // frame loop that keeps calling this while hidden wastes per-frame work and
+    // rotates a detached object.
+    if (!this.headingUp || !this.visible || !this.cssObject || !camera) {
       return;
     }
     const target = this.targetHeadingDeg;

@@ -155,6 +155,7 @@ import { FrameBlobCache } from './visualization/frame-blob-cache';
 import { OccupancyGrid } from 'gps-plus-slam-app-framework/ar/occupancy-grid';
 import { OccupancyCubesVisualizer } from './visualization/occupancy-cubes-visualizer';
 import { OcclusionMesh } from 'gps-plus-slam-app-framework/visualization';
+import { createOccluderMeshWorker } from './visualization/occluder-mesh-worker-client';
 import { wireOccupancyGridSubscribers } from './visualization/wire-occupancy-grid-subscribers';
 import { setOccupancyGrid } from './state/occupancy-grid-provider';
 import { SESSION_IMAGES_DIR } from 'gps-plus-slam-app-framework/storage/file-system-utils';
@@ -273,6 +274,11 @@ let occupancyGrid: OccupancyGrid | null = null;
 let occupancyCubesVisualizer: OccupancyCubesVisualizer | null = null;
 // Persistent depth-only occluder (off by default — occupancy.persistentOcclusion).
 let occlusionMesh: OcclusionMesh | null = null;
+// Web Worker driver that meshes the occluder off the main thread (falls back to
+// synchronous meshing if a worker can't be created). Lifecycle mirrors
+// `occlusionMesh` — disposed on re-enter + in resetMainState.
+let occluderMeshWorker: ReturnType<typeof createOccluderMeshWorker> | null =
+  null;
 // Live CPU-depth occluder (off by default — occupancy.liveOcclusion). Lifecycle
 // mirrors `occlusionMesh`: disposed on re-enter + in resetMainState (not via the
 // framework session-disposer registry). `liveOccluderUnregisterFrame` unhooks
@@ -629,6 +635,8 @@ export function resetMainState(): void {
     occlusionMesh.dispose();
     occlusionMesh = null;
   }
+  occluderMeshWorker?.dispose();
+  occluderMeshWorker = null;
   disposeLiveOccluder();
   occupancyGrid = null;
   setOccupancyGrid(null);
@@ -1307,6 +1315,8 @@ async function handleEnterAR(): Promise<void> {
         occupancyCubesVisualizer = null;
         occlusionMesh?.dispose();
         occlusionMesh = null;
+        occluderMeshWorker?.dispose();
+        occluderMeshWorker = null;
         occupancyGrid = null;
         setOccupancyGrid(null);
 
@@ -1347,12 +1357,12 @@ async function handleEnterAR(): Promise<void> {
         // placed behind it. The adapter snapshots the SAME minConfidence floor
         // the cubes/COLMAP use, so the three consumers can't silently diverge.
         const minConfidence = recordingOptions.occupancy.minConfidence;
+        // Mesher style (occupancy.occluderMeshMode): blocky greedy cubes by
+        // default; 'corner-fit'/'smooth' opt into the surface-hugging meshers.
+        const occluderMode = recordingOptions.occupancy.occluderMeshMode;
         const occluderSink = recordingOptions.occupancy.persistentOcclusion
           ? ((occlusionMesh = new OcclusionMesh(arWorldGroup, {
-              // Mesher style (occupancy.occluderMeshMode): blocky greedy cubes by
-              // default; 'corner-fit'/'smooth' opt into the surface-hugging
-              // meshers so they can be A/B-tested on-device.
-              mode: recordingOptions.occupancy.occluderMeshMode,
+              mode: occluderMode,
             })),
             // Debug viz (occupancy.occluderDebugViz): render the occluder mesh
             // as a visible shiny matcap so its shape can be judged on-device. No
@@ -1361,14 +1371,24 @@ async function handleEnterAR(): Promise<void> {
             occlusionMesh.setDebugVisualization(
               recordingOptions.occupancy.occluderDebugViz
             ),
+            // Mesh off the main thread so a large-grid re-mesh (100s of ms at
+            // hundreds of metres) never stalls the render; coalesces to the
+            // latest snapshot while busy, and falls back to synchronous meshing
+            // if a worker can't be created.
+            (occluderMeshWorker = createOccluderMeshWorker()),
             {
-              // Pass getCellPoint so the surface-hugging meshers can read each
-              // cell's measured centroid; the cube meshers ignore it.
+              // getOccupiedCells + getCellPoint stay main-thread (the grid lives
+              // here); only meshOccupiedCells runs in the worker, its geometry
+              // applied back here. getCellPoint is read only by the
+              // surface-hugging modes (the cube modes ignore it).
               refresh: (g: OccupancyGrid) =>
-                occlusionMesh?.update(
+                occluderMeshWorker?.driver.request(
                   g.getOccupiedCells(minConfidence),
                   g.cellSizeM,
-                  (cell) => g.getCellPoint(cell)
+                  occluderMode,
+                  (cell) => g.getCellPoint(cell),
+                  (positions, indices) =>
+                    occlusionMesh?.applyMeshData(positions, indices)
                 ),
               clear: () => occlusionMesh?.clear(),
             })

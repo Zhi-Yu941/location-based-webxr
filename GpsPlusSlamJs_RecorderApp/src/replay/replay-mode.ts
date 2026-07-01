@@ -50,6 +50,7 @@ import { OccupancyGrid } from 'gps-plus-slam-app-framework/ar/occupancy-grid';
 import { loadRecordingOptions } from 'gps-plus-slam-app-framework/state/recording-options';
 import { OccupancyCubesVisualizer } from '../visualization/occupancy-cubes-visualizer';
 import { OcclusionMesh } from 'gps-plus-slam-app-framework/visualization';
+import { createOccluderMeshWorker } from '../visualization/occluder-mesh-worker-client';
 import { wireOccupancyGridSubscribers } from '../visualization/wire-occupancy-grid-subscribers';
 import { createZipFrameBlobSource } from '../storage/zip-frame-blob-source';
 import * as THREE from 'three';
@@ -202,6 +203,9 @@ export async function startReplayMode(
   let unsubscribeOccupancyGrid: (() => void) | null = null;
   let occupancyCubesVisualizer: OccupancyCubesVisualizer | null = null;
   let occlusionMesh: OcclusionMesh | null = null;
+  // Off-main-thread occluder mesher (falls back to synchronous meshing).
+  let occluderMeshWorker: ReturnType<typeof createOccluderMeshWorker> | null =
+    null;
   try {
     // Re-derive the grid from the recorded depth points at the user's current
     // voxel size (recording-options `occupancy.cellSizeM`, clamped 1–20 cm).
@@ -224,25 +228,33 @@ export async function startReplayMode(
     // per replay like the cubes. Snapshots the same minConfidence floor.
     // (Live occlusion is live-AR-only — replay has no live depth stream — so
     // only the persistent flag is honoured here.)
+    const occluderMode = occupancyOptions.occluderMeshMode;
+    const occluderMinConfidence = occupancyOptions.minConfidence;
     const occluderSink = occupancyOptions.persistentOcclusion
       ? ((occlusionMesh = new OcclusionMesh(replaySceneState.arWorldGroup, {
           // Mesher style (occupancy.occluderMeshMode), re-read per replay like
           // the cubes — so the surface-hugging meshers can be inspected on a
           // recorded session, not only live.
-          mode: occupancyOptions.occluderMeshMode,
+          mode: occluderMode,
         })),
         // Debug viz (occupancy.occluderDebugViz): visible shiny matcap render of
         // the occluder mesh so its shape can be judged on replay too (additive
         // skin; occlusion unchanged), re-read per replay like the cubes.
         occlusionMesh.setDebugVisualization(occupancyOptions.occluderDebugViz),
+        // Mesh off the main thread so a large replay grid never stalls playback;
+        // coalesces to the latest while busy (synchronous fallback if no worker).
+        (occluderMeshWorker = createOccluderMeshWorker()),
         {
-          // Pass getCellPoint for the surface-hugging meshers (cube meshers
-          // ignore it).
+          // getOccupiedCells + getCellPoint stay main-thread; only the mesh runs
+          // in the worker. getCellPoint is read only by the surface-hugging modes.
           refresh: (g: OccupancyGrid) =>
-            occlusionMesh?.update(
-              g.getOccupiedCells(occupancyOptions.minConfidence),
+            occluderMeshWorker?.driver.request(
+              g.getOccupiedCells(occluderMinConfidence),
               g.cellSizeM,
-              (cell) => g.getCellPoint(cell)
+              occluderMode,
+              (cell) => g.getCellPoint(cell),
+              (positions, indices) =>
+                occlusionMesh?.applyMeshData(positions, indices)
             ),
           clear: () => occlusionMesh?.clear(),
         })
@@ -400,6 +412,7 @@ export async function startReplayMode(
       unsubscribeOccupancyGrid?.();
       occupancyCubesVisualizer?.dispose();
       occlusionMesh?.dispose();
+      occluderMeshWorker?.dispose();
       disposeReplayScene();
       log.info('Replay mode disposed');
     },

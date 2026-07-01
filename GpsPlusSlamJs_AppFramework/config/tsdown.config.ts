@@ -34,6 +34,9 @@ const entryFiles = [
   // Pure voxel→surface mesher — deep-importable (the `./ar/*` wildcard
   // advertises this subpath), so it must be built per-file.
   'src/ar/occupancy-mesher.ts',
+  // Occluder Web Worker protocol (runs `meshOccupiedCells` off-thread); the
+  // recorder's worker shell deep-imports it, so it must be a dist entry.
+  'src/ar/occlusion-mesh-worker.ts',
   'src/ar/enable-gps-ar.ts',
   'src/ar/frame-loop.ts',
   'src/ar/image-capture.ts',
@@ -140,6 +143,9 @@ const entryFiles = [
   'src/visualization/gps-compass-cubes.ts',
   'src/visualization/gps-event-markers.ts',
   'src/visualization/occlusion-mesh.ts',
+  // Main-thread driver for the occluder Web Worker offload — deep-imported by
+  // the recorder's worker client, so it must be a dist entry.
+  'src/visualization/occluder-mesh-driver.ts',
   'src/visualization/hit-test-reticle.ts',
   'src/visualization/leaflet-map-overlay.ts',
   'src/visualization/lerp-utils.ts',

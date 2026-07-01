@@ -1,0 +1,22 @@
+# occlusion-mesh-worker.ts
+
+## Purpose
+
+The **pure, transfer-friendly halves** of the occluder Web Worker offload (Phase 1 of `2026-07-01-occluder-worker-and-chunked-remesh-plan.md`). Moving `meshOccupiedCells` off the main thread keeps the render smooth when a large-grid re-mesh takes 100s of ms. Framework-owned so any consumer needs only a ~10-line worker shell.
+
+## Public API
+
+- `packMeshRequest(id, cells, cellSizeM, mode, getCellPoint?) → { request, transfer }` — **main thread.** Packs the occupied-cell snapshot into `MeshWorkerRequest` (a flat `Int32Array` of cells; for the surface-hugging modes a parallel `Float64Array` of centroids, `NaN` = a cell whose `getCellPoint` was `null`). `transfer` is the buffer list for `postMessage`'s 2nd arg (zero-copy).
+- `runMeshRequest(request) → { response, transfer }` — **worker.** Unpacks, rebuilds `getCellPoint` from the parallel centroid array, runs `meshOccupiedCells`, and returns `{ id, positions, indices }` + its transfer list.
+- `MeshWorkerRequest` / `MeshWorkerResponse` — the message shapes.
+
+## Invariants & assumptions
+
+- **Round-trip fidelity:** `runMeshRequest(packMeshRequest(…))` is **byte-identical** to a direct `meshOccupiedCells` — centroids are carried at **f64** (not f32) so the surface-hugging modes match exactly.
+- **Centroids only for `smooth`/`corner-fit`** (the cube modes ignore `getCellPoint`, so no centroid buffer is packed for them → 1 transferable, not 2).
+- **Transfer, don't copy:** the returned `transfer` arrays are the request/response backing buffers; after `postMessage(msg, transfer)` the sender's typed arrays are detached.
+- Cell coords must be within the mesher's packable range (`|coord| ≤ 32767`) — the worker's centroid lookup uses the same 17-bit packed key.
+
+## Tests
+
+- `occlusion-mesh-worker.test.ts` — round-trip == direct mesh for all 4 modes; null-centroid → geometric fallback; the transfer list is the request's backing buffers.

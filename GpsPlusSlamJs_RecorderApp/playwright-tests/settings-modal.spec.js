@@ -118,16 +118,17 @@ test.describe('Settings Modal', () => {
       await expect(valueDisplay).toHaveText('70%');
     });
 
-    test('occluder mesh-style selector defaults to greedy cubes and offers all modes', async ({
+    test('occluder mesh-style selector defaults to surface nets and offers all modes', async ({
       page,
     }) => {
       // 2026-06-30 F2/F2b: switch the persistent-occluder mesher between blocky
-      // cubes, corner-fit cubes and surface nets. Default greedy (unchanged).
+      // cubes, corner-fit cubes and surface nets. Default 'smooth' (Naive
+      // Surface Nets) since the 2026-07-01 default-on decision.
       const select = page.locator('#occupancy-occluder-mesh-mode');
-      await expect(select).toHaveValue('greedy');
-      await expect(select.locator('option')).toHaveCount(3);
-      await select.selectOption('smooth');
       await expect(select).toHaveValue('smooth');
+      await expect(select.locator('option')).toHaveCount(3);
+      await select.selectOption('greedy');
+      await expect(select).toHaveValue('greedy');
     });
 
     test('unchecking depth disables depth sliders', async ({ page }) => {

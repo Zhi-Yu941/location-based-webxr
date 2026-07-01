@@ -196,11 +196,12 @@ export interface OccupancyOptions {
    * invisible-but-depth-writing under `arWorldGroup`, so real geometry the
    * camera saw earlier hides virtual objects placed behind it — including
    * out-of-view surfaces a live depth occluder cannot remember. Default
-   * **false**: it is an extra GPU/CPU cost, and on-device verification that the
-   * persisted occluder helps (vs. drifting out of registration as alignment
-   * updates) is still pending. Read once when the mesh is wired (Enter-AR /
-   * replay load), like the other occupancy knobs. See
-   * `GpsPlusSlamJs_Docs/docs/2026-06-13-occupancy-mesh-options-plan.md`.
+   * **true** (since 2026-07-01): the Web-Worker mesh offload removed the
+   * per-refresh render stall that was the reason to keep it opt-in, so the
+   * remembered occluder ships on by the default `'smooth'` mesher. Read once when
+   * the mesh is wired (Enter-AR / replay load), like the other occupancy knobs.
+   * See `GpsPlusSlamJs_Docs/docs/2026-06-13-occupancy-mesh-options-plan.md` and
+   * `GpsPlusSlamJs_Docs/docs/2026-07-01-occluder-worker-and-chunked-remesh-plan.md`.
    *
    * **Migration:** this field replaces the former `occlusionMeshEnabled`
    * boolean — `validateOccupancyOptions` maps a persisted
@@ -236,9 +237,10 @@ export interface OccupancyOptions {
   occluderDebugViz: boolean;
   /**
    * Which mesher builds the **persistent occluder** mesh (see
-   * {@link OccluderMeshMode}). Default `'greedy'` — the existing blocky cubes, so
-   * shipped behaviour is unchanged. Switch to `'corner-fit'` or `'smooth'` to
-   * test the surface-hugging meshers on-device (combine with
+   * {@link OccluderMeshMode}). Default `'smooth'` (since 2026-07-01) — Naive
+   * Surface Nets, the smoothest and lightest mesh. Switch to `'greedy'` (blocky
+   * cubes, watertight) or `'corner-fit'` (surface-hugging + watertight) if the
+   * smooth mesh's open concave seams leak occlusion in practice (combine with
    * {@link occluderDebugViz} to actually *see* the mesh shape). Only has an
    * effect when {@link persistentOcclusion} is on. Read once when the mesh is
    * wired (Enter-AR / replay load), like the other occupancy knobs. See
@@ -398,10 +400,10 @@ export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
   occupancy: {
     cellSizeM: 0.15, // 15 cm voxels — matches OccupancyGrid's own default (Unity parity); balances detail vs speed
     minConfidence: 3, // ≥3 observations to render a voxel — the FAST-reconstruction noise floor (2026-07-01; ~1.5s dwell before a surface meshes vs 2.5s at 5, +25% early coverage; 1 = legacy/unfiltered)
-    persistentOcclusion: false, // persistent depth-only mesh occluder OFF by default (extra cost; on-device gate pending)
+    persistentOcclusion: true, // persistent depth-only mesh occluder ON by default (2026-07-01: Web-Worker offload removed the render stall — see 2026-07-01-occluder-worker-and-chunked-remesh-plan.md)
     liveOcclusion: false, // live CPU-depth occluder OFF by default (device-gated quality; replay no-op)
-    occluderDebugViz: false, // matcap debug visualization of the persistent occluder mesh OFF by default
-    occluderMeshMode: 'greedy', // persistent-occluder mesher: blocky greedy cubes by default (unchanged); 'corner-fit'/'smooth' opt in to surface-hugging
+    occluderDebugViz: false, // matcap debug visualization of the persistent occluder mesh OFF by default (occlusion is invisible in normal use)
+    occluderMeshMode: 'smooth', // persistent-occluder mesher: Naive Surface Nets by default (smoothest/lightest); 'greedy' = blocky cubes (watertight), 'corner-fit' = surface-hugging + watertight
   },
   frameTileDisplay: {
     // Half-resolution display texture by default (D7): a noticeable per-tile

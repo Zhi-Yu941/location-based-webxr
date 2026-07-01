@@ -1221,15 +1221,15 @@ No errors</pre
                   class="w-4 h-4 accent-blue-500"
                 />
                 <span class="text-sm text-gray-200"
-                  >Persistent mesh occluder (experimental)</span
+                  >Persistent mesh occluder</span
                 >
               </label>
               <p class="text-[11px] text-gray-400">
                 Mesh the occupancy grid into an invisible depth-only surface so
                 real geometry hides virtual objects placed behind it — including
-                surfaces you already walked past. Off by default (extra cost;
-                still being tuned on device). Applies the next time you enter AR
-                or load a replay.
+                surfaces you already walked past. On by default (meshed
+                off-thread, so it no longer stalls rendering). Applies the next
+                time you enter AR or load a replay.
               </p>
               <label class="block text-sm text-gray-200 mt-1"
                 >Occluder mesh style</label
@@ -1240,17 +1240,20 @@ No errors</pre
               >
                 <option value="greedy">Cubes (blocky)</option>
                 <option value="corner-fit">Corner-fit cubes (smoothed)</option>
-                <option value="smooth">Surface nets (smoothest)</option>
+                <option value="smooth" selected>
+                  Surface nets (smoothest)
+                </option>
               </select>
               <p class="text-[11px] text-gray-400">
-                How the persistent occluder mesh is built. “Cubes” is the blocky
-                default; “Corner-fit” nudges the cube corners toward the
-                measured surface while keeping their cube shape
-                (gap-free/watertight); “Surface nets” is the smoothest (hugs the
-                floor, but an open sheet over thin features). Turn on
-                “Debug-visualize” below to see the shape. Only affects the
-                persistent mesh occluder above; applies the next time you enter
-                AR or load a replay.
+                How the persistent occluder mesh is built. “Surface nets” is the
+                default — the smoothest (hugs the floor, but an open sheet over
+                thin features, so it can leak occlusion at concave wall–floor
+                seams); “Cubes” is blocky but watertight; “Corner-fit” nudges
+                the cube corners toward the measured surface while keeping their
+                cube shape (gap-free/watertight). Turn on “Debug-visualize”
+                below to see the shape. Only affects the persistent mesh
+                occluder above; applies the next time you enter AR or load a
+                replay.
               </p>
               <label class="flex items-center gap-2 cursor-pointer mt-1">
                 <input

@@ -540,9 +540,10 @@ describe('Occupancy-grid cube wiring in live AR', () => {
     expect(options.grid).toBe(mockOccupancyGridInstance);
     expect(options.visualizer).toBe(mockVisualizerInstance);
     expect(options.storeRef).toBeDefined();
-    // The persistent occluder is OFF by default: the mock options omit
-    // occupancy.persistentOcclusion, so no occluder sink is wired (it is the
-    // opt-in, on-device-gated half of the occupancy-mesh feature).
+    // This test exercises the occluder-OFF path: the mock options omit
+    // occupancy.persistentOcclusion (falsy), so no occluder sink is wired. (The
+    // shipped default is now ON — see recording-options.ts — but the wiring keys
+    // off the raw flag, which this mock leaves unset.)
     expect(options.occluder).toBeUndefined();
     // Issue A (2026-06-22 cube cadence/locality plan §2): the cube-refresh
     // throttle is wired from depth.intervalMs (500 ms in the mock), not the

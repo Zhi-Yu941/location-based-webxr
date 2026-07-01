@@ -272,7 +272,7 @@ let unsubscribeFrameTiles: (() => void) | null = null;
 // in the live AR scene at ~1 Hz.
 let occupancyGrid: OccupancyGrid | null = null;
 let occupancyCubesVisualizer: OccupancyCubesVisualizer | null = null;
-// Persistent depth-only occluder (off by default — occupancy.persistentOcclusion).
+// Persistent depth-only occluder (ON by default — occupancy.persistentOcclusion).
 let occlusionMesh: OcclusionMesh | null = null;
 // Web Worker driver that meshes the occluder off the main thread (falls back to
 // synchronous meshing if a worker can't be created). Lifecycle mirrors
@@ -1351,7 +1351,7 @@ async function handleEnterAR(): Promise<void> {
             ))
           : { refresh: () => {}, clear: () => {} };
 
-        // Persistent depth-only occluder (opt-in, off by default). When on, it
+        // Persistent depth-only occluder (ON by default). When on, it
         // re-meshes the grid on the same throttle as the cubes and writes depth
         // (no color) under arWorldGroup so real geometry hides virtual content
         // placed behind it. The adapter snapshots the SAME minConfidence floor

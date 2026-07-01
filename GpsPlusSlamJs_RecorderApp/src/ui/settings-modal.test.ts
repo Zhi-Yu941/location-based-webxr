@@ -424,13 +424,13 @@ describe('settings-modal', () => {
       expect(getWorkingOptions()?.occupancy.persistentOcclusion).toBe(false);
     });
 
-    it('defaults the persistent-occluder checkbox to off (feature off by default)', () => {
+    it('defaults the persistent-occluder checkbox to ON (feature on by default since 2026-07-01)', () => {
       localStorageMock.getItem.mockReturnValueOnce(JSON.stringify({}));
       showSettingsModal();
       const checkbox = document.getElementById(
         'occupancy-persistent-occlusion'
       ) as HTMLInputElement;
-      expect(checkbox.checked).toBe(false);
+      expect(checkbox.checked).toBe(true);
     });
 
     it('populates the live-occluder checkbox from saved options and updates the working copy', () => {
@@ -506,13 +506,13 @@ describe('settings-modal', () => {
       );
     });
 
-    it("defaults the occluder mesh-style select to 'greedy' (blocky cubes, unchanged behaviour)", () => {
+    it("defaults the occluder mesh-style select to 'smooth' (Naive Surface Nets, default since 2026-07-01)", () => {
       localStorageMock.getItem.mockReturnValueOnce(JSON.stringify({}));
       showSettingsModal();
       const select = document.getElementById(
         'occupancy-occluder-mesh-mode'
       ) as HTMLSelectElement;
-      expect(select.value).toBe('greedy');
+      expect(select.value).toBe('smooth');
     });
 
     it('lets the live and persistent occluders be ticked together (they compose)', () => {

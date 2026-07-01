@@ -434,13 +434,17 @@ describe('recording-options', () => {
 
     /**
      * Why these matter (2026-06-13-occupancy-mesh-options-plan.md +
-     * 2026-06-29-occupancy-mesh-followups.md): the two occluders are extra-cost,
-     * on-device-gated features, so both must default OFF and round-trip as
-     * booleans — a corrupted stored value must not silently switch either on.
+     * 2026-06-29-occupancy-mesh-followups.md +
+     * 2026-07-01-occluder-worker-and-chunked-remesh-plan.md): both occluders
+     * round-trip as booleans — a corrupted stored value must not silently switch
+     * either on. Since 2026-07-01 the **persistent** mesh occluder ships ON by
+     * default (Web-Worker offload removed the render stall; surface-nets mesher —
+     * see occluderMeshMode below); the **live** CPU-depth occluder stays OFF
+     * (still device-gated, replay no-op).
      */
-    it('defaults persistentOcclusion and liveOcclusion to false for an empty object', () => {
+    it('defaults persistentOcclusion to true and liveOcclusion to false for an empty object', () => {
       const out = validateOccupancyOptions({});
-      expect(out.persistentOcclusion).toBe(false);
+      expect(out.persistentOcclusion).toBe(true);
       expect(out.liveOcclusion).toBe(false);
     });
 
@@ -524,14 +528,14 @@ describe('recording-options', () => {
 
     /**
      * Why these matter: `occluderMeshMode` (2026-06-30 F2/F2b) picks the
-     * persistent-occluder mesher so the surface-hugging approaches can be A/B
-     * tested on-device. It must default to the existing blocky cubes (`'greedy'`)
-     * so shipped behaviour is unchanged, preserve a known mode, and reject any
-     * corrupt/legacy/unknown value back to the default rather than crashing the
-     * mesher with a bad mode string.
+     * persistent-occluder mesher. Since 2026-07-01 it defaults to `'smooth'`
+     * (Naive Surface Nets) — the smoothest, lightest mesh, shipped as the default
+     * occluder now that the persistent occluder is ON by default. It must still
+     * preserve a known mode and reject any corrupt/legacy/unknown value back to
+     * the default rather than crashing the mesher with a bad mode string.
      */
-    it("defaults occluderMeshMode to 'greedy' for an empty object", () => {
-      expect(validateOccupancyOptions({}).occluderMeshMode).toBe('greedy');
+    it("defaults occluderMeshMode to 'smooth' for an empty object", () => {
+      expect(validateOccupancyOptions({}).occluderMeshMode).toBe('smooth');
     });
 
     it('preserves each known occluderMeshMode', () => {
@@ -553,7 +557,7 @@ describe('recording-options', () => {
         validateOccupancyOptions({
           occluderMeshMode: 42 as never,
         }).occluderMeshMode
-      ).toBe('greedy');
+      ).toBe('smooth');
     });
   });
 

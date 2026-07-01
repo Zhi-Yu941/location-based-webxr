@@ -224,7 +224,7 @@ export async function startReplayMode(
       replaySceneState.arWorldGroup,
       { minObservations: occupancyOptions.minConfidence }
     );
-    // Persistent depth-only occluder (opt-in, off by default), re-quantizable
+    // Persistent depth-only occluder (ON by default), re-quantizable
     // per replay like the cubes. Snapshots the same minConfidence floor.
     // (Live occlusion is live-AR-only — replay has no live depth stream — so
     // only the persistent flag is honoured here.)

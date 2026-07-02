@@ -122,6 +122,23 @@ describe('meshOccupiedCells', () => {
     expect(result.aabbs).toHaveLength(1);
   });
 
+  // Why this test matters: `isPackableCell`'s documented guard is "finite,
+  // INTEGER, and in key range" — the packed-key algebra (neighbour ±1 lookups,
+  // corner-fit half-lattice keys `2·coord ± 1`) is only collision-safe for
+  // integer coordinates, and a fractional cell is type-legal on this public
+  // API (`GridCell` is just three numbers). It must be dropped like a
+  // non-finite one, not silently meshed with unmatchable keys (PR #147 review).
+  it('skips cells with a non-integer coordinate (defensive)', () => {
+    const cells: GridCell[] = [
+      [0, 0, 0],
+      [0.5, 0, 0],
+      [0, 0, -2.25],
+    ];
+    const result = meshOccupiedCells(cells, 0.15);
+    expect(faceCount(result.indices)).toBe(6); // only the integer voxel
+    expect(result.aabbs).toHaveLength(1);
+  });
+
   describe('greedy merge', () => {
     it('keeps a single voxel at 6 quads (nothing to merge)', () => {
       const culled = meshOccupiedCells([[0, 0, 0]], 0.15);

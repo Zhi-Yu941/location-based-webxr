@@ -234,11 +234,15 @@ function cellKey(x: number, y: number, z: number): number {
   );
 }
 
-/** Finite, integer, and within the packable key range on every axis. */
+/** Finite, integer, and within the packable key range on every axis.
+ *  `Number.isInteger` subsumes the finiteness check (NaN/±Infinity are not
+ *  integers) and rejects fractional coordinates, which the packed-key algebra
+ *  cannot key safely (neighbour ±1 and half-lattice `2·coord ± 1` keys only
+ *  coincide for integer cells). */
 function isPackableCell(cell: GridCell): boolean {
   for (let i = 0; i < 3; i++) {
     const c = cell[i]!;
-    if (!Number.isFinite(c) || Math.abs(c) > CELL_KEY_LIMIT) {
+    if (!Number.isInteger(c) || Math.abs(c) > CELL_KEY_LIMIT) {
       return false;
     }
   }
@@ -251,8 +255,9 @@ function isPackableCell(cell: GridCell): boolean {
  * Only faces whose neighbour cell is **not** in the occupied set are emitted
  * (interior faces are dropped), so the triangle count scales with the surface
  * area of the occupied set. Duplicate cells in `cells` are de-duplicated;
- * cells with a non-finite coordinate are skipped defensively (a tracking glitch
- * upstream must not poison the mesh).
+ * cells with a non-finite or non-integer coordinate are skipped defensively (a
+ * tracking glitch upstream must not poison the mesh, and the packed cell keys
+ * are only collision-safe for integer coordinates).
  *
  * @param cells     occupied cells (e.g. `grid.getOccupiedCells(minConfidence)`).
  * @param cellSizeM cube edge length in metres (must be a positive finite number).
@@ -271,7 +276,7 @@ export function meshOccupiedCells(
   const half = cellSizeM / 2;
 
   // Snapshot into a Set for O(1) neighbour tests, de-duplicating and dropping
-  // non-finite / out-of-range cells. Keep the de-duplicated cells in insertion
+  // non-integer / out-of-range cells. Keep the de-duplicated cells in insertion
   // order for deterministic AABB / face emission.
   const occupied = new Set<number>();
   const uniqueCells: GridCell[] = [];

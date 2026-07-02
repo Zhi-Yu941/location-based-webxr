@@ -1364,12 +1364,13 @@ async function handleEnterAR(): Promise<void> {
           ? ((occlusionMesh = new OcclusionMesh(arWorldGroup, {
               mode: occluderMode,
             })),
-            // Debug viz (occupancy.occluderDebugViz): render the occluder mesh
-            // as a visible shiny matcap so its shape can be judged on-device. No
-            // effect on occlusion (additive skin); read here like the other
+            // Debug style (occupancy.occluderDebugStyle): render the occluder
+            // mesh with visible debug skin(s) — matcap / depth-shaded /
+            // wireframe — so its shape and structure can be judged on-device.
+            // No effect on occlusion (additive skins); read here like the other
             // occupancy knobs so a change applies on the next Enter-AR.
-            occlusionMesh.setDebugVisualization(
-              recordingOptions.occupancy.occluderDebugViz
+            occlusionMesh.setDebugStyle(
+              recordingOptions.occupancy.occluderDebugStyle
             ),
             // Mesh off the main thread so a large-grid re-mesh (100s of ms at
             // hundreds of metres) never stalls the render; coalesces to the

@@ -19,6 +19,7 @@ import {
   QR_CONSTRAINTS,
   type RecordingOptions,
   type OccluderMeshMode,
+  type OccluderDebugStyle,
 } from 'gps-plus-slam-app-framework/state/recording-options';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
 import { getBuildInfo } from '../utils/build-info';
@@ -75,7 +76,7 @@ let occupancyMinConfidenceSlider: HTMLInputElement | null = null;
 let occupancyMinConfidenceValue: HTMLElement | null = null;
 let occupancyLiveOcclusionCheckbox: HTMLInputElement | null = null;
 let occupancyPersistentOcclusionCheckbox: HTMLInputElement | null = null;
-let occupancyOccluderDebugVizCheckbox: HTMLInputElement | null = null;
+let occupancyOccluderDebugStyleSelect: HTMLSelectElement | null = null;
 let occupancyOccluderMeshModeSelect: HTMLSelectElement | null = null;
 let frameTileDisplayDivisorSlider: HTMLInputElement | null = null;
 let frameTileDisplayDivisorValue: HTMLElement | null = null;
@@ -211,9 +212,9 @@ export function initSettingsModal(
   occupancyPersistentOcclusionCheckbox = document.getElementById(
     'occupancy-persistent-occlusion'
   ) as HTMLInputElement;
-  occupancyOccluderDebugVizCheckbox = document.getElementById(
-    'occupancy-occluder-debug-viz'
-  ) as HTMLInputElement;
+  occupancyOccluderDebugStyleSelect = document.getElementById(
+    'occupancy-occluder-debug-style'
+  ) as HTMLSelectElement;
   occupancyOccluderMeshModeSelect = document.getElementById(
     'occupancy-occluder-mesh-mode'
   ) as HTMLSelectElement;
@@ -366,13 +367,15 @@ export function initSettingsModal(
     }
   });
 
-  // Debug visualization of the persistent occluder mesh (matcap, shiny,
-  // semi-transparent). Independent flag; only visible when the persistent
-  // occluder is on. Applies on the next Enter-AR / replay load.
-  occupancyOccluderDebugVizCheckbox?.addEventListener('change', () => {
-    if (workingOptions && occupancyOccluderDebugVizCheckbox) {
-      workingOptions.occupancy.occluderDebugViz =
-        occupancyOccluderDebugVizCheckbox.checked;
+  // Debug-visualization style of the persistent occluder mesh
+  // (occupancy.occluderDebugStyle): off / matcap / depth-shaded / wireframe /
+  // both. Only visible when the persistent occluder is on. Validated on save
+  // (unknown <option> values resolve to 'off'). Applies on the next Enter-AR /
+  // replay load.
+  occupancyOccluderDebugStyleSelect?.addEventListener('change', () => {
+    if (workingOptions && occupancyOccluderDebugStyleSelect) {
+      workingOptions.occupancy.occluderDebugStyle =
+        occupancyOccluderDebugStyleSelect.value as OccluderDebugStyle;
     }
   });
 
@@ -908,9 +911,9 @@ function populateForm(options: RecordingOptions): void {
     occupancyPersistentOcclusionCheckbox.checked =
       options.occupancy.persistentOcclusion;
   }
-  if (occupancyOccluderDebugVizCheckbox) {
-    occupancyOccluderDebugVizCheckbox.checked =
-      options.occupancy.occluderDebugViz;
+  if (occupancyOccluderDebugStyleSelect) {
+    occupancyOccluderDebugStyleSelect.value =
+      options.occupancy.occluderDebugStyle;
   }
   if (occupancyOccluderMeshModeSelect) {
     occupancyOccluderMeshModeSelect.value = options.occupancy.occluderMeshMode;

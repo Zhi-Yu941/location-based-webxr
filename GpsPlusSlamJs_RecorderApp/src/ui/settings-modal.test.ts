@@ -176,12 +176,18 @@ describe('settings-modal', () => {
       expect(html).toContain('id="occupancy-live-occlusion"');
     });
 
-    it('includes the occluder debug-visualization checkbox', () => {
-      // 2026-06-29 occlusion-debug-viz feedback: a third independent checkbox
-      // (occupancy.occluderDebugViz) renders the persistent occluder mesh as a
-      // visible matcap so its shape can be judged on-device.
+    it('includes the occluder debug-style selector with all five styles', () => {
+      // 2026-07-02 debug-viz-styles plan: a <select>
+      // (occupancy.occluderDebugStyle) replaced the former debug-viz checkbox —
+      // it picks which visible debug skin(s) render the persistent occluder
+      // mesh (matcap / depth-shaded / wireframe / both / off).
       const html = loadSettingsModalHtml();
-      expect(html).toContain('id="occupancy-occluder-debug-viz"');
+      expect(html).toContain('id="occupancy-occluder-debug-style"');
+      expect(html).toContain('value="off"');
+      expect(html).toContain('value="matcap"');
+      expect(html).toContain('value="depth-shaded"');
+      expect(html).toContain('value="wireframe"');
+      expect(html).toContain('value="depth-shaded-wireframe"');
     });
 
     it('includes the occluder mesh-style selector with all three modes', () => {
@@ -460,30 +466,46 @@ describe('settings-modal', () => {
       expect(checkbox.checked).toBe(false);
     });
 
-    it('populates the occluder debug-viz checkbox from saved options and updates the working copy', () => {
+    it('populates the occluder debug-style select from saved options and updates the working copy', () => {
       localStorageMock.getItem.mockReturnValueOnce(
-        JSON.stringify({ occupancy: { occluderDebugViz: true } })
+        JSON.stringify({ occupancy: { occluderDebugStyle: 'wireframe' } })
       );
 
       showSettingsModal();
 
-      const checkbox = document.getElementById(
-        'occupancy-occluder-debug-viz'
-      ) as HTMLInputElement;
-      expect(checkbox.checked).toBe(true);
+      const select = document.getElementById(
+        'occupancy-occluder-debug-style'
+      ) as HTMLSelectElement;
+      expect(select.value).toBe('wireframe');
 
-      checkbox.checked = false;
-      checkbox.dispatchEvent(new Event('change'));
-      expect(getWorkingOptions()?.occupancy.occluderDebugViz).toBe(false);
+      // Switch to the combined style → working copy updates (persisted on Save).
+      select.value = 'depth-shaded-wireframe';
+      select.dispatchEvent(new Event('change'));
+      expect(getWorkingOptions()?.occupancy.occluderDebugStyle).toBe(
+        'depth-shaded-wireframe'
+      );
     });
 
-    it('defaults the occluder debug-viz checkbox to off (off by default)', () => {
+    it("defaults the occluder debug-style select to 'off' (debug rendering off by default)", () => {
       localStorageMock.getItem.mockReturnValueOnce(JSON.stringify({}));
       showSettingsModal();
-      const checkbox = document.getElementById(
-        'occupancy-occluder-debug-viz'
-      ) as HTMLInputElement;
-      expect(checkbox.checked).toBe(false);
+      const select = document.getElementById(
+        'occupancy-occluder-debug-style'
+      ) as HTMLSelectElement;
+      expect(select.value).toBe('off');
+    });
+
+    it("shows 'matcap' for a saved legacy occluderDebugViz=true (boolean migration)", () => {
+      // The pre-2026-07-02 boolean must keep its meaning: true used to enable
+      // the matcap skin, so the migrated select shows 'matcap' — not 'off'.
+      localStorageMock.getItem.mockReturnValueOnce(
+        JSON.stringify({ occupancy: { occluderDebugViz: true } })
+      );
+      showSettingsModal();
+      const select = document.getElementById(
+        'occupancy-occluder-debug-style'
+      ) as HTMLSelectElement;
+      expect(select.value).toBe('matcap');
     });
 
     it('populates the occluder mesh-style select from saved options and updates the working copy', () => {

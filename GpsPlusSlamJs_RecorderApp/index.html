@@ -1250,26 +1250,36 @@ No errors</pre
                 thin features, so it can leak occlusion at concave wall–floor
                 seams); “Cubes” is blocky but watertight; “Corner-fit” nudges
                 the cube corners toward the measured surface while keeping their
-                cube shape (gap-free/watertight). Turn on “Debug-visualize”
+                cube shape (gap-free/watertight). Pick an “Occluder debug style”
                 below to see the shape. Only affects the persistent mesh
                 occluder above; applies the next time you enter AR or load a
                 replay.
               </p>
-              <label class="flex items-center gap-2 cursor-pointer mt-1">
-                <input
-                  type="checkbox"
-                  id="occupancy-occluder-debug-viz"
-                  class="w-4 h-4 accent-blue-500"
-                />
-                <span class="text-sm text-gray-200"
-                  >Debug-visualize occluder mesh</span
-                >
-              </label>
+              <label class="block text-sm text-gray-200 mt-1"
+                >Occluder debug style</label
+              >
+              <select
+                id="occupancy-occluder-debug-style"
+                class="w-full mt-1 text-sm bg-gray-700 text-gray-200 rounded px-2 py-1"
+              >
+                <option value="off" selected>Off</option>
+                <option value="matcap">Matcap (shiny surface)</option>
+                <option value="depth-shaded">
+                  Depth-shaded (near bright, far dark + rim)
+                </option>
+                <option value="wireframe">Wireframe (triangulation)</option>
+                <option value="depth-shaded-wireframe">
+                  Depth-shaded + wireframe
+                </option>
+              </select>
               <p class="text-[11px] text-gray-400">
-                Render the persistent occluder mesh as a shiny, semi-transparent
-                surface so you can see its shape and quality. It still occludes.
-                Only visible when the persistent mesh occluder above is on. Off
-                by default; applies the next time you enter AR or load a replay.
+                Renders the persistent occluder mesh visibly so its shape and
+                structure can be judged: “Depth-shaded” separates overlapping
+                near/far layers (distance fade + silhouette rim), “Wireframe”
+                shows the actual triangulation of the mesh style above. It still
+                occludes in every style. Only visible when the persistent mesh
+                occluder above is on. Off by default; applies the next time you
+                enter AR or load a replay.
               </p>
             </div>
           </div>

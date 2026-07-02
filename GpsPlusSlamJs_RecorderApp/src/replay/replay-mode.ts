@@ -237,10 +237,11 @@ export async function startReplayMode(
           // recorded session, not only live.
           mode: occluderMode,
         })),
-        // Debug viz (occupancy.occluderDebugViz): visible shiny matcap render of
-        // the occluder mesh so its shape can be judged on replay too (additive
-        // skin; occlusion unchanged), re-read per replay like the cubes.
-        occlusionMesh.setDebugVisualization(occupancyOptions.occluderDebugViz),
+        // Debug style (occupancy.occluderDebugStyle): visible debug skin(s) —
+        // matcap / depth-shaded / wireframe — so the mesh's shape and structure
+        // can be judged on replay too (additive skins; occlusion unchanged),
+        // re-read per replay like the cubes.
+        occlusionMesh.setDebugStyle(occupancyOptions.occluderDebugStyle),
         // Mesh off the main thread so a large replay grid never stalls playback;
         // coalesces to the latest while busy (synchronous fallback if no worker).
         (occluderMeshWorker = createOccluderMeshWorker()),

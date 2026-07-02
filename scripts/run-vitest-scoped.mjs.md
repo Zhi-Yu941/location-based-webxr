@@ -15,7 +15,11 @@ everything else to vitest unchanged, so both `pnpm run test:unit <file>` and
 
 - `buildScopedVitestArgs(rawArgs: string[]): string[]` — pure arg builder.
   Removes bare `--` tokens; preserves everything else (flags, paths) in order.
-  Never throws.
+  When the result contains a positional file filter AND `--coverage`, four
+  `--coverage.thresholds.*=0` overrides are inserted directly after
+  `--coverage` (a scoped run covering ~one file can never meet whole-suite
+  thresholds; inserting them early means a developer's own later threshold
+  flag wins). Never throws.
 - CLI entry (when executed directly): spawns `vitest` with the built argv
   (`stdio: inherit`; `shell: true` so the invoking package's
   `node_modules/.bin` shim resolves on Windows) and exits with the child's
@@ -25,11 +29,15 @@ everything else to vitest unchanged, so both `pnpm run test:unit <file>` and
 
 - **Generic by design:** the wrapper hardcodes NO vitest args. Each package's
   `test:unit` line passes its own canonical invocation first (e.g.
-  `node ../scripts/run-vitest-scoped.mjs run --coverage --config
-  config/vitest.config.ts`), and pnpm appends developer args after it.
+  `node ../scripts/run-vitest-scoped.mjs run --coverage
+  --config=config/vitest.config.ts`), and pnpm appends developer args after
+  it.
+- **Base args MUST use `--flag=value` form** (`--config=…`, never
+  `--config …`): a space-separated flag value is indistinguishable from a
+  positional file filter, which would make every run look scoped.
 - **A no-arg (unfiltered) run must pass through unchanged** — it is the
   full-suite invocation each package's `test`/`test:core` gate uses. Do not
-  add a refuse-on-empty guard.
+  add a refuse-on-empty guard; coverage thresholds stay enforced there.
 - Runs with the invoking package's cwd, so package-relative config paths and
   the package-local vitest binary are used.
 - Importing the module (as the repo-config test does) must not spawn anything

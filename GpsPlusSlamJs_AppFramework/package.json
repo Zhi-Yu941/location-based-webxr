@@ -39,7 +39,7 @@
     "verify:pack": "pnpm pack --dry-run",
     "verify:community-key-lifetime": "node scripts/verify-community-key-lifetime.mjs",
     "prepublishOnly": "pnpm run build && pnpm run verify:pack && pnpm run verify:community-key-lifetime",
-    "test:unit": "node ../scripts/run-vitest-scoped.mjs run --coverage --config config/vitest.config.ts",
+    "test:unit": "node ../scripts/run-vitest-scoped.mjs run --coverage --config=config/vitest.config.ts",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "typecheck:tests": "tsc -p tsconfig.vitest.json --noEmit",
     "lint": "eslint . --config config/eslint.config.mjs",

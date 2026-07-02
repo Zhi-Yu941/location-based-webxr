@@ -19,13 +19,38 @@ import { pathToFileURL } from 'node:url';
  * that is the invocation each package's `test`/`test:core` gate uses, so this
  * wrapper must never refuse an unfiltered run.
  *
+ * Scoped runs of a `--coverage` package additionally get GLOBAL coverage
+ * thresholds neutralized (zero-overrides inserted right after `--coverage`,
+ * so a developer's own later threshold flag still wins): covering ~one file
+ * can never meet a whole-suite threshold, so without this a green scoped run
+ * exits 1 — the same single-file-TDD failure the core library's stage runner
+ * solves with identical overrides. Unfiltered gate runs keep thresholds
+ * enforced. NOTE: base args in package.json must use `--flag=value` form
+ * (e.g. `--config=config/vitest.config.ts`) — a space-separated flag value
+ * would be indistinguishable from a positional file filter.
+ *
  * @param {string[]} rawArgs args after the script name (process.argv.slice(2))
  * @returns {string[]} argv to hand to the `vitest` binary
  */
 export function buildScopedVitestArgs(rawArgs) {
   // Drop only the bare `--` separator; real flags (`--reporter=dot`, …) and
   // file paths pass through untouched, in order.
-  return rawArgs.filter((arg) => arg !== '--');
+  const args = rawArgs.filter((arg) => arg !== '--');
+  // args[0] is the vitest command word (`run`); any later non-flag arg is a
+  // positional file filter (base args use --flag=value form, see above).
+  const hasFileFilter = args.some((arg, i) => i > 0 && !arg.startsWith('-'));
+  const coverageIdx = args.indexOf('--coverage');
+  if (hasFileFilter && coverageIdx !== -1) {
+    args.splice(
+      coverageIdx + 1,
+      0,
+      '--coverage.thresholds.statements=0',
+      '--coverage.thresholds.branches=0',
+      '--coverage.thresholds.functions=0',
+      '--coverage.thresholds.lines=0'
+    );
+  }
+  return args;
 }
 
 // Execute only when run directly (node scripts/run-vitest-scoped.mjs), not

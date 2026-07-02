@@ -14,7 +14,10 @@
  * Invariants:
  *  1. FULL coverage — comparable triangle count to the per-face cubes on ragged
  *     / thin surfaces (the bug fix), incl. 1-cell-wide features the 2×2 heuristic
- *     missed entirely;
+ *     missed entirely — AND non-zero AREA for features thin in ≥2 dimensions
+ *     (count alone hid a zero-area collapse: all dual vertices around an
+ *     isolated voxel / line / pillar coincided until the single-corner nudge,
+ *     SINGLE_CORNER_NUDGE_K, 2026-07-02);
  *  2. consumes getCellPoint — vertices are pulled onto the measured surface (a
  *     uniform sub-cell offset shifts every vertex by that offset);
  *  3. welded + watertight on a closed (thick) region (even-edge-cover = 0);

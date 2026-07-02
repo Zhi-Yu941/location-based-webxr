@@ -173,6 +173,31 @@ export interface ImageCaptureOptions {
 const OCCLUDER_MESH_MODES = ['greedy', 'corner-fit', 'smooth'] as const;
 export type OccluderMeshMode = (typeof OCCLUDER_MESH_MODES)[number];
 
+/**
+ * Debug-visualization style for the **persistent occluder** mesh (2026-07-02
+ * debug-viz-styles plan) — which visible debug skin(s) `OcclusionMesh` renders
+ * on top of the invisible depth-only occluder:
+ * - `'off'` — no debug rendering (the shipped default; occlusion is invisible).
+ * - `'matcap'` — the original shiny semi-transparent cyan skin.
+ * - `'depth-shaded'` — matcap + camera-distance fade + white fresnel rim, so
+ *   overlapping near/far surfaces read as separate shells.
+ * - `'wireframe'` — the raw triangulation as GL lines (mesh-structure
+ *   inspection: triangle density, mesher seams, degenerate spots).
+ * - `'depth-shaded-wireframe'` — both of the above composed.
+ *
+ * Values array module-private (validation only; the settings `<select>`
+ * options are hardcoded in the recorder's `index.html`), type exported —
+ * mirroring `OCCLUDER_MESH_MODES` / {@link OccluderMeshMode}.
+ */
+const OCCLUDER_DEBUG_STYLES = [
+  'off',
+  'matcap',
+  'depth-shaded',
+  'wireframe',
+  'depth-shaded-wireframe',
+] as const;
+export type OccluderDebugStyle = (typeof OCCLUDER_DEBUG_STYLES)[number];
+
 export interface OccupancyOptions {
   /**
    * Voxel edge length in metres. Drives the occupancy-grid quantization, the
@@ -231,24 +256,31 @@ export interface OccupancyOptions {
    */
   liveOcclusion: boolean;
   /**
-   * Render the persistent occluder mesh with a **visible debug material** (a
-   * shiny, semi-transparent matcap) instead of the invisible depth-only one, so
-   * the operator can see the mesh shape/quality on-device. The mesh **still
-   * writes depth**, so it keeps occluding while visible. Only has an effect when
-   * {@link persistentOcclusion} is on (the debug mesh is the persistent
-   * occluder's mesh); ticking it alone is a harmless no-op. Default **false**.
+   * Which **visible debug skin(s)** render the persistent occluder mesh (see
+   * {@link OccluderDebugStyle}) so its shape/structure can be judged on-device.
+   * All styles are additive overlays — the invisible depth-only mesh keeps
+   * writing depth unchanged, so occlusion is identical in every style. Only has
+   * a visible effect when {@link persistentOcclusion} is on (it is that
+   * occluder's mesh); any other value is a harmless no-op. Default **`'off'`**.
    * Read once when the mesh is wired (Enter-AR / replay load), like the other
    * occupancy knobs. See
+   * `GpsPlusSlamJs_Docs/docs/2026-07-02-occluder-debug-viz-styles-plan.md` and
    * `GpsPlusSlamJs_Docs/docs/2026-06-29-occlusion-debug-viz-and-live-occluder-user-feedback.md`.
+   *
+   * **Migration:** this field replaces the former `occluderDebugViz` boolean —
+   * `validateOccupancyOptions` maps a persisted `occluderDebugViz: true` onto
+   * `'matcap'` (the skin the boolean used to enable) when this field is absent,
+   * mirroring the `occlusionMeshEnabled` → {@link persistentOcclusion}
+   * migration.
    */
-  occluderDebugViz: boolean;
+  occluderDebugStyle: OccluderDebugStyle;
   /**
    * Which mesher builds the **persistent occluder** mesh (see
    * {@link OccluderMeshMode}). Default `'smooth'` (since 2026-07-01) — Naive
    * Surface Nets, the smoothest and lightest mesh. Switch to `'greedy'` (blocky
    * cubes, watertight) or `'corner-fit'` (surface-hugging + watertight) if the
    * smooth mesh's open concave seams leak occlusion in practice (combine with
-   * {@link occluderDebugViz} to actually *see* the mesh shape). Only has an
+   * {@link occluderDebugStyle} to actually *see* the mesh shape). Only has an
    * effect when {@link persistentOcclusion} is on. Read once when the mesh is
    * wired (Enter-AR / replay load), like the other occupancy knobs. See
    * `GpsPlusSlamJs_Docs/docs/2026-06-30-occluder-tuning-followups.md`.
@@ -409,7 +441,7 @@ export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
     minConfidence: 3, // ≥3 observations to render a voxel — the FAST-reconstruction noise floor (2026-07-01; ~1.5s dwell before a surface meshes vs 2.5s at 5, +25% early coverage; 1 = legacy/unfiltered)
     persistentOcclusion: true, // persistent depth-only mesh occluder ON by default (2026-07-01: Web-Worker offload removed the render stall — see 2026-07-01-occluder-worker-and-chunked-remesh-plan.md)
     liveOcclusion: false, // live CPU-depth occluder OFF by default (device-gated quality; replay no-op)
-    occluderDebugViz: false, // matcap debug visualization of the persistent occluder mesh OFF by default (occlusion is invisible in normal use)
+    occluderDebugStyle: 'off', // debug visualization of the persistent occluder mesh OFF by default (occlusion is invisible in normal use)
     occluderMeshMode: 'smooth', // persistent-occluder mesher: Naive Surface Nets by default (smoothest/lightest); 'greedy' = blocky cubes (watertight), 'corner-fit' = surface-hugging + watertight
   },
   frameTileDisplay: {
@@ -880,14 +912,43 @@ function resolvePersistentOcclusion(
     : defaultValue;
 }
 
+/**
+ * Resolve `occluderDebugStyle` with legacy migration, following the same
+ * contract as {@link resolvePersistentOcclusion}: a **present** new field
+ * always wins over the legacy `occluderDebugViz` boolean — even when its value
+ * is unknown/corrupt it falls back to the default (`'off'`), never to the
+ * legacy flag, so corrupted saved options can't silently turn a debug render
+ * on. Only an **absent** new field migrates the legacy boolean
+ * (`true → 'matcap'`, the skin the boolean used to enable); else the default.
+ */
+function resolveOccluderDebugStyle(
+  options: Partial<OccupancyOptions>,
+  legacyOccluderDebugViz: unknown,
+  defaultValue: OccluderDebugStyle
+): OccluderDebugStyle {
+  if ('occluderDebugStyle' in options) {
+    return (OCCLUDER_DEBUG_STYLES as readonly unknown[]).includes(
+      options.occluderDebugStyle
+    )
+      ? (options.occluderDebugStyle as OccluderDebugStyle)
+      : defaultValue;
+  }
+  if (typeof legacyOccluderDebugViz === 'boolean') {
+    return legacyOccluderDebugViz ? 'matcap' : 'off';
+  }
+  return defaultValue;
+}
+
 export function validateOccupancyOptions(
   options: Partial<OccupancyOptions>
 ): OccupancyOptions {
   const defaults = DEFAULT_RECORDING_OPTIONS.occupancy;
-  // Legacy field (removed from OccupancyOptions): only read for migration.
+  // Legacy fields (removed from OccupancyOptions): only read for migration.
   const legacyOcclusionMeshEnabled = (
     options as { occlusionMeshEnabled?: unknown }
   ).occlusionMeshEnabled;
+  const legacyOccluderDebugViz = (options as { occluderDebugViz?: unknown })
+    .occluderDebugViz;
   return {
     cellSizeM: clamp(
       typeof options.cellSizeM === 'number' &&
@@ -921,12 +982,13 @@ export function validateOccupancyOptions(
       typeof options.liveOcclusion === 'boolean'
         ? options.liveOcclusion
         : defaults.liveOcclusion,
-    // Brand-new field — no migration; boolean-or-default (a corrupt stored value
-    // never silently turns the debug rendering on).
-    occluderDebugViz:
-      typeof options.occluderDebugViz === 'boolean'
-        ? options.occluderDebugViz
-        : defaults.occluderDebugViz,
+    // Present new field wins (unknown value → default 'off'); absent → migrate
+    // the legacy occluderDebugViz boolean. See resolveOccluderDebugStyle.
+    occluderDebugStyle: resolveOccluderDebugStyle(
+      options,
+      legacyOccluderDebugViz,
+      defaults.occluderDebugStyle
+    ),
     // Enum-or-default: only one of the known mesher modes is accepted; anything
     // else (corrupt/legacy/missing) falls back to the default blocky cubes.
     occluderMeshMode: (OCCLUDER_MESH_MODES as readonly string[]).includes(

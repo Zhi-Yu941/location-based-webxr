@@ -522,28 +522,80 @@ describe('recording-options', () => {
     });
 
     /**
-     * Debug-visualization toggle (2026-06-29 testing feedback): renders the
-     * persistent occluder mesh as a visible (matcap) surface so its shape can be
-     * judged on-device. A new, independent boolean — default OFF, boolean-or-
-     * default like the two occluder flags, and no migration (brand-new field).
+     * Debug-visualization style (2026-07-02 debug-viz-styles plan): a 5-value
+     * enum replacing the former `occluderDebugViz` boolean — picks which visible
+     * debug skin(s) `OcclusionMesh` renders for the persistent occluder. Default
+     * `'off'`; an unknown/corrupt stored value must coerce to `'off'` (a debug
+     * render must never switch itself on), and a persisted legacy boolean must
+     * migrate (`true → 'matcap'`, the skin the boolean used to enable) exactly
+     * like the `occlusionMeshEnabled → persistentOcclusion` precedent — a
+     * present new field always wins over the legacy one, even when invalid.
      */
-    it('defaults occluderDebugViz to false for an empty object', () => {
-      expect(validateOccupancyOptions({}).occluderDebugViz).toBe(false);
+    it("defaults occluderDebugStyle to 'off' for an empty object", () => {
+      expect(validateOccupancyOptions({}).occluderDebugStyle).toBe('off');
     });
 
-    it('preserves a boolean occluderDebugViz', () => {
+    it('preserves each known occluderDebugStyle', () => {
+      for (const style of [
+        'off',
+        'matcap',
+        'depth-shaded',
+        'wireframe',
+        'depth-shaded-wireframe',
+      ] as const) {
+        expect(
+          validateOccupancyOptions({ occluderDebugStyle: style })
+            .occluderDebugStyle
+        ).toBe(style);
+      }
+    });
+
+    it("coerces an unknown occluderDebugStyle to the default 'off'", () => {
       expect(
-        validateOccupancyOptions({ occluderDebugViz: true }).occluderDebugViz
-      ).toBe(true);
+        validateOccupancyOptions({ occluderDebugStyle: 'neon' as never })
+          .occluderDebugStyle
+      ).toBe('off');
+      expect(
+        validateOccupancyOptions({ occluderDebugStyle: 42 as never })
+          .occluderDebugStyle
+      ).toBe('off');
     });
 
-    it('falls back to the default for a non-boolean occluderDebugViz', () => {
+    it("migrates a legacy occluderDebugViz=true to 'matcap'", () => {
       const out = validateOccupancyOptions({
-        occluderDebugViz: 'yes' as unknown as boolean,
-      });
-      expect(out.occluderDebugViz).toBe(
-        DEFAULT_RECORDING_OPTIONS.occupancy.occluderDebugViz
-      );
+        occluderDebugViz: true,
+      } as unknown as Partial<OccupancyOptions>);
+      expect(out.occluderDebugStyle).toBe('matcap');
+    });
+
+    it("migrates a legacy occluderDebugViz=false to 'off'", () => {
+      const out = validateOccupancyOptions({
+        occluderDebugViz: false,
+      } as unknown as Partial<OccupancyOptions>);
+      expect(out.occluderDebugStyle).toBe('off');
+    });
+
+    it('lets a present occluderDebugStyle override a conflicting legacy occluderDebugViz', () => {
+      const out = validateOccupancyOptions({
+        occluderDebugViz: true,
+        occluderDebugStyle: 'wireframe',
+      } as unknown as Partial<OccupancyOptions>);
+      expect(out.occluderDebugStyle).toBe('wireframe');
+    });
+
+    it("ignores the legacy field when occluderDebugStyle is present-but-invalid (new field wins → default 'off')", () => {
+      const out = validateOccupancyOptions({
+        occluderDebugStyle: 'bad' as never,
+        occluderDebugViz: true,
+      } as unknown as Partial<OccupancyOptions>);
+      expect(out.occluderDebugStyle).toBe('off');
+    });
+
+    it('drops the legacy occluderDebugViz key from the validated output', () => {
+      const out = validateOccupancyOptions({
+        occluderDebugViz: true,
+      } as unknown as Partial<OccupancyOptions>);
+      expect('occluderDebugViz' in out).toBe(false);
     });
 
     /**
@@ -1429,7 +1481,7 @@ describe('recording-options', () => {
           minConfidence: 3,
           persistentOcclusion: true,
           liveOcclusion: true,
-          occluderDebugViz: true,
+          occluderDebugStyle: 'depth-shaded-wireframe',
           occluderMeshMode: 'smooth',
         },
         frameTileDisplay: { divisor: 4 },

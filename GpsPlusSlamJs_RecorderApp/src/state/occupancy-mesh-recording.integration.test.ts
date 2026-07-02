@@ -79,64 +79,77 @@ function maxOddEdgeCount(positions: Float32Array, cellSizeM: number): number {
 describe.skipIf(!HAS_ZIP)(
   'occupancy mesh — real recording integration + perf probe',
   () => {
-    it('meshes a real recorded room: invariants hold + scale/perf recorded', async () => {
-      const loaded = await loadRecording(new Uint8Array(fs.readFileSync(ZIP)));
-      const depthSamples = loaded.actions
-        .map((e) => e.action)
-        .filter((a) => a.type === 'recording/recordDepthSample')
-        .map((a) => a.payload as DepthSample);
+    // 60 s: replays a real recorded room through grid + mesher — ~5-10 s on a
+    // dev machine, so the 5 s vitest default flaked (worse under full-suite
+    // parallel load). Invariant assertions are structural, not wall-clock.
+    it(
+      'meshes a real recorded room: invariants hold + scale/perf recorded',
+      { timeout: 60_000 },
+      async () => {
+        const loaded = await loadRecording(
+          new Uint8Array(fs.readFileSync(ZIP))
+        );
+        const depthSamples = loaded.actions
+          .map((e) => e.action)
+          .filter((a) => a.type === 'recording/recordDepthSample')
+          .map((a) => a.payload as DepthSample);
 
-      // The recording must actually contain depth (this fixture does); if a
-      // future fixture lacks projection-bearing depth the grid stays empty and
-      // this assertion flags it rather than silently passing on nothing.
-      expect(depthSamples.length).toBeGreaterThan(0);
+        // The recording must actually contain depth (this fixture does); if a
+        // future fixture lacks projection-bearing depth the grid stays empty and
+        // this assertion flags it rather than silently passing on nothing.
+        expect(depthSamples.length).toBeGreaterThan(0);
 
-      const grid = new OccupancyGrid({ cellSizeM: 0.15 });
-      for (const s of depthSamples) grid.addSample(s);
-      const cells = grid.getOccupiedCells(3); // same minConfidence floor as the cubes
-      expect(cells.length).toBeGreaterThan(0);
+        const grid = new OccupancyGrid({ cellSizeM: 0.15 });
+        for (const s of depthSamples) grid.addSample(s);
+        const cells = grid.getOccupiedCells(3); // same minConfidence floor as the cubes
+        expect(cells.length).toBeGreaterThan(0);
 
-      const t0 = performance.now();
-      const perFace = meshOccupiedCells(cells, grid.cellSizeM);
-      const tPerFace = performance.now() - t0;
+        const t0 = performance.now();
+        const perFace = meshOccupiedCells(cells, grid.cellSizeM);
+        const tPerFace = performance.now() - t0;
 
-      const t1 = performance.now();
-      const greedy = meshOccupiedCells(cells, grid.cellSizeM, { greedy: true });
-      const tGreedy = performance.now() - t1;
+        const t1 = performance.now();
+        const greedy = meshOccupiedCells(cells, grid.cellSizeM, {
+          greedy: true,
+        });
+        const tGreedy = performance.now() - t1;
 
-      const perFaceTris = perFace.indices.length / 3;
-      const greedyTris = greedy.indices.length / 3;
+        const perFaceTris = perFace.indices.length / 3;
+        const greedyTris = greedy.indices.length / 3;
 
-      // --- Oracle-free invariants (hold for ANY input) ---
-      // Per-face surface is watertight: no edge covered an odd number of times.
-      expect(maxOddEdgeCount(perFace.positions, grid.cellSizeM)).toBe(0);
-      // One AABB per occupied cell, unaffected by greedy.
-      expect(perFace.aabbs.length).toBe(cells.length);
-      expect(greedy.aabbs.length).toBe(cells.length);
-      // Greedy never adds triangles and produces a non-empty surface.
-      expect(greedyTris).toBeGreaterThan(0);
-      expect(greedyTris).toBeLessThanOrEqual(perFaceTris);
-      // Indices in range; positions finite.
-      const verts = perFace.positions.length / 3;
-      for (const idx of perFace.indices) expect(idx).toBeLessThan(verts);
-      expect(perFace.positions.every((p) => Number.isFinite(p))).toBe(true);
+        // --- Oracle-free invariants (hold for ANY input) ---
+        // Per-face surface is watertight: no edge covered an odd number of times.
+        expect(maxOddEdgeCount(perFace.positions, grid.cellSizeM)).toBe(0);
+        // One AABB per occupied cell, unaffected by greedy.
+        expect(perFace.aabbs.length).toBe(cells.length);
+        expect(greedy.aabbs.length).toBe(cells.length);
+        // Greedy never adds triangles and produces a non-empty surface.
+        expect(greedyTris).toBeGreaterThan(0);
+        expect(greedyTris).toBeLessThanOrEqual(perFaceTris);
+        // Indices in range; positions finite.
+        const verts = perFace.positions.length / 3;
+        for (const idx of perFace.indices) expect(idx).toBeLessThan(verts);
+        expect(perFace.positions.every((p) => Number.isFinite(p))).toBe(true);
 
-      // --- Scale / perf numbers (the §7 budget proxy) ---
-      // Logged, not asserted as a hard time bound (machine-dependent). The
-      // structural bounds above are the assertions; these inform the budget.
-      console.info(
-        '[occupancy-mesh perf probe]',
-        JSON.stringify({
-          depthSamples: depthSamples.length,
-          occupiedCells: cells.length,
-          perFaceTriangles: perFaceTris,
-          greedyTriangles: greedyTris,
-          greedyReduction: +(perFaceTris / Math.max(1, greedyTris)).toFixed(1),
-          perFaceMeshMs: +tPerFace.toFixed(1),
-          greedyMeshMs: +tGreedy.toFixed(1),
-          cellSizeM: grid.cellSizeM,
-        })
-      );
-    });
+        // --- Scale / perf numbers (the §7 budget proxy) ---
+        // Logged, not asserted as a hard time bound (machine-dependent). The
+        // structural bounds above are the assertions; these inform the budget.
+        console.info(
+          '[occupancy-mesh perf probe]',
+          JSON.stringify({
+            depthSamples: depthSamples.length,
+            occupiedCells: cells.length,
+            perFaceTriangles: perFaceTris,
+            greedyTriangles: greedyTris,
+            greedyReduction: +(perFaceTris / Math.max(1, greedyTris)).toFixed(
+              1
+            ),
+            perFaceMeshMs: +tPerFace.toFixed(1),
+            greedyMeshMs: +tGreedy.toFixed(1),
+            cellSizeM: grid.cellSizeM,
+          })
+        );
+      }
+    );
   }
 );

@@ -297,52 +297,60 @@ describe('main.ts replay mode wiring', () => {
     `;
   });
 
-  it('switches to replay mode when WebXR is not supported', async () => {
-    // Simulate WebXR not available
-    (checkAllPermissions as Mock).mockResolvedValue({
-      webxr: { supported: false },
-      geolocation: { granted: false },
-      camera: { granted: false },
-      deviceOrientation: { granted: false },
-      allMandatoryReady: false,
-    });
+  // 30 s test budget to match the generous waitFor below (load-dependent).
+  it(
+    'switches to replay mode when WebXR is not supported',
+    { timeout: 30_000 },
+    async () => {
+      // Simulate WebXR not available
+      (checkAllPermissions as Mock).mockResolvedValue({
+        webxr: { supported: false },
+        geolocation: { granted: false },
+        camera: { granted: false },
+        deviceOrientation: { granted: false },
+        allMandatoryReady: false,
+      });
 
-    // Dynamically import main to trigger the main() call
-    await import('./main');
+      // Dynamically import main to trigger the main() call
+      await import('./main');
 
-    // Wait for the async main() to reach its replay branch. Poll for the signal
-    // instead of a fixed `setTimeout(100)` — that fixed wait was flaky under
-    // full-suite scheduling load (it passed in isolation but intermittently
-    // failed when the whole unit suite ran). Once switchToReplayMode is called,
-    // the rest of the replay-branch calls below have already run synchronously.
-    await vi.waitFor(() => expect(switchToReplayMode).toHaveBeenCalled(), {
-      timeout: 3000,
-    });
+      // Wait for the async main() to reach its replay branch. Poll for the signal
+      // instead of a fixed `setTimeout(100)` — that fixed wait was flaky under
+      // full-suite scheduling load (it passed in isolation but intermittently
+      // failed when the whole unit suite ran). Once switchToReplayMode is called,
+      // the rest of the replay-branch calls below have already run synchronously.
+      // 15 s: the dynamic main.ts import above transitively pulls in three.js and
+      // the framework, which under full-suite parallel load alone can take
+      // several seconds — 3 s still timed out spuriously (2026-07-02).
+      await vi.waitFor(() => expect(switchToReplayMode).toHaveBeenCalled(), {
+        timeout: 15_000,
+      });
 
-    // Verify initReplayUI was called with callbacks
-    expect(initReplayUI).toHaveBeenCalledWith(
-      expect.objectContaining({
-        onScenarioChange: expect.any(Function),
-        onSessionSelect: expect.any(Function),
-        onStartReplay: expect.any(Function),
-        onPlayPause: expect.any(Function),
-        onSpeedChange: expect.any(Function),
-        onCameraToggle: expect.any(Function),
-      })
-    );
+      // Verify initReplayUI was called with callbacks
+      expect(initReplayUI).toHaveBeenCalledWith(
+        expect.objectContaining({
+          onScenarioChange: expect.any(Function),
+          onSessionSelect: expect.any(Function),
+          onStartReplay: expect.any(Function),
+          onPlayPause: expect.any(Function),
+          onSpeedChange: expect.any(Function),
+          onCameraToggle: expect.any(Function),
+        })
+      );
 
-    // Verify status updated for replay mode
-    expect(updateStatus).toHaveBeenCalledWith(
-      expect.stringContaining('Replay Mode')
-    );
+      // Verify status updated for replay mode
+      expect(updateStatus).toHaveBeenCalledWith(
+        expect.stringContaining('Replay Mode')
+      );
 
-    // D1 (2026-06-16 user feedback, Finding 1): the prominent unsupported-platform
-    // notice must be revealed so the user understands *why* recording is off
-    // (typically iOS) instead of a silent drop into replay mode.
-    expect(showUnsupportedPlatformNotice).toHaveBeenCalled();
+      // D1 (2026-06-16 user feedback, Finding 1): the prominent unsupported-platform
+      // notice must be revealed so the user understands *why* recording is off
+      // (typically iOS) instead of a silent drop into replay mode.
+      expect(showUnsupportedPlatformNotice).toHaveBeenCalled();
 
-    // Bug 5 (SPA audit): GPS warm-up watch must be stopped when entering
-    // replay mode to avoid draining battery on mobile devices.
-    expect(stopGpsWatch).toHaveBeenCalled();
-  });
+      // Bug 5 (SPA audit): GPS warm-up watch must be stopped when entering
+      // replay mode to avoid draining battery on mobile devices.
+      expect(stopGpsWatch).toHaveBeenCalled();
+    }
+  );
 });

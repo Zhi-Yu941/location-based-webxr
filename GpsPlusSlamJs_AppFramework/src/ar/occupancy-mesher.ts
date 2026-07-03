@@ -355,18 +355,6 @@ export function meshOccupiedCells(
 }
 
 /** Push a quad (4 corners, already ordered) as two triangles. */
-function pushQuad(
-  positions: number[],
-  indices: number[],
-  corners: readonly [number, number, number][]
-): void {
-  const base = positions.length / 3;
-  for (const [px, py, pz] of corners) {
-    positions.push(px, py, pz);
-  }
-  indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
-}
-
 /** Per-face culling: emit each exposed unit face as its own quad. */
 function buildCulled(
   occupied: Set<number>,
@@ -556,16 +544,17 @@ function buildSmooth(
   // For an occupied cell C with an empty neighbour along d·sgn, the four dual
   // cells sharing the (C, neighbour) edge have `base_d = (sgn>0 ? C_d : C_d−1)`
   // and `base_{u,v} ∈ {C−1, C}`; they are wound to face the empty side.
-  // Reused scratch dual-cell base — mutated per corner, read immediately by
-  // dualVertex, so no per-crossing array allocations in this hot loop.
+  // Reused scratch tuples — mutated in place, read immediately, so the
+  // per-cell loop allocates nothing (`c` is the axis-indexable view of the
+  // current cell; `dualBase` is the dual-cell base fed to dualVertex).
   const dualBase: [number, number, number] = [0, 0, 0];
+  const c: [number, number, number] = [0, 0, 0];
   for (const cell of uniqueCells) {
-    const cx = cell[0];
-    const cy = cell[1];
-    const cz = cell[2];
-    const c: [number, number, number] = [cx, cy, cz];
+    c[0] = cell[0];
+    c[1] = cell[1];
+    c[2] = cell[2];
     for (const { d, u, v } of GREEDY_DIRS) {
-      for (const sgn of [1, -1] as const) {
+      for (let sgn = 1; sgn >= -1; sgn -= 2) {
         const nbd = c[d] + sgn;
         // crossing iff the neighbour along d·sgn is empty
         dualBase[d] = nbd;
@@ -654,9 +643,11 @@ function buildCornerFit(
     const ox = cp[0] - cell[0] * cellSizeM;
     const oy = cp[1] - cell[1] * cellSizeM;
     const oz = cp[2] - cell[2] * cellSizeM;
-    for (const sx of [-1, 1] as const) {
-      for (const sy of [-1, 1] as const) {
-        for (const sz of [-1, 1] as const) {
+    // Numeric sign loops (−1, +1): allocation-free per cell, unlike iterating
+    // fresh `[-1, 1]` array literals (7 arrays per contributing cell).
+    for (let sx = -1; sx <= 1; sx += 2) {
+      for (let sy = -1; sy <= 1; sy += 2) {
+        for (let sz = -1; sz <= 1; sz += 2) {
           const key = cellKey(
             2 * cell[0] + sx,
             2 * cell[1] + sy,
@@ -707,7 +698,7 @@ function buildCornerFit(
         continue; // shared interior face — cull it
       }
       // Look up the 4 (displaced) corner vertices directly — no per-face `.map()`
-      // allocation. Same winding as pushQuad: (0,1,2)+(0,2,3).
+      // allocation. Standard quad winding: triangles (0,1,2)+(0,2,3).
       const corners = face.corners;
       const x2 = 2 * x;
       const y2 = 2 * y;
@@ -739,12 +730,17 @@ function buildGreedy(
   indices: number[]
 ): void {
   const half = cellSizeM / 2;
+  // Reused neighbour scratch — written and read immediately per cell, so the
+  // exposure probe allocates nothing (6 probes per cell across axes × signs).
+  const neighbour: [number, number, number] = [0, 0, 0];
   for (const { d, u, v } of GREEDY_DIRS) {
-    for (const sign of [1, -1] as const) {
+    for (let sign = 1; sign >= -1; sign -= 2) {
       // Group exposed (iu,iv) cells by slice index k = cell[d].
       const slices = new Map<number, Map<number, readonly [number, number]>>();
       for (const cell of uniqueCells) {
-        const neighbour: [number, number, number] = [cell[0], cell[1], cell[2]];
+        neighbour[0] = cell[0];
+        neighbour[1] = cell[1];
+        neighbour[2] = cell[2];
         neighbour[d] += sign;
         if (occupied.has(cellKey(neighbour[0], neighbour[1], neighbour[2]))) {
           continue; // interior face on this side
@@ -798,6 +794,9 @@ function greedyMergeSlice(
   const used = new Set<number>();
   const isUsed = (iu: number, iv: number): boolean =>
     used.has(cellKey(iu, iv, 0));
+  // Reused corner scratch (axis-indexable) — the quad emission below mutates
+  // only its u/v components between pushes, so rectangles allocate nothing.
+  const p: [number, number, number] = [0, 0, 0];
   // Deterministic order: by iv (outer) then iu (inner), both ascending.
   const cells = [...slice.values()].sort((a, b) =>
     a[1] !== b[1] ? a[1] - b[1] : a[0] - b[0]
@@ -836,28 +835,29 @@ function greedyMergeSlice(
     const uMax = (iu + w - 1) * cellSizeM + half;
     const vMin = iv * cellSizeM - half;
     const vMax = (iv + h - 1) * cellSizeM + half;
-    const corner = (uVal: number, vVal: number): [number, number, number] => {
-      const p: [number, number, number] = [0, 0, 0];
-      p[d] = plane;
-      p[u] = uVal;
-      p[v] = vVal;
-      return p;
-    };
-    // +d side: CCW (uMin,vMin)→(uMax,vMin)→(uMax,vMax)→(uMin,vMax); −d reversed.
-    const corners: [number, number, number][] =
-      sign > 0
-        ? [
-            corner(uMin, vMin),
-            corner(uMax, vMin),
-            corner(uMax, vMax),
-            corner(uMin, vMax),
-          ]
-        : [
-            corner(uMin, vMin),
-            corner(uMin, vMax),
-            corner(uMax, vMax),
-            corner(uMax, vMin),
-          ];
-    pushQuad(positions, indices, corners);
+    // Emit the quad's 4 corners directly via the scratch (winding as before:
+    // +d side CCW (uMin,vMin)→(uMax,vMin)→(uMax,vMax)→(uMin,vMax); −d reversed),
+    // then the two triangles (0,1,2)+(0,2,3) over them.
+    const base = positions.length / 3;
+    p[d] = plane;
+    p[u] = uMin;
+    p[v] = vMin;
+    positions.push(p[0], p[1], p[2]);
+    if (sign > 0) {
+      p[u] = uMax;
+      positions.push(p[0], p[1], p[2]);
+      p[v] = vMax;
+      positions.push(p[0], p[1], p[2]);
+      p[u] = uMin;
+      positions.push(p[0], p[1], p[2]);
+    } else {
+      p[v] = vMax;
+      positions.push(p[0], p[1], p[2]);
+      p[u] = uMax;
+      positions.push(p[0], p[1], p[2]);
+      p[v] = vMin;
+      positions.push(p[0], p[1], p[2]);
+    }
+    indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
   }
 }

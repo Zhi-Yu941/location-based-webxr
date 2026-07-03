@@ -296,6 +296,91 @@ describe('OccluderMeshDriver', () => {
     expect(driver.busy).toBe(false);
   });
 
+  it('does not wedge when getCellPoint throws during request packing: reports via onError and recovers (PR #152 review)', () => {
+    // `post()` marks the slot in flight *before* `packMeshRequest` runs, and
+    // packing invokes the caller's `getCellPoint` (surface modes sample every
+    // cell's centroid on the main thread). An unguarded provider throw therefore
+    // escaped `request()` with `inFlightId` still set — the same freeze the
+    // postMessage/runMeshRequest guards above already prevent, via the one
+    // remaining unguarded throw site in the post path.
+    const { poster, posted, respond } = makeFakePoster();
+    const onError = vi.fn();
+    const onWorkerUnusable = vi.fn();
+    const driver = new OccluderMeshDriver(poster, {
+      onError,
+      onWorkerUnusable,
+    });
+    const goodPoint = (c: GridCell): [number, number, number] => [
+      c[0] * CELL,
+      c[1] * CELL,
+      c[2] * CELL,
+    ];
+    const done: string[] = [];
+
+    // Prove the worker good first so the pack-time failure below cannot be
+    // mistaken for a load failure.
+    driver.request(box(2), CELL, 'smooth', goodPoint, () => done.push('A'));
+    respond(0);
+    expect(done).toEqual(['A']);
+
+    expect(() =>
+      driver.request(
+        box(3),
+        CELL,
+        'smooth',
+        () => {
+          throw new Error('centroid provider boom');
+        },
+        () => done.push('B')
+      )
+    ).not.toThrow();
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(driver.busy).toBe(false); // ← was: stayed true forever (wedged)
+    expect(posted).toHaveLength(1); // the failed job never reached the worker
+
+    // The driver still works: the next refresh posts and meshes normally.
+    driver.request(box(2), CELL, 'smooth', goodPoint, () => done.push('C'));
+    expect(posted).toHaveLength(2);
+    respond(1);
+    expect(done).toEqual(['A', 'C']);
+    expect(onWorkerUnusable).not.toHaveBeenCalled();
+  });
+
+  it('keeps the worker when packing throws before any success — a main-thread provider error is not the worker’s fault', () => {
+    // Contrast with the postMessage-throw test above: a pack-time throw happens
+    // BEFORE the worker is involved, so even with zero prior successes it must
+    // not condemn the worker to the synchronous fallback for the session.
+    const { poster, posted, respond } = makeFakePoster();
+    const onError = vi.fn();
+    const onWorkerUnusable = vi.fn();
+    const driver = new OccluderMeshDriver(poster, {
+      onError,
+      onWorkerUnusable,
+    });
+
+    expect(() =>
+      driver.request(
+        box(2),
+        CELL,
+        'smooth',
+        () => {
+          throw new Error('centroid provider boom');
+        },
+        () => {}
+      )
+    ).not.toThrow();
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(driver.busy).toBe(false);
+    expect(onWorkerUnusable).not.toHaveBeenCalled(); // worker NOT condemned
+
+    // The next request still goes to the worker (not the sync fallback).
+    const done: string[] = [];
+    driver.request(box(3), CELL, 'per-face', undefined, () => done.push('ok'));
+    expect(posted).toHaveLength(1);
+    respond(0);
+    expect(done).toEqual(['ok']);
+  });
+
   // Mesh-time stats — the freshness instrumentation for the Phase-2 gate
   // (2026-07-01-occluder-worker-and-chunked-remesh-plan.md §"Next step"): the
   // on-device walk reads the occluder's freshness latency off these numbers

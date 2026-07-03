@@ -198,13 +198,26 @@ export class OccluderMeshDriver {
       mode: job.mode,
       synchronous: this.syncMode || this.poster === null,
     };
-    const { request, transfer } = packMeshRequest(
-      id,
-      job.cells,
-      job.cellSizeM,
-      job.mode,
-      job.getCellPoint
-    );
+    // Packing runs the caller's `getCellPoint` per cell (surface modes) and can
+    // throw on an invalid flat snapshot — and the slot was already marked
+    // in-flight above, so an unguarded throw would wedge the driver exactly
+    // like the two guarded sites below. Unlike those, a pack-time throw happens
+    // on the main thread BEFORE the worker is involved, so it must not condemn
+    // a (possibly healthy) worker to the synchronous fallback.
+    let packed: ReturnType<typeof packMeshRequest>;
+    try {
+      packed = packMeshRequest(
+        id,
+        job.cells,
+        job.cellSizeM,
+        job.mode,
+        job.getCellPoint
+      );
+    } catch (error) {
+      this.failInFlight(id, error, { workerAtFault: false });
+      return;
+    }
+    const { request, transfer } = packed;
     if (this.poster && !this.syncMode) {
       // `Worker.postMessage` can throw SYNCHRONOUSLY (a `DataCloneError` for a
       // non-cloneable payload, or an already-detached/invalid transferable).
@@ -286,11 +299,17 @@ export class OccluderMeshDriver {
   /**
    * Clear a failed in-flight job so the driver never wedges. If the worker had
    * never produced a mesh (almost always a module load failure) fall back to
-   * synchronous meshing; then re-post the pending snapshot if one is queued. We
-   * deliberately do NOT re-post the *failed* job: if it failed on deterministic
-   * bad data, re-posting would loop — the next refresh brings a fresh snapshot.
+   * synchronous meshing — unless `workerAtFault` is false (a pack-time error in
+   * the caller's `getCellPoint`, which never reached the worker). Then re-post
+   * the pending snapshot if one is queued. We deliberately do NOT re-post the
+   * *failed* job: if it failed on deterministic bad data, re-posting would
+   * loop — the next refresh brings a fresh snapshot.
    */
-  private failInFlight(id: number, error?: unknown): void {
+  private failInFlight(
+    id: number,
+    error?: unknown,
+    options: { workerAtFault?: boolean } = {}
+  ): void {
     if (this.disposed || id !== this.inFlightId) {
       return; // stale
     }
@@ -300,7 +319,11 @@ export class OccluderMeshDriver {
     if (error !== undefined) {
       this.onError?.(error);
     }
-    if (!this.syncMode && !this.hasSucceeded) {
+    if (
+      (options.workerAtFault ?? true) &&
+      !this.syncMode &&
+      !this.hasSucceeded
+    ) {
       // The worker errored before ever meshing — treat it as unusable (we will
       // not get a second error to act on, and further posts would vanish into a
       // dead worker). Switch to synchronous main-thread meshing.

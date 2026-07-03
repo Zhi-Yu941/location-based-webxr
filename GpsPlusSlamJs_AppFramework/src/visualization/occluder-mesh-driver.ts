@@ -42,6 +42,24 @@ import type { Vector3 } from 'gps-plus-slam-js';
 export type OnMesh = (positions: Float32Array, indices: Uint32Array) => void;
 
 /**
+ * Timing/size stats for one completed mesh job — the freshness instrumentation
+ * for the Phase-2 gate (see the plan's §"Next step"): `durationMs` is the
+ * wall-clock time from posting the job (including packing already done by then)
+ * to receiving its geometry, i.e. the occluder's current refresh latency.
+ * Failed jobs report nothing (they surface via
+ * {@link OccluderMeshDriverOptions.onError}).
+ */
+export interface OccluderMeshStats {
+  /** Wall-clock ms from post to delivered geometry (inline time on the sync path). */
+  readonly durationMs: number;
+  /** Number of occupied cells the mesh was built from. */
+  readonly cellCount: number;
+  readonly mode: MeshMode;
+  /** True when meshed inline on the main thread (fallback), false when off-thread. */
+  readonly synchronous: boolean;
+}
+
+/**
  * The minimal `Worker`-like surface the driver needs. A consumer adapts a real
  * `Worker`: forwards `worker.onmessage` → `poster.onmessage` and
  * `worker.onerror` / `worker.onmessageerror` → `poster.onerror` (so the driver
@@ -69,6 +87,17 @@ export interface OccluderMeshDriverOptions {
    * the error is swallowed (the frame is dropped, the driver stays healthy).
    */
   onError?: (error: unknown) => void;
+  /**
+   * Called with {@link OccluderMeshStats} each time a job completes (fires just
+   * before the job's geometry callback). Optional logging seam so the consumer
+   * can surface mesh duration + input size per refresh.
+   */
+  onMeshStats?: (stats: OccluderMeshStats) => void;
+  /**
+   * Injectable monotonic clock in ms for {@link OccluderMeshStats.durationMs}
+   * (tests); defaults to `performance.now()`.
+   */
+  now?: () => number;
 }
 
 interface Job {
@@ -83,9 +112,17 @@ export class OccluderMeshDriver {
   private readonly poster: MeshWorkerPoster | null;
   private readonly onWorkerUnusable?: () => void;
   private readonly onError?: (error: unknown) => void;
+  private readonly onMeshStats?: (stats: OccluderMeshStats) => void;
+  private readonly now: () => number;
   private nextId = 1;
   private inFlightId: number | null = null;
   private inFlightCallback: OnMesh | null = null;
+  /** Timing/size context of the in-flight job; cleared on completion/failure. */
+  private inFlightStats:
+    | (Omit<OccluderMeshStats, 'durationMs'> & {
+        readonly startedMs: number;
+      })
+    | null = null;
   private pending: Job | null = null;
   private disposed = false;
   /** True ⇒ mesh inline (no worker, or the worker was declared unusable). */
@@ -106,6 +143,8 @@ export class OccluderMeshDriver {
     this.syncMode = poster === null;
     this.onWorkerUnusable = options.onWorkerUnusable;
     this.onError = options.onError;
+    this.onMeshStats = options.onMeshStats;
+    this.now = options.now ?? ((): number => performance.now());
     if (poster) {
       poster.onmessage = (event) => this.handleResponse(event.data);
       poster.onerror = (error) => this.handleWorkerError(error);
@@ -143,6 +182,14 @@ export class OccluderMeshDriver {
     const id = this.nextId++;
     this.inFlightId = id;
     this.inFlightCallback = job.onMesh;
+    // `syncMode` cannot change while this job is in flight (it only flips on a
+    // failure, which also clears this record), so capturing it here is safe.
+    this.inFlightStats = {
+      startedMs: this.now(),
+      cellCount: job.cells.length,
+      mode: job.mode,
+      synchronous: this.syncMode || this.poster === null,
+    };
     const { request, transfer } = packMeshRequest(
       id,
       job.cells,
@@ -183,8 +230,14 @@ export class OccluderMeshDriver {
     }
     this.hasSucceeded = true;
     const callback = this.inFlightCallback;
+    const stats = this.inFlightStats;
     this.inFlightId = null;
     this.inFlightCallback = null;
+    this.inFlightStats = null;
+    if (stats && this.onMeshStats) {
+      const { startedMs, ...rest } = stats;
+      this.onMeshStats({ ...rest, durationMs: this.now() - startedMs });
+    }
     callback?.(response.positions, response.indices);
     // Post the coalesced latest, if one arrived while we were busy.
     if (!this.disposed && this.pending) {
@@ -235,6 +288,7 @@ export class OccluderMeshDriver {
     }
     this.inFlightId = null;
     this.inFlightCallback = null;
+    this.inFlightStats = null; // failed jobs report no stats (onError covers them)
     if (error !== undefined) {
       this.onError?.(error);
     }
@@ -258,6 +312,7 @@ export class OccluderMeshDriver {
     this.pending = null;
     this.inFlightCallback = null;
     this.inFlightId = null;
+    this.inFlightStats = null;
     if (this.poster) {
       this.poster.onmessage = null;
       this.poster.onerror = null;

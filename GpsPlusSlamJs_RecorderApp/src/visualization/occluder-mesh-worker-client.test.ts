@@ -13,6 +13,10 @@ import {
   type MeshWorkerRequest,
 } from 'gps-plus-slam-app-framework/ar/occlusion-mesh-worker';
 import type { GridCell } from 'gps-plus-slam-app-framework/ar/bresenham3d';
+import {
+  clearLogBuffer,
+  getLogBuffer,
+} from 'gps-plus-slam-app-framework/utils/logger';
 
 const CELL = 0.15;
 const CELLS: GridCell[] = [
@@ -65,6 +69,37 @@ describe('createOccluderMeshWorker', () => {
 
     dispose();
     expect(fakeWorker.terminate).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs mesh duration + cell count per completed job (the freshness numbers the Phase-2 gate field walk reads)', () => {
+    clearLogBuffer();
+    const posted: MeshWorkerRequest[] = [];
+    const fakeWorker = {
+      onmessage: null as ((event: { data: unknown }) => void) | null,
+      onerror: null as ((event: unknown) => void) | null,
+      postMessage: (message: MeshWorkerRequest): void => {
+        posted.push(message);
+      },
+      terminate: vi.fn(),
+    };
+    const { driver, dispose } = createOccluderMeshWorker(
+      () => fakeWorker as unknown as Worker
+    );
+
+    driver.request(CELLS, CELL, 'greedy', undefined, () => {});
+    const { response } = runMeshRequest(posted[0]!);
+    fakeWorker.onmessage?.({ data: response });
+
+    const entries = getLogBuffer().filter(
+      (e) => e.tag === 'OccluderMeshWorker' && e.message.includes('cells')
+    );
+    expect(entries).toHaveLength(1);
+    // The log line must carry the numbers the field checklist needs: input
+    // size, mesh mode, and the wall-clock duration.
+    expect(entries[0]!.message).toMatch(/4 cells/);
+    expect(entries[0]!.message).toMatch(/greedy/);
+    expect(entries[0]!.message).toMatch(/\d+ ms/);
+    dispose();
   });
 
   it('recovers to synchronous meshing when the worker errors before ever meshing (module load failure)', () => {

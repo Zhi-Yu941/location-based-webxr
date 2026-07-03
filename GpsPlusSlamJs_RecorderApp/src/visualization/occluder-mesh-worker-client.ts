@@ -49,6 +49,17 @@ export function createOccluderMeshWorker(
       log.warn('Occluder mesh worker unusable; meshing synchronously');
       worker?.terminate();
     },
+    // Freshness instrumentation for the Phase-2 gate (see the plan's §"Next
+    // step"): one debug line per completed mesh so the on-device walk can read
+    // the occluder's refresh latency + grid size off the log panel instead of
+    // estimating by feel. The settled-skip suppresses refreshes on an unchanged
+    // grid, so this only logs while new surface is actually being meshed.
+    onMeshStats: (s) =>
+      log.debug(
+        `Meshed ${s.cellCount} cells (${s.mode}) in ${Math.round(s.durationMs)} ms${
+          s.synchronous ? ' [sync]' : ''
+        }`
+      ),
   });
   return {
     driver,

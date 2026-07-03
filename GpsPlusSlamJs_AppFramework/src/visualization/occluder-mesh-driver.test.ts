@@ -16,6 +16,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   OccluderMeshDriver,
   type MeshWorkerPoster,
+  type OccluderMeshStats,
 } from './occluder-mesh-driver';
 import {
   runMeshRequest,
@@ -293,6 +294,77 @@ describe('OccluderMeshDriver', () => {
     expect(Array.from(indices!)).toEqual(Array.from(direct.indices));
     expect(posted).toHaveLength(0); // never posted to the dead worker
     expect(driver.busy).toBe(false);
+  });
+
+  // Mesh-time stats — the freshness instrumentation for the Phase-2 gate
+  // (2026-07-01-occluder-worker-and-chunked-remesh-plan.md §"Next step"): the
+  // on-device walk reads the occluder's freshness latency off these numbers
+  // instead of estimating it by feel, so each completed job must report its
+  // wall-clock duration + input size. Failed jobs report nothing (they already
+  // surface via onError).
+
+  it('reports duration, cell count, mode and synchronous=false via onMeshStats when a worker job completes', () => {
+    const { poster, respond } = makeFakePoster();
+    const stats: OccluderMeshStats[] = [];
+    let nowMs = 1000;
+    const driver = new OccluderMeshDriver(poster, {
+      onMeshStats: (s) => stats.push(s),
+      now: () => nowMs,
+    });
+    const cells = box(3);
+    driver.request(cells, CELL, 'greedy', undefined, () => {});
+    expect(stats).toEqual([]); // nothing reported until the job completes
+
+    nowMs = 1250; // the worker "takes" 250 ms
+    respond(0);
+    expect(stats).toEqual([
+      { durationMs: 250, cellCount: 9, mode: 'greedy', synchronous: false },
+    ]);
+  });
+
+  it('reports synchronous fallback meshes with synchronous=true', () => {
+    const stats: OccluderMeshStats[] = [];
+    let nowMs = 100;
+    // The clock is read once at post and once at completion; advancing it per
+    // read makes the inline (same-tick) duration observable.
+    const driver = new OccluderMeshDriver(null, {
+      onMeshStats: (s) => stats.push(s),
+      now: () => (nowMs += 7),
+    });
+    driver.request(box(2), CELL, 'per-face', undefined, () => {});
+    expect(stats).toEqual([
+      { durationMs: 7, cellCount: 4, mode: 'per-face', synchronous: true },
+    ]);
+  });
+
+  it('reports stats for each COMPLETED job when coalescing (dropped intermediates report nothing)', () => {
+    const { poster, respond } = makeFakePoster();
+    const stats: OccluderMeshStats[] = [];
+    const driver = new OccluderMeshDriver(poster, {
+      onMeshStats: (s) => stats.push(s),
+      now: () => 0,
+    });
+    driver.request(box(2), CELL, 'per-face', undefined, () => {}); // A → in flight
+    driver.request(box(3), CELL, 'per-face', undefined, () => {}); // B → dropped
+    driver.request(box(4), CELL, 'per-face', undefined, () => {}); // C → pending
+    respond(0); // A completes, C posts
+    respond(1); // C completes
+    expect(stats.map((s) => s.cellCount)).toEqual([4, 16]); // A and C only, never B
+  });
+
+  it('reports no stats for a failed job (the error already surfaces via onError)', () => {
+    const { poster, error } = makeFakePoster();
+    const stats: OccluderMeshStats[] = [];
+    const onError = vi.fn();
+    const driver = new OccluderMeshDriver(poster, {
+      onMeshStats: (s) => stats.push(s),
+      onError,
+      now: () => 0,
+    });
+    driver.request(box(3), CELL, 'per-face', undefined, () => {});
+    error(); // the job never completes
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(stats).toEqual([]);
   });
 
   it('delivers nothing after dispose()', () => {

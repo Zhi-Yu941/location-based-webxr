@@ -487,6 +487,40 @@ describe('wireOccupancyGridSubscribers', () => {
     dispose();
   });
 
+  it('survives a THROWING onError callback — the error handler itself must not break the subscription', () => {
+    // Why this test matters: the wirer's documented contract is that a failure
+    // "can never break the AR session or the store subscription", but onError
+    // is caller-supplied — an unguarded throw from it escaped the catch blocks
+    // straight into the store's dispatch path.
+    const grid = makeGridSpy();
+    grid.addSample.mockImplementation(() => {
+      throw new Error('grid boom');
+    });
+    const visualizer = makeVisualizerSpy();
+    const onError = vi.fn(() => {
+      throw new Error('broken error handler');
+    });
+    const dispose = wireOccupancyGridSubscribers({
+      storeRef,
+      grid,
+      visualizer,
+      onError,
+    });
+
+    expect(() =>
+      storeRef.get().dispatch(recordDepthSample(makeSample(1)))
+    ).not.toThrow();
+    expect(onError).toHaveBeenCalledTimes(1);
+
+    // The subscription is still alive: the next sample reaches the grid.
+    expect(() =>
+      storeRef.get().dispatch(recordDepthSample(makeSample(2)))
+    ).not.toThrow();
+    expect(grid.addSample).toHaveBeenCalledTimes(2);
+
+    dispose();
+  });
+
   it('reports visualizer refresh failures via onError without breaking sample flow', () => {
     const grid = makeGridSpy();
     const visualizer = makeVisualizerSpy();

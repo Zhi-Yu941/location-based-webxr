@@ -579,6 +579,20 @@ describe('setFolderImportExpanded', () => {
     expect(hint.textContent).toBe('');
   });
 
+  it('keeps the hint hidden when called collapsed WITH a hint (hint is gated on expanded — PR #63 review)', () => {
+    // Why this test matters: a hint line under a collapsed section is
+    // internally inconsistent state — the hint exists to explain WHY the
+    // section auto-expanded, so it must only show alongside expansion.
+    setupMinimalDOM();
+    initUI(createMockCallbacks());
+
+    setFolderImportExpanded(false, 'should not be visible');
+
+    const hint = document.getElementById('folder-import-hint') as HTMLElement;
+    expect(hint.classList.contains('hidden')).toBe(true);
+    expect(hint.textContent).toBe('');
+  });
+
   it('does not throw when the folder-import elements are absent (graceful)', () => {
     document.body.innerHTML = '';
     expect(() => setFolderImportExpanded(true, 'x')).not.toThrow();

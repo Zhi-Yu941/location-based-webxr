@@ -791,6 +791,42 @@ describe('handleStartRecording', () => {
     );
   });
 
+  it('disposes a still-live analyzer before spawning a new one (start-over-start must not leak the worker)', async () => {
+    // Why this test matters (PR #115/#120 review): the start path claims "a
+    // previous recording's worker can't leak into this one" but only re-set the
+    // analyzer FUNCTION — the previous client OBJECT (owning a real Worker) was
+    // overwritten undisposed. performStop() disposes it on the normal flow, but
+    // a start that skips/races the stop must not orphan a live worker.
+    const opts: RecordingOptions = {
+      images: {
+        enabled: true,
+        intervalMs: 2000,
+        quality: 0.7,
+        resolutionDivisor: 1,
+        motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
+        qualityFilter: {
+          ...DEFAULT_RECORDING_OPTIONS.images.qualityFilter,
+          enabled: true,
+        },
+      },
+      depth: { enabled: false, intervalMs: 1000, gridSize: 3, rgb: true },
+      arCrashIsolation: { ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation },
+      occupancy: { ...DEFAULT_RECORDING_OPTIONS.occupancy },
+      frameTileDisplay: { ...DEFAULT_RECORDING_OPTIONS.frameTileDisplay },
+      visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
+      qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
+      compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
+    };
+    deps = createMockDeps({ getRecordingOptions: () => opts });
+    handlers = createRecordingSessionHandlers(deps);
+
+    await handlers.handleStartRecording();
+    expect(mockImageQualityClientInstance.dispose).not.toHaveBeenCalled();
+    await handlers.handleStartRecording(); // second start, no stop in between
+    expect(mockImageQualityClientInstance.dispose).toHaveBeenCalledTimes(1);
+    expect(mockCreateImageQualityAnalyzer).toHaveBeenCalledTimes(2);
+  });
+
   it('continues recording (fails open) when the quality-gate worker cannot be created', async () => {
     // The analyzer's worker is constructed synchronously (`new Worker`). On a
     // locked-down deployment (e.g. CSP `worker-src 'none'`) that constructor can

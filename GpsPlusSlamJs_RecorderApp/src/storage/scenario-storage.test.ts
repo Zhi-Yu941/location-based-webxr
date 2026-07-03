@@ -253,6 +253,23 @@ describe('ScenarioWrappingStorageBackend', () => {
     ).resolves.toBeDefined();
   });
 
+  it('drops the previous scenario handle when a FLAT session follows a scenario session (PR #106 review)', async () => {
+    // Why this test matters: it pins the OBSERVABLE contract — after a flat
+    // session, getCurrentScenarioHandle() must answer null. (The accessor's
+    // empty-name guard already delivered that; the flat branch now also nulls
+    // the retained handle reference so module state stays coherent instead of
+    // merely masked.)
+    const backend = new ScenarioWrappingStorageBackend();
+    await backend.createSession(
+      new Date(Date.UTC(2025, 1, 28, 14, 30, 11)),
+      'StaleSc'
+    );
+    expect(getCurrentScenarioHandle()?.name).toBe('StaleSc');
+
+    await backend.createSession(new Date(Date.UTC(2025, 1, 28, 14, 30, 12))); // flat
+    expect(getCurrentScenarioHandle()).toBeNull();
+  });
+
   it('round-trips action / frame / metadata writes into the scenario session', async () => {
     const backend = new ScenarioWrappingStorageBackend();
     const timestamp = new Date(Date.UTC(2025, 0, 2, 3, 4, 5));

@@ -1184,7 +1184,10 @@ export function setFolderImportExpanded(
   }
   const hintEl = document.getElementById('folder-import-hint');
   if (hintEl) {
-    if (hint && hint.trim()) {
+    // The hint explains WHY the section auto-expanded, so it is gated on
+    // `expanded` — a hint under a collapsed section would be inconsistent
+    // state (PR #63 review).
+    if (expanded && hint && hint.trim()) {
       hintEl.textContent = hint;
       hintEl.classList.remove('hidden');
     } else {

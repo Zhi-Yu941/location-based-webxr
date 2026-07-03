@@ -126,6 +126,17 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
     refreshOnCameraMoveM,
   } = options;
 
+  // `onError` is caller-supplied; a throwing error handler must not itself
+  // break the store subscription the wirer promises to protect — isolate it.
+  const reportError = (err: unknown): void => {
+    try {
+      onError?.(err);
+    } catch {
+      // A broken error handler is unreportable by definition; swallow it so
+      // the wiring (and the AR session behind it) stays alive.
+    }
+  };
+
   let disposed = false;
   let lastRefreshTime = -Infinity;
   // Grid-size telemetry throttle; -Infinity so the first sample reports the
@@ -194,7 +205,7 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
       visualizer.refresh(grid, lastViewerPose ?? undefined);
     } catch (err) {
       rendered = false;
-      onError?.(err);
+      reportError(err);
     }
     // Independent best-effort: a throwing visualizer must not skip the
     // occluder re-mesh, and vice versa.
@@ -203,7 +214,7 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
         occluder.refresh(grid, lastViewerPose ?? undefined);
       } catch (err) {
         rendered = false;
-        onError?.(err);
+        reportError(err);
       }
     }
     if (rendered) {
@@ -238,7 +249,7 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
     try {
       grid.addSample(sample);
     } catch (err) {
-      onError?.(err);
+      reportError(err);
       return;
     }
     // Cells-over-time telemetry (~30 s cadence). Best-effort like the sinks:
@@ -250,7 +261,7 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
         try {
           onGridSize(grid.size);
         } catch (err) {
-          onError?.(err);
+          reportError(err);
         }
       }
     }
@@ -301,18 +312,18 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
     try {
       grid.clear();
     } catch (err) {
-      onError?.(err);
+      reportError(err);
     }
     try {
       visualizer.clear();
     } catch (err) {
-      onError?.(err);
+      reportError(err);
     }
     if (occluder) {
       try {
         occluder.clear();
       } catch (err) {
-        onError?.(err);
+        reportError(err);
       }
     }
     detach = attach(nextStore);

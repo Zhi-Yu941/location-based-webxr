@@ -494,6 +494,11 @@ export function createRecordingSessionHandlers(
       // worker can't leak into this one.
       if (imageConfig.qualityFilter.enabled) {
         try {
+          // A client can still be live here only when a start races/skips the
+          // stop (performStop disposes on the normal flow) — dispose it so the
+          // previous recording's Worker can't leak, matching this block's
+          // stated contract.
+          imageQualityClient?.dispose();
           imageQualityClient = createImageQualityAnalyzer(
             imageConfig.qualityFilter
           );

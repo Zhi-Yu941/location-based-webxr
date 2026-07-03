@@ -446,6 +446,11 @@ export class ScenarioWrappingStorageBackend implements StorageBackend {
     }
     const result = await createOpfsSession(timestamp);
     _currentScenarioName = '';
+    // Drop the previous scenario's directory handle too (PR #106 review): the
+    // public accessor already answers null while the name is empty, but the
+    // retained reference kept the handle alive and left module state
+    // internally inconsistent (empty name, non-null handle).
+    currentScenarioHandle = null;
     _currentSessionName = result.sessionName;
     return { sessionName: result.sessionName };
   }

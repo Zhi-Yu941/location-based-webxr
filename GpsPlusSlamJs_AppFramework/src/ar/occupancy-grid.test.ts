@@ -509,4 +509,121 @@ describe('OccupancyGrid', () => {
       expect(grid.getOccupiedCells(12)).toHaveLength(1);
     });
   });
+
+  describe('viewer-local window via the chunk index (Step 2, 2026-07-03 fps plan)', () => {
+    // Why these tests matter: getOccupiedCellsWithin is what bounds the
+    // cubes/occluder refresh cost by the local neighbourhood instead of the
+    // whole session — its result must be EXACTLY the brute-force
+    // radius-filter of getOccupiedCells (the property test hammers this),
+    // it must track carving (the chunk index must never serve deleted
+    // cells), and clear() must reset the index.
+
+    /** Brute-force reference: meter-space center-distance filter. */
+    function bruteForceWithin(
+      grid: OccupancyGrid,
+      center: readonly [number, number, number],
+      radiusM: number,
+      minObservations = 1
+    ) {
+      return grid.getOccupiedCells(minObservations).filter((cell) => {
+        const c = grid.getCellCenter(cell);
+        const dx = c[0] - center[0];
+        const dy = c[1] - center[1];
+        const dz = c[2] - center[2];
+        return dx * dx + dy * dy + dz * dz <= radiusM * radiusM;
+      });
+    }
+
+    it('returns exactly the cells whose centers lie within the radius', () => {
+      // carveStopCells 20 disables carving between these collinear samples
+      // (both rays run along -z from the origin; a default carve would erase
+      // the near cell when the deep sample lands).
+      const grid = new OccupancyGrid({ cellSizeM: 1, carveStopCells: 20 });
+      // Cells at z = -2 and z = -9 (depths 2 and 9 from the origin).
+      grid.addSample(makeSample([0, 0, 0], [2]));
+      grid.addSample(makeSample([0, 0, 0], [9]));
+      expect(grid.getOccupiedCells()).toHaveLength(2);
+
+      const near = grid.getOccupiedCellsWithin([0, 0, 0], 5);
+      expect(near).toEqual([[0, 0, -2]]);
+      // The window is a pure filter — the unbounded API is untouched.
+      expect(grid.getOccupiedCells()).toHaveLength(2);
+      // A window around the far cell sees only it.
+      expect(grid.getOccupiedCellsWithin([0, 0, -9], 3)).toEqual([[0, 0, -9]]);
+    });
+
+    it('respects the minObservations floor', () => {
+      // carveStopCells 5: the depth-4 ray must not carve the z=-2 cell.
+      const grid = new OccupancyGrid({ cellSizeM: 1, carveStopCells: 5 });
+      grid.addSample(makeSample([0, 0, 0], [2]));
+      grid.addSample(makeSample([0, 0, 0], [2]));
+      grid.addSample(makeSample([0, 0, 0], [4]));
+      expect(grid.getOccupiedCellsWithin([0, 0, 0], 10, 2)).toEqual([
+        [0, 0, -2],
+      ]);
+    });
+
+    it('never serves a carved cell (the chunk index tracks deletions)', () => {
+      const grid = new OccupancyGrid({ cellSizeM: 1, carveStopCells: 2 });
+      grid.addSample(makeSample([0, 0, 0], [3]));
+      expect(grid.getOccupiedCellsWithin([0, 0, -3], 1)).toHaveLength(1);
+      // A deeper ray carves the z=-3 cell away (3 ≥ carveStopCells before 9).
+      grid.addSample(makeSample([0, 0, 0], [9]));
+      expect(grid.getOccupiedCellsWithin([0, 0, -3], 1)).toHaveLength(0);
+      expect(bruteForceWithin(grid, [0, 0, -3], 1)).toHaveLength(0);
+    });
+
+    it('clear() empties the window and the flat variant matches the tuple one', () => {
+      const grid = new OccupancyGrid({ cellSizeM: 1 });
+      grid.addSample(makeSample([0, 0, 0], [2, 5]));
+      const tuples = grid.getOccupiedCellsWithin([0, 0, 0], 100);
+      const flat = grid.getOccupiedCellsWithinFlat([0, 0, 0], 100);
+      expect(Array.from(flat)).toEqual(tuples.flat());
+      grid.clear();
+      expect(grid.getOccupiedCellsWithin([0, 0, 0], 100)).toHaveLength(0);
+      expect(grid.getOccupiedCellsWithinFlat([0, 0, 0], 100)).toHaveLength(0);
+    });
+
+    it('rejects invalid radii and degrades non-finite centers to an empty result', () => {
+      const grid = new OccupancyGrid({ cellSizeM: 1 });
+      grid.addSample(makeSample([0, 0, 0], [2]));
+      // Programmer error: a windowed query with no window is a bug upstream.
+      expect(() => grid.getOccupiedCellsWithin([0, 0, 0], 0)).toThrow(
+        RangeError
+      );
+      expect(() => grid.getOccupiedCellsWithin([0, 0, 0], -1)).toThrow(
+        RangeError
+      );
+      expect(() => grid.getOccupiedCellsWithin([0, 0, 0], NaN)).toThrow(
+        RangeError
+      );
+      // Sensor glitch: a NaN camera position yields nothing rather than
+      // throwing mid-session (mirrors raycast's non-finite policy).
+      expect(grid.getOccupiedCellsWithin([NaN, 0, 0], 5)).toHaveLength(0);
+    });
+
+    it('bumps a per-chunk revision on mutations inside that chunk only', () => {
+      // Why: the per-chunk dirty counters are the bookkeeping a later
+      // dirty-chunk remesh needs (worker plan Phase-2 sketch) — landing them
+      // with the index makes that a consumer-side change only.
+      const grid = new OccupancyGrid({ cellSizeM: 1 });
+      // Two observations far apart land in different 16³ chunks.
+      grid.addSample(makeSample([0, 0, 0], [2])); // cell [0,0,-2] → chunk [0,0,-1]
+      grid.addSample(makeSample([0, 0, 0], [40])); // cell [0,0,-40] → chunk [0,0,-3]
+      const nearChunk: [number, number, number] = [0, 0, -1];
+      const farChunk: [number, number, number] = [0, 0, -3];
+      const near1 = grid.getChunkRevision(nearChunk);
+      const far1 = grid.getChunkRevision(farChunk);
+      expect(near1).toBeGreaterThan(0);
+      expect(far1).toBeGreaterThan(0);
+
+      // Re-observing the near cell bumps ONLY the near chunk.
+      grid.addSample(makeSample([0, 0, 0], [2]));
+      expect(grid.getChunkRevision(nearChunk)).toBeGreaterThan(near1);
+      expect(grid.getChunkRevision(farChunk)).toBe(far1);
+
+      // An untouched chunk reports 0.
+      expect(grid.getChunkRevision([50, 50, 50])).toBe(0);
+    });
+  });
 });

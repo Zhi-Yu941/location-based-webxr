@@ -73,6 +73,23 @@ export class OccupancyGrid {
   readonly carveStopCells: number;
   private readonly cells = new Map<number, CellRecord>();
   /**
+   * Chunk index (Step 2 of the 2026-07-03 long-session fps plan): cell keys
+   * grouped by {@link CHUNK_EDGE_CELLS}³ chunk, maintained incrementally on
+   * add/carve/clear (O(1) per mutation). Lets {@link getOccupiedCellsWithin}
+   * visit only the chunks a query sphere touches — cost independent of total
+   * explored area. Empty chunk sets are dropped.
+   */
+  private readonly chunks = new Map<number, Set<number>>();
+  /**
+   * Per-chunk dirty revision, bumped whenever a mutation inside the chunk
+   * could change some consumer's occupied set (same semantics as the global
+   * {@link revision}). This is the bookkeeping a future dirty-chunk remesh
+   * needs (2026-07-01 worker plan, Phase-2 sketch) — landed with the index so
+   * that plan becomes a consumer-side change only. Entries survive a chunk
+   * emptying (a consumer must still see "changed"); reset by {@link clear}.
+   */
+  private readonly chunkRevisions = new Map<number, number>();
+  /**
    * Monotonic counter bumped whenever the **occupied set** (at any
    * `minConfidence ≤ MAX_RELEVANT_COUNT`) could have changed: a cell added, a
    * cell removed by carving, a cell's count rising while still `≤
@@ -271,6 +288,139 @@ export class OccupancyGrid {
     return used === flat.length ? flat : flat.slice(0, used);
   }
 
+  /**
+   * Occupied cells (≥ `minObservations`) whose **centers** lie within
+   * `radiusM` of `centerPos` — the viewer-local window that keeps consumer
+   * refresh cost independent of total explored area (Step 2 of the
+   * 2026-07-03 long-session fps plan). Walks only the chunks whose
+   * cell-center AABB intersects the query sphere; chunks entirely inside it
+   * skip the per-cell distance test. Result set ≡ the brute-force radius
+   * filter of {@link getOccupiedCells} (property-tested; iteration order may
+   * differ). Fresh array per call (no memo — the camera moves every frame).
+   *
+   * @throws RangeError for a non-finite or non-positive `radiusM` (a
+   *   windowed query without a window is an upstream bug). A non-finite
+   *   `centerPos` (tracking glitch) returns `[]` instead — mirrors
+   *   {@link raycast}'s non-finite policy.
+   */
+  getOccupiedCellsWithin(
+    centerPos: Vector3,
+    radiusM: number,
+    minObservations = 1
+  ): GridCell[] {
+    const result: GridCell[] = [];
+    this.forEachOccupiedCellWithin(
+      centerPos,
+      radiusM,
+      minObservations,
+      (record) => {
+        result.push(record.cell);
+      }
+    );
+    return result;
+  }
+
+  /**
+   * Flat `[x0,y0,z0, …]` variant of {@link getOccupiedCellsWithin} for the
+   * mesh-worker pack path (same contract as {@link getOccupiedCellsFlat}:
+   * fresh array every call — packing transfers/detaches the buffer).
+   */
+  getOccupiedCellsWithinFlat(
+    centerPos: Vector3,
+    radiusM: number,
+    minObservations = 1
+  ): Int32Array {
+    const coords: number[] = [];
+    this.forEachOccupiedCellWithin(
+      centerPos,
+      radiusM,
+      minObservations,
+      (record) => {
+        coords.push(record.cell[0], record.cell[1], record.cell[2]);
+      }
+    );
+    return Int32Array.from(coords);
+  }
+
+  /**
+   * Per-chunk dirty revision (see the field docs): 0 for a never-touched
+   * chunk. `chunk` is in chunk coordinates (`floor(cell / 16)` per axis).
+   */
+  getChunkRevision(chunk: GridCell): number {
+    return (
+      this.chunkRevisions.get(chunkKeyOf(chunk[0], chunk[1], chunk[2])) ?? 0
+    );
+  }
+
+  /** Shared sphere-window walk behind the tuple and flat queries. */
+  private forEachOccupiedCellWithin(
+    centerPos: Vector3,
+    radiusM: number,
+    minObservations: number,
+    visit: (record: CellRecord) => void
+  ): void {
+    if (!Number.isFinite(radiusM) || radiusM <= 0) {
+      throw new RangeError(
+        `radiusM must be a positive finite number, got ${radiusM}`
+      );
+    }
+    if (!isFiniteTriple(centerPos)) {
+      return;
+    }
+    const cs = this.cellSizeM;
+    const r2 = radiusM * radiusM;
+    // fp-safety margins for the CHUNK shortcuts only: skip a chunk only when
+    // it is clearly beyond the sphere, and skip the per-cell test only when
+    // the chunk is clearly inside — boundary chunks always get the exact
+    // per-cell test, which uses the same arithmetic as the brute-force
+    // reference so the results are identical.
+    const skipBeyond = (radiusM + cs * 1e-9) ** 2;
+    const wholeInsideR2 = (radiusM - cs * 1e-9) ** 2;
+    for (const [chunkKey, cellKeys] of this.chunks) {
+      // AABB of the chunk's CELL CENTERS in meters: [b·cs, (b+15)·cs] per axis.
+      const bx = unpackChunkCoord(chunkKey, 0) * CHUNK_EDGE_CELLS * cs;
+      const by = unpackChunkCoord(chunkKey, 1) * CHUNK_EDGE_CELLS * cs;
+      const bz = unpackChunkCoord(chunkKey, 2) * CHUNK_EDGE_CELLS * cs;
+      const extent = (CHUNK_EDGE_CELLS - 1) * cs;
+      let dMin2 = 0;
+      let dMax2 = 0;
+      for (let axis = 0; axis < 3; axis++) {
+        const lo = axis === 0 ? bx : axis === 1 ? by : bz;
+        const hi = lo + extent;
+        const v = centerPos[axis]!;
+        const below = lo - v;
+        const above = v - hi;
+        const dMin = Math.max(below, above, 0);
+        dMin2 += dMin * dMin;
+        const dMax = Math.max(Math.abs(v - lo), Math.abs(hi - v));
+        dMax2 += dMax * dMax;
+      }
+      if (dMin2 > skipBeyond) {
+        continue; // clearly outside the sphere
+      }
+      const wholeInside = dMax2 <= wholeInsideR2;
+      for (const key of cellKeys) {
+        const record = this.cells.get(key);
+        // Defensive: the index and the cell map are updated together, so a
+        // missing record would be an internal inconsistency — skip it rather
+        // than crash a render tick.
+        if (!record || record.count < minObservations) {
+          continue;
+        }
+        if (!wholeInside) {
+          const c = record.cell;
+          const dx = c[0] * cs - centerPos[0];
+          const dy = c[1] * cs - centerPos[1];
+          const dz = c[2] * cs - centerPos[2];
+          if (dx * dx + dy * dy + dz * dz > r2) {
+            continue;
+          }
+        }
+        visit(record);
+      }
+    }
+  }
+
   /** Quantize a raw-WebXR position to its grid cell (round per axis). */
   cellForPosition(pos: Vector3): GridCell {
     // `+ 0` normalizes Math.round's -0 so cell coordinates compare cleanly
@@ -366,6 +516,8 @@ export class OccupancyGrid {
       this.revision++;
     }
     this.cells.clear();
+    this.chunks.clear();
+    this.chunkRevisions.clear();
   }
 
   /**
@@ -382,13 +534,55 @@ export class OccupancyGrid {
       (cell) => {
         if (!cellsEqual(cell, pointCell)) {
           // A carve removes a cell from the occupied set → a meaningful change.
-          if (this.cells.delete(cellKey(cell))) {
+          const key = cellKey(cell);
+          if (this.cells.delete(key)) {
             this.revision++;
+            this.unindexCell(cell, key);
           }
         }
         return true;
       },
       this.carveStopCells
+    );
+  }
+
+  /** Add a newly-occupied cell to its chunk's index set. */
+  private indexCell(cell: GridCell, key: number): void {
+    const ck = chunkKeyOf(
+      Math.floor(cell[0] / CHUNK_EDGE_CELLS),
+      Math.floor(cell[1] / CHUNK_EDGE_CELLS),
+      Math.floor(cell[2] / CHUNK_EDGE_CELLS)
+    );
+    let set = this.chunks.get(ck);
+    if (!set) {
+      set = new Set<number>();
+      this.chunks.set(ck, set);
+    }
+    set.add(key);
+  }
+
+  /** Remove a carved cell from its chunk (dropping an emptied chunk set). */
+  private unindexCell(cell: GridCell, key: number): void {
+    const ck = chunkKeyOf(
+      Math.floor(cell[0] / CHUNK_EDGE_CELLS),
+      Math.floor(cell[1] / CHUNK_EDGE_CELLS),
+      Math.floor(cell[2] / CHUNK_EDGE_CELLS)
+    );
+    const set = this.chunks.get(ck);
+    if (set) {
+      set.delete(key);
+      if (set.size === 0) {
+        this.chunks.delete(ck);
+      }
+    }
+    this.bumpChunkRevision(ck);
+  }
+
+  /** Mirror of the global revision bump, scoped to one chunk. */
+  private bumpChunkRevision(chunkKey: number): void {
+    this.chunkRevisions.set(
+      chunkKey,
+      (this.chunkRevisions.get(chunkKey) ?? 0) + 1
     );
   }
 
@@ -404,6 +598,7 @@ export class OccupancyGrid {
         colorSum: [0, 0, 0],
       };
       this.cells.set(key, record);
+      this.indexCell(cell, key);
     }
     record.count++;
     // Bump the revision while the cell could still cross some consumer's
@@ -412,6 +607,13 @@ export class OccupancyGrid {
     // costs no re-mesh — the key long-session idle saving.
     if (record.count <= MAX_RELEVANT_COUNT) {
       this.revision++;
+      this.bumpChunkRevision(
+        chunkKeyOf(
+          Math.floor(cell[0] / CHUNK_EDGE_CELLS),
+          Math.floor(cell[1] / CHUNK_EDGE_CELLS),
+          Math.floor(cell[2] / CHUNK_EDGE_CELLS)
+        )
+      );
     }
     // Every observation carries a finite position (the unprojector guarantees
     // it), so it always feeds the running-average surface point.
@@ -455,6 +657,37 @@ function cellKey(cell: GridCell): number {
     (cell[1] + KEY_OFFSET) * KEY_FIELD +
     (cell[2] + KEY_OFFSET)
   );
+}
+
+// --- Chunk index (Step 2 of the 2026-07-03 long-session fps plan) ---
+// Chunks are CHUNK_EDGE_CELLS³ cell groups (16³ = 2.4 m at the 0.15 m default,
+// per the plan's sizing note). With |cell| ≤ 65 535, chunk coordinates are
+// within ±4096, so three 13-bit fields pack into one safe-integer key using
+// the same scheme as `cellKey`.
+const CHUNK_EDGE_CELLS = 16;
+const CHUNK_KEY_OFFSET = 4096; // 2^12
+const CHUNK_KEY_FIELD = 8192; // 2^13
+const CHUNK_KEY_FIELD_SQ = CHUNK_KEY_FIELD * CHUNK_KEY_FIELD; // 2^26
+
+function chunkKeyOf(cx: number, cy: number, cz: number): number {
+  return (
+    (cx + CHUNK_KEY_OFFSET) * CHUNK_KEY_FIELD_SQ +
+    (cy + CHUNK_KEY_OFFSET) * CHUNK_KEY_FIELD +
+    (cz + CHUNK_KEY_OFFSET)
+  );
+}
+
+/** Inverse of {@link chunkKeyOf} for one axis (0 = x, 1 = y, 2 = z). */
+function unpackChunkCoord(key: number, axis: 0 | 1 | 2): number {
+  if (axis === 0) {
+    return Math.floor(key / CHUNK_KEY_FIELD_SQ) - CHUNK_KEY_OFFSET;
+  }
+  if (axis === 1) {
+    return (
+      (Math.floor(key / CHUNK_KEY_FIELD) % CHUNK_KEY_FIELD) - CHUNK_KEY_OFFSET
+    );
+  }
+  return (key % CHUNK_KEY_FIELD) - CHUNK_KEY_OFFSET;
 }
 
 function cellsEqual(a: GridCell, b: GridCell): boolean {

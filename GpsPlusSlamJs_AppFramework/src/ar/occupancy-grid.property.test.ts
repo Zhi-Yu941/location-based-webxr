@@ -209,4 +209,65 @@ describe('OccupancyGrid properties', () => {
       )
     );
   });
+
+  it('getOccupiedCellsWithin ≡ brute-force radius filter of getOccupiedCells for any grid, center and radius (Step 2)', () => {
+    // Why this property matters: the chunk-index window is the structural
+    // change that bounds consumer cost by the neighbourhood — if its
+    // AABB-vs-sphere chunk walk or interior-chunk shortcut ever drops or
+    // over-includes a cell relative to the plain distance filter, occlusion
+    // and cubes silently diverge from the grid. Cameras at several origins
+    // spread samples across chunk boundaries.
+    fc.assert(
+      fc.property(
+        fc.array(
+          fc.record({
+            camX: fc.integer({ min: -30, max: 30 }),
+            camY: fc.integer({ min: -5, max: 5 }),
+            depths: fc.array(fc.double({ min: 0.6, max: 20, noNaN: true }), {
+              minLength: 1,
+              maxLength: 4,
+            }),
+          }),
+          { minLength: 1, maxLength: 6 }
+        ),
+        fc.tuple(
+          fc.double({ min: -35, max: 35, noNaN: true }),
+          fc.double({ min: -8, max: 8, noNaN: true }),
+          fc.double({ min: -25, max: 5, noNaN: true })
+        ),
+        fc.double({ min: 0.3, max: 40, noNaN: true }),
+        fc.integer({ min: 1, max: 3 }),
+        (samples, center, radiusM, minObservations) => {
+          const grid = new OccupancyGrid({ cellSizeM: 1 });
+          for (const s of samples) {
+            grid.addSample(makeSample([s.camX, s.camY, 0], s.depths));
+          }
+          const expected = grid
+            .getOccupiedCells(minObservations)
+            .filter((cell) => {
+              const c = grid.getCellCenter(cell);
+              const dx = c[0] - center[0];
+              const dy = c[1] - center[1];
+              const dz = c[2] - center[2];
+              return dx * dx + dy * dy + dz * dz <= radiusM * radiusM;
+            });
+          const actual = grid.getOccupiedCellsWithin(
+            center,
+            radiusM,
+            minObservations
+          );
+          // Same SET of cells (chunk iteration order differs from Map order).
+          const key = (c: readonly number[]): string => c.join(',');
+          expect(new Set(actual.map(key))).toEqual(new Set(expected.map(key)));
+          expect(actual).toHaveLength(expected.length);
+          // The flat variant carries exactly the tuple result.
+          expect(
+            Array.from(
+              grid.getOccupiedCellsWithinFlat(center, radiusM, minObservations)
+            )
+          ).toEqual(actual.flat());
+        }
+      )
+    );
+  });
 });

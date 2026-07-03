@@ -37,6 +37,19 @@ import { WEBXR_TO_NUE } from 'gps-plus-slam-app-framework/ar/webxr-nue-basis';
 /** The read surface of the framework's `OccupancyGrid` this class draws. */
 export interface OccupancyGridSource {
   getOccupiedCells(minObservations?: number): readonly GridCell[];
+  /**
+   * Viewer-local window over the occupied set (Step 2 of the 2026-07-03
+   * long-session fps plan — backed by the grid's chunk index, so the cost is
+   * bounded by the neighbourhood, not the session). Optional so older grid
+   * doubles still satisfy the interface; when present AND a finite pose is
+   * supplied AND `overCapRadiusM` is bounded, `refresh` snapshots through it
+   * instead of the O(total-cells) `getOccupiedCells` walk.
+   */
+  getOccupiedCellsWithin?(
+    centerPos: readonly [number, number, number],
+    radiusM: number,
+    minObservations?: number
+  ): readonly GridCell[];
   getCellCenter(cell: GridCell): readonly [number, number, number];
   /**
    * Per-cell average of the EXACT unprojected surface points (follow-up
@@ -181,7 +194,22 @@ export class OccupancyCubesVisualizer {
    */
   refresh(grid: OccupancyGridSource, viewerPose?: ViewerPose): void {
     if (this.disposed) return;
-    const occupied = grid.getOccupiedCells(this.minObservations);
+    // Step 2 (2026-07-03 fps plan): snapshot only the viewer's neighbourhood
+    // via the chunk-indexed windowed query when the grid offers it — the
+    // O(total-cells) walk then never runs. Falls back to the full snapshot
+    // for older grids, a missing/non-finite pose, or an opted-out radius.
+    const hasFinitePose =
+      viewerPose !== undefined && isFiniteVec3(viewerPose.cameraPos);
+    const occupied =
+      grid.getOccupiedCellsWithin &&
+      hasFinitePose &&
+      Number.isFinite(this.overCapRadiusM)
+        ? grid.getOccupiedCellsWithin(
+            viewerPose.cameraPos,
+            this.overCapRadiusM,
+            this.minObservations
+          )
+        : grid.getOccupiedCells(this.minObservations);
     const capacity = this.mesh.instanceMatrix.count;
     // Draw at the exact per-cell surface point when available (Item A),
     // falling back to the lattice center for grids without it.

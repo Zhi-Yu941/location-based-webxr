@@ -78,6 +78,8 @@ let occupancyLiveOcclusionCheckbox: HTMLInputElement | null = null;
 let occupancyPersistentOcclusionCheckbox: HTMLInputElement | null = null;
 let occupancyOccluderDebugStyleSelect: HTMLSelectElement | null = null;
 let occupancyOccluderMeshModeSelect: HTMLSelectElement | null = null;
+let occupancyOccluderRadiusSlider: HTMLInputElement | null = null;
+let occupancyOccluderRadiusValue: HTMLElement | null = null;
 let frameTileDisplayDivisorSlider: HTMLInputElement | null = null;
 let frameTileDisplayDivisorValue: HTMLElement | null = null;
 let frameTileMaxTilesSlider: HTMLInputElement | null = null;
@@ -221,6 +223,12 @@ export function initSettingsModal(
   occupancyOccluderMeshModeSelect = document.getElementById(
     'occupancy-occluder-mesh-mode'
   ) as HTMLSelectElement;
+  occupancyOccluderRadiusSlider = document.getElementById(
+    'occupancy-occluder-radius'
+  ) as HTMLInputElement;
+  occupancyOccluderRadiusValue = document.getElementById(
+    'occupancy-occluder-radius-value'
+  );
   occupancyMinConfidenceValue = document.getElementById(
     'occupancy-min-confidence-value'
   );
@@ -400,6 +408,20 @@ export function initSettingsModal(
     if (workingOptions && occupancyOccluderMeshModeSelect) {
       workingOptions.occupancy.occluderMeshMode =
         occupancyOccluderMeshModeSelect.value as OccluderMeshMode;
+    }
+  });
+
+  // Camera-local occluder window (Step 2, 2026-07-03 long-session fps plan);
+  // 0 = unlimited. Applies on the next Enter-AR / replay load.
+  occupancyOccluderRadiusSlider?.addEventListener('input', () => {
+    if (
+      workingOptions &&
+      occupancyOccluderRadiusSlider &&
+      occupancyOccluderRadiusValue
+    ) {
+      const value = parseInt(occupancyOccluderRadiusSlider.value, 10);
+      workingOptions.occupancy.occluderRadiusM = value;
+      occupancyOccluderRadiusValue.textContent = formatOccluderRadius(value);
     }
   });
 
@@ -664,6 +686,11 @@ export function initSettingsModal(
 /** Label for the live frame-tile cap: 0 is the explicit "unlimited". */
 function formatMaxTiles(maxTiles: number): string {
   return maxTiles === 0 ? 'unlimited' : String(maxTiles);
+}
+
+/** Label for the occluder window: 0 is the explicit "unlimited". */
+function formatOccluderRadius(radiusM: number): string {
+  return radiusM === 0 ? 'unlimited' : `${radiusM} m`;
 }
 
 function formatResolutionDivisor(divisor: number): string {
@@ -951,6 +978,26 @@ function populateForm(options: RecordingOptions): void {
   }
   if (occupancyOccluderMeshModeSelect) {
     occupancyOccluderMeshModeSelect.value = options.occupancy.occluderMeshMode;
+  }
+  // Camera-local occluder window (Step 2, 2026-07-03 fps plan)
+  if (occupancyOccluderRadiusSlider) {
+    occupancyOccluderRadiusSlider.min = String(
+      OCCUPANCY_CONSTRAINTS.occluderRadiusM.min
+    );
+    occupancyOccluderRadiusSlider.max = String(
+      OCCUPANCY_CONSTRAINTS.occluderRadiusM.max
+    );
+    occupancyOccluderRadiusSlider.step = String(
+      OCCUPANCY_CONSTRAINTS.occluderRadiusM.step
+    );
+    occupancyOccluderRadiusSlider.value = String(
+      options.occupancy.occluderRadiusM
+    );
+  }
+  if (occupancyOccluderRadiusValue) {
+    occupancyOccluderRadiusValue.textContent = formatOccluderRadius(
+      options.occupancy.occluderRadiusM
+    );
   }
 
   // Frame-tile display-resolution divisor (D7-resolution)

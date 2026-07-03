@@ -77,7 +77,11 @@ export interface WireOccupancyGridSubscribersOptions<
    * `occupancy.persistentOcclusion` setting is on (on by default).
    */
   readonly occluder?: {
-    refresh(grid: NoInfer<TGrid>): void;
+    // viewerPose: the latest sample's head pose (raw WebXR), so a windowed
+    // occluder (occupancy.occluderRadiusM, Step 2 of the 2026-07-03 fps plan)
+    // can snapshot getOccupiedCellsWithinFlat around the camera. Optional —
+    // an unbounded sink that ignores it still satisfies the type.
+    refresh(grid: NoInfer<TGrid>, viewerPose?: ViewerPose): void;
     clear(): void;
   };
   /** Defaults to {@link DEFAULT_REFRESH_INTERVAL_MS}. */
@@ -91,6 +95,17 @@ export interface WireOccupancyGridSubscribersOptions<
    * a throwing callback surfaces via `onError` and never breaks the wiring.
    */
   readonly onGridSize?: (cells: number) => void;
+  /**
+   * ⚠ Revision-guard interaction for CAMERA-RELATIVE consumers (Step 2 of the
+   * 2026-07-03 fps plan): with a viewer-local window, the correct visible set
+   * changes when the camera moves even if the grid is settled — so when this
+   * is set, an unchanged-revision refresh is skipped only while the camera
+   * stays within this distance (meters) of the last-rendered position.
+   * Suggested value ≈ one chunk edge (2.4 m at the 0.15 m default). Leave
+   * unset for unbounded consumers — the legacy pure-revision skip — since
+   * their output is camera-independent and ε-refreshes would be pure waste.
+   */
+  readonly refreshOnCameraMoveM?: number;
 }
 
 /**
@@ -108,6 +123,7 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
     refreshIntervalMs = DEFAULT_REFRESH_INTERVAL_MS,
     onError,
     onGridSize,
+    refreshOnCameraMoveM,
   } = options;
 
   let disposed = false;
@@ -118,6 +134,9 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
   // Occupied-set revision last actually rendered. `null` forces the next refresh
   // (start / after a store swap). Lets a settled grid skip the O(cells) refresh.
   let lastRenderedRevision: number | null = null;
+  // Camera position at the last successful render — the second half of the
+  // settled-skip guard when `refreshOnCameraMoveM` is set (Step 2).
+  let lastRenderedPose: ViewerPose | null = null;
   let pendingRefresh: ReturnType<typeof setTimeout> | null = null;
   // The most recent depth sample's head pose (raw WebXR), forwarded to the
   // visualizer so an over-cap refresh can pick the cells nearest the user
@@ -131,12 +150,36 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
     }
   };
 
+  // True when the camera left the ε-sphere around the last-rendered position
+  // (or either pose is unknown — then a refresh is the safe answer). Only
+  // consulted when `refreshOnCameraMoveM` is set.
+  const cameraMovedBeyondEpsilon = (): boolean => {
+    if (lastViewerPose === null || lastRenderedPose === null) {
+      return true;
+    }
+    const a = lastViewerPose.cameraPos;
+    const b = lastRenderedPose.cameraPos;
+    const dx = a[0] - b[0];
+    const dy = a[1] - b[1];
+    const dz = a[2] - b[2];
+    const epsilon = refreshOnCameraMoveM ?? 0;
+    return dx * dx + dy * dy + dz * dz > epsilon * epsilon;
+  };
+
   const refreshNow = (): void => {
     // Skip the whole O(cells) re-derive when the occupied set is unchanged since
     // the last render (a settled scene being re-observed) — cube re-build and
     // occluder re-mesh both produce identical output. Cheap O(1) guard.
+    // With camera-relative windows (`refreshOnCameraMoveM`), the skip
+    // additionally requires the camera to have stayed within ε of the
+    // last-rendered position — otherwise walking back into settled geometry
+    // would never re-window the consumers (Step 2 revision-guard fix).
     const revision = grid.getRevision?.();
-    if (revision !== undefined && revision === lastRenderedRevision) {
+    if (
+      revision !== undefined &&
+      revision === lastRenderedRevision &&
+      (refreshOnCameraMoveM === undefined || !cameraMovedBeyondEpsilon())
+    ) {
       return;
     }
     lastRefreshTime = Date.now();
@@ -157,7 +200,7 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
     // occluder re-mesh, and vice versa.
     if (occluder) {
       try {
-        occluder.refresh(grid);
+        occluder.refresh(grid, lastViewerPose ?? undefined);
       } catch (err) {
         rendered = false;
         onError?.(err);
@@ -165,6 +208,7 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
     }
     if (rendered) {
       lastRenderedRevision = revision ?? null;
+      lastRenderedPose = lastViewerPose;
     }
   };
 
@@ -248,6 +292,7 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
     lastGridSizeTime = -Infinity;
     // Force the first refresh of the new store's grid (its revision restarts).
     lastRenderedRevision = null;
+    lastRenderedPose = null;
     // Drop the stale pose: the new store's samples carry their own, and the
     // old recording's head pose is meaningless for the new one.
     lastViewerPose = null;

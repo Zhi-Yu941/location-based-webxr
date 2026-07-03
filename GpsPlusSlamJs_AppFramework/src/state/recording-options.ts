@@ -287,6 +287,20 @@ export interface OccupancyOptions {
    * `GpsPlusSlamJs_Docs/docs/2026-06-30-occluder-tuning-followups.md`.
    */
   occluderMeshMode: OccluderMeshMode;
+  /**
+   * Camera-local window for the **persistent occluder** snapshot (Step 2 of
+   * the 2026-07-03 long-session fps plan): each re-mesh reads only the
+   * occupied cells within this many meters of the camera
+   * (`OccupancyGrid.getOccupiedCellsWithinFlat`), so snapshot/pack/mesh cost
+   * is bounded by the neighbourhood instead of the whole session. Default
+   * **25 m** — a 15 cm voxel at 25 m subtends ~0.3°, so occlusion errors
+   * beyond that are imperceptible. `0` = unbounded (the pre-Step-2
+   * behaviour, the safe fallback). The grid forgets nothing: walking back
+   * re-meshes far geometry from memory — exactly the persistent-grid intent.
+   * Only has an effect when {@link persistentOcclusion} is on. Read once at
+   * Enter-AR / replay load like the other occupancy knobs.
+   */
+  occluderRadiusM: number;
 }
 
 /**
@@ -468,6 +482,7 @@ export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
     liveOcclusion: false, // live CPU-depth occluder OFF by default (device-gated quality; replay no-op)
     occluderDebugStyle: 'off', // debug visualization of the persistent occluder mesh OFF by default (occlusion is invisible in normal use)
     occluderMeshMode: 'smooth', // persistent-occluder mesher: Naive Surface Nets by default (smoothest/lightest); 'greedy' = blocky cubes (watertight), 'corner-fit' = surface-hugging + watertight
+    occluderRadiusM: 25, // camera-local occluder window (2026-07-03 fps plan Step 2); 0 = unbounded
   },
   frameTileDisplay: {
     // Half-resolution display texture by default (D7): a noticeable per-tile
@@ -580,6 +595,10 @@ export const QUALITY_FILTER_CONSTRAINTS = {
 export const OCCUPANCY_CONSTRAINTS = {
   cellSizeM: { min: 0.01, max: 0.2, step: 0.01 },
   minConfidence: { min: 1, max: 10, step: 1 },
+  // Camera-local occluder window: 0 = unbounded; 200 m is far past any
+  // useful mobile-AR occlusion distance but keeps a corrupt stored value
+  // from effectively disabling the bound by accident.
+  occluderRadiusM: { min: 0, max: 200, step: 5 },
 } as const;
 
 /**
@@ -1036,6 +1055,17 @@ export function validateOccupancyOptions(
     )
       ? (options.occluderMeshMode as OccluderMeshMode)
       : defaults.occluderMeshMode,
+    // Number-or-default; 0 stays 0 (the explicit "unbounded"). Rounded to
+    // whole meters — the grid throws on invalid radii, so garbage must never
+    // pass through.
+    occluderRadiusM: clamp(
+      typeof options.occluderRadiusM === 'number' &&
+        Number.isFinite(options.occluderRadiusM)
+        ? Math.round(options.occluderRadiusM)
+        : defaults.occluderRadiusM,
+      OCCUPANCY_CONSTRAINTS.occluderRadiusM.min,
+      OCCUPANCY_CONSTRAINTS.occluderRadiusM.max
+    ),
   };
 }
 

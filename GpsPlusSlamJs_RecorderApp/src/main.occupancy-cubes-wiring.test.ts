@@ -427,6 +427,30 @@ vi.mock('gps-plus-slam-app-framework', () => ({
 vi.mock('./ui/hud-tracking-quality-subscriber', () => ({
   subscribeHudToTrackingQuality: vi.fn(() => vi.fn()),
 }));
+// Persistent occluder (Step 2 windowed-occluder wiring test): OcclusionMesh +
+// the worker client are mocked so enabling occupancy.persistentOcclusion
+// exercises main.ts's occluder sink without THREE/WebGL.
+const { mockOcclusionMeshCtor, mockDriverRequest } = vi.hoisted(() => ({
+  mockOcclusionMeshCtor: vi.fn(function () {
+    return {
+      applyMeshData: vi.fn(),
+      clear: vi.fn(),
+      dispose: vi.fn(),
+      setDebugStyle: vi.fn(),
+    };
+  }),
+  mockDriverRequest: vi.fn(),
+}));
+vi.mock('gps-plus-slam-app-framework/visualization', () => ({
+  OcclusionMesh: mockOcclusionMeshCtor,
+}));
+vi.mock('./visualization/occluder-mesh-worker-client', () => ({
+  createOccluderMeshWorker: vi.fn(() => ({
+    driver: { request: mockDriverRequest },
+    dispose: vi.fn(),
+  })),
+}));
+
 vi.mock('./replay/replay-handlers', () => ({
   createReplayHandlers: vi.fn().mockReturnValue({
     handleStartReplay: vi.fn(),
@@ -550,6 +574,110 @@ describe('Occupancy-grid cube wiring in live AR', () => {
     // visualizer's hardcoded 1000 ms fallback. This pins the one thing that
     // can silently regress — the call site dropping the option again.
     expect(options.refreshIntervalMs).toBe(500);
+  });
+
+  describe('windowed persistent occluder (Step 2, 2026-07-03 fps plan)', () => {
+    // Why these tests matter: the camera-local occluder window is the plan's
+    // structural fix for the O(total-cells) snapshot+pack cost. The sink
+    // main.ts hands the wirer must snapshot getOccupiedCellsWithinFlat
+    // around the pose when occluderRadiusM > 0 and degrade to the unbounded
+    // flat snapshot otherwise — and the wirer must get the camera-move ε so
+    // a settled grid still re-windows when the user walks.
+
+    function makeFakeGrid() {
+      const flatWindow = new Int32Array([1, 2, 3]);
+      const flatFull = new Int32Array([4, 5, 6, 7, 8, 9]);
+      return {
+        flatWindow,
+        flatFull,
+        grid: {
+          getOccupiedCellsWithinFlat: vi.fn(() => flatWindow),
+          getOccupiedCellsFlat: vi.fn(() => flatFull),
+          getCellPoint: vi.fn(() => null),
+          cellSizeM: 0.15,
+        },
+      };
+    }
+
+    function optionsWithOccluderOn(occluderRadiusM: number) {
+      return {
+        ...loadRecordingOptions(),
+        occupancy: {
+          cellSizeM: 0.15,
+          minConfidence: 3,
+          persistentOcclusion: true,
+          liveOcclusion: false,
+          occluderDebugStyle: 'off' as const,
+          occluderMeshMode: 'smooth' as const,
+          occluderRadiusM,
+        },
+      };
+    }
+
+    async function wiredOccluderSink(occluderRadiusM: number) {
+      setRecordingOptionsForTesting(optionsWithOccluderOn(occluderRadiusM));
+      await handleEnterARForTesting();
+      // .at(-1): a test may enter AR more than once — always read the wiring
+      // of the LATEST cycle.
+      const options = mockWireOccupancyGridSubscribers.mock.calls.at(
+        -1
+      )?.[0] as {
+        occluder?: {
+          refresh(grid: unknown, pose?: { cameraPos: number[] }): void;
+        };
+        refreshOnCameraMoveM?: number;
+      };
+      return options;
+    }
+
+    it('snapshots the camera-local window and passes the ε guard to the wirer', async () => {
+      const options = await wiredOccluderSink(25);
+      expect(options.occluder).toBeDefined();
+      // ε = one chunk edge = 16 · cellSizeM = 2.4 m at the 0.15 m default.
+      expect(options.refreshOnCameraMoveM).toBeCloseTo(2.4, 10);
+
+      const { grid, flatWindow } = makeFakeGrid();
+      options.occluder!.refresh(grid, { cameraPos: [1, 2, 3] });
+      expect(grid.getOccupiedCellsWithinFlat).toHaveBeenCalledWith(
+        [1, 2, 3],
+        25,
+        3
+      );
+      expect(grid.getOccupiedCellsFlat).not.toHaveBeenCalled();
+      expect(mockDriverRequest).toHaveBeenCalledWith(
+        flatWindow,
+        0.15,
+        'smooth',
+        expect.any(Function),
+        expect.any(Function)
+      );
+    });
+
+    it('falls back to the unbounded snapshot for radius 0, a missing pose, or a non-finite pose', async () => {
+      const options = await wiredOccluderSink(0);
+      const { grid: g0, flatFull } = makeFakeGrid();
+      options.occluder!.refresh(g0, { cameraPos: [1, 2, 3] });
+      expect(g0.getOccupiedCellsWithinFlat).not.toHaveBeenCalled();
+      expect(mockDriverRequest).toHaveBeenLastCalledWith(
+        flatFull,
+        0.15,
+        'smooth',
+        expect.any(Function),
+        expect.any(Function)
+      );
+
+      const options25 = await wiredOccluderSink(25);
+      const { grid: g1 } = makeFakeGrid();
+      options25.occluder!.refresh(g1); // no pose (first refresh edge case)
+      expect(g1.getOccupiedCellsWithinFlat).not.toHaveBeenCalled();
+      expect(g1.getOccupiedCellsFlat).toHaveBeenCalledWith(3);
+
+      const { grid: g2 } = makeFakeGrid();
+      options25.occluder!.refresh(g2, { cameraPos: [NaN, 0, 0] });
+      // A glitched pose must degrade to unbounded, never blank the occluder.
+      expect(g2.getOccupiedCellsWithinFlat).not.toHaveBeenCalled();
+      expect(g2.getOccupiedCellsFlat).toHaveBeenCalledWith(3);
+    });
   });
 
   it('resetMainState disposes the wiring and the visualizer', async () => {

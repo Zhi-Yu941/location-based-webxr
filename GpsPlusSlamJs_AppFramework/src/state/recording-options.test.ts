@@ -346,6 +346,43 @@ describe('recording-options', () => {
       expect(result).toEqual(DEFAULT_RECORDING_OPTIONS.occupancy);
     });
 
+    // occluderRadiusM (Step 2 of the 2026-07-03 long-session fps plan): the
+    // camera-local occluder window. Default 25 m (a 15 cm voxel at 25 m is
+    // ~0.3° — occlusion errors beyond that are imperceptible); 0 = unbounded
+    // (today's behaviour, the safe fallback). Feeds
+    // OccupancyGrid.getOccupiedCellsWithinFlat, which throws on invalid
+    // radii — so corrupt values must clamp/fall back here.
+    it('occluderRadiusM defaults to 25 and preserves valid values including 0 (unbounded)', () => {
+      expect(validateOccupancyOptions({}).occluderRadiusM).toBe(25);
+      expect(DEFAULT_RECORDING_OPTIONS.occupancy.occluderRadiusM).toBe(25);
+      expect(
+        validateOccupancyOptions({ occluderRadiusM: 50 }).occluderRadiusM
+      ).toBe(50);
+      expect(
+        validateOccupancyOptions({ occluderRadiusM: 0 }).occluderRadiusM
+      ).toBe(0);
+    });
+
+    it('occluderRadiusM clamps/rounds bad values and falls back to default for non-numbers', () => {
+      expect(
+        validateOccupancyOptions({ occluderRadiusM: -10 }).occluderRadiusM
+      ).toBe(0);
+      expect(
+        validateOccupancyOptions({ occluderRadiusM: 12.4 }).occluderRadiusM
+      ).toBe(12);
+      expect(
+        validateOccupancyOptions({ occluderRadiusM: 1e6 }).occluderRadiusM
+      ).toBe(OCCUPANCY_CONSTRAINTS.occluderRadiusM.max);
+      expect(
+        validateOccupancyOptions({ occluderRadiusM: NaN }).occluderRadiusM
+      ).toBe(25);
+      expect(
+        validateOccupancyOptions({
+          occluderRadiusM: 'far' as unknown as number,
+        }).occluderRadiusM
+      ).toBe(25);
+    });
+
     it('preserves a valid in-range cell size', () => {
       expect(validateOccupancyOptions({ cellSizeM: 0.05 }).cellSizeM).toBe(
         0.05
@@ -1541,6 +1578,7 @@ describe('recording-options', () => {
           liveOcclusion: true,
           occluderDebugStyle: 'depth-shaded-wireframe',
           occluderMeshMode: 'smooth',
+          occluderRadiusM: 40,
         },
         frameTileDisplay: { divisor: 4, maxTiles: 250 },
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },

@@ -153,7 +153,10 @@ import { decodeFrameTexture } from './visualization/frame-texture-decoder';
 import { wireFrameTileSubscribers } from './visualization/wire-frame-tile-subscribers';
 import { FrameBlobCache } from './visualization/frame-blob-cache';
 import { OccupancyGrid } from 'gps-plus-slam-app-framework/ar/occupancy-grid';
-import { OccupancyCubesVisualizer } from './visualization/occupancy-cubes-visualizer';
+import {
+  OccupancyCubesVisualizer,
+  type ViewerPose,
+} from './visualization/occupancy-cubes-visualizer';
 import { OcclusionMesh } from 'gps-plus-slam-app-framework/visualization';
 import { createOccluderMeshWorker } from './visualization/occluder-mesh-worker-client';
 import { wireOccupancyGridSubscribers } from './visualization/wire-occupancy-grid-subscribers';
@@ -1397,6 +1400,12 @@ async function handleEnterAR(): Promise<void> {
         // Mesher style (occupancy.occluderMeshMode): blocky greedy cubes by
         // default; 'corner-fit'/'smooth' opt into the surface-hugging meshers.
         const occluderMode = recordingOptions.occupancy.occluderMeshMode;
+        // Camera-local occluder window (Step 2, 2026-07-03 fps plan): each
+        // re-mesh reads only the cells within this radius of the camera, so
+        // snapshot/pack/mesh cost stays bounded by the neighbourhood. 0 =
+        // unbounded (pre-Step-2 behaviour). The grid forgets nothing —
+        // walking back re-meshes far geometry from memory.
+        const occluderRadiusM = recordingOptions.occupancy.occluderRadiusM;
         const occluderSink = recordingOptions.occupancy.persistentOcclusion
           ? ((occlusionMesh = new OcclusionMesh(arWorldGroup, {
               mode: occluderMode,
@@ -1421,9 +1430,25 @@ async function handleEnterAR(): Promise<void> {
               // main-thread; only meshOccupiedCells runs in the worker, its
               // geometry applied back here. getCellPoint is read only by the
               // surface-hugging modes (the cube modes ignore it).
-              refresh: (g: OccupancyGrid) =>
+              refresh: (g: OccupancyGrid, pose?: ViewerPose) =>
                 occluderMeshWorker?.driver.request(
-                  g.getOccupiedCellsFlat(minConfidence),
+                  // Windowed snapshot around the camera when a radius is set
+                  // and the pose is usable; unbounded fallback otherwise (a
+                  // tracking-glitch pose must degrade gracefully, never
+                  // blank the occluder).
+                  occluderRadiusM > 0 &&
+                    pose &&
+                    pose.cameraPos.every(Number.isFinite)
+                    ? g.getOccupiedCellsWithinFlat(
+                        [
+                          pose.cameraPos[0],
+                          pose.cameraPos[1],
+                          pose.cameraPos[2],
+                        ],
+                        occluderRadiusM,
+                        minConfidence
+                      )
+                    : g.getOccupiedCellsFlat(minConfidence),
                   g.cellSizeM,
                   occluderMode,
                   (cell) => g.getCellPoint(cell),
@@ -1433,11 +1458,23 @@ async function handleEnterAR(): Promise<void> {
               clear: () => occlusionMesh?.clear(),
             })
           : undefined;
+        // With any camera-relative window active (the cubes window by
+        // default; the occluder when occluderRadiusM > 0), a settled grid
+        // must still re-render when the camera moves — ε = one chunk edge
+        // (16 cells; 2.4 m at the 0.15 m default). See the wirer's
+        // revision-guard docs (Step 2 correctness detail).
+        const anyWindowedConsumer =
+          viz.occupancyCubes ||
+          (recordingOptions.occupancy.persistentOcclusion &&
+            occluderRadiusM > 0);
         unsubscribeOccupancyGrid = wireOccupancyGridSubscribers({
           storeRef,
           grid: occupancyGrid,
           visualizer: occupancyVisualizerSink,
           occluder: occluderSink,
+          refreshOnCameraMoveM: anyWindowedConsumer
+            ? 16 * recordingOptions.occupancy.cellSizeM
+            : undefined,
           // Tie the cube-refresh throttle to the depth-sample cadence so a
           // faster `depth.intervalMs` (e.g. 500 ms) isn't capped at the old
           // hardcoded 1 Hz. At the default 1000 ms this equals the previous

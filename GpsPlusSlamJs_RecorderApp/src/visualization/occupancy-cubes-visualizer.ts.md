@@ -16,7 +16,7 @@ Plan: `GpsPlusSlamJs_Docs/docs/2026-06-11-depth-occupancy-grid-port-plan.md` §3
 - **`clear(): void`** — hides all cubes (count 0); the mesh stays for the next refresh (store-swap path).
 - **`dispose(): void`** — removes the mesh from its parent and disposes instance buffers, geometry, material. `refresh` after dispose is a safe no-op.
 - **`getCount(): number`** — cubes currently drawn.
-- **`OccupancyGridSource`** — the read surface required of the grid (`getOccupiedCells`, `getCellCenter`, `getCellColor`, and optional `getCellPoint`); structurally satisfied by the framework's `OccupancyGrid`.
+- **`OccupancyGridSource`** — the read surface required of the grid (`getOccupiedCells`, `getCellCenter`, `getCellColor`, optional `getCellPoint`, and optional `getOccupiedCellsWithin`); structurally satisfied by the framework's `OccupancyGrid`. When `getOccupiedCellsWithin` is present AND a finite pose is supplied AND `overCapRadiusM` is bounded, `refresh` snapshots through the chunk-indexed window (Step 2 of the 2026-07-03 fps plan) — the O(total-cells) `getOccupiedCells` walk then never runs; older grid doubles, a missing pose, or an opted-out radius fall back to the full snapshot.
 
 ## Invariants & Assumptions
 

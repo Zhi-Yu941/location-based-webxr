@@ -274,6 +274,29 @@ describe('settings-modal', () => {
       expect(checkbox.checked).toBe(false);
     });
 
+    it('populates the occluder-radius slider (Step 2) and updates the working copy, labelling 0 as unlimited', () => {
+      // Why: occluderRadiusM bounds the per-refresh occluder snapshot/mesh
+      // cost — the slider must round-trip the stored value and present the
+      // 0 opt-out as "unlimited" (the safe pre-Step-2 fallback).
+      localStorageMock.getItem.mockReturnValueOnce(
+        JSON.stringify({ occupancy: { occluderRadiusM: 50 } })
+      );
+      initSettingsModal();
+      showSettingsModal();
+
+      const slider = document.getElementById(
+        'occupancy-occluder-radius'
+      ) as HTMLInputElement;
+      const label = document.getElementById('occupancy-occluder-radius-value');
+      expect(slider.value).toBe('50');
+      expect(label?.textContent).toBe('50 m');
+
+      slider.value = '0';
+      slider.dispatchEvent(new Event('input'));
+      expect(getWorkingOptions()?.occupancy.occluderRadiusM).toBe(0);
+      expect(label?.textContent).toBe('unlimited');
+    });
+
     it('populates the live tile-cap slider (Step 4) and updates the working copy, labelling 0 as unlimited', () => {
       // Why: the FIFO cap bounds live draw calls/GPU memory on long walks —
       // the slider must round-trip the stored value and make the 0 opt-out

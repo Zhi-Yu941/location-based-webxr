@@ -205,6 +205,94 @@ describe('wireOccupancyGridSubscribers', () => {
     dispose();
   });
 
+  it('re-refreshes a SETTLED grid when the camera moves beyond the epsilon (Step 2 revision-guard fix)', () => {
+    // Why this matters (2026-07-03 fps plan, Step 2 ⚠ revision-guard
+    // interaction): with camera-relative windows, the correct visible set
+    // changes when the CAMERA moves even if the grid didn't. Without this
+    // condition, walking back into settled geometry never re-windows — the
+    // occluder/cubes freeze on the old neighbourhood.
+    const grid = makeRevisionGridSpy(0);
+    const visualizer = makeVisualizerSpy();
+    const occluder = makeOccluderSpy();
+    const dispose = wireOccupancyGridSubscribers({
+      storeRef,
+      grid,
+      visualizer,
+      occluder,
+      refreshIntervalMs: 1000,
+      refreshOnCameraMoveM: 2.4,
+    });
+
+    grid.setRevision(1);
+    storeRef.get().dispatch(recordDepthSample(makeSample(1, [0, 0, 0])));
+    expect(visualizer.refresh).toHaveBeenCalledTimes(1);
+    expect(occluder.refresh).toHaveBeenCalledTimes(1);
+
+    // Settled grid + small drift (1 m < ε): skip stays in force.
+    vi.advanceTimersByTime(2000);
+    storeRef.get().dispatch(recordDepthSample(makeSample(2, [1, 0, 0])));
+    expect(visualizer.refresh).toHaveBeenCalledTimes(1);
+    expect(occluder.refresh).toHaveBeenCalledTimes(1);
+
+    // Settled grid + camera moved 5 m from the LAST RENDERED position
+    // (> 2.4 m ε): both sinks must re-derive their windows.
+    vi.advanceTimersByTime(2000);
+    storeRef.get().dispatch(recordDepthSample(makeSample(3, [5, 0, 0])));
+    expect(visualizer.refresh).toHaveBeenCalledTimes(2);
+    expect(occluder.refresh).toHaveBeenCalledTimes(2);
+
+    // The re-render recorded the new pose: staying put skips again.
+    vi.advanceTimersByTime(2000);
+    storeRef.get().dispatch(recordDepthSample(makeSample(4, [5.5, 0, 0])));
+    expect(visualizer.refresh).toHaveBeenCalledTimes(2);
+
+    dispose();
+  });
+
+  it('without refreshOnCameraMoveM the legacy guard skips on unchanged revision regardless of movement', () => {
+    // Why: unbounded consumers (radius 0 / older callers) produce identical
+    // output wherever the camera is — ε-refreshes would be pure waste, so
+    // the movement condition is strictly opt-in.
+    const grid = makeRevisionGridSpy(0);
+    const visualizer = makeVisualizerSpy();
+    const dispose = wireOccupancyGridSubscribers({
+      storeRef,
+      grid,
+      visualizer,
+      refreshIntervalMs: 1000,
+    });
+
+    grid.setRevision(1);
+    storeRef.get().dispatch(recordDepthSample(makeSample(1, [0, 0, 0])));
+    expect(visualizer.refresh).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(2000);
+    storeRef.get().dispatch(recordDepthSample(makeSample(2, [100, 0, 0])));
+    expect(visualizer.refresh).toHaveBeenCalledTimes(1);
+
+    dispose();
+  });
+
+  it('forwards the viewer pose to the occluder sink (windowed occluder snapshots need it)', () => {
+    const grid = makeGridSpy();
+    const occluder = makeOccluderSpy();
+    const dispose = wireOccupancyGridSubscribers({
+      storeRef,
+      grid,
+      visualizer: makeVisualizerSpy(),
+      occluder,
+    });
+
+    const sample = makeSample(1, [3, 2, 1], [0, 0, 0, 1]);
+    storeRef.get().dispatch(recordDepthSample(sample));
+    expect(occluder.refresh).toHaveBeenCalledWith(grid, {
+      cameraPos: [3, 2, 1],
+      cameraRot: [0, 0, 0, 1],
+    });
+
+    dispose();
+  });
+
   it('retries a same-revision refresh after a transient sink failure (does not get stuck)', () => {
     // Why this matters: `lastRenderedRevision` must not advance until the sinks
     // actually succeed. If a refresh throws once while the revision was already
@@ -433,11 +521,12 @@ describe('wireOccupancyGridSubscribers', () => {
         refreshIntervalMs: 1000,
       });
 
-      // Leading-edge refresh hits both sinks with the live grid.
+      // Leading-edge refresh hits both sinks with the live grid (plus the
+      // sample's viewer pose since the Step-2 windowed-occluder change).
       storeRef.get().dispatch(recordDepthSample(makeSample(1)));
       expect(visualizer.refresh).toHaveBeenCalledTimes(1);
       expect(occluder.refresh).toHaveBeenCalledTimes(1);
-      expect(occluder.refresh).toHaveBeenCalledWith(grid);
+      expect(occluder.refresh.mock.calls[0]?.[0]).toBe(grid);
 
       // Burst coalesces to a single trailing refresh on BOTH sinks.
       storeRef.get().dispatch(recordDepthSample(makeSample(2)));

@@ -48,7 +48,10 @@ import { decodeFrameTexture } from '../visualization/frame-texture-decoder';
 import { wireFrameTileSubscribers } from '../visualization/wire-frame-tile-subscribers';
 import { OccupancyGrid } from 'gps-plus-slam-app-framework/ar/occupancy-grid';
 import { loadRecordingOptions } from 'gps-plus-slam-app-framework/state/recording-options';
-import { OccupancyCubesVisualizer } from '../visualization/occupancy-cubes-visualizer';
+import {
+  OccupancyCubesVisualizer,
+  type ViewerPose,
+} from '../visualization/occupancy-cubes-visualizer';
 import { OcclusionMesh } from 'gps-plus-slam-app-framework/visualization';
 import { createOccluderMeshWorker } from '../visualization/occluder-mesh-worker-client';
 import { wireOccupancyGridSubscribers } from '../visualization/wire-occupancy-grid-subscribers';
@@ -234,6 +237,9 @@ export async function startReplayMode(
     // only the persistent flag is honoured here.)
     const occluderMode = occupancyOptions.occluderMeshMode;
     const occluderMinConfidence = occupancyOptions.minConfidence;
+    // Camera-local occluder window (Step 2, 2026-07-03 fps plan) — replay
+    // parity with main.ts; 0 = unbounded.
+    const occluderRadiusM = occupancyOptions.occluderRadiusM;
     const occluderSink = occupancyOptions.persistentOcclusion
       ? ((occlusionMesh = new OcclusionMesh(replaySceneState.arWorldGroup, {
           // Mesher style (occupancy.occluderMeshMode), re-read per replay like
@@ -253,9 +259,19 @@ export async function startReplayMode(
           // Flat snapshot (Step 1.3, 2026-07-03 fps plan — parity with main.ts):
           // snapshot + getCellPoint stay main-thread; only the mesh runs in the
           // worker. getCellPoint is read only by the surface-hugging modes.
-          refresh: (g: OccupancyGrid) =>
+          // Windowed around the replayed camera pose when a radius is set
+          // (Step 2); unbounded fallback for a missing/non-finite pose.
+          refresh: (g: OccupancyGrid, pose?: ViewerPose) =>
             occluderMeshWorker?.driver.request(
-              g.getOccupiedCellsFlat(occluderMinConfidence),
+              occluderRadiusM > 0 &&
+                pose &&
+                pose.cameraPos.every(Number.isFinite)
+                ? g.getOccupiedCellsWithinFlat(
+                    [pose.cameraPos[0], pose.cameraPos[1], pose.cameraPos[2]],
+                    occluderRadiusM,
+                    occluderMinConfidence
+                  )
+                : g.getOccupiedCellsFlat(occluderMinConfidence),
               g.cellSizeM,
               occluderMode,
               (cell) => g.getCellPoint(cell),
@@ -276,6 +292,11 @@ export async function startReplayMode(
       // NOT the recording's original capture cadence (2026-06-22 cube
       // cadence/locality plan §2).
       refreshIntervalMs: replayOptions.depth.intervalMs,
+      // Camera-relative windows (cubes always; occluder when radius > 0)
+      // must re-render a settled grid when the replayed camera moves — ε =
+      // one chunk edge (16 cells). Step 2 revision-guard fix, parity with
+      // main.ts.
+      refreshOnCameraMoveM: 16 * occupancyOptions.cellSizeM,
       onError: (err) => {
         log.warn('Occupancy grid update failed during replay', err);
       },

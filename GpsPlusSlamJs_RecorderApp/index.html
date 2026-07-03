@@ -1299,6 +1299,26 @@ No errors</pre
                 occluder above is on. Off by default; applies the next time you
                 enter AR or load a replay.
               </p>
+              <!-- Camera-local occluder window (Step 2, 2026-07-03           -->
+              <!-- long-session fps plan): bounds the per-refresh snapshot    -->
+              <!-- + re-mesh by the neighbourhood. 0 = unlimited.             -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs text-gray-400">
+                  <span>Occluder radius (0 = unlimited)</span>
+                  <span id="occupancy-occluder-radius-value">25 m</span>
+                </div>
+                <input
+                  type="range"
+                  id="occupancy-occluder-radius"
+                  class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+                <p class="text-[11px] text-gray-400">
+                  Only surfaces within this distance occlude virtual content —
+                  keeps long walks fast. Everything stays remembered: walking
+                  back rebuilds far geometry instantly. Applies the next time
+                  you enter AR or load a replay.
+                </p>
+              </div>
             </div>
           </div>
 

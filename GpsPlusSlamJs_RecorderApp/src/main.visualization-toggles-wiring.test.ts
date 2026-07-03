@@ -41,7 +41,15 @@ const {
   mockCreateGpsCompassCubes,
   mockGpsEventVisualizer,
   mockRecordingOptions,
+  mockCreateStatsOverlay,
+  mockStatsOverlayInstance,
 } = vi.hoisted(() => {
+  const mockStatsOverlayInstance = {
+    dom: {} as HTMLElement,
+    panelCount: 3,
+    update: vi.fn(),
+    dispose: vi.fn(),
+  };
   const mockFrameTileVisualizerInstance = {
     addTile: vi.fn(),
     clear: vi.fn(),
@@ -92,6 +100,8 @@ const {
       }
     ),
     occupancyDisposers,
+    mockCreateStatsOverlay: vi.fn(() => mockStatsOverlayInstance),
+    mockStatsOverlayInstance,
     mockCreateGpsCompassCubes: vi.fn(),
     mockGpsEventVisualizer: {
       setVisible: vi.fn(),
@@ -112,6 +122,7 @@ const {
         occupancyCubes: true,
         gpsAlignmentMarkers: true,
         compassCubes: true,
+        statsOverlay: false,
       },
     },
   };
@@ -429,6 +440,9 @@ vi.mock('gps-plus-slam-app-framework', () => ({
 vi.mock('./ui/hud-tracking-quality-subscriber', () => ({
   subscribeHudToTrackingQuality: vi.fn(() => vi.fn()),
 }));
+vi.mock('./ui/stats-overlay', () => ({
+  createStatsOverlay: mockCreateStatsOverlay,
+}));
 vi.mock('./replay/replay-handlers', () => ({
   createReplayHandlers: vi.fn().mockReturnValue({
     handleStartReplay: vi.fn(),
@@ -482,12 +496,14 @@ describe('Visualization overlay toggles in live AR (Finding B)', () => {
     vi.clearAllMocks();
     frameTileDisposers.length = 0;
     occupancyDisposers.length = 0;
-    // Reset to the additive default (all overlays ON) before each test.
+    // Reset to the additive default (all overlays ON, stats OFF) before each
+    // test — statsOverlay is the group's one off-by-default field.
     mockRecordingOptions.visualization = {
       frameTiles: true,
       occupancyCubes: true,
       gpsAlignmentMarkers: true,
       compassCubes: true,
+      statsOverlay: false,
     };
     document.body.innerHTML = `
       <div id="app"></div>
@@ -560,6 +576,38 @@ describe('Visualization overlay toggles in live AR (Finding B)', () => {
       await handleEnterARForTesting();
 
       expect(mockGpsEventVisualizer.setVisible).toHaveBeenCalledWith(true);
+    });
+  });
+
+  describe('statsOverlay toggle (Step 0 of the 2026-07-03 long-session fps plan)', () => {
+    it('does NOT mount the stats overlay by default (off — debug tool)', async () => {
+      await handleEnterARForTesting();
+
+      expect(mockCreateStatsOverlay).not.toHaveBeenCalled();
+    });
+
+    it('mounts the stats overlay into the #app dom-overlay root when on', async () => {
+      mockRecordingOptions.visualization.statsOverlay = true;
+      await handleEnterARForTesting();
+
+      expect(mockCreateStatsOverlay).toHaveBeenCalledTimes(1);
+      // Must be (inside) the dom-overlay root or it cannot composite in AR.
+      expect(mockCreateStatsOverlay).toHaveBeenCalledWith(
+        document.getElementById('app')
+      );
+    });
+
+    it('disposes a previous cycle overlay on re-enter so panels never stack', async () => {
+      mockRecordingOptions.visualization.statsOverlay = true;
+      await handleEnterARForTesting();
+      expect(mockStatsOverlayInstance.dispose).not.toHaveBeenCalled();
+
+      // Second Enter-AR cycle (back-to-setup → Enter AR): the stale overlay
+      // must be disposed even when the toggle is now off.
+      mockRecordingOptions.visualization.statsOverlay = false;
+      await handleEnterARForTesting();
+      expect(mockStatsOverlayInstance.dispose).toHaveBeenCalledTimes(1);
+      expect(mockCreateStatsOverlay).toHaveBeenCalledTimes(1);
     });
   });
 

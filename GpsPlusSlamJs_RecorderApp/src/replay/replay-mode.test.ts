@@ -108,14 +108,32 @@ vi.mock('../visualization/wire-frame-tile-subscribers', () => ({
 // real visualizer would call arWorldGroup.add() on the mock scene node and
 // throw, leaving the block silently caught). Lets us assert Issue A — that
 // the cube-refresh throttle is wired from depth.intervalMs.
-vi.mock('gps-plus-slam-app-framework/state/recording-options', () => ({
-  loadRecordingOptions: vi.fn(() => ({
+// Shared mutable options object (same pattern as the main.ts wiring tests):
+// per-test mutation + beforeEach reset, because mockReturnValue would leak the
+// override into later tests (clearAllMocks does not reset implementations) and
+// an enabled stats overlay's rAF loop breaks runAllTimers-based tests.
+const { mockReplayRecordingOptions } = vi.hoisted(() => ({
+  mockReplayRecordingOptions: {
     // 500 ms ≠ the visualizer's hardcoded 1000 ms fallback — proves the
     // throttle is sourced from depth.intervalMs (2026-06-22 cube
     // cadence/locality plan §2).
     depth: { enabled: true, intervalMs: 500 },
     occupancy: { cellSizeM: 0.15, minConfidence: 3 },
     frameTileDisplay: { divisor: 2 },
+    // Stats overlay defaults OFF (Step 0 of the 2026-07-03 long-session fps
+    // plan); the dedicated tests below flip it on.
+    visualization: { statsOverlay: false },
+  },
+}));
+vi.mock('gps-plus-slam-app-framework/state/recording-options', () => ({
+  loadRecordingOptions: vi.fn(() => mockReplayRecordingOptions),
+}));
+vi.mock('../ui/stats-overlay', () => ({
+  createStatsOverlay: vi.fn(() => ({
+    dom: {} as HTMLElement,
+    panelCount: 3,
+    update: vi.fn(),
+    dispose: vi.fn(),
   })),
 }));
 vi.mock('../visualization/occupancy-cubes-visualizer', () => ({
@@ -130,6 +148,7 @@ vi.mock('../visualization/wire-occupancy-grid-subscribers', () => ({
 
 import { startReplayMode } from './replay-mode.js';
 import { wireOccupancyGridSubscribers } from '../visualization/wire-occupancy-grid-subscribers';
+import { createStatsOverlay } from '../ui/stats-overlay';
 import { loadRecording } from '../storage/recording-loader';
 import { wireStoreSubscribers } from 'gps-plus-slam-app-framework/state/store-subscribers';
 import type { MapData } from 'gps-plus-slam-app-framework/visualization/map-data';
@@ -198,6 +217,9 @@ describe('replay-mode', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    // Stats overlay back to its OFF default (a leaked ON would add a rAF
+    // loop that breaks the runAllTimers-based playback tests below).
+    mockReplayRecordingOptions.visualization.statsOverlay = false;
     // Default: loadRecording returns our fixture wrapped in the LoadedRecording shape.
     const fixtureEntries = makeMockZipActions();
     vi.mocked(loadRecording).mockResolvedValue({
@@ -270,6 +292,36 @@ describe('replay-mode', () => {
     await startReplayMode(fakeZipData, config);
 
     expect(initReplayScene).toHaveBeenCalledWith(container);
+  });
+
+  // --- Perf stats overlay (2026-07-03 long-session fps plan, Step 0) ---
+
+  it('does NOT mount the stats overlay by default (visualization.statsOverlay off)', async () => {
+    const config = makeConfig();
+    await startReplayMode(fakeZipData, config);
+
+    expect(createStatsOverlay).not.toHaveBeenCalled();
+  });
+
+  it('mounts the stats overlay into the replay container when enabled, and disposes it with the controller', async () => {
+    // Why: statsOverlay is the one visualization toggle that ALSO applies to
+    // replay — replay frame time feeds the same long-session fps
+    // investigation. It must mount into the replay container and must not
+    // outlive dispose() (a leaked rAF loop + panel would survive into the
+    // next replay).
+    mockReplayRecordingOptions.visualization.statsOverlay = true;
+    const container = document.createElement('div');
+    const config = makeConfig({ container });
+    const controller = await startReplayMode(fakeZipData, config);
+
+    expect(createStatsOverlay).toHaveBeenCalledTimes(1);
+    expect(createStatsOverlay).toHaveBeenCalledWith(container);
+
+    const overlay = vi.mocked(createStatsOverlay).mock.results[0]!
+      .value as ReturnType<typeof createStatsOverlay>;
+    expect(overlay.dispose).not.toHaveBeenCalled();
+    controller.dispose();
+    expect(overlay.dispose).toHaveBeenCalledTimes(1);
   });
 
   // --- Store subscriber wiring (R6) ---

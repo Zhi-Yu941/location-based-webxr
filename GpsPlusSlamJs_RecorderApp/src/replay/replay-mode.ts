@@ -53,6 +53,10 @@ import { OcclusionMesh } from 'gps-plus-slam-app-framework/visualization';
 import { createOccluderMeshWorker } from '../visualization/occluder-mesh-worker-client';
 import { wireOccupancyGridSubscribers } from '../visualization/wire-occupancy-grid-subscribers';
 import { createZipFrameBlobSource } from '../storage/zip-frame-blob-source';
+import {
+  createStatsOverlay,
+  type StatsOverlayHandle,
+} from '../ui/stats-overlay';
 import * as THREE from 'three';
 
 const log = createLogger('ReplayMode');
@@ -274,12 +278,39 @@ export async function startReplayMode(
       onError: (err) => {
         log.warn('Occupancy grid update failed during replay', err);
       },
+      // Cells-over-time telemetry (Step 0 of the 2026-07-03 long-session fps
+      // plan) — replay parity with the live wiring in main.ts.
+      onGridSize: (cells) => {
+        log.info(`[OccupancyGrid] ${cells} cells`);
+      },
     });
   } catch (err) {
     log.warn(
       'Occupancy grid wiring skipped; replay continues without depth cubes',
       err
     );
+  }
+
+  // Perf stats overlay (visualization.statsOverlay — Step 0 of the 2026-07-03
+  // long-session fps plan; the one visualization toggle that ALSO applies to
+  // replay, since replay frame time matters for the same investigation). The
+  // replay scene's render loop is module-private in the framework, so the
+  // panels are advanced by their own rAF loop — rAF fires once per browser
+  // frame, so the measured cadence equals the replay render cadence.
+  // Best-effort like the visualizers above.
+  let statsOverlay: StatsOverlayHandle | null = null;
+  let statsRafId: number | null = null;
+  try {
+    if (loadRecordingOptions().visualization.statsOverlay) {
+      statsOverlay = createStatsOverlay(config.container);
+      const statsTick = (): void => {
+        statsOverlay?.update();
+        statsRafId = requestAnimationFrame(statsTick);
+      };
+      statsRafId = requestAnimationFrame(statsTick);
+    }
+  } catch (err) {
+    log.warn('Stats overlay skipped; replay continues without it', err);
   }
 
   // Get the alignment lerper (Issue 4) — store subscribers route alignment
@@ -414,6 +445,11 @@ export async function startReplayMode(
       occupancyCubesVisualizer?.dispose();
       occlusionMesh?.dispose();
       occluderMeshWorker?.dispose();
+      if (statsRafId !== null) {
+        cancelAnimationFrame(statsRafId);
+        statsRafId = null;
+      }
+      statsOverlay?.dispose();
       disposeReplayScene();
       log.info('Replay mode disposed');
     },

@@ -189,6 +189,10 @@ import {
   type RecordingOptions,
 } from 'gps-plus-slam-app-framework/state/recording-options';
 import { initSettingsModal } from './ui/settings-modal';
+import {
+  createStatsOverlay,
+  type StatsOverlayHandle,
+} from './ui/stats-overlay';
 import { wireQrRecording } from './qr/wire-qr-recording';
 import type { QrDetectionController } from 'gps-plus-slam-app-framework/ar';
 
@@ -265,6 +269,12 @@ const liveFrameBlobs = new FrameBlobCache({
 });
 let frameTileVisualizer: FrameTileVisualizer | null = null;
 let unsubscribeFrameTiles: (() => void) | null = null;
+
+// Perf stats overlay (visualization.statsOverlay, OFF by default) — Step 0 of
+// the 2026-07-03 long-session fps plan. Mounted into the #app dom-overlay root
+// at Enter-AR, advanced from the setFrameCallback tick, disposed on re-enter +
+// in resetMainState (same lifecycle as the frame-tile visualizer).
+let statsOverlay: StatsOverlayHandle | null = null;
 
 // Occupancy-grid cubes (2026-06-11 depth occupancy-grid port plan): the
 // grid is derived state fed from `recordDepthSample` actions via
@@ -620,6 +630,12 @@ export function resetMainState(): void {
   if (frameTileVisualizer) {
     frameTileVisualizer.dispose();
     frameTileVisualizer = null;
+  }
+  // Perf stats overlay — remove the panels so they don't linger (frozen) on
+  // the setup screen after the AR session ends.
+  if (statsOverlay) {
+    statsOverlay.dispose();
+    statsOverlay = null;
   }
   // Occupancy-grid teardown — stop feeding the grid and release the
   // instanced mesh once the AR session ends.
@@ -1239,6 +1255,22 @@ async function handleEnterAR(): Promise<void> {
       // GpsPlusSlamJs_Docs/docs/2026-06-14-followup-frame-tile-legacy-aspect-and-live-toggle.md.
       const viz = recordingOptions.visualization;
 
+      // Perf stats overlay (Step 0 of the 2026-07-03 long-session fps plan).
+      // Teardown is unconditional (turning the toggle off must remove a prior
+      // cycle's panels); creation is gated. Mounted into the #app dom-overlay
+      // root so it composites over the AR view; advanced once per XR frame in
+      // the setFrameCallback tick below. Best-effort: a failure must not
+      // break the AR session.
+      statsOverlay?.dispose();
+      statsOverlay = null;
+      if (viz.statsOverlay) {
+        try {
+          statsOverlay = createStatsOverlay(appContainer);
+        } catch (err) {
+          log.warn('Stats overlay skipped; session continues without it', err);
+        }
+      }
+
       // Compass cubes — recorder-side skip. Nothing non-visual depends on them.
       if (viz.compassCubes) {
         createGpsCompassCubes(cameraFollower.object3D);
@@ -1408,6 +1440,12 @@ async function handleEnterAR(): Promise<void> {
           onError: (err) => {
             log.warn('Occupancy grid update failed', err);
           },
+          // Cells-over-time telemetry (Step 0 of the 2026-07-03 long-session
+          // fps plan): one line per ~30 s so a log export correlates grid
+          // growth with the stats overlay's fps trend.
+          onGridSize: (cells) => {
+            log.info(`[OccupancyGrid] ${cells} cells`);
+          },
         });
       } catch (err) {
         log.warn(
@@ -1482,6 +1520,9 @@ async function handleEnterAR(): Promise<void> {
       const now = performance.now();
       const dt = (now - lastFrameTime) / 1000;
       lastFrameTime = now;
+
+      // Advance the perf stats panels (FPS/ms/MB) once per rendered XR frame.
+      statsOverlay?.update();
 
       // Update alignment lerper (Issue 4) — interpolate arWorldGroup.matrix
       alignmentLerper?.update(dt);

@@ -15,7 +15,8 @@ Plan: `GpsPlusSlamJs_Docs/docs/2026-06-11-depth-occupancy-grid-port-plan.md` §3
   - `occluder?: { refresh(grid: TGrid), clear() }` — optional persistent depth-only occluder (the `OcclusionMesh` adapter), refreshed on the **same** throttle as the visualizer. Present only when `occupancy.persistentOcclusion` is on (on by default). `refresh` gets the live grid so the adapter snapshots `getOccupiedCells(minConfidence)`; independent best-effort like the visualizer (a throwing occluder still lets the visualizer refresh, and vice versa).
   - `refreshIntervalMs?` — minimum delay between refreshes; default 1000. Live and replay both pass `depth.intervalMs` here (Issue A).
   - `onError?(err)` — receives grid/visualizer failures; the subscription itself never breaks.
-- **`OccupancyGridSink`** — the grid surface this wirer needs.
+  - `onGridSize?(cells)` — grid-size telemetry (Step 0 of `GpsPlusSlamJs_Docs/docs/2026-07-03-long-session-fps-and-voxel-grid-scaling-plan.md`): called with `grid.size` for the first folded sample (t0 baseline) and then at most once per ~30 s, so a log export correlates cells-over-time with the stats overlay's fps-over-time. Needs the sink to expose `size`; best-effort (a throwing callback goes to `onError`). The cadence resets on store swap so a new session logs from t0 again.
+- **`OccupancyGridSink`** — the grid surface this wirer needs (`addSample`, `clear`, optional `getRevision` and optional O(1) `size`).
 
 ## Invariants & Assumptions
 
@@ -43,5 +44,5 @@ const dispose = wireOccupancyGridSubscribers({
 
 ## Tests
 
-- `wire-occupancy-grid-subscribers.test.ts` — exact-once folding, pre-wiring seed, leading+trailing throttle behavior (fake timers), store-swap clearing + re-attach, dispose, both error paths, the **settled-scene revision skip** (unchanged revision ⇒ neither sink re-derives) and its **retry-on-failure** guard (a once-throwing refresh is retried on the next same-revision sample, not stuck forever), and **viewer-pose forwarding (Issue B1): the leading-edge refresh carries the sample's pose, the trailing refresh of a burst carries the freshest pose, and a swap does not leak the old store's pose into the new one.**
+- `wire-occupancy-grid-subscribers.test.ts` — exact-once folding, pre-wiring seed, leading+trailing throttle behavior (fake timers), store-swap clearing + re-attach, dispose, both error paths, the **settled-scene revision skip** (unchanged revision ⇒ neither sink re-derives) and its **retry-on-failure** guard (a once-throwing refresh is retried on the next same-revision sample, not stuck forever), **viewer-pose forwarding (Issue B1): the leading-edge refresh carries the sample's pose, the trailing refresh of a burst carries the freshest pose, and a swap does not leak the old store's pose into the new one**, and the **grid-size telemetry** (first-sample baseline, ~30 s throttle, size-less sinks report nothing, throwing callback → `onError`, cadence reset on swap).
 - Call-site forwarding of `refreshIntervalMs` from `depth.intervalMs` (Issue A) is pinned at both wiring sites: `main.occupancy-cubes-wiring.test.ts` (live) and `replay/replay-mode.test.ts` (replay).

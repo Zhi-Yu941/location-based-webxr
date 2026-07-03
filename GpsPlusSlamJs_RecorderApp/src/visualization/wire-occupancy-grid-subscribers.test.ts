@@ -488,4 +488,114 @@ describe('wireOccupancyGridSubscribers', () => {
       dispose();
     });
   });
+
+  describe('grid-size telemetry (Step 0 of the 2026-07-03 long-session fps plan)', () => {
+    // Why these tests matter: the ~30 s cells-over-time log line is the
+    // offline half of the fps attribution — it correlates grid growth with
+    // the stats overlay's fps trend from a single log export. It must be
+    // throttled (a per-sample log would spam a 2 Hz stream) and must never
+    // break the wiring.
+
+    /** Grid spy with a mutable `size` (mirrors `OccupancyGrid.size`). */
+    function makeSizedGridSpy() {
+      const spy = {
+        addSample: vi.fn<(sample: DepthSample) => number>(() => 1),
+        clear: vi.fn<() => void>(),
+        size: 0,
+      };
+      return spy;
+    }
+
+    it('reports grid.size with the first sample, then at most once per interval', () => {
+      const grid = makeSizedGridSpy();
+      const onGridSize = vi.fn();
+      const dispose = wireOccupancyGridSubscribers({
+        storeRef,
+        grid,
+        visualizer: makeVisualizerSpy(),
+        onGridSize,
+      });
+
+      grid.size = 10;
+      storeRef.get().dispatch(recordDepthSample(makeSample(1)));
+      expect(onGridSize).toHaveBeenCalledTimes(1);
+      expect(onGridSize).toHaveBeenLastCalledWith(10);
+
+      // Samples within the 30 s window do not re-report.
+      vi.advanceTimersByTime(10_000);
+      grid.size = 500;
+      storeRef.get().dispatch(recordDepthSample(makeSample(2)));
+      expect(onGridSize).toHaveBeenCalledTimes(1);
+
+      // Crossing the window reports the CURRENT size.
+      vi.advanceTimersByTime(21_000);
+      grid.size = 1234;
+      storeRef.get().dispatch(recordDepthSample(makeSample(3)));
+      expect(onGridSize).toHaveBeenCalledTimes(2);
+      expect(onGridSize).toHaveBeenLastCalledWith(1234);
+
+      dispose();
+    });
+
+    it('does not report for grids without a size, and a throwing callback surfaces via onError without breaking folding', () => {
+      const plainGrid = makeGridSpy(); // no `size` property
+      const onGridSize = vi.fn();
+      const dispose = wireOccupancyGridSubscribers({
+        storeRef,
+        grid: plainGrid,
+        visualizer: makeVisualizerSpy(),
+        onGridSize,
+      });
+      storeRef.get().dispatch(recordDepthSample(makeSample(1)));
+      expect(onGridSize).not.toHaveBeenCalled();
+      dispose();
+
+      const grid = makeSizedGridSpy();
+      const onError = vi.fn();
+      const throwing = vi.fn(() => {
+        throw new Error('telemetry boom');
+      });
+      // Fresh store: the previous wirer's sample survives in the old store and
+      // would be re-seeded on attach, skewing the addSample count.
+      const freshRef = createStoreRef(makeStore());
+      const dispose2 = wireOccupancyGridSubscribers({
+        storeRef: freshRef,
+        grid,
+        visualizer: makeVisualizerSpy(),
+        onGridSize: throwing,
+        onError,
+      });
+      freshRef.get().dispatch(recordDepthSample(makeSample(2)));
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(grid.addSample).toHaveBeenCalledTimes(1);
+      dispose2();
+    });
+
+    it('restarts the telemetry cadence on store swap (new session logs from t0)', () => {
+      const grid = makeSizedGridSpy();
+      const onGridSize = vi.fn();
+      const dispose = wireOccupancyGridSubscribers({
+        storeRef,
+        grid,
+        visualizer: makeVisualizerSpy(),
+        onGridSize,
+      });
+
+      grid.size = 42;
+      storeRef.get().dispatch(recordDepthSample(makeSample(1)));
+      expect(onGridSize).toHaveBeenCalledTimes(1);
+
+      // Swap the store (Start Recording / Replay) shortly after: the fresh
+      // session's first sample must report immediately, not wait out the
+      // previous session's window.
+      vi.advanceTimersByTime(1_000);
+      storeRef.set(makeStore());
+      grid.size = 3;
+      storeRef.get().dispatch(recordDepthSample(makeSample(2)));
+      expect(onGridSize).toHaveBeenCalledTimes(2);
+      expect(onGridSize).toHaveBeenLastCalledWith(3);
+
+      dispose();
+    });
+  });
 });

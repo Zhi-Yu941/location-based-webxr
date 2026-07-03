@@ -1403,6 +1403,20 @@ No errors</pre
                   >Rotate minimap to my heading (heading-up)</span
                 >
               </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="viz-stats-overlay"
+                  class="w-4 h-4 accent-blue-500"
+                />
+                <span class="text-sm text-gray-200"
+                  >Performance stats (FPS / ms / MB) — also in replay</span
+                >
+              </label>
+              <p class="text-[11px] text-gray-400">
+                Stats need the DOM overlay: with "DOM Overlay" disabled under AR
+                crash isolation they can't be shown in AR.
+              </p>
             </div>
           </div>
 

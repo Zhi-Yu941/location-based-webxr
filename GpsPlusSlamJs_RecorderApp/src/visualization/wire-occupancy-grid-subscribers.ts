@@ -27,6 +27,13 @@ import type { ViewerPose } from './occupancy-cubes-visualizer';
 /** Default minimum delay between two visualizer refreshes. */
 const DEFAULT_REFRESH_INTERVAL_MS = 1000;
 
+/**
+ * Minimum delay between two `onGridSize` telemetry reports (Step 0 of the
+ * 2026-07-03 long-session fps plan): frequent enough to draw a cells-over-time
+ * curve, sparse enough not to spam the log export at the 2 Hz sample stream.
+ */
+const GRID_SIZE_TELEMETRY_INTERVAL_MS = 30_000;
+
 /** The part of `OccupancyGrid` this wirer feeds. */
 export interface OccupancyGridSink {
   addSample(sample: DepthSample): number;
@@ -39,6 +46,11 @@ export interface OccupancyGridSink {
    * session). A sink without it always refreshes (prior behaviour).
    */
   getRevision?(): number;
+  /**
+   * Optional occupied-cell count (O(1) on `OccupancyGrid`), read for the
+   * ~30 s `onGridSize` telemetry. A sink without it reports nothing.
+   */
+  readonly size?: number;
 }
 
 export interface WireOccupancyGridSubscribersOptions<
@@ -71,6 +83,14 @@ export interface WireOccupancyGridSubscribersOptions<
   /** Defaults to {@link DEFAULT_REFRESH_INTERVAL_MS}. */
   readonly refreshIntervalMs?: number;
   readonly onError?: (err: unknown) => void;
+  /**
+   * Grid-size telemetry (Step 0 of the 2026-07-03 long-session fps plan):
+   * called with `grid.size` for the first folded sample and then at most once
+   * per ~30 s, so a log export correlates cells-over-time with fps-over-time.
+   * Requires the sink to expose {@link OccupancyGridSink.size}. Best-effort:
+   * a throwing callback surfaces via `onError` and never breaks the wiring.
+   */
+  readonly onGridSize?: (cells: number) => void;
 }
 
 /**
@@ -87,10 +107,14 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
     occluder,
     refreshIntervalMs = DEFAULT_REFRESH_INTERVAL_MS,
     onError,
+    onGridSize,
   } = options;
 
   let disposed = false;
   let lastRefreshTime = -Infinity;
+  // Grid-size telemetry throttle; -Infinity so the first sample reports the
+  // t0 baseline of the cells-over-time curve.
+  let lastGridSizeTime = -Infinity;
   // Occupied-set revision last actually rendered. `null` forces the next refresh
   // (start / after a store swap). Lets a settled grid skip the O(cells) refresh.
   let lastRenderedRevision: number | null = null;
@@ -173,6 +197,19 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
       onError?.(err);
       return;
     }
+    // Cells-over-time telemetry (~30 s cadence). Best-effort like the sinks:
+    // a broken callback must never break the store subscription.
+    if (onGridSize && typeof grid.size === 'number') {
+      const now = Date.now();
+      if (now - lastGridSizeTime >= GRID_SIZE_TELEMETRY_INTERVAL_MS) {
+        lastGridSizeTime = now;
+        try {
+          onGridSize(grid.size);
+        } catch (err) {
+          onError?.(err);
+        }
+      }
+    }
     // Remember where the camera was for this sample so the next refresh can
     // rank cells by distance to the viewer (Issue B1). Updated even when the
     // refresh is throttled, so the trailing refresh uses the freshest pose.
@@ -207,6 +244,8 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
     detach();
     cancelPendingRefresh();
     lastRefreshTime = -Infinity;
+    // New session logs its cells-over-time curve from t0 again.
+    lastGridSizeTime = -Infinity;
     // Force the first refresh of the new store's grid (its revision restarts).
     lastRenderedRevision = null;
     // Drop the stale pose: the new store's samples carry their own, and the

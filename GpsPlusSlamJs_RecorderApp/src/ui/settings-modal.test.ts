@@ -236,6 +236,42 @@ describe('settings-modal', () => {
       expect(html).toContain('id="viz-gps-alignment-markers"');
       expect(html).toContain('id="viz-compass-cubes"');
       expect(html).toContain('id="viz-heading-up-map"');
+      // Step 0 of the 2026-07-03 long-session fps plan: the perf stats
+      // toggle lives in the same section, with the dom-overlay dependency
+      // spelled out (with DOM overlay disabled it cannot composite in AR).
+      expect(html).toContain('id="viz-stats-overlay"');
+      expect(html).toContain('Stats need the DOM overlay');
+    });
+
+    it('populates the stats-overlay checkbox from saved options and updates the working copy', () => {
+      // Why this test matters: statsOverlay is the visualization group's one
+      // OFF-by-default field — the round-trip must preserve an operator's
+      // opt-in and the checkbox must never come up checked by default.
+      localStorageMock.getItem.mockReturnValueOnce(
+        JSON.stringify({ visualization: { statsOverlay: true } })
+      );
+
+      initSettingsModal();
+      showSettingsModal();
+
+      const checkbox = document.getElementById(
+        'viz-stats-overlay'
+      ) as HTMLInputElement;
+      expect(checkbox.checked).toBe(true);
+
+      checkbox.checked = false;
+      checkbox.dispatchEvent(new Event('change'));
+      expect(getWorkingOptions()?.visualization.statsOverlay).toBe(false);
+    });
+
+    it('defaults the stats-overlay checkbox to off (debug tool, off by default)', () => {
+      localStorageMock.getItem.mockReturnValueOnce(JSON.stringify({}));
+      initSettingsModal();
+      showSettingsModal();
+      const checkbox = document.getElementById(
+        'viz-stats-overlay'
+      ) as HTMLInputElement;
+      expect(checkbox.checked).toBe(false);
     });
 
     it('includes "Clear Reference Point Cache" button', () => {

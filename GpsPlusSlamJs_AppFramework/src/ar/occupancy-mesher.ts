@@ -348,8 +348,11 @@ export function meshOccupiedCells(
   }
 
   return {
-    positions: Float32Array.from(positions),
-    indices: Uint32Array.from(indices),
+    // `new Float32Array(arr)` is the idiomatic (and faster) construction from a
+    // plain number[]; `.from` adds general-iterable + map-fn overhead for the
+    // same bytes.
+    positions: new Float32Array(positions),
+    indices: new Uint32Array(indices),
     aabbs,
   };
 }

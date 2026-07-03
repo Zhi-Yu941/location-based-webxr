@@ -41,9 +41,14 @@ Plan: `GpsPlusSlamJs_Docs/docs/2026-06-11-depth-occupancy-grid-port-plan.md`.
 
 ```ts
 const grid = new OccupancyGrid();
-storeRef.get().subscribe(() => {
+let last: DepthSample | null = null;
+const store = storeRef.get();
+store.subscribe(() => {
   const sample = selectLatestDepthSample(store.getState());
-  if (sample && sample !== last) grid.addSample(sample);
+  if (sample && sample !== last) {
+    last = sample;
+    grid.addSample(sample);
+  }
 });
 const cells = grid.getOccupiedCells(2); // noise-filtered
 const hit = grid.raycast(cameraPos, forwardPoint); // cursor placement

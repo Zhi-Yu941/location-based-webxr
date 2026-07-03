@@ -5,7 +5,7 @@
 Integration test that replays real field-test recordings (zip files
 under `gps-plus-slam/TestDataJs*/`) through a production-shaped
 `createSlamAppStore` and asserts that the observations documented in the
-[2026-05-23 user-feedback doc](../../../../GpsPlusSlamJs_Docs/docs/2026-05-23-tracking-quality-hud-user-feedback.md)
+[2026-05-23 user-feedback doc](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-23-tracking-quality-hud-user-feedback.md)
 are reproducible from the recorded data. It is the executable spec for
 "fixed" — after each Finding-N fix lands, the relevant assertion is
 flipped to its post-fix expectation.

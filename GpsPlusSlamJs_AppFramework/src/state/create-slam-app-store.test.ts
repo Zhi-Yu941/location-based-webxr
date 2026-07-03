@@ -1,7 +1,7 @@
 ﻿/**
  * Tests for `createSlamAppStore` — the framework's composable Redux store
  * factory introduced in Iter 1 of the AppFramework/RecorderApp boundary
- * migration ([plan](../../../../GpsPlusSlamJs_Docs/docs/2026-05-03-appframework-vs-recorderapp-boundary-analysis.md)).
+ * migration ([plan](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-03-appframework-vs-recorderapp-boundary-analysis.md)).
  *
  * The factory replaces `createRecorderStore` for non-recorder consumers.
  * It wires:

@@ -36,7 +36,7 @@ scene (GPS world frame — NUE: X=North, Y=Up, Z=East)
 
 - `arWorldGroup` local space is **NUE** — objects added here use `[1,0,0]`=North, `[0,0,1]`=East.
   `applyAlignmentMatrix(m)` writes `m` directly to `arWorldGroup.matrix` (no WEBXR_TO_NUE composition).
-  **`arWorldGroup.matrix` carries the alignment (GPS→AR), and that is what GPS-registers the view:**
+  **`arWorldGroup.matrix` carries the alignment (AR/odometry-NUE → GPS-world NUE), and that is what GPS-registers the view:**
   the camera (a descendant) and every GPS anchor parented under `arWorldGroup` ride the alignment
   together. Apps apply it via `enableArWorldGroupAlignment({ store, arWorldGroup })`
   (smoothly lerped); the recorder drives its own lerper into `applyAlignmentMatrix`. GPS anchors

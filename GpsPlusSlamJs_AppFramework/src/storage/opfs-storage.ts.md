@@ -103,7 +103,7 @@ const { available, used } = await checkStorageQuota();
 2. `createSession()` must be called before `writeAction()`/`writeFrame()`
 3. Action indices are 1-based and zero-padded to 6 digits (000001.json)
 4. Frame filenames follow the pattern `frame-{index}.jpg`
-5. Session folders are named `recording-{ISO-timestamp}utc`. The timestamp is whole-second resolution, so `createSession()` probes for an existing directory and appends a numeric suffix (`-2`, `-3`, …) on collision — two recordings started within the same UTC second get distinct directories instead of silently reusing and mixing one. The first session in a given second keeps the bare timestamp name.
+5. Session folders are named `recording-YYYY-MM-DD_HH-MM-SSutc` (an underscore/dash-separated UTC stamp, NOT ISO 8601 — colons are illegal in directory names). The timestamp is whole-second resolution, so `createSession()` probes for an existing directory and appends a numeric suffix (`-2`, `-3`, …) on collision — two recordings started within the same UTC second get distinct directories instead of silently reusing and mixing one. The first session in a given second keeps the bare timestamp name.
 6. All write operations use `safeWriteToFile()` helper which guarantees `FileSystemWritableFileStream` cleanup. On write/close errors, it captures the original error, attempts `writable.abort()` in a separate try/catch (so abort failures cannot mask the original error), and then rethrows the original error.
 
 ## Error Modes

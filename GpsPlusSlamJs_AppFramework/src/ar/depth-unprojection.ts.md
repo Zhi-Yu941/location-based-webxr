@@ -31,7 +31,9 @@ const worldPoint = unprojectDepthPoint(
   sample.cameraRot,
   sample.projectionMatrix
 );
-if (worldPoint) grid.addPoint(worldPoint);
+if (worldPoint) worldPoints.push(worldPoint);
+// (Grid folding goes through `grid.addSample(sample)`, which unprojects
+// every point of the sample itself via createDepthUnprojector.)
 ```
 
 ## Tests

@@ -29,8 +29,8 @@ construction**, with no `queueMicrotask` / re-entrancy guard to hand-maintain.
 
 See the full analysis and plan:
 
-- [`2026-06-28-subscriber-dispatch-persistence-ordering-review.md`](../../../../GpsPlusSlamJs_Docs/docs/2026-06-28-subscriber-dispatch-persistence-ordering-review.md)
-- [`2026-06-28-subscriber-dispatch-persistence-ordering-plan.md`](../../../../GpsPlusSlamJs_Docs/docs/2026-06-28-subscriber-dispatch-persistence-ordering-plan.md)
+- [`2026-06-28-subscriber-dispatch-persistence-ordering-review.md`](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-28-subscriber-dispatch-persistence-ordering-review.md)
+- [`2026-06-28-subscriber-dispatch-persistence-ordering-plan.md`](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-28-subscriber-dispatch-persistence-ordering-plan.md)
 
 ## Public API
 

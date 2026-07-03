@@ -6,15 +6,15 @@ Redux Toolkit slice for recorder session management. Extracted from inline code 
 
 ## Public API
 
-| Export               | Kind           | Description                                                                                          |
-| -------------------- | -------------- | ---------------------------------------------------------------------------------------------------- |
-| `RecordingState`     | Type           | Shape of the `recorder` state slice                                                                  |
-| `SessionMetadata`    | Type           | Session metadata: scenario name, session name, start time, etc.                                      |
-| `recordingReducer`   | Reducer        | RTK slice reducer for `recorder/*` actions                                                           |
-| `startSession`       | Action creator | `recorder/startSession` — sets `isRecording = true`, stores metadata, resets counters                |
-| `endSession`         | Action creator | `recorder/endSession` — sets `isRecording = false`                                                   |
-| `recordDepthSample`  | Action creator | `recorder/recordDepthSample` — stores the latest sample in `latestDepthSample`; persisted for replay |
-| `recordWriteFailure` | Action creator | `recorder/recordWriteFailure` — increments `failedWriteCount`                                        |
+| Export               | Kind           | Description                                                                                           |
+| -------------------- | -------------- | ----------------------------------------------------------------------------------------------------- |
+| `RecordingState`     | Type           | Shape of the `recorder` state slice                                                                   |
+| `SessionMetadata`    | Type           | Session metadata: scenario name, session name, start time, etc.                                       |
+| `recordingReducer`   | Reducer        | RTK slice reducer for `recording/*` actions                                                           |
+| `startSession`       | Action creator | `recording/startSession` — sets `isRecording = true`, stores metadata, resets counters                |
+| `endSession`         | Action creator | `recording/endSession` — sets `isRecording = false`                                                   |
+| `recordDepthSample`  | Action creator | `recording/recordDepthSample` — stores the latest sample in `latestDepthSample`; persisted for replay |
+| `recordWriteFailure` | Action creator | `recording/recordWriteFailure` — increments `failedWriteCount`                                        |
 
 ## Invariants & Assumptions
 

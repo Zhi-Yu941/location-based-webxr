@@ -67,7 +67,7 @@ was the alignment-frame bug
 ## Examples
 
 ```ts
-import { nueToArLocal } from './frame-conversions.js';
+import { nueToArLocal, worldNueToGps } from './frame-conversions.js';
 
 // GpsAnchor steady-state: place a child of arWorldGroup at a GPS-world point.
 const local = nueToArLocal(getAlignmentMatrix(), nue, scratchTarget);

@@ -1,7 +1,7 @@
 /**
  * Integration test — reproduces field-test findings from recorded sessions.
  *
- * See [2026-05-23-tracking-quality-hud-user-feedback.md](../../../../GpsPlusSlamJs_Docs/docs/2026-05-23-tracking-quality-hud-user-feedback.md)
+ * See [2026-05-23-tracking-quality-hud-user-feedback.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-23-tracking-quality-hud-user-feedback.md)
  * §3 for the full plan. This test loads two real field-test recordings,
  * replays them through a production-shaped `createSlamAppStore`, and
  * asserts the observations documented in Findings 1–4 are reproducible.

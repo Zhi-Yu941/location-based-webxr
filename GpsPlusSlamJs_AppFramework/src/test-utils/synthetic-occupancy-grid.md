@@ -30,9 +30,11 @@ skipped in CI.
 - **Exact placement via identity projection.** Camera at the origin, identity
   rotation, identity projection ⇒ `depth-unprojection.ts` collapses to
   `world = ((2·sx−1)·D, (1−2·sy)·D, −D)`, `D = depthM`. The builder inverts this
-  to place each cell's point exactly. The slab is pushed to `kBase = −(A+C+16)`
+  to place each cell's point exactly. The slab is pushed to `kBase = −(A+B+C+16)`
   in −Z so every `screenX/screenY ∈ [0,1]` (the only constraint identity
-  projection imposes).
+  projection imposes). The budget covers BOTH transverse dimensions (A = width,
+  B = thickness) — budgeting only A once made a tall slab trip the loud view
+  guard (PR #145 review; pinned by `synthetic-occupancy-grid.test.ts`).
 - **Carving disabled.** `carveStopCells = MAX_TRACE_STEPS`, so `carve()` visits
   only the origin cell (never a surface cell) and returns — the placed surface is
   _exactly_ the intended cells and construction stays cheap.

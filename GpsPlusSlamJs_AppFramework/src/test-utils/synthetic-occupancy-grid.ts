@@ -158,8 +158,11 @@ export function buildSyntheticSurfaceGrid(
   }
 
   // Push the slab into −Z far enough that every screen coordinate stays in
-  // [0,1] (needs |worldZ| ≥ |worldX|,|worldY|; worldX,worldY ≤ (A,B)·cellSize).
-  const kBase = -(A + C + 16);
+  // [0,1] (needs |worldZ| ≥ |worldX|,|worldY| at the NEAREST cell, so the
+  // budget must cover BOTH transverse dimensions — worldX ≤ A·cellSize and
+  // worldY ≤ B·cellSize. Budgeting only A once tripped the loud view guard
+  // below for a tall slab, PR #145 review).
+  const kBase = -(A + B + C + 16);
 
   // Disable carving: a stop distance above any ray's span means carve() visits
   // only the origin cell (never a surface cell) and returns — cheap, and the

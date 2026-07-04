@@ -32,6 +32,10 @@
 
 import type { Vector3 } from 'gps-plus-slam-js';
 import type { GridCell } from './bresenham3d';
+import {
+  HALF_LATTICE_CELL_KEY_LIMIT,
+  packCellKey as cellKey,
+} from './cell-key';
 
 /**
  * An axis-aligned bounding box for one occupied cell (or, after greedy merge, a
@@ -214,28 +218,16 @@ const FACES: readonly FaceSpec[] = [
   },
 ];
 
-// Numeric cell key — packs three integer coordinates into ONE safe-integer
-// Map/Set key, avoiding the per-lookup string allocation that dominated the
-// mesher hot loops (millions of neighbour tests + vertex-weld lookups). Valid
-// for `|coord| ≤ CELL_KEY_LIMIT`; that bound also keeps every DERIVED key in
-// range — neighbours (±1), dual-cell bases (−1) and corner-fit half-lattice keys
-// (`2·coord ± 1`, hence the 2× headroom in the field width) all stay inside one
-// 17-bit field, so the packed key never exceeds 2^53. At 0.15 m cells the limit
-// spans ±4.9 km — far beyond any real scene; `meshOccupiedCells` skips cells
-// outside it (alongside the non-finite skip), guaranteeing every internal key is
-// packable and collision-free.
-const CELL_KEY_LIMIT = 32767;
-const KEY_OFFSET = 65536; // 2^16 — shifts a packable field to non-negative
-const KEY_FIELD = 131072; // 2^17 — width of one packed coordinate field
-const KEY_FIELD_SQ = KEY_FIELD * KEY_FIELD; // 2^34
-
-function cellKey(x: number, y: number, z: number): number {
-  return (
-    (x + KEY_OFFSET) * KEY_FIELD_SQ +
-    (y + KEY_OFFSET) * KEY_FIELD +
-    (z + KEY_OFFSET)
-  );
-}
+// Numeric cell key — the shared packed-key implementation (`cell-key.ts`, one
+// packer for grid + meshers + worker since the 2026-07-04 consolidation),
+// avoiding the per-lookup string allocation that dominated the mesher hot
+// loops (millions of neighbour tests + vertex-weld lookups). The mesher uses
+// the tighter HALF_LATTICE tier (±32 767): it also keys DERIVED coordinates —
+// neighbours (±1), dual-cell bases (−1) and corner-fit half-lattice keys
+// (`2·coord ± 1`) — which must stay inside the same 17-bit field. At 0.15 m
+// cells the limit spans ±4.9 km — far beyond any real scene;
+// `meshOccupiedCells` skips cells outside it (alongside the non-finite skip),
+// guaranteeing every internal key is packable and collision-free.
 
 /** Finite, integer, and within the packable key range on every axis.
  *  `Number.isInteger` subsumes the finiteness check (NaN/±Infinity are not
@@ -245,7 +237,7 @@ function cellKey(x: number, y: number, z: number): number {
 function isPackableCell(cell: GridCell): boolean {
   for (let i = 0; i < 3; i++) {
     const c = cell[i]!;
-    if (!Number.isInteger(c) || Math.abs(c) > CELL_KEY_LIMIT) {
+    if (!Number.isInteger(c) || Math.abs(c) > HALF_LATTICE_CELL_KEY_LIMIT) {
       return false;
     }
   }

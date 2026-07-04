@@ -26,6 +26,13 @@ import type { Vector3 } from 'gps-plus-slam-js';
 import type { DepthSample, RgbTuple } from '../types/ar-types';
 import { createDepthUnprojector } from './depth-unprojection';
 import { bresenham3d, type GridCell } from './bresenham3d';
+import {
+  CELL_KEY_LIMIT,
+  cellCoordsInKeyRange,
+  cellKey,
+  unpackCellCoord,
+  unpackCellKey,
+} from './cell-key';
 
 export interface OccupancyGridOptions {
   /** Edge length of a cubic grid cell in meters. Default 0.15 (Unity parity). */
@@ -684,61 +691,17 @@ export class OccupancyGrid {
   }
 }
 
-// Numeric cell key — packs three integer coordinates into ONE safe-integer Map
-// key, avoiding the per-lookup string allocation in the addSample / carve hot
-// paths (one per point + one per carved cell). Three 17-bit fields keep the
-// packed key under 2^53, so `|coord|` must be `≤ CELL_KEY_LIMIT`; at the 0.15 m
-// default that spans ±9.8 km from the origin — far beyond any real session — and
-// `addSample` skips points whose cell falls outside it, so every stored key is
-// packable and collision-free.
-const CELL_KEY_LIMIT = 65535;
-const KEY_OFFSET = 65536; // 2^16 — shift a packable coordinate to non-negative
-const KEY_FIELD = 131072; // 2^17 — width of one packed field
-const KEY_FIELD_SQ = KEY_FIELD * KEY_FIELD; // 2^34
+// Numeric cell key — the shared packed-key implementation (cell-key.ts, one
+// packer for grid + meshers + worker since the 2026-07-04 consolidation).
+// `|coord|` must be `≤ CELL_KEY_LIMIT` (±65 535 ≈ ±9.8 km at the 0.15 m
+// default — far beyond any real session); `addSample` skips points whose cell
+// falls outside it, so every stored key is packable and collision-free. The
+// pack/unpack pair stays re-exported here (public grid API since Step 3.1 of
+// the 2026-07-03 fps plan, property-tested as exact inverses).
+export { cellKey, unpackCellKey } from './cell-key';
 
 function cellInKeyRange(cell: GridCell): boolean {
-  return (
-    Math.abs(cell[0]) <= CELL_KEY_LIMIT &&
-    Math.abs(cell[1]) <= CELL_KEY_LIMIT &&
-    Math.abs(cell[2]) <= CELL_KEY_LIMIT
-  );
-}
-
-/**
- * Pack a cell into the numeric Map key. Exported (Step 3.1 of the 2026-07-03
- * fps plan) together with {@link unpackCellKey} — the pair is property-tested
- * as exact inverses over the full ±65 535 envelope (pr145 §1).
- */
-export function cellKey(cell: GridCell): number {
-  return (
-    (cell[0] + KEY_OFFSET) * KEY_FIELD_SQ +
-    (cell[1] + KEY_OFFSET) * KEY_FIELD +
-    (cell[2] + KEY_OFFSET)
-  );
-}
-
-/** One axis of {@link unpackCellKey} without allocating the tuple (hot paths). */
-function unpackCellCoord(key: number, axis: 0 | 1 | 2): number {
-  if (axis === 0) {
-    return Math.floor(key / KEY_FIELD_SQ) - KEY_OFFSET;
-  }
-  if (axis === 1) {
-    return (Math.floor(key / KEY_FIELD) % KEY_FIELD) - KEY_OFFSET;
-  }
-  return (key % KEY_FIELD) - KEY_OFFSET;
-}
-
-/**
- * Exact inverse of {@link cellKey}. Since Step 3.1 the per-cell records no
- * longer store their coordinate tuple — every tuple a public API returns is
- * recovered from the key through this function.
- */
-export function unpackCellKey(key: number): GridCell {
-  return [
-    unpackCellCoord(key, 0),
-    unpackCellCoord(key, 1),
-    unpackCellCoord(key, 2),
-  ];
+  return cellCoordsInKeyRange(cell, CELL_KEY_LIMIT);
 }
 
 // --- Chunk index (Step 2 of the 2026-07-03 long-session fps plan) ---

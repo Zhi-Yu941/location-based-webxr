@@ -20,6 +20,7 @@
 
 import type { Vector3 } from 'gps-plus-slam-js';
 import type { GridCell } from './bresenham3d';
+import { packCellKey as packKey } from './cell-key';
 import { meshOccupiedCells, type MeshMode } from './occupancy-mesher';
 
 /** Main-thread → worker: an occupied-cell snapshot to mesh. */
@@ -50,16 +51,9 @@ function needsCentroids(mode: MeshMode): boolean {
   return mode === 'smooth' || mode === 'corner-fit';
 }
 
-// Local numeric cell key (parallel-array lookup in the worker). Matches the
-// mesher's packable range (|coord| ≤ 32767); only ever called for in-range cells.
-const K_OFFSET = 65536;
-const K_FIELD = 131072;
-const K_FIELD_SQ = K_FIELD * K_FIELD;
-function packKey(x: number, y: number, z: number): number {
-  return (
-    (x + K_OFFSET) * K_FIELD_SQ + (y + K_OFFSET) * K_FIELD + (z + K_OFFSET)
-  );
-}
+// Numeric cell key for the worker's parallel-array centroid lookup — the
+// shared implementation (`cell-key.ts`); only ever called for cells inside the
+// mesher's HALF_LATTICE tier, so the keys are collision-free.
 
 /**
  * Pack an occupied-cell snapshot into a transferable {@link MeshWorkerRequest}

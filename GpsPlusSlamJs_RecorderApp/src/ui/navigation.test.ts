@@ -584,6 +584,104 @@ describe('Screen Navigation (Phase 2)', () => {
     });
   });
 
+  describe('F4 regression: programmatic popModalState must not trigger screen-back', () => {
+    // Why these tests matter: confirming the ref-point name dialog calls
+    // popModalState(), whose history.back() fires an ASYNC popstate. By the
+    // time it arrives, modalStatePushed is already false, so the handler used
+    // to fall through to the screen branch and open the "Stop recording?"
+    // confirm on every ref-point confirm (F4 in
+    // docs/2026-07-04-ar-clipping-planes-and-lifecycle-user-feedback.md).
+    // popModalState() must arm a one-shot guard that swallows exactly that
+    // self-induced popstate — and nothing else.
+
+    function createCallbacks(): NavigationCallbacks {
+      return {
+        onCloseModal: vi.fn(),
+        onBackToSetup: vi.fn(),
+        onBackFromSummary: vi.fn(),
+        onBackDuringRecording: vi.fn(),
+      };
+    }
+
+    it('swallows the self-induced popstate after popModalState during recording (bug repro)', () => {
+      const cbs = createCallbacks();
+      initNavigation(cbs, store);
+      pushScreenState('ar');
+      pushScreenState('recording');
+      pushModalState(); // picker opens
+      popModalState(); // picker Confirm/Cancel button → programmatic close
+
+      // The async popstate that history.back() triggers arrives later:
+      window.dispatchEvent(new PopStateEvent('popstate', { state: null }));
+
+      // Neither the screen branch (the bug) nor the modal branch (the caller
+      // already closed the modal) may fire.
+      expect(cbs.onBackDuringRecording).not.toHaveBeenCalled();
+      expect(cbs.onCloseModal).not.toHaveBeenCalled();
+      expect(getCurrentScreen()).toBe('recording');
+    });
+
+    it('guard is one-shot: a subsequent user back during recording still delegates', () => {
+      const cbs = createCallbacks();
+      initNavigation(cbs, store);
+      pushScreenState('recording');
+      pushModalState();
+      popModalState();
+
+      // Self-induced popstate — swallowed.
+      window.dispatchEvent(new PopStateEvent('popstate', { state: null }));
+      // Real user back gesture afterwards — must reach the screen branch.
+      window.dispatchEvent(new PopStateEvent('popstate', { state: null }));
+
+      expect(cbs.onBackDuringRecording).toHaveBeenCalledOnce();
+    });
+
+    it('user back gesture with modal open (no popModalState) still closes the modal', () => {
+      const cbs = createCallbacks();
+      initNavigation(cbs, store);
+      pushScreenState('recording');
+      pushModalState();
+
+      // Browser back — the guard must NOT be armed on this path.
+      window.dispatchEvent(new PopStateEvent('popstate', { state: null }));
+
+      expect(cbs.onCloseModal).toHaveBeenCalledOnce();
+      expect(cbs.onBackDuringRecording).not.toHaveBeenCalled();
+    });
+
+    it('popModalState with nothing pushed arms no guard: next back still delegates', () => {
+      const cbs = createCallbacks();
+      initNavigation(cbs, store);
+      pushScreenState('recording');
+      popModalState(); // no-op — nothing was pushed
+
+      window.dispatchEvent(new PopStateEvent('popstate', { state: null }));
+
+      expect(cbs.onBackDuringRecording).toHaveBeenCalledOnce();
+    });
+
+    it('destroyNavigation clears a pending guard so a re-init does not swallow a real back', () => {
+      // Why: if the one-shot guard survived teardown (e.g. popModalState's
+      // popstate never arrived before destroy), the first genuine back press
+      // after re-initialization would be silently ignored.
+      const cbs = createCallbacks();
+      initNavigation(cbs, store);
+      pushScreenState('recording');
+      pushModalState();
+      popModalState(); // guard armed, popstate never delivered
+
+      destroyNavigation();
+      const store2 = createTestStore();
+      const cbs2 = createCallbacks();
+      initNavigation(cbs2, store2);
+      pushScreenState('recording');
+
+      window.dispatchEvent(new PopStateEvent('popstate', { state: null }));
+
+      expect(cbs2.onBackDuringRecording).toHaveBeenCalledOnce();
+    });
+  });
+
   describe('Bug 9 regression: navigation must follow store replacement', () => {
     // Why: navigation.ts stored a direct store reference from initNavigation.
     // When main.ts replaced the store on soft reset (store = createNewStore()),

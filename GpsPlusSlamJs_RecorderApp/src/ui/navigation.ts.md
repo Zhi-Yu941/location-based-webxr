@@ -27,6 +27,14 @@ and prevents accidental page exits during recording.
 
 - `pushModalState` is idempotent — duplicate calls are ignored.
 - `popModalState` is a no-op when no state was pushed.
+- **Programmatic history cleanup never re-enters screen-back logic** (F4,
+  [2026-07-04 user feedback](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-04-ar-clipping-planes-and-lifecycle-user-feedback.md)):
+  `popModalState()` arms a one-shot `suppressNextPopstate` guard right before
+  its `history.back()`; the handler consumes the guard as Priority 0 and
+  ignores exactly that self-induced popstate. Accepted edge: a real user back
+  landing in the microsecond window between `popModalState()` and its popstate
+  delivery is swallowed — one ignored back press, benign. The guard is cleared
+  by `destroyNavigation()` so it cannot leak across re-initialization.
 - Popstate handler prioritizes modal close over screen navigation.
 - Screen state (`currentScreen`) lives in Redux via
   `routing-slice.ts`, not a module-level variable (Bug 2 fix).
@@ -63,9 +71,11 @@ console.log(getCurrentScreen()); // 'ar'
 
 ## Tests
 
-- `navigation.test.ts` — 43 tests covering:
+- `navigation.test.ts` — 48 tests covering:
   - Modal state push/pop idempotence
   - Screen transitions and popstate handling
   - Priority: modal close > screen back
   - Bug 2 regression: Redux store sync verification
   - Bug 9 regression: store getter resolves current store after replacement
+  - F4 regression: the self-induced popstate after `popModalState()` is
+    swallowed (one-shot), user-back paths and re-init are unaffected

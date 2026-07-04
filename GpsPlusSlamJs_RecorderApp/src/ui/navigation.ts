@@ -35,6 +35,9 @@
  * - pushModalState is idempotent (won't push twice if already pushed)
  * - popModalState is a no-op when no state was pushed (prevents double-pop on
  *   back-button path, where the browser already popped the entry)
+ * - Programmatic history cleanup never re-enters screen-back logic: the
+ *   popstate fired by popModalState()'s own history.back() is swallowed by a
+ *   one-shot guard (F4, 2026-07-04 user feedback)
  * - popstate handler prioritizes modal close over screen navigation
  * - Back during recording delegates to onBackDuringRecording (fire-and-forget)
  * - Back from AR calls onBackToSetup; back from summary calls onBackFromSummary
@@ -99,6 +102,21 @@ export interface NavigationCallbacks {
 let modalStatePushed = false;
 
 /**
+ * One-shot guard armed by `popModalState()` just before its `history.back()`.
+ * That back() fires an ASYNC popstate; by the time it arrives,
+ * `modalStatePushed` is already false, so without the guard the handler
+ * misclassified the programmatic cleanup as a user back gesture and (during
+ * recording) opened the "Stop recording?" confirm on every ref-point confirm.
+ * F4 in docs/2026-07-04-ar-clipping-planes-and-lifecycle-user-feedback.md.
+ *
+ * Invariant: programmatic history cleanup never re-enters screen-back logic.
+ * Known accepted edge: a real user back landing in the microsecond window
+ * between popModalState() and its popstate delivery is swallowed (one ignored
+ * back press — benign).
+ */
+let suppressNextPopstate = false;
+
+/**
  * Store getter for reading/writing screen state via Redux.
  * Bug 2 fix: replaces the module-level `currentScreen` variable.
  * Bug 9 fix: changed from direct reference to getter to support store replacement.
@@ -140,6 +158,7 @@ export function popModalState(): void {
     return;
   }
   modalStatePushed = false;
+  suppressNextPopstate = true;
   history.back();
   log.info('Popped modal history state via history.back()');
 }
@@ -253,6 +272,14 @@ export function initNavigation(
   navigationStoreGetter = typeof store === 'function' ? store : () => store;
 
   popstateHandler = (_event: PopStateEvent) => {
+    // Priority 0: swallow the self-induced popstate from popModalState()'s
+    // history.back() — one-shot, see suppressNextPopstate above (F4).
+    if (suppressNextPopstate) {
+      suppressNextPopstate = false;
+      log.info('Ignoring self-induced popstate from popModalState()');
+      return;
+    }
+
     // Priority 1: Modal close (Phase 1)
     if (modalStatePushed) {
       modalStatePushed = false;
@@ -341,6 +368,7 @@ export function destroyNavigation(): void {
   }
   disableBeforeUnloadWarning();
   modalStatePushed = false;
+  suppressNextPopstate = false;
   // Reset screen state to setup before clearing store reference
   const store = getNavigationStore();
   if (store) {

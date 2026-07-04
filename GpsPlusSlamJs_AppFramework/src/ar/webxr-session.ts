@@ -745,6 +745,24 @@ export async function isWebXRSupported(): Promise<boolean> {
 }
 
 /**
+ * AR camera frustum constants — the single source of truth for live AR and
+ * replay (both build their camera via {@link createSceneHierarchy}).
+ *
+ * F2 (2026-07-04 user feedback): far raised 100 → 200 m so objects in the
+ * reported 100–200 m range are no longer frustum-culled. The far-plane
+ * distance itself is essentially free at this app's object counts; the real
+ * constraint is depth precision — far/near = 2×10⁴ is comfortable for a
+ * 24-bit depth buffer. Revisit the ratio if AR_CAMERA_NEAR ever shrinks.
+ *
+ * Note: these apply to WebGL content only. The CSS3D minimap is composited by
+ * the browser from the camera fov alone — near/far do not clip it (F1 in the
+ * same feedback doc).
+ */
+export const AR_CAMERA_FOV = 70;
+export const AR_CAMERA_NEAR = 0.01;
+export const AR_CAMERA_FAR = 200;
+
+/**
  * Create the scene hierarchy with proper AR/GPS frame separation.
  * This is a pure function for testability.
  *
@@ -816,10 +834,10 @@ export function createSceneHierarchy(): {
   // Its world transform = arWorldGroup.matrix × basisChangeNode.matrix × arpose.matrix × camera.matrix
   //                     = alignment × WEBXR_TO_NUE × arpose × camera  (mathematically identical to before)
   const newCamera = new THREE.PerspectiveCamera(
-    70,
+    AR_CAMERA_FOV,
     window.innerWidth / window.innerHeight,
-    0.01,
-    100
+    AR_CAMERA_NEAR,
+    AR_CAMERA_FAR
   );
   newArPose.add(newCamera);
 

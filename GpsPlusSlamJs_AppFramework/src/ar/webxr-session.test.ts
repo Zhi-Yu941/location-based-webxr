@@ -54,6 +54,9 @@ import {
   setFrameCallback,
   getLiveCss3dManager,
   getDepthInfoFromFrame,
+  AR_CAMERA_FOV,
+  AR_CAMERA_NEAR,
+  AR_CAMERA_FAR,
   type ARPose,
 } from './webxr-session.js';
 import { createMockPose } from '../test-utils/browser-mocks.js';
@@ -526,6 +529,26 @@ describe('createSceneHierarchy', () => {
     expect(basisChangeNode.parent).toBe(arWorldGroup);
     expect(arWorldGroup.parent).toBe(scene);
     expect(scene.parent).toBeNull();
+  });
+
+  /**
+   * Why this test matters:
+   * F2 (2026-07-04 user feedback): objects 100–200 m away popped in late
+   * because the far plane was a hard-coded literal 100 in the camera
+   * constructor. The frustum values are named exported constants (a single
+   * source of truth — live AR and replay both go through
+   * createSceneHierarchy()), and far is 200 m to cover the reported range.
+   * Depth precision stays comfortable: far/near = 2×10⁴ on a 24-bit buffer.
+   */
+  it('camera frustum uses the exported AR_CAMERA_* constants with far = 200 m (F2)', () => {
+    const { camera } = createSceneHierarchy();
+
+    expect(AR_CAMERA_FOV).toBe(70);
+    expect(AR_CAMERA_NEAR).toBe(0.01);
+    expect(AR_CAMERA_FAR).toBe(200);
+    expect(camera.fov).toBe(AR_CAMERA_FOV);
+    expect(camera.near).toBe(AR_CAMERA_NEAR);
+    expect(camera.far).toBe(AR_CAMERA_FAR);
   });
 
   /**

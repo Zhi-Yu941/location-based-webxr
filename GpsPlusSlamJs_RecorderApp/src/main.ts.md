@@ -10,7 +10,7 @@ This module is the entry point that runs on page load. It also exports the follo
 
 | Export                                   | Type                     | Description                                                                                                                                                                            |
 | ---------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `resetForNewRecording()`                 | `async () => void`       | Orchestrates soft reset: tears down current session (store, trackers, sync, map), creates fresh store, resets storage/UI state, and checks if read folder permission is still granted. |
+| `resetForNewRecording()`                 | `async () => void`       | Orchestrates soft reset: tears down current session (store, trackers, sync, map), ends the WebXR session (best-effort — a rejected end is logged and the reset continues; required because `initAR()` throws on a live session, so the next Enter AR must start clean), creates fresh store, resets storage/UI state, and checks if read folder permission is still granted. |
 | `getImportedRefPoints()`                 | `() => KnownGeoAnchor[]` | Returns the sidecar-imported known anchors (entries with `timestamp === 0`) from the flat `refPoints` slice via `selectImportedKnownAnchors`. Test-only seam.                          |
 | `setImportedRefPointsForTesting(points)` | `(points) => void`       | Dispatches `setImportedRefPointEntries` into the flat `refPoints` slice; each input becomes a `RefPointEntry` with `timestamp: 0` (sidecar marker). Test-only.                         |
 | `setCurrentScenarioName(name)`           | `(string) => void`       | Sets current scenario name (test-only).                                                                                                                                                |
@@ -106,11 +106,14 @@ import './main';
   - Session summary data collection
   - Progress tracking (frame/action counters)
   - Reference point deduplication (imported + scenario)
-  - **Soft reset** (Issue 4): 5 tests for `resetForNewRecording()`:
+  - **Soft reset** (Issue 4): tests for `resetForNewRecording()`:
     - Calls all cleanup functions (hideSessionSummary, resetForNewSession, etc.)
     - Creates a fresh store
     - Keeps folder when read permission still granted
     - Clears folder + imported ref points when permission lost
     - Graceful handling of permission check returning false
+    - Ends the WebXR session exactly once (so the next Enter AR passes the
+      `initAR()` re-entry guard) and completes the reset even when
+      `endARSession()` rejects
 - E2E tests in `playwright-tests/smoke.spec.js` verify the page loads
 - E2E tests in `playwright-tests/session-summary.spec.js` verify post-recording summary

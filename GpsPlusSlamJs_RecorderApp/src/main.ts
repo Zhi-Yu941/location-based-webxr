@@ -753,12 +753,15 @@ export function getReplaySessionEntriesForTesting(): SessionEntry[] {
  * Preserves:
  * - Read folder handle (so user doesn't re-select the folder)
  * - Imported reference points (loaded from the read folder)
- * - AR/WebXR session (stays alive, user returns to AR_READY)
  * - Recording options (user settings from localStorage)
  * - OPFS root/scenarios directory handles (storage stays initialized)
  * - Logger subscribers and buffer
  *
  * Resets:
+ * - AR/WebXR session (ended — the setup screen requires Enter AR again, and
+ *   initAR() throws on a live session, so a preserved session would make the
+ *   first Enter AR after the reset fail; see
+ *   GpsPlusSlamJs_Docs docs/2026-07-04-soft-reset-end-ar-session-plan.md)
  * - Store (fresh Redux store for new session)
  * - Session/scenario names
  * - Sync manager, trackers, map overlay
@@ -779,6 +782,17 @@ export async function resetForNewRecording(): Promise<void> {
   if (mapOverlay) {
     mapOverlay.dispose();
     mapOverlay = null;
+  }
+
+  // End the WebXR session so the next Enter AR initializes cleanly (initAR
+  // rejects while a session is live). Fires the framework session-end
+  // callback with requestedByApp: true, which the system-session-end handler
+  // deliberately ignores. Best-effort: a rejected end must not abort the
+  // reset — endARSession() leaves the framework re-initialisable either way.
+  try {
+    await endARSession();
+  } catch (err) {
+    log.warn('Ending AR session during soft reset failed; continuing:', err);
   }
 
   // Reset recording-level counters

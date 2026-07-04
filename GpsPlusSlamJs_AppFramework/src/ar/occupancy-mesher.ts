@@ -629,6 +629,22 @@ function buildCornerFit(
     number,
     { x: number; y: number; z: number; n: number }
   >();
+  const addCornerOffset = (
+    key: number,
+    ox: number,
+    oy: number,
+    oz: number
+  ): void => {
+    let acc = cornerSum.get(key);
+    if (!acc) {
+      acc = { x: 0, y: 0, z: 0, n: 0 };
+      cornerSum.set(key, acc);
+    }
+    acc.x += ox;
+    acc.y += oy;
+    acc.z += oz;
+    acc.n += 1;
+  };
   for (const cell of uniqueCells) {
     const cp = getCellPoint ? getCellPoint(cell) : null;
     if (!cp || !isFiniteVector3(cp)) {
@@ -643,20 +659,12 @@ function buildCornerFit(
     for (let sx = -1; sx <= 1; sx += 2) {
       for (let sy = -1; sy <= 1; sy += 2) {
         for (let sz = -1; sz <= 1; sz += 2) {
-          const key = cellKey(
-            2 * cell[0] + sx,
-            2 * cell[1] + sy,
-            2 * cell[2] + sz
+          addCornerOffset(
+            cellKey(2 * cell[0] + sx, 2 * cell[1] + sy, 2 * cell[2] + sz),
+            ox,
+            oy,
+            oz
           );
-          let acc = cornerSum.get(key);
-          if (!acc) {
-            acc = { x: 0, y: 0, z: 0, n: 0 };
-            cornerSum.set(key, acc);
-          }
-          acc.x += ox;
-          acc.y += oy;
-          acc.z += oz;
-          acc.n += 1;
         }
       }
     }
@@ -771,7 +779,6 @@ function buildGreedy(
 }
 
 /** Greedy-merge one slice's exposed (iu,iv) mask into maximal rectangles. */
-// eslint-disable-next-line max-params
 function greedyMergeSlice(
   slice: ReadonlyMap<number, readonly [number, number]>,
   half: number,

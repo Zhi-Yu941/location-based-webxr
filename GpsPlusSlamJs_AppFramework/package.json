@@ -42,7 +42,7 @@
     "test:unit": "node ../scripts/run-vitest-scoped.mjs run --coverage --config=config/vitest.config.ts",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "typecheck:tests": "tsc -p tsconfig.vitest.json --noEmit",
-    "lint": "eslint . --config config/eslint.config.mjs",
+    "lint": "eslint . --config config/eslint.config.mjs --max-warnings 37",
     "test:watch": "vitest --config config/vitest.config.ts",
     "check:cycles": "dpdm -T --exit-code circular:1 --no-warning --no-tree ./src/index.ts",
     "setup": "bash ./scripts/setup.sh"

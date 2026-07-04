@@ -98,7 +98,6 @@ describe('occupancy-grid long-session scaling (fps plan Steps 1–3 acceptance)'
       const smallMs = timeWindowedQuery(small.grid, slabCenter(SMALL_EDGE));
       const largeMs = timeWindowedQuery(large.grid, slabCenter(LARGE_EDGE));
       // Informational for humans reading the CI log (mesher-harness policy).
-      // eslint-disable-next-line no-console
       console.log(
         `[perf] windowed query (r=${WINDOW_RADIUS_M} m, ${smallWindow.length} cells): ` +
           `${small.grid.size} cells → ${smallMs.toFixed(3)} ms | ` +
@@ -122,7 +121,6 @@ describe('occupancy-grid long-session scaling (fps plan Steps 1–3 acceptance)'
           cellSizeM: CELL_SIZE_M,
         });
         const bytesPerCell = (memory().heapUsed - before) / probe.grid.size;
-        // eslint-disable-next-line no-console
         console.log(
           `[perf] ~${probe.grid.size} cells ≈ ${bytesPerCell.toFixed(0)} B/cell (informational; pre-flattening baseline ~201 B/cell)`
         );

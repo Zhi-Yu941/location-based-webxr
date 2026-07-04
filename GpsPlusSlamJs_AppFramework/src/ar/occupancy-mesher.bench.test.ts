@@ -79,7 +79,6 @@ describe.skipIf(!RUN)('occupancy mesher — perf benchmark', () => {
         }),
       }));
 
-      // eslint-disable-next-line no-console
       console.info(
         '[mesher bench] ' +
           JSON.stringify({
@@ -120,7 +119,6 @@ describe.skipIf(!RUN)('occupancy mesher — perf benchmark', () => {
         meshOccupiedCells(cells, cellSizeM, { mode: 'smooth', getCellPoint })
       );
 
-      // eslint-disable-next-line no-console
       console.info(
         '[long-session bench] ' +
           JSON.stringify({

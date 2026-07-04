@@ -69,7 +69,6 @@ describe.skipIf(!RUN)('depth unprojection — perf benchmark', () => {
       }
       samples.push(performance.now() - t0);
     }
-    // eslint-disable-next-line no-console
     console.info(
       '[unproject bench] ' +
         JSON.stringify({

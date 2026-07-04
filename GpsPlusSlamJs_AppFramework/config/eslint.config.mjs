@@ -32,6 +32,11 @@ export default defineConfig(
       'no-eval': 'error',
       'no-implied-eval': 'error',
       'no-extend-native': 'error',
+      // WARNING RATCHET (2026-07-04 code-health pass): the lint script runs
+      // with `--max-warnings 37` — exactly the current count of `complexity`
+      // warnings (acknowledged design debt: reduce a function's complexity
+      // when you next touch it, then LOWER the ratchet in package.json). Any
+      // NEW warning of any kind now fails the gate instead of scrolling by.
       complexity: ['warn', 10],
       'max-depth': ['warn', 4],
     },

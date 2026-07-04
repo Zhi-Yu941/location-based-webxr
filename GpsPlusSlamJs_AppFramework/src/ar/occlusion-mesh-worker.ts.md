@@ -16,6 +16,7 @@ The **pure, transfer-friendly halves** of the occluder Web Worker offload (Phase
 - **Centroids only for `smooth`/`corner-fit`** (the cube modes ignore `getCellPoint`, so no centroid buffer is packed for them → 1 transferable, not 2).
 - **Transfer, don't copy:** the returned `transfer` arrays are the request/response backing buffers; after `postMessage(msg, transfer)` the sender's typed arrays are detached.
 - Cell coords must be within the mesher's packable range (`|coord| ≤ 32767`) — the worker's centroid lookup uses the same 17-bit packed key.
+- **`getCellPoint` receives a transient tuple** (PR #161 review): on the flat-snapshot path `packMeshRequest` passes a reused scratch tuple, so the provider must not retain the `cell` argument beyond the call (see `MeshOccupiedCellsOptions.getCellPoint` for the full contract).
 
 ## Tests
 

@@ -111,6 +111,11 @@ export interface MeshOccupiedCellsOptions {
    * A `null` or non-finite result degrades that cell to its geometric position
    * too — a NaN/Infinity centroid must not poison welded vertices (and NaN is
    * the worker wire protocol's "no centroid" sentinel, so both paths agree).
+   *
+   * **Contract:** the `cell` tuple is only valid for the duration of the call —
+   * the meshers pass a reused scratch tuple on their allocation-free hot paths
+   * (PR #161 review), so implementations must read the coordinates and must NOT
+   * retain the tuple (no caching it as a key, no async use). Copy it if needed.
    */
   readonly getCellPoint?: (cell: GridCell) => Vector3 | null;
 }

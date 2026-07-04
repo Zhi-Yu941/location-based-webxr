@@ -167,6 +167,9 @@ export class OccluderMeshDriver {
    * see `packMeshRequest`; a flat snapshot's buffer is transferred/detached,
    * so pass a fresh array). If a job is already in flight, this becomes the
    * (single) pending job — the newest request wins; intermediates are dropped.
+   * `getCellPoint` is invoked with a transient cell tuple that may be a reused
+   * scratch — it must not retain the tuple beyond the call (see
+   * `MeshOccupiedCellsOptions.getCellPoint`).
    */
   request(
     cells: readonly GridCell[] | Int32Array,

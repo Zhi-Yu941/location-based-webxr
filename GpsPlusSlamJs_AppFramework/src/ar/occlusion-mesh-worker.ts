@@ -68,6 +68,10 @@ function needsCentroids(mode: MeshMode): boolean {
  * `transfer` and is DETACHED after posting — callers must pass a fresh array
  * they do not reuse. Throws `RangeError` when a flat snapshot's length is not
  * a multiple of 3 (a truncated buffer must fail loudly, not mesh garbage).
+ *
+ * `getCellPoint` receives a **transient** cell tuple (a reused scratch on the
+ * flat path — see `MeshOccupiedCellsOptions.getCellPoint` for the contract):
+ * implementations must not retain the tuple beyond the call.
  */
 export function packMeshRequest(
   id: number,

@@ -32,7 +32,7 @@ Encapsulates recording-session lifecycle state and event handlers, extracted fro
 | `recordWriteFailure(err)`     | Null-safe proxy to write-failure tracker                                                            |
 | `recordCaptureSuccess()`      | Null-safe proxy to capture-failure tracker                                                          |
 | `recordCaptureFailure()`      | Null-safe proxy to capture-failure tracker                                                          |
-| `cleanupForNewRecording()`    | Tears down sync manager, store subscribers, failure trackers for soft reset                         |
+| `cleanupForNewRecording()`    | Soft reset with **teardown parity to `performStop`** (2026-07-04): first stops the live feeds via the shared `stopLiveFeeds()` (captures, sensor watches, quality-analyzer worker, HUD readouts — previously this path skipped them, leaving camera/GPS feeds and the Worker running on an XR session end), then tears down sync manager, store subscribers, failure trackers |
 | `reset()`                     | Full reset of all internal state                                                                    |
 
 ## Invariants & Assumptions

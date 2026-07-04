@@ -612,18 +612,20 @@ export function createRecordingSessionHandlers(
     }
   }
 
-  async function performStop(): Promise<void> {
-    log.info('Stop recording');
-
-    disableBeforeUnloadWarning();
-
-    // Capture counts before stopping
-    const imageCount = getImageCaptureFrameCount();
-    const depthSampleCount = getDepthSampleCount();
-
+  /**
+   * Stop everything that actively FEEDS a recording — captures, sensor
+   * watches, the off-thread quality analyzer — plus their HUD readouts. The
+   * ONE teardown for this resource cluster, shared by `performStop` (the
+   * ordered stop flow) and `cleanupForNewRecording` (the XR-session-end /
+   * start-over path), which previously skipped it and left the camera/GPS
+   * feeds and the analyzer Worker running (recurring PR #115/#120/#123 review
+   * finding). Every call is idempotent, so running it on an already-stopped
+   * session is a no-op.
+   */
+  function stopLiveFeeds(): void {
     stopImageCapture();
-    // Tear down the off-thread quality analyzer (worker) for this recording and
-    // clear the injected callback so the next recording starts clean.
+    // Tear down the off-thread quality analyzer (worker) for this recording
+    // and clear the injected callback so the next recording starts clean.
     setImageQualityAnalyzer(null);
     imageQualityClient?.dispose();
     imageQualityClient = null;
@@ -635,6 +637,18 @@ export function createRecordingSessionHandlers(
     stopAbsCompassHudUpdates();
     stopAbsoluteOrientationWatch();
     hideAbsCompass();
+  }
+
+  async function performStop(): Promise<void> {
+    log.info('Stop recording');
+
+    disableBeforeUnloadWarning();
+
+    // Capture counts before stopping
+    const imageCount = getImageCaptureFrameCount();
+    const depthSampleCount = getDepthSampleCount();
+
+    stopLiveFeeds();
 
     // Capture authoritative end time immediately when recording stops,
     // before async operations (metadata write, sync, ZIP export) that
@@ -888,6 +902,9 @@ export function createRecordingSessionHandlers(
   // --- Lifecycle ---
 
   function cleanupForNewRecording(): void {
+    // Teardown parity with performStop: this path (XR session end, start-over)
+    // must also stop the captures/watches/analyzer, not only the bookkeeping.
+    stopLiveFeeds();
     if (unsubscribeStore) {
       unsubscribeStore();
       unsubscribeStore = null;

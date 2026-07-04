@@ -254,6 +254,32 @@ describe('OccluderMeshDriver', () => {
     expect(indices).not.toBeNull();
   });
 
+  it('reports a sync-path consumer onMesh throw via onError instead of swallowing it', () => {
+    // Why this test matters (code-health plan step 2): on the worker path a
+    // throwing onMesh at least surfaces as an uncaught error from
+    // Worker.onmessage; on the SYNC path the throw was caught by post()'s
+    // guard, hit failInFlight's stale check (handleResponse's finally had
+    // already cleared the slot) and vanished SILENTLY — a consumer bug the
+    // consumer could never observe. The mesh itself succeeded, so this must
+    // be reported as a consumer-callback error, not a mesh failure.
+    const onError = vi.fn();
+    const driver = new OccluderMeshDriver(null, { onError });
+    expect(() =>
+      driver.request(box(2), CELL, 'per-face', undefined, () => {
+        throw new Error('consumer boom');
+      })
+    ).not.toThrow();
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(driver.busy).toBe(false);
+
+    // The driver stays healthy: a later request meshes and delivers.
+    let delivered = false;
+    driver.request(box(2), CELL, 'per-face', undefined, () => {
+      delivered = true;
+    });
+    expect(delivered).toBe(true);
+  });
+
   it('does not wedge when the worker postMessage throws synchronously (e.g. DataCloneError): reports via onError and falls back to sync', () => {
     const { poster, posted } = makeFakePoster();
     const onError = vi.fn();

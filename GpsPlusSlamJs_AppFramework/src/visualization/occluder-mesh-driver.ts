@@ -240,7 +240,16 @@ export class OccluderMeshDriver {
         const { response } = runMeshRequest(request);
         this.handleResponse(response);
       } catch (error) {
-        this.failInFlight(id, error);
+        if (this.inFlightId === id) {
+          this.failInFlight(id, error);
+        } else {
+          // The slot is no longer ours ⇒ handleResponse completed the job
+          // (its finally cleared the slot / drained pending) and the throw
+          // came from the CONSUMER callback, not the mesh. Report it — the
+          // worker path at least surfaces such throws as uncaught errors
+          // from Worker.onmessage; swallowing them here hid consumer bugs.
+          this.onError?.(error);
+        }
       }
     }
   }

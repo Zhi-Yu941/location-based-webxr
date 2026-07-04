@@ -310,6 +310,8 @@ export { SCENE_NODE } from './scene-node-names.js';
 export {
   initAR,
   endARSession,
+  setSessionEndCallback,
+  type SessionEndInfo,
   setImageCaptureCallback,
   setImageQualityAnalyzer,
   startImageCapture,

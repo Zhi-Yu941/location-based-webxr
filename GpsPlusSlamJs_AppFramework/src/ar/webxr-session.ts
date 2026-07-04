@@ -227,6 +227,8 @@ export function resetWebXRState(): void {
   onTrackingRestarted = null;
   onTrackingLost = null;
   onTrackingRecovered = null;
+  onSessionEnd = null;
+  endRequestedByApp = false;
   depthSampler = null;
   onDepthCaptured = null;
   onDepthUnavailable = null;
@@ -351,6 +353,33 @@ let onTrackingLost: (() => void) | null = null;
  * Set via setTrackingRecoveredCallback.
  */
 let onTrackingRecovered: (() => void) | null = null;
+
+/**
+ * Info passed to the session-end callback (F3, 2026-07-04 user feedback).
+ * `requestedByApp` discriminates the app's own `endARSession()` from a
+ * system-initiated end (e.g. the Android back gesture, which ends an
+ * immersive XRSession directly — no popstate, no beforeunload, not
+ * cancelable).
+ */
+export interface SessionEndInfo {
+  requestedByApp: boolean;
+}
+
+/**
+ * Host callback fired exactly once whenever the XRSession ends — on BOTH the
+ * app-initiated and the system-initiated path (set via setSessionEndCallback).
+ * Cleared by resetWebXRState() like every other module-level callback.
+ */
+let onSessionEnd: ((info: SessionEndInfo) => void) | null = null;
+
+/**
+ * Set by endARSession() immediately before its `xrSession.end()` so the
+ * shared 'end' listener can tell the two trigger paths apart (the app's own
+ * end() fires the same 'end' event the system path does). Consumed (reset to
+ * false) by handleSessionEnded(); also cleared defensively in
+ * resetWebXRState() in case end() rejects without the event ever firing.
+ */
+let endRequestedByApp = false;
 
 /**
  * Depth sampler instance (created when AR session starts with depth callbacks)
@@ -926,16 +955,13 @@ export async function initAR(
 
   xrSession = await navigator.xr.requestSession('immersive-ar', sessionOptions);
 
-  // Handle session end
+  // Handle session end — BOTH trigger paths funnel through this listener:
+  // the system-initiated end (Android back gesture — fires 'end' directly)
+  // and the app's own endARSession() (its session.end() fires the same
+  // event). handleSessionEnded() runs the full teardown and notifies the
+  // host exactly once (F3, 2026-07-04 user feedback).
   xrSession.addEventListener('end', () => {
-    log.info('Session ended');
-    // Reset the tracking slice so the next session starts from a clean
-    // INITIALIZING state.
-    if (trackingStore) {
-      trackingStore.dispatch(resetTrackingAction());
-    }
-    xrSession = null;
-    latestArPose = null;
+    handleSessionEnded();
   });
 
   await renderer.xr.setSession(xrSession);
@@ -1449,6 +1475,55 @@ export function nueQuaternionToWebXR(
 }
 
 /**
+ * Register a host callback fired exactly once whenever the XRSession ends —
+ * app-initiated ({@link endARSession}) AND system-initiated (e.g. the Android
+ * back gesture, which ends an immersive session directly and uncancelably).
+ * `info.requestedByApp` discriminates the two. Fired AFTER the full teardown,
+ * so the host can immediately start a fresh session from inside the callback.
+ *
+ * Cleared by resetWebXRState() (i.e. after every session end) like the other
+ * module-level callbacks — re-register before/with each new session.
+ * Pass `null` to unregister. F3, 2026-07-04 user feedback.
+ */
+export function setSessionEndCallback(
+  cb: ((info: SessionEndInfo) => void) | null
+): void {
+  onSessionEnd = cb;
+}
+
+/**
+ * The ONE teardown for a session that has ended, shared by both trigger
+ * paths via the XRSession 'end' listener. Before F3 the system-initiated
+ * path (back gesture) only nulled `xrSession`/`latestArPose`, leaving the
+ * renderer compositing the 3D scene over a black camera background and the
+ * host app never notified — the "haunted scene" from
+ * docs/2026-02-15-lifecycle-orphans.md §1.
+ */
+function handleSessionEnded(): void {
+  log.info('Session ended');
+  // Capture callback + discriminator BEFORE teardown — resetWebXRState()
+  // clears both.
+  const callback = onSessionEnd;
+  const requestedByApp = endRequestedByApp;
+  endRequestedByApp = false;
+  // Reset the tracking slice so the next session starts from a clean
+  // INITIALIZING state (must run before resetWebXRState() nulls the store).
+  if (trackingStore) {
+    trackingStore.dispatch(resetTrackingAction());
+  }
+  resetWebXRState();
+  // Notify the host last, defensively: a throwing callback must never leave
+  // the module half-torn-down.
+  if (callback) {
+    try {
+      callback({ requestedByApp });
+    } catch (err) {
+      log.error('Session-end callback threw:', err);
+    }
+  }
+}
+
+/**
  * End the current XR session and clean up all resources.
  *
  * Stops the animation loop, ends the XR session, then delegates the full
@@ -1479,6 +1554,10 @@ export async function endARSession(): Promise<void> {
   // guarantees the module always returns to a clean, re-initialisable state.
   try {
     if (xrSession) {
+      // Mark this end as app-initiated for the shared 'end' listener —
+      // end() fires the same 'end' event a system-initiated end does, and
+      // handleSessionEnded() consumes this flag to discriminate the paths.
+      endRequestedByApp = true;
       await xrSession.end();
     }
   } finally {

@@ -128,6 +128,9 @@ Every ID below is referenced by TypeScript code. Removing or renaming any of the
 | `folder-import-hint` | `p` | `hud.ts` | One-line recovery hint shown above the folder button when auto-expanded |
 | `btn-open-folder` | `button` | `hud.ts` | Inside `folder-import-section`. Click opens File System Access API. `aria-label` set |
 | `folder-status` | `p` | `hud.ts` | `.textContent` set to selected folder path |
+| `folder-import-progress` | `div` | `hud.ts` | D2 (2026-07-05): container of the determinate folder-import indexing progress display (`data-testid="folder-import-progress"`); `.hidden` toggled by `setFolderImportProgress` |
+| `folder-import-progress-text` | `p` | `hud.ts` | Text label above the bar ("Recovering reference points… x / y recordings" / ✓ end-state summary) |
+| `folder-import-progress-bar` | `div` | `hud.ts` | Inner bar; `style.width` set to the completion percentage |
 | `scenario-select` | `select` | `hud.ts` | `<option>` elements appended dynamically; `change` listener |
 | `new-scenario-section` | `div` | `hud.ts` | `.hidden` toggled + opacity animation (CSS transition contract) |
 | `new-scenario-name` | `input` | `hud.ts` | `.value` read for custom scenario name; pre-filled with `Default Scenario` (UX 2026-05-03) so users can tap Enter AR without typing when no existing scenarios are found |

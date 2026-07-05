@@ -262,7 +262,8 @@ export function createFolderManager(deps: FolderManagerDeps): FolderManager {
       return;
     }
 
-    // Recording mode: discover scenarios (ref point import is scenario-scoped, handled in loadAndDisplayRefPoints)
+    // Recording mode: discover scenario names for the dropdown; the actual
+    // ref-point import runs right after as the eager indexing pass below.
     try {
       const [folderScenarios, zipScenarios] = await Promise.all([
         deps.listScenariosFromFolder(folderHandle),

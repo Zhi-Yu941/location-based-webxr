@@ -24,7 +24,15 @@ recorder.
 - `setCurrentScenario(name): Promise<handle | null>` — select an existing
   scenario; `null` if absent.
 - `ensureScenarioDirectory(name): Promise<handle | null>` — create-on-demand,
-  used during OPFS recovery after a browser data clear.
+  used during OPFS recovery after a browser data clear. ⚠️ Like
+  `setCurrentScenario`, it repoints the module-level current-scenario state as
+  a side effect.
+- `getScenarioDirectoryHandle(name, {create?}): Promise<handle | null>` —
+  side-effect-free variant that does NOT repoint the current scenario. Used by
+  the eager ref-point indexing pass, which writes into many scenarios while
+  the user's selection must stay current (2026-07-05 folder-import plan §3.2).
+  Returns `null` when storage is uninitialized, or when the scenario is absent
+  and `create` was not requested.
 - `clearRefPointsCacheForAllScenarios(): Promise<ClearRefPointsCacheResult>` —
   delete every scenario's `refPoints/` cache so the next load re-imports from
   read-folder ZIPs. Per-scenario failures collected in `errors`; a missing cache

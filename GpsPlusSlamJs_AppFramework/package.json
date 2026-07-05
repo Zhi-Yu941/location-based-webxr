@@ -48,7 +48,7 @@
     "setup": "bash ./scripts/setup.sh"
   },
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=22"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.11.2",

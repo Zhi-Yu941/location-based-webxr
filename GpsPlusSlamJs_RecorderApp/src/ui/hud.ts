@@ -1198,6 +1198,87 @@ export function setFolderImportExpanded(
 }
 
 /**
+ * State of the folder-import progress display (D2, 2026-07-05 folder-import
+ * feedback): `progress` while the eager ref-point indexing pass runs (one
+ * event per ZIP), `done` as the durable end state, `null` to reset/hide
+ * (failure and abort paths — the error itself surfaces via the toast/error
+ * channel, not the bar).
+ */
+export type FolderImportProgressState =
+  | { kind: 'progress'; done: number; total: number }
+  | { kind: 'done'; refPointsWritten: number; zipFilesTotal: number }
+  | null;
+
+/** How long the ✓ end state stays visible before the bar hides itself. */
+const FOLDER_IMPORT_PROGRESS_LINGER_MS = 4000;
+let folderImportProgressHideTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Durable ✓ end-state copy for the folder-import progress label. */
+function folderImportDoneText(
+  refPointsWritten: number,
+  zipFilesTotal: number
+): string {
+  const recordings = `${zipFilesTotal} recording${zipFilesTotal === 1 ? '' : 's'}`;
+  if (refPointsWritten > 0) {
+    const points = `${refPointsWritten} reference point${refPointsWritten === 1 ? '' : 's'}`;
+    return `✓ ${points} recovered from ${recordings}`;
+  }
+  return `✓ Reference points already up to date (${recordings} scanned)`;
+}
+
+/**
+ * Drive the determinate progress bar (+ text label above it) inside the
+ * folder-import section while recordings are indexed into per-scenario ref
+ * points. Progress granularity is per ZIP file. Degrades gracefully when the
+ * elements are absent (minimal test DOMs). Async-UX rule: the done state is
+ * durable — it lingers for a few seconds before the bar hides itself; a
+ * `null` reset also cancels a pending linger timer so a torn-down pass can
+ * never resurface the bar.
+ */
+export function setFolderImportProgress(
+  state: FolderImportProgressState
+): void {
+  const container = document.getElementById('folder-import-progress');
+  const text = document.getElementById('folder-import-progress-text');
+  const bar = document.getElementById('folder-import-progress-bar');
+  if (!container || !text || !bar) return;
+
+  if (folderImportProgressHideTimer !== null) {
+    clearTimeout(folderImportProgressHideTimer);
+    folderImportProgressHideTimer = null;
+  }
+
+  const hide = (): void => {
+    container.classList.add('hidden');
+    bar.style.width = '0%';
+    text.textContent = '';
+  };
+
+  if (state === null || (state.kind === 'progress' && state.total <= 0)) {
+    hide();
+    return;
+  }
+
+  container.classList.remove('hidden');
+  if (state.kind === 'progress') {
+    text.textContent = `Recovering reference points… ${state.done} / ${state.total} recordings`;
+    bar.style.width = `${Math.round((state.done / state.total) * 100)}%`;
+    return;
+  }
+
+  // Durable end state (async-UX rule): 100% + ✓ summary, linger, then hide.
+  bar.style.width = '100%';
+  text.textContent = folderImportDoneText(
+    state.refPointsWritten,
+    state.zipFilesTotal
+  );
+  folderImportProgressHideTimer = setTimeout(() => {
+    folderImportProgressHideTimer = null;
+    hide();
+  }, FOLDER_IMPORT_PROGRESS_LINGER_MS);
+}
+
+/**
  * Get the current folderSelected state.
  * Used for testing.
  * @internal

@@ -742,6 +742,29 @@ No errors</pre
                     >
                       ❌ No folder selected
                     </p>
+                    <!-- D2 (2026-07-05): determinate progress for the eager
+                       ref-point indexing pass that starts when the folder is
+                       granted. Text label above a small bar; driven by
+                       hud.setFolderImportProgress (hidden when idle). -->
+                    <div
+                      id="folder-import-progress"
+                      data-testid="folder-import-progress"
+                      class="hidden space-y-1"
+                    >
+                      <p
+                        id="folder-import-progress-text"
+                        class="text-xs text-gray-300"
+                      ></p>
+                      <div
+                        class="w-full bg-gray-600 rounded h-1.5 overflow-hidden"
+                      >
+                        <div
+                          id="folder-import-progress-bar"
+                          class="bg-blue-500 h-full rounded"
+                          style="width: 0%"
+                        ></div>
+                      </div>
+                    </div>
                   </div>
                 </details>
               </div>

@@ -12,6 +12,7 @@
  */
 
 import type { RefPointPickerResult } from './ui/ref-point-picker';
+import type { FolderImportProgressState } from './ui/hud';
 import type { PermissionCheckResult } from 'gps-plus-slam-app-framework/sensors/permission-checker';
 import type { TrackingQualityReport } from 'gps-plus-slam-app-framework';
 import type { SessionSummaryData } from './ui/session-summary';
@@ -75,6 +76,8 @@ declare global {
       // Mandatory storage selection hooks (Task 1a-fix)
       setFolderSelected: (selected: boolean) => void;
       setFolderImportExpanded: (expanded: boolean, hint?: string) => void;
+      /** Folder-import indexing progress bar (D2, 2026-07-05). */
+      setFolderImportProgress: (state: FolderImportProgressState) => void;
       setSaveLocationSelected: (selected: boolean) => void;
       /**
        * Step 4B — mount the map-centric recording browser with fixture tours

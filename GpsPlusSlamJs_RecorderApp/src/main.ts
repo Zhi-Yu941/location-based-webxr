@@ -38,6 +38,7 @@ import {
   setFolderSelected,
   setSaveLocationSelected,
   setFolderImportExpanded,
+  setFolderImportProgress,
   updateFolderStatus,
   updateSaveStatus,
   resetUIForNewRecording,
@@ -521,6 +522,22 @@ const folderManager = createFolderManager({
   setSaveLocationSelected,
   setFolderImportExpanded,
   validateEnterButton,
+  // D2 (2026-07-05): the eager ref-point indexing pass drives the
+  // determinate progress bar inside the folder-import section.
+  onIndexingProgress: ({ done, total }) =>
+    setFolderImportProgress({ kind: 'progress', done, total }),
+  onIndexingSettled: (outcome) => {
+    if (outcome.status === 'success') {
+      setFolderImportProgress({
+        kind: 'done',
+        refPointsWritten: outcome.refPointsWritten,
+        zipFilesTotal: outcome.zipFilesTotal,
+      });
+    } else {
+      // Failure/abort: reset the bar; errors surface via the error channel.
+      setFolderImportProgress(null);
+    }
+  },
   listScenariosFromFolder,
   extractScenarioNamesFromZips,
   discoverScenariosFromZipMetadata,
@@ -1897,6 +1914,8 @@ if (
     setFolderSelected,
     setSaveLocationSelected,
     setFolderImportExpanded,
+    // Folder-import indexing progress bar (D2, 2026-07-05)
+    setFolderImportProgress,
     /**
      * Map-centric recording browser (Step 4B). Mounts the full-bleed browser
      * with fixture tours (GPS paths → H3 coverage), so Playwright can exercise

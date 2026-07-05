@@ -153,6 +153,55 @@ test.describe('Setup Modal Flow', () => {
     await expect(folderStatus).toContainText('No folder selected');
   });
 
+  // D2 (2026-07-05 folder-import feedback): the eager ref-point indexing pass
+  // drives a determinate progress bar (+ text label) inside the folder-import
+  // section. Playwright cannot exercise the real File System Access API, so
+  // the bar states are driven via the same testHooks the app wires
+  // (setFolderImportProgress) — asserting the transitional AND the durable
+  // end state per the CLAUDE.md async-UX rule.
+  test('folder-import progress bar shows in-progress and durable ✓ end states', async ({
+    page,
+  }) => {
+    const progress = page.getByTestId('folder-import-progress');
+    // Hidden while idle.
+    await expect(progress).toBeHidden();
+
+    // Expand the optional section (as the auto-expand hint flow would) and
+    // start the indexing pass.
+    await page.evaluate(() => {
+      window.testHooks.setFolderImportExpanded(true);
+      window.testHooks.setFolderImportProgress({
+        kind: 'progress',
+        done: 1,
+        total: 3,
+      });
+    });
+    await expect(progress).toBeVisible();
+    await expect(page.locator('#folder-import-progress-text')).toHaveText(
+      'Recovering reference points… 1 / 3 recordings'
+    );
+
+    // Durable end state: ✓ summary at 100%.
+    await page.evaluate(() =>
+      window.testHooks.setFolderImportProgress({
+        kind: 'done',
+        refPointsWritten: 5,
+        zipFilesTotal: 3,
+      })
+    );
+    await expect(page.locator('#folder-import-progress-text')).toHaveText(
+      '✓ 5 reference points recovered from 3 recordings'
+    );
+    const barWidth = await page
+      .locator('#folder-import-progress-bar')
+      .evaluate((el) => el.style.width);
+    expect(barWidth).toBe('100%');
+
+    // Failure/abort path: a reset hides the bar again.
+    await page.evaluate(() => window.testHooks.setFolderImportProgress(null));
+    await expect(progress).toBeHidden();
+  });
+
   // D6 item 8 (2026-06-16 user feedback): the "choose a save location" blocker
   // is stated ONCE, on the disabled Enter AR button's hint — NOT duplicated in
   // #save-status. So #save-status starts empty (it is a pure path-status line)

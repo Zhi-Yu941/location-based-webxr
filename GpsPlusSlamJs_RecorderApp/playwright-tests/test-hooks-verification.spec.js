@@ -250,6 +250,8 @@ test.describe('Test Hooks Match Real Behavior', () => {
       'setSaveLocationSelected',
       // Optional folder-import collapse hook (D5)
       'setFolderImportExpanded',
+      // Folder-import indexing progress bar (D2, 2026-07-05)
+      'setFolderImportProgress',
       // Map-centric recording browser (Step 4B)
       'mountMapBrowser',
       // Progressive map-browser streaming (Slice A)

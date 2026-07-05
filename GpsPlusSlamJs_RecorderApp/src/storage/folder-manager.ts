@@ -324,7 +324,11 @@ export function createFolderManager(deps: FolderManagerDeps): FolderManager {
         result.definitionsByScenario,
         abort.signal
       );
-      await refreshCurrentScenarioAfterIndexing(written.byScenario);
+      // Late re-check: if the active scenario changed after its bucket was
+      // persisted (or persisted without an early publish), refresh now.
+      if (written.publishedScenario !== resolveActiveScenarioName()) {
+        await refreshCurrentScenarioAfterIndexing(written.byScenario);
+      }
       deps.onIndexingSettled?.({
         status: 'success',
         refPointsWritten: written.total,
@@ -353,14 +357,33 @@ export function createFolderManager(deps: FolderManagerDeps): FolderManager {
    * Persist per-scenario definitions into their own OPFS stores (strict
    * routing, D4a) via the side-effect-free scenario handle accessor, so the
    * user's selected scenario never changes underneath them.
+   *
+   * The ACTIVE scenario's bucket is persisted FIRST and published (store
+   * dispatch + status line + hint collapse) immediately once durable —
+   * round-3 option 2 (2026-07-05): its points must not wait for the other
+   * scenarios' buckets. Returns which scenario was early-published (if any)
+   * so the caller can skip the redundant end-of-pass refresh.
    */
   async function persistIndexedDefinitions(
     definitionsByScenario: Map<string, RefPointDefinition[]>,
     signal: AbortSignal
-  ): Promise<{ total: number; byScenario: Map<string, number> }> {
+  ): Promise<{
+    total: number;
+    byScenario: Map<string, number>;
+    publishedScenario: string | null;
+  }> {
     const byScenario = new Map<string, number>();
     let total = 0;
-    for (const [scenarioName, defs] of definitionsByScenario) {
+    let publishedScenario: string | null = null;
+
+    // Active scenario first (stable order otherwise — buckets keep their
+    // newest-first-encounter grouping from the indexing pass).
+    const activeName = resolveActiveScenarioName();
+    const ordered = [...definitionsByScenario.entries()].sort(
+      ([a], [b]) => Number(b === activeName) - Number(a === activeName)
+    );
+
+    for (const [scenarioName, defs] of ordered) {
       if (signal.aborted) {
         throw new DOMException('Aborted', 'AbortError');
       }
@@ -376,9 +399,14 @@ export function createFolderManager(deps: FolderManagerDeps): FolderManager {
         byScenario.set(scenarioName, written);
         total += written;
         log.info(`Indexed ${written} new ref point(s) into "${scenarioName}"`);
+        // Early publish: the user's scenario is durable — show it now.
+        if (scenarioName === activeName && publishedScenario === null) {
+          await refreshCurrentScenarioAfterIndexing(byScenario);
+          publishedScenario = scenarioName;
+        }
       }
     }
-    return { total, byScenario };
+    return { total, byScenario, publishedScenario };
   }
 
   /**

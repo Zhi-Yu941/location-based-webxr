@@ -1331,6 +1331,68 @@ describe('createFolderManager', () => {
       expect(deps.setFolderImportExpanded).toHaveBeenCalledWith(false);
     });
 
+    /**
+     * Why this test matters:
+     * Round-3 option 2 (2026-07-05): the active scenario's points must become
+     * visible as soon as ITS bucket is durable — not after every other
+     * scenario's bucket has been persisted too. The pass persists the active
+     * scenario first and publishes (store dispatch + status + hint collapse)
+     * before touching the remaining buckets, and must not refresh a second
+     * time at the end of the pass.
+     */
+    it('publishes the active scenario before persisting the other buckets (early publish)', async () => {
+      const defParis = mkDef('cell-p');
+      const defBerlin = mkDef('cell-b');
+      // Berlin arrives FIRST in the map — the pass must reorder.
+      vi.mocked(indexRefPointDefinitionsFromFolder).mockResolvedValue(
+        indexResult([
+          ['Berlin', [defBerlin]],
+          ['Paris', [defParis]],
+        ])
+      );
+      // loadAllRefPoints sequence: Paris gap-check (empty) → refresh re-load
+      // (has the new def) → Berlin gap-check (empty).
+      vi.mocked(loadAllRefPoints)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([defParis])
+        .mockResolvedValue([]);
+      const scenarioHandle = {
+        kind: 'directory',
+        name: 'Paris',
+      } as unknown as FileSystemDirectoryHandle;
+      vi.mocked(setCurrentScenario).mockResolvedValue(scenarioHandle);
+
+      const { manager, store } = createFolderManagerWithDefaults();
+      manager.setCurrentScenarioName('Paris');
+
+      await manager.handleOpenFolder();
+
+      // The publish dispatch happened BEFORE Berlin's bucket was written.
+      const dispatchMock = store.dispatch as unknown as {
+        mock: {
+          calls: Array<[{ type?: string }]>;
+          invocationCallOrder: number[];
+        };
+      };
+      const publishIdx = dispatchMock.mock.calls.findIndex(
+        ([action]) => action?.type === 'refPoints/setImportedRefPointEntries'
+      );
+      expect(publishIdx).toBeGreaterThanOrEqual(0);
+      const publishOrder = dispatchMock.mock.invocationCallOrder[publishIdx]!;
+
+      const writeMock = vi.mocked(writeRefPointDefinition).mock;
+      const berlinIdx = writeMock.calls.findIndex(
+        ([, def]) => def.id === 'cell-b'
+      );
+      expect(berlinIdx).toBeGreaterThanOrEqual(0);
+      const berlinOrder = writeMock.invocationCallOrder[berlinIdx]!;
+
+      expect(publishOrder).toBeLessThan(berlinOrder);
+
+      // No duplicate refresh at the end of the pass.
+      expect(setCurrentScenario).toHaveBeenCalledTimes(1);
+    });
+
     it('does not refresh when the selected scenario gained nothing', async () => {
       vi.mocked(indexRefPointDefinitionsFromFolder).mockResolvedValue(
         indexResult([['Paris', [mkDef('cell-a')]]])

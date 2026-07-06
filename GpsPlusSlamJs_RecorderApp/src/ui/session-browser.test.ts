@@ -267,6 +267,50 @@ describe('parseDateFromSessionFilename', () => {
     // Month "00" is invalid for Date (months are 1-12 in ISO)
     expect(date).toBeNull();
   });
+
+  it('returns null for impossible calendar dates instead of rolling them over', () => {
+    // Why: V8 normalizes out-of-range ISO components instead of yielding
+    // Invalid Date — new Date('2026-02-30T10:00:00Z') is silently March 2 —
+    // so the isNaN guard alone did NOT enforce the "not Feb 30" validation
+    // the parser documents; a renamed zip with an impossible date sorted
+    // under a fabricated timestamp instead of falling back to
+    // File.lastModified (PR #163 review, coderabbit).
+    expect(
+      parseDateFromSessionFilename('recording-2026-02-30_10-00-00utc.zip')
+    ).toBeNull();
+    expect(
+      parseDateFromSessionFilename('recording-2025-02-29_10-00-00utc.zip')
+    ).toBeNull(); // non-leap year
+    expect(
+      parseDateFromSessionFilename('recording-2026-04-31_10-00-00utc.zip')
+    ).toBeNull();
+  });
+
+  it('returns null for out-of-range time or month components instead of rolling them over', () => {
+    // Why: the same rollover hazard applies to time fields (hour 24 → next
+    // day) and month 13 (→ January of the next year).
+    expect(
+      parseDateFromSessionFilename('recording-2026-02-19_24-00-00utc.zip')
+    ).toBeNull();
+    expect(
+      parseDateFromSessionFilename('recording-2026-02-19_10-60-00utc.zip')
+    ).toBeNull();
+    expect(
+      parseDateFromSessionFilename('recording-2026-02-19_10-00-61utc.zip')
+    ).toBeNull();
+    expect(
+      parseDateFromSessionFilename('recording-2026-13-01_10-00-00utc.zip')
+    ).toBeNull();
+  });
+
+  it('still accepts real leap-day timestamps', () => {
+    // Why: the round-trip validation must not over-reject valid dates.
+    const date = parseDateFromSessionFilename(
+      'recording-2028-02-29_23-59-59utc.zip'
+    );
+    expect(date).toBeInstanceOf(Date);
+    expect(date!.toISOString()).toBe('2028-02-29T23:59:59.000Z');
+  });
 });
 
 // ============================================================================

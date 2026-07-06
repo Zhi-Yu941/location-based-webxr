@@ -36,7 +36,8 @@ const SESSION_DATE_PATTERN =
  * - "Paris-session-2026-01-30_14-30-45utc.zip"
  *
  * @param filename - The zip filename to parse
- * @returns Parsed Date in UTC, or null if filename doesn't match the expected pattern
+ * @returns Parsed Date in UTC, or null if the filename doesn't match the
+ * expected pattern or encodes an impossible timestamp (e.g. Feb 30, hour 24)
  */
 export function parseDateFromSessionFilename(filename: string): Date | null {
   const match = SESSION_DATE_PATTERN.exec(filename);
@@ -45,12 +46,27 @@ export function parseDateFromSessionFilename(filename: string): Date | null {
   }
 
   const [, year, month, day, hours, minutes, seconds] = match;
-  // Construct ISO 8601 string for unambiguous UTC parsing
-  const iso = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}Z`;
-  const date = new Date(iso);
+  const y = Number(year);
+  const mo = Number(month);
+  const d = Number(day);
+  const h = Number(hours);
+  const mi = Number(minutes);
+  const s = Number(seconds);
 
-  // Validate the date is real (e.g., not Feb 30)
-  if (isNaN(date.getTime())) {
+  // Construct via Date.UTC and verify every component round-trips: engines
+  // NORMALIZE out-of-range components instead of rejecting them (V8 turns
+  // 2026-02-30 into March 2, hour 24 into the next day), so an isNaN check
+  // alone would accept impossible timestamps and sort the zip under a
+  // fabricated date instead of falling back to File.lastModified.
+  const date = new Date(Date.UTC(y, mo - 1, d, h, mi, s));
+  if (
+    date.getUTCFullYear() !== y ||
+    date.getUTCMonth() !== mo - 1 ||
+    date.getUTCDate() !== d ||
+    date.getUTCHours() !== h ||
+    date.getUTCMinutes() !== mi ||
+    date.getUTCSeconds() !== s
+  ) {
     return null;
   }
 

@@ -24,7 +24,11 @@ while ui → storage is allowed — so the shared pieces live here and
 - `parseDateFromSessionFilename(filename: string): Date | null` — parses the
   `..._YYYY-MM-DD_HH-MM-SSutc.zip` timestamp (both `recording-…` and
   `<Scenario>-session-…` forms); `null` for non-conforming names or impossible
-  dates (e.g. Feb 30).
+  timestamps (e.g. Feb 30, hour 24). Validation compares every component of
+  the `Date.UTC`-constructed date back to the parsed fields — engines
+  NORMALIZE out-of-range ISO components instead of rejecting them (V8 parses
+  `2026-02-30T…Z` as March 2), so an `isNaN` check alone is not enough
+  (PR #163 review fix, 2026-07-06).
 - `resolveScenarioNameFromMetadata(metadata: Record<string, unknown> | null): string`
   — resolves a recording's scenario with precedence `contextTag` (current
   framework field) → legacy `scenarioName` → `DEFAULT_SCENARIO`.

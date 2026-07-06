@@ -59,6 +59,13 @@ vi.mock('../storage/ref-point-recovery', () => ({
   ),
 }));
 
+vi.mock('../storage/ref-point-merge', () => ({
+  // Passthrough spy: the merge algorithm has its own unit/property tests
+  // (ref-point-merge.test.ts). Here we only pin that loadAndDisplayRefPoints
+  // routes the loaded definitions THROUGH the merge and consumes its result.
+  mergeSiblingRefPoints: vi.fn((defs: unknown) => defs),
+}));
+
 vi.mock('gps-plus-slam-app-framework/geo/h3-proximity', () => ({
   // Defaults: every id counts as H3, cells match only on equality. Individual
   // tests override h3CellsMatch to simulate gridDisk neighbor overlap.
@@ -805,6 +812,36 @@ describe('createFolderManager', () => {
       expect(loadAllRefPoints).toHaveBeenCalledWith(mockFolderHandle);
       expect(flattenRefPointsToMarks).toHaveBeenCalledWith(mockDefs);
       expect(result).toEqual({ refPointCount: 1, observationCount: 1 });
+    });
+
+    it('routes loaded definitions through the sibling merge and consumes its result (D6a)', async () => {
+      // Why: durable neighbor-cell twins and legacy-id duplicates must be
+      // collapsed BEFORE display/averaging/matcher dispatch — existing
+      // stores heal in memory without any file rewrite. This pins the seam:
+      // loaded defs go in, everything downstream consumes the merge OUTPUT.
+      const { loadAllRefPoints, flattenRefPointsToMarks } =
+        await import('../storage/ref-point-loader');
+      const { mergeSiblingRefPoints } =
+        await import('../storage/ref-point-merge');
+      const loadedDefs = [
+        { id: 'twin-a', name: 'Door', createdAt: 1, observations: [] },
+        { id: 'twin-b', name: 'Door', createdAt: 2, observations: [] },
+      ] as never;
+      const mergedDefs = [
+        { id: 'twin-a', name: 'Door', createdAt: 1, observations: [] },
+      ] as never;
+      vi.mocked(loadAllRefPoints).mockResolvedValue(loadedDefs);
+      // Once — clearAllMocks does NOT reset implementations, so a sticky
+      // override would leak the merged result into every later test.
+      vi.mocked(mergeSiblingRefPoints).mockReturnValueOnce(mergedDefs);
+      vi.mocked(flattenRefPointsToMarks).mockReturnValue([]);
+      const { manager } = createFolderManagerWithDefaults();
+
+      const result = await manager.loadAndDisplayRefPoints(mockFolderHandle);
+
+      expect(mergeSiblingRefPoints).toHaveBeenCalledWith(loadedDefs);
+      expect(flattenRefPointsToMarks).toHaveBeenCalledWith(mergedDefs);
+      expect(result.refPointCount).toBe(1);
     });
 
     it('should dispatch setImportedRefPointEntries into refPoints (Step 5.5)', async () => {

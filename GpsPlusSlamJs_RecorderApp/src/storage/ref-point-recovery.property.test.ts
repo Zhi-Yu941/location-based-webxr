@@ -5,9 +5,13 @@
  *
  * Why this test file matters:
  * The indexing pass partitions definitions from arbitrary ZIP sets into
- * per-scenario buckets (D4a) with observation dedupe by sessionId:timestamp.
- * Example-based tests pin individual behaviors; these properties pin the
- * invariants that must hold for ANY folder content:
+ * per-scenario buckets (D4a) and merges each bucket via the shared sibling
+ * merge (D6(a)): same-anchor definitions collapse, legacy ids re-mint to
+ * their averaged-position cell, observations dedupe by content. Because the
+ * merge may change definition IDS, the partition invariant is pinned at the
+ * OBSERVATION level per scenario. Example-based tests pin individual
+ * behaviors; these properties pin the invariants that must hold for ANY
+ * folder content:
  * - Partition completeness: every input observation surfaces in exactly the
  *   bucket of its ZIP's scenario — nothing lost, nothing leaked across
  *   scenarios.
@@ -173,13 +177,16 @@ describe('indexRefPointDefinitionsFromFolder — properties', () => {
           createFolderHandle(files)
         );
 
-        // Expected: set of "scenario|id|sessionId:timestamp" over all inputs
-        // (duplicates collapse — exactly what the dedupe must do).
+        // Expected: set of "scenario|sessionId:timestamp" over all inputs
+        // (duplicates collapse — exactly what the dedupe must do). The
+        // definition ID is deliberately NOT part of the key: the D6(a)
+        // sibling merge may collapse ids or re-mint legacy ones, but it must
+        // never move an observation across scenarios or lose one.
         const expected = new Set<string>();
         for (const spec of zipSpecs) {
           for (const def of spec.defs) {
             for (const obs of def.observations) {
-              expected.add(`${spec.scenario}|${def.id}|${obsKey(obs)}`);
+              expected.add(`${spec.scenario}|${obsKey(obs)}`);
             }
           }
         }
@@ -188,7 +195,7 @@ describe('indexRefPointDefinitionsFromFolder — properties', () => {
         for (const [scenario, defs] of result.definitionsByScenario) {
           for (const def of defs) {
             for (const obs of def.observations) {
-              actual.add(`${scenario}|${def.id}|${obsKey(obs)}`);
+              actual.add(`${scenario}|${obsKey(obs)}`);
             }
           }
         }

@@ -14,6 +14,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BlobWriter, ZipWriter, TextReader } from '@zip.js/zip.js';
+import { gpsToH3 } from 'gps-plus-slam-app-framework/geo/h3-proximity';
 import type {
   RefPointDefinition,
   RefPointObservation,
@@ -97,6 +98,17 @@ function makeObservation(
     gpsPoint: makeGpsPoint(lat, lon),
   };
 }
+
+// Distinct physical spots (~1.1 km apart) with their REAL H3 cell ids.
+// Since the per-bucket merge (D6(a)) clusters definitions spatially and
+// re-mints legacy ids, fixtures for DISTINCT logical points must carry
+// distinct positions and H3-shaped ids or they would (correctly) merge.
+const POS_A = { lat: 50.0, lon: 8.0 };
+const POS_B = { lat: 50.01, lon: 8.0 };
+const POS_C = { lat: 50.02, lon: 8.0 };
+const CELL_A = gpsToH3(POS_A.lat, POS_A.lon);
+const CELL_B = gpsToH3(POS_B.lat, POS_B.lon);
+const CELL_C = gpsToH3(POS_C.lat, POS_C.lon);
 
 /** Build a RefPointDefinition with the given observations. */
 function makeRefPointDef(
@@ -201,8 +213,8 @@ describe('ref-point-recovery', () => {
 
       const zipParis = await createTestZipBlob(
         [
-          makeRefPointDef('cell-paris', 'Paris point', [
-            makeObservation('s1', 1000),
+          makeRefPointDef(CELL_A, 'Paris point', [
+            makeObservation('s1', 1000, POS_A.lat, POS_A.lon),
           ]),
         ],
         'Paris',
@@ -210,8 +222,8 @@ describe('ref-point-recovery', () => {
       );
       const zipBerlin = await createTestZipBlob(
         [
-          makeRefPointDef('cell-berlin', 'Berlin point', [
-            makeObservation('s2', 2000),
+          makeRefPointDef(CELL_B, 'Berlin point', [
+            makeObservation('s2', 2000, POS_B.lat, POS_B.lon),
           ]),
         ],
         'Berlin',
@@ -219,8 +231,8 @@ describe('ref-point-recovery', () => {
       );
       const zipNoMeta = await createTestZipBlob(
         [
-          makeRefPointDef('cell-default', 'Orphan point', [
-            makeObservation('s3', 3000),
+          makeRefPointDef(CELL_C, 'Orphan point', [
+            makeObservation('s3', 3000, POS_C.lat, POS_C.lon),
           ]),
         ],
         'ignored',
@@ -242,13 +254,13 @@ describe('ref-point-recovery', () => {
       );
       expect(
         result.definitionsByScenario.get('Paris')!.map((d) => d.id)
-      ).toEqual(['cell-paris']);
+      ).toEqual([CELL_A]);
       expect(
         result.definitionsByScenario.get('Berlin')!.map((d) => d.id)
-      ).toEqual(['cell-berlin']);
+      ).toEqual([CELL_B]);
       expect(
         result.definitionsByScenario.get(DEFAULT_SCENARIO)!.map((d) => d.id)
-      ).toEqual(['cell-default']);
+      ).toEqual([CELL_C]);
     });
 
     /**
@@ -263,12 +275,20 @@ describe('ref-point-recovery', () => {
       const { DEFAULT_SCENARIO } = await import('./session-zip-naming');
 
       const zipExplicit = await createTestZipBlob(
-        [makeRefPointDef('cell-a', 'A', [makeObservation('s1', 1000)])],
+        [
+          makeRefPointDef(CELL_A, 'A', [
+            makeObservation('s1', 1000, POS_A.lat, POS_A.lon),
+          ]),
+        ],
         DEFAULT_SCENARIO,
         'contextTag'
       );
       const zipNone = await createTestZipBlob(
-        [makeRefPointDef('cell-b', 'B', [makeObservation('s2', 2000)])],
+        [
+          makeRefPointDef(CELL_B, 'B', [
+            makeObservation('s2', 2000, POS_B.lat, POS_B.lon),
+          ]),
+        ],
         'ignored',
         'none'
       );
@@ -291,7 +311,7 @@ describe('ref-point-recovery', () => {
           .get(DEFAULT_SCENARIO)!
           .map((d) => d.id)
           .sort()
-      ).toEqual(['cell-a', 'cell-b']);
+      ).toEqual([CELL_A, CELL_B].sort());
     });
 
     /**
@@ -347,7 +367,11 @@ describe('ref-point-recovery', () => {
 
       const corrupt = new Blob(['this is not a zip archive']);
       const good = await createTestZipBlob(
-        [makeRefPointDef('cell-good', 'Good', [makeObservation('s1', 1000)])],
+        [
+          makeRefPointDef(CELL_A, 'Good', [
+            makeObservation('s1', 1000, POS_A.lat, POS_A.lon),
+          ]),
+        ],
         'Paris',
         'contextTag'
       );
@@ -372,7 +396,7 @@ describe('ref-point-recovery', () => {
       expect(result.errors.length).toBeGreaterThanOrEqual(1);
       expect(
         result.definitionsByScenario.get('Paris')!.map((d) => d.id)
-      ).toEqual(['cell-good']);
+      ).toEqual([CELL_A]);
     });
 
     /**
@@ -456,35 +480,36 @@ describe('ref-point-recovery', () => {
 
     /**
      * Why this test matters:
-     * D4b-ii — ZIPs are processed newest-first (filename timestamp) so the
-     * newest recording provides the canonical metadata (name) of a merged
-     * definition, while observations from all recordings are unioned and
-     * createdAt keeps the earliest value. The entries are handed to the mock
-     * folder oldest-first to prove the sort (directory order is arbitrary in
-     * real folders).
+     * D4b-ii — ZIPs are processed newest-first (filename timestamp) so
+     * bucket order keeps the newest recording's definitions first (the
+     * gap-fill acceptance loop walks in order). Name conflicts resolve by
+     * the D6(a) most-observations-wins policy; with an equal observation
+     * count the tie goes to the name with the newest backing observation.
+     * The entries are handed to the mock folder oldest-first to prove the
+     * sort (directory order is arbitrary in real folders).
      */
-    it('processes ZIPs newest-first so the newest recording provides the canonical name (D4b-ii)', async () => {
+    it('processes ZIPs newest-first; equal-count name conflicts resolve to the newest backing observation (D4b-ii + D6a tie-break)', async () => {
       const { indexRefPointDefinitionsFromFolder } =
         await import('./ref-point-recovery');
 
-      const oldObs = makeObservation('session-old', 1000);
-      const newObs = makeObservation('session-new', 2000);
+      const oldObs = makeObservation('session-old', 1000, POS_A.lat, POS_A.lon);
+      const newObs = makeObservation('session-new', 2000, POS_A.lat, POS_A.lon);
       const zipOld = await createTestZipBlob(
         [
-          makeRefPointDef('cell-x', 'Old Name', [oldObs]),
+          makeRefPointDef(CELL_A, 'Old Name', [oldObs]),
           // Unique to the old zip, with the earliest createdAt (500) — pins
           // that buckets keep FIRST-ENCOUNTER order (newest recording first),
           // not createdAt order: the Slice-2 gap-fill acceptance loop walks
           // the bucket in order and must see the newest definitions first.
-          makeRefPointDef('cell-y', 'Only Old', [
-            makeObservation('session-old', 500),
+          makeRefPointDef(CELL_B, 'Only Old', [
+            makeObservation('session-old', 500, POS_B.lat, POS_B.lon),
           ]),
         ],
         'Paris',
         'contextTag'
       );
       const zipNew = await createTestZipBlob(
-        [makeRefPointDef('cell-x', 'New Name', [newObs])],
+        [makeRefPointDef(CELL_A, 'New Name', [newObs])],
         'Paris',
         'contextTag'
       );
@@ -498,10 +523,98 @@ describe('ref-point-recovery', () => {
       const result = await indexRefPointDefinitionsFromFolder(folderHandle);
 
       const paris = result.definitionsByScenario.get('Paris')!;
-      expect(paris.map((d) => d.id)).toEqual(['cell-x', 'cell-y']);
+      expect(paris.map((d) => d.id)).toEqual([CELL_A, CELL_B]);
       expect(paris[0]!.name).toBe('New Name');
       expect(paris[0]!.createdAt).toBe(1000);
       expect(paris[0]!.observations).toHaveLength(2);
+    });
+
+    /**
+     * Why this test matters:
+     * D6(a) — a name backed by MORE observations must beat a newer name
+     * backed by fewer (the rename-artifact fix: one throwaway name in the
+     * newest recording cannot override a long consistent naming history),
+     * and sibling definitions of the same physical spot (here: same cell)
+     * collapse into ONE definition on a clean import.
+     */
+    it('resolves name conflicts by most observations across ZIPs (D6a name policy)', async () => {
+      const { indexRefPointDefinitionsFromFolder } =
+        await import('./ref-point-recovery');
+
+      const zipOld = await createTestZipBlob(
+        [
+          makeRefPointDef(CELL_A, 'Haustüre', [
+            makeObservation('session-1', 1000, POS_A.lat, POS_A.lon),
+            makeObservation('session-2', 2000, POS_A.lat, POS_A.lon),
+          ]),
+        ],
+        'Paris',
+        'contextTag'
+      );
+      const zipNew = await createTestZipBlob(
+        [
+          makeRefPointDef(CELL_A, 'Trz4', [
+            makeObservation('session-3', 9000, POS_A.lat, POS_A.lon),
+          ]),
+        ],
+        'Paris',
+        'contextTag'
+      );
+
+      const folderHandle = createMockFolderHandle([
+        createMockFileEntry('recording-2026-01-01_10-00-00utc.zip', zipOld),
+        createMockFileEntry('recording-2026-06-01_10-00-00utc.zip', zipNew),
+      ]);
+
+      const result = await indexRefPointDefinitionsFromFolder(folderHandle);
+
+      const paris = result.definitionsByScenario.get('Paris')!;
+      expect(paris).toHaveLength(1);
+      expect(paris[0]!.name).toBe('Haustüre');
+      expect(paris[0]!.observations).toHaveLength(3);
+    });
+
+    /**
+     * Why this test matters:
+     * D6(a) — a legacy user-typed id at the same physical spot as an H3
+     * definition is the same anchor; a clean import must persist ONE merged
+     * definition under the H3 identity instead of resurrecting the split.
+     */
+    it('merges a legacy-id definition into the H3 definition of the same spot (D6a sibling merge)', async () => {
+      const { indexRefPointDefinitionsFromFolder } =
+        await import('./ref-point-recovery');
+
+      const zipLegacy = await createTestZipBlob(
+        [
+          makeRefPointDef('Treppe', 'Treppe', [
+            makeObservation('s-legacy', 500, POS_A.lat, POS_A.lon),
+          ]),
+        ],
+        'Paris',
+        'contextTag'
+      );
+      const zipH3 = await createTestZipBlob(
+        [
+          makeRefPointDef(CELL_A, 'Treppe', [
+            makeObservation('s-h3', 1000, POS_A.lat, POS_A.lon),
+            makeObservation('s-h3b', 2000, POS_A.lat, POS_A.lon),
+          ]),
+        ],
+        'Paris',
+        'contextTag'
+      );
+
+      const folderHandle = createMockFolderHandle([
+        createMockFileEntry('recording-2026-01-01_10-00-00utc.zip', zipLegacy),
+        createMockFileEntry('recording-2026-06-01_10-00-00utc.zip', zipH3),
+      ]);
+
+      const result = await indexRefPointDefinitionsFromFolder(folderHandle);
+
+      const paris = result.definitionsByScenario.get('Paris')!;
+      expect(paris).toHaveLength(1);
+      expect(paris[0]!.id).toBe(CELL_A);
+      expect(paris[0]!.observations).toHaveLength(3);
     });
 
     /**
@@ -515,8 +628,8 @@ describe('ref-point-recovery', () => {
 
       const zipParis = await createTestZipBlob(
         [
-          makeRefPointDef('cell-x', 'Paris view', [
-            makeObservation('s1', 1000),
+          makeRefPointDef(CELL_A, 'Paris view', [
+            makeObservation('s1', 1000, POS_A.lat, POS_A.lon),
           ]),
         ],
         'Paris',
@@ -524,8 +637,8 @@ describe('ref-point-recovery', () => {
       );
       const zipBerlin = await createTestZipBlob(
         [
-          makeRefPointDef('cell-x', 'Berlin view', [
-            makeObservation('s2', 2000),
+          makeRefPointDef(CELL_A, 'Berlin view', [
+            makeObservation('s2', 2000, POS_A.lat, POS_A.lon),
           ]),
         ],
         'Berlin',
@@ -544,13 +657,13 @@ describe('ref-point-recovery', () => {
           id: d.id,
           obs: d.observations.length,
         }))
-      ).toEqual([{ id: 'cell-x', obs: 1 }]);
+      ).toEqual([{ id: CELL_A, obs: 1 }]);
       expect(
         result.definitionsByScenario.get('Berlin')!.map((d) => ({
           id: d.id,
           obs: d.observations.length,
         }))
-      ).toEqual([{ id: 'cell-x', obs: 1 }]);
+      ).toEqual([{ id: CELL_A, obs: 1 }]);
     });
   });
 });

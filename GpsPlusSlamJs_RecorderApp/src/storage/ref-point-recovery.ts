@@ -19,6 +19,7 @@
  */
 
 import type { RefPointDefinition } from './ref-point-loader';
+import { mergeSiblingRefPoints } from './ref-point-merge';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
 import { loadSessionMetadataFromBlob } from 'gps-plus-slam-app-framework/storage/zip-reader';
 import {
@@ -112,51 +113,11 @@ async function extractDefinitionsFromZip(
 // Merge Logic
 // ============================================================================
 
-/**
- * Merge observations from multiple RefPointDefinitions with the same ID.
- * Deduplicates observations by sessionId + timestamp.
- * Uses earliest createdAt and first-encountered name.
- *
- * Output is in first-encounter order: the indexing pass feeds definitions
- * newest-recording-first, and the folder-manager gap-fill acceptance walks
- * the result in order, so the newest definition must come first (D4b-ii).
- */
-function mergeDefinitions(allDefs: RefPointDefinition[]): RefPointDefinition[] {
-  const byId = new Map<
-    string,
-    { def: RefPointDefinition; seen: Set<string> }
-  >();
-
-  for (const def of allDefs) {
-    let entry = byId.get(def.id);
-    if (!entry) {
-      entry = {
-        def: {
-          id: def.id,
-          name: def.name,
-          createdAt: def.createdAt,
-          observations: [],
-        },
-        seen: new Set<string>(),
-      };
-      byId.set(def.id, entry);
-    } else if (def.createdAt < entry.def.createdAt) {
-      entry.def.createdAt = def.createdAt;
-    }
-
-    // Unified dedup: every observation (initial or merged) passes through seen
-    for (const obs of def.observations) {
-      const key = `${obs.sessionId}:${obs.timestamp}`;
-      if (!entry.seen.has(key)) {
-        entry.seen.add(key);
-        entry.def.observations.push(obs);
-      }
-    }
-  }
-
-  // Map iteration preserves insertion order = first-encounter order.
-  return Array.from(byId.values()).map((e) => e.def);
-}
+// Definition merging (same-id observation union, sibling-cluster collapse,
+// legacy-id re-mint, most-observations-wins name policy) is delegated to the
+// shared `mergeSiblingRefPoints` (D6(a), 2026-07-06) — the same mechanism
+// `loadAndDisplayRefPoints` applies at load time, so what a clean import
+// persists is exactly what an existing store displays.
 
 // ============================================================================
 // Scenario-aware full-folder indexing pass (2026-07-05 folder-import plan)
@@ -245,10 +206,11 @@ function appendToBucket(
  *
  * - **Newest-first (D4b-ii):** ZIPs are sorted descending by the timestamp in
  *   their filename (`..._YYYY-MM-DD_HH-MM-SSutc.zip`; non-conforming names
- *   fall back to `File.lastModified`), so when the same ref-point id occurs
- *   in several recordings the newest one provides the canonical metadata
- *   (`name`) while observations are unioned and `createdAt` keeps the
- *   earliest value (see `mergeDefinitions`).
+ *   fall back to `File.lastModified`), so bucket order keeps the newest
+ *   recording's definitions first. Per-bucket merging (observation union,
+ *   sibling-cluster collapse, name policy) is `mergeSiblingRefPoints`
+ *   (D6(a)): the name backed by the MOST observations wins (ties → newest
+ *   backing observation) and `createdAt` keeps the earliest value.
  * - **Strict per-scenario routing (D4a):** each ZIP's definitions land only
  *   in the bucket of that ZIP's scenario (from its `session.json`); the same
  *   id under two scenarios stays in both buckets, unmerged.
@@ -303,13 +265,16 @@ export async function indexRefPointDefinitionsFromFolder(
     onProgress?.({ done, total });
   }
 
-  // Merge per scenario only (D4a). Buckets were filled newest-first, so the
-  // first-encountered name inside mergeDefinitions is the newest recording's,
-  // and 'encounter' order keeps the newest definition first in each bucket
-  // (the gap-fill acceptance loop in folder-manager relies on this; D4b-ii).
+  // Merge per scenario only (D4a) — cross-scenario ids stay unmerged. The
+  // shared sibling merge (D6(a)) unions same-id observations, collapses
+  // neighbor-cell/legacy sibling clusters, and applies the
+  // most-observations-wins name policy. Buckets were filled newest-first
+  // and the merge preserves first-encounter cluster order, so the gap-fill
+  // acceptance loop in folder-manager still sees newest definitions first
+  // (D4b-ii).
   const definitionsByScenario = new Map<string, RefPointDefinition[]>();
   for (const [scenario, defs] of rawByScenario) {
-    definitionsByScenario.set(scenario, mergeDefinitions(defs));
+    definitionsByScenario.set(scenario, mergeSiblingRefPoints(defs));
   }
 
   log.info(

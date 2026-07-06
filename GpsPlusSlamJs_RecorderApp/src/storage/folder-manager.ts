@@ -31,6 +31,7 @@ import {
   type RefPointDefinition,
 } from '../storage/ref-point-loader';
 import { indexRefPointDefinitionsFromFolder } from '../storage/ref-point-recovery';
+import { mergeSiblingRefPoints } from '../storage/ref-point-merge';
 import {
   isH3Index,
   h3CellsMatch,
@@ -594,6 +595,11 @@ export function createFolderManager(deps: FolderManagerDeps): FolderManager {
     if (refPointDefs.length === 0) {
       refPointDefs = await tryRecoverRefPointsFromZips(handle);
     }
+
+    // D6(a): collapse sibling clusters (durable neighbor-cell twins, legacy
+    // ids) IN MEMORY — display, capture-matching, and averaging all consume
+    // merged definitions, so existing stores heal without any file rewrite.
+    refPointDefs = mergeSiblingRefPoints(refPointDefs);
 
     const allObservations = flattenRefPointsToMarks(refPointDefs);
 

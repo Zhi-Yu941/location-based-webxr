@@ -23,9 +23,13 @@ Scans all `.zip` files in the folder **newest-first** (filename timestamp
 `..._YYYY-MM-DD_HH-MM-SSutc.zip`; non-conforming names fall back to
 `File.lastModified`, read lazily only for those), resolves each ZIP's scenario
 (`contextTag` → legacy `scenarioName` → `DEFAULT_SCENARIO`; shared resolver in
-`session-zip-naming.ts`), extracts `refPoints/*.json` entries, and merges
-observations per ref-point id **within each scenario bucket only** (D4a — the
-same id under two scenarios stays in both buckets).
+`session-zip-naming.ts`), extracts `refPoints/*.json` entries, and merges each
+scenario bucket via the shared `mergeSiblingRefPoints` (D6(a),
+`ref-point-merge.ts`) **within each scenario bucket only** (D4a — the same id
+under two scenarios stays in both buckets): same-anchor definitions collapse
+(same id, or neighbor cells with averaged positions within the merge
+distance), legacy ids re-mint to their averaged-position cell, observations
+dedupe by content key, and name conflicts resolve most-observations-wins.
 
 **Options:**
 
@@ -59,14 +63,15 @@ interface RefPointIndexResult {
 
 ## Invariants & Assumptions
 
-- Ref-point IDs are H3 cell ids (since the March 2026 H3 migration); merging
-  inside a bucket is by exact id (gridDisk-neighbor handling happens in the
-  folder-manager gap-fill, not here).
-- Observations are deduplicated by the `sessionId:timestamp` composite key
-  (NOT collision-safe across devices — see the 2026-07-05
-  observation-merge follow-up doc before reusing it for cross-device merges).
-- Merged metadata: first-encountered (= newest recording's) name wins;
-  earliest `createdAt` wins.
+- Bucket merging is delegated to `mergeSiblingRefPoints` (`ref-point-merge.ts`,
+  D6(a)): same-anchor clusters collapse (exact id, or matching effective
+  cells with averaged positions within the merge distance), legacy ids
+  re-mint to the H3 cell of their averaged position, so a clean import
+  persists exactly what an existing store displays after its load-time merge.
+- Observations are deduplicated by a content key
+  (`sessionId|timestamp|lat|lon`).
+- Merged metadata: the name backed by the MOST observations wins (ties → the
+  name with the newest backing observation); earliest `createdAt` wins.
 - Scenario resolution and filename-timestamp parsing live in
   `session-zip-naming.ts` so the replay discovery and this pass can never
   drift apart.
@@ -92,7 +97,10 @@ for (const [scenarioName, defs] of result.definitionsByScenario) {
 - `ref-point-recovery.test.ts` — scenario grouping (contextTag / legacy /
   missing metadata), Default-Scenario canonicalization, progress events
   (initial 0/total, corrupt-ZIP advance), abort (pre-start and mid-pass),
-  newest-first ordering + canonical-name selection, cross-scenario isolation.
-- `ref-point-recovery.property.test.ts` — partition completeness (every input
-  observation lands in exactly its scenario bucket, nothing lost or leaked)
-  and determinism/idempotence over arbitrary generated ZIP sets.
+  newest-first ordering + name tie-break, most-observations name policy,
+  legacy-into-H3 sibling merge, cross-scenario isolation.
+- `ref-point-recovery.property.test.ts` — partition completeness at the
+  observation level (every input observation lands in exactly its scenario
+  bucket, nothing lost or leaked — ids may change through the merge) and
+  determinism/idempotence over arbitrary generated ZIP sets.
+- The merge algorithm itself is covered in `ref-point-merge.test.ts`.

@@ -34,6 +34,7 @@ export interface RecordingOptionsInput {
   visualization?: Partial<VisualizationOptions>;
   qr?: Partial<QrCaptureOptions>;
   compassDebug?: Partial<CompassDebugOptions>;
+  loopClosureDebug?: Partial<LoopClosureDebugOptions>;
 }
 
 /**
@@ -62,6 +63,24 @@ export interface CompassDebugOptions {
   rotationPrior: boolean;
   /** GPS-free compass↔WebXR consistency gate (`setCompassWebXRConsistencyEnabled`). */
   webXRConsistency: boolean;
+}
+
+/**
+ * Live loop-closure capture toggles (experimental, default OFF).
+ *
+ * When `detectorEnabled` is on, the recorder feeds every AR frame's raw WebXR
+ * pose into the library's `createLoopClosureHandler`, so an AR relocalization
+ * jump (>1 m between consecutive frames) dispatches `arLoopClosureDetected`
+ * into the session store — and therefore into the recording. This is the
+ * missing producer that has kept the whole corpus loop-closure-free (the
+ * pair-refresh T5 verdict is blocked on such recordings). It also changes the
+ * LIVE alignment (each closure Bézier-deforms the stored trajectory), which is
+ * why it stays an operator opt-in. See
+ * GpsPlusSlamJs_Docs/docs/2026-07-06-recorder-loop-closure-detector-wiring-plan.md.
+ */
+export interface LoopClosureDebugOptions {
+  /** Wire the live loop-closure handler into the AR frame loop. Default OFF. */
+  detectorEnabled: boolean;
 }
 
 /**
@@ -430,6 +449,8 @@ export interface RecordingOptions {
   qr: QrCaptureOptions;
   /** Compass alignment debug toggles (Stage 0 / Stage C / consistency gate) */
   compassDebug: CompassDebugOptions;
+  /** Live loop-closure capture toggles (experimental, default OFF) */
+  loopClosureDebug: LoopClosureDebugOptions;
 }
 
 // --- Constants ---
@@ -520,6 +541,12 @@ export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
     coldStartOverride: true,
     rotationPrior: false,
     webXRConsistency: false,
+  },
+  loopClosureDebug: {
+    // OFF by default: with it ON every AR relocalization jump dispatches
+    // arLoopClosureDetected into the recording AND deforms the live
+    // alignment — an experimental capture feature until corpus-validated.
+    detectorEnabled: false,
   },
 };
 
@@ -689,6 +716,23 @@ export function validateCompassDebugOptions(
       typeof options.webXRConsistency === 'boolean'
         ? options.webXRConsistency
         : defaults.webXRConsistency,
+  };
+}
+
+/**
+ * Validate and normalize the loop-closure capture toggles. Boolean-or-default
+ * per field; a missing/corrupted/pre-feature value falls back to the OFF
+ * default so a bad persisted value can never silently wire the detector in.
+ */
+export function validateLoopClosureDebugOptions(
+  options: Partial<LoopClosureDebugOptions>
+): LoopClosureDebugOptions {
+  const defaults = DEFAULT_RECORDING_OPTIONS.loopClosureDebug;
+  return {
+    detectorEnabled:
+      typeof options.detectorEnabled === 'boolean'
+        ? options.detectorEnabled
+        : defaults.detectorEnabled,
   };
 }
 
@@ -1119,6 +1163,9 @@ export function validateRecordingOptions(
     visualization: validateVisualizationOptions(options.visualization ?? {}),
     qr: validateQrOptions(options.qr ?? {}),
     compassDebug: validateCompassDebugOptions(options.compassDebug ?? {}),
+    loopClosureDebug: validateLoopClosureDebugOptions(
+      options.loopClosureDebug ?? {}
+    ),
   };
 }
 
@@ -1210,5 +1257,6 @@ export function cloneRecordingOptions(
     visualization: { ...options.visualization },
     qr: { ...options.qr },
     compassDebug: { ...options.compassDebug },
+    loopClosureDebug: { ...options.loopClosureDebug },
   };
 }

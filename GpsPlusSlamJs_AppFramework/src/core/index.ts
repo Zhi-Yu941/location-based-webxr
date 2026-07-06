@@ -43,6 +43,12 @@ export {
   // Actions
   odometryTrackingRestarted,
 
+  // Live loop-closure handler factory (2026-07-06 recorder wiring): feed raw
+  // WebXR poses per frame; dispatches arLoopClosureDetected on a >1 m jump so
+  // recordings finally capture loop closures. Gated by the operator's
+  // `loopClosureDebug.detectorEnabled` recording option (default OFF).
+  createLoopClosureHandler,
+
   // Store factory (test/integration use)
   createGpsSlamStore,
 
@@ -64,6 +70,10 @@ export type {
   // Frame-tile payload (used by the recorder's frame-tile visualizer
   // subscriber; see 2026-05-27 collapse-refpoint-and-frame-slices plan).
   ArImageCapture,
+
+  // Live loop-closure handler contract (see createLoopClosureHandler above)
+  LoopClosureHandler,
+  LoopClosureHandlerConfig,
 
   // Library root state (renamed to avoid collision with framework RootState)
   RootState as LibraryRootState,

@@ -19,6 +19,7 @@ import {
   validateFrameTileDisplayOptions,
   validateVisualizationOptions,
   validateCompassDebugOptions,
+  validateLoopClosureDebugOptions,
   validateQrOptions,
   validateMotionFilterOptions,
   validateQualityFilterOptions,
@@ -811,6 +812,51 @@ describe('recording-options', () => {
     });
   });
 
+  describe('validateLoopClosureDebugOptions', () => {
+    // Why these tests matter: the loop-closure detector wiring is an
+    // experimental capture feature (2026-07-06 recorder wiring plan). It MUST
+    // default OFF and a corrupted/pre-feature persisted value must never
+    // silently enable it — with it ON, every AR relocalization jump dispatches
+    // arLoopClosureDetected into the recording and deforms the live alignment.
+    it('returns the OFF default when given empty object', () => {
+      const result = validateLoopClosureDebugOptions({});
+      expect(result).toEqual(DEFAULT_RECORDING_OPTIONS.loopClosureDebug);
+      expect(result).toEqual({ detectorEnabled: false });
+    });
+
+    it('preserves a valid boolean value', () => {
+      expect(
+        validateLoopClosureDebugOptions({ detectorEnabled: true })
+      ).toEqual({ detectorEnabled: true });
+      expect(
+        validateLoopClosureDebugOptions({ detectorEnabled: false })
+      ).toEqual({ detectorEnabled: false });
+    });
+
+    it('falls back to OFF for non-boolean values', () => {
+      expect(
+        validateLoopClosureDebugOptions({
+          detectorEnabled: 'yes' as unknown as boolean,
+        })
+      ).toEqual({ detectorEnabled: false });
+      expect(
+        validateLoopClosureDebugOptions({
+          detectorEnabled: 1 as unknown as boolean,
+        })
+      ).toEqual({ detectorEnabled: false });
+    });
+
+    it('validateRecordingOptions + cloneRecordingOptions carry loopClosureDebug (deep-cloned)', () => {
+      const opts = validateRecordingOptions({
+        loopClosureDebug: { detectorEnabled: true },
+      });
+      expect(opts.loopClosureDebug).toEqual({ detectorEnabled: true });
+      const clone = cloneRecordingOptions(opts);
+      expect(clone.loopClosureDebug).not.toBe(opts.loopClosureDebug); // no aliasing
+      expect(clone.loopClosureDebug).toEqual(opts.loopClosureDebug);
+    });
+  });
+
   describe('validateVisualizationOptions', () => {
     /**
      * Why these tests matter (Finding B / DB-1b of
@@ -1081,6 +1127,7 @@ describe('recording-options', () => {
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
         qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
         compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
+        loopClosureDebug: { ...DEFAULT_RECORDING_OPTIONS.loopClosureDebug },
       };
       localStorageMock.getItem.mockReturnValueOnce(JSON.stringify(stored));
 
@@ -1176,6 +1223,7 @@ describe('recording-options', () => {
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
         qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
         compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
+        loopClosureDebug: { ...DEFAULT_RECORDING_OPTIONS.loopClosureDebug },
       };
 
       saveRecordingOptions(options);
@@ -1203,6 +1251,7 @@ describe('recording-options', () => {
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
         qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
         compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
+        loopClosureDebug: { ...DEFAULT_RECORDING_OPTIONS.loopClosureDebug },
       };
 
       saveRecordingOptions(options);
@@ -1584,6 +1633,7 @@ describe('recording-options', () => {
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
         qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
         compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
+        loopClosureDebug: { ...DEFAULT_RECORDING_OPTIONS.loopClosureDebug },
       };
 
       saveRecordingOptions(customOptions);
@@ -1609,6 +1659,7 @@ describe('recording-options', () => {
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
         qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
         compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
+        loopClosureDebug: { ...DEFAULT_RECORDING_OPTIONS.loopClosureDebug },
       };
 
       saveRecordingOptions(options1);
@@ -1643,6 +1694,7 @@ describe('recording-options', () => {
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
         qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
         compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
+        loopClosureDebug: { ...DEFAULT_RECORDING_OPTIONS.loopClosureDebug },
       });
 
       // Reset
@@ -1705,6 +1757,7 @@ describe('recording-options', () => {
         visualization: { ...DEFAULT_RECORDING_OPTIONS.visualization },
         qr: { ...DEFAULT_RECORDING_OPTIONS.qr },
         compassDebug: { ...DEFAULT_RECORDING_OPTIONS.compassDebug },
+        loopClosureDebug: { ...DEFAULT_RECORDING_OPTIONS.loopClosureDebug },
       };
       localStorageMock.setItem(CUSTOM_KEY, JSON.stringify(custom));
 

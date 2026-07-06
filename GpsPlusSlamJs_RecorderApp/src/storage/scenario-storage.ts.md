@@ -32,7 +32,10 @@ recorder.
   the eager ref-point indexing pass, which writes into many scenarios while
   the user's selection must stay current (2026-07-05 folder-import plan §3.2).
   Returns `null` when storage is uninitialized, or when the scenario is absent
-  and `create` was not requested.
+  and `create` was not requested. Any other error (`QuotaExceededError`,
+  `TypeMismatchError` from a file occupying the name, …) is **rethrown** —
+  mapping it to `null` made the indexing pass skip the scenario yet report
+  success (PR #165 review fix, 2026-07-06).
 - `clearRefPointsCacheForAllScenarios(): Promise<ClearRefPointsCacheResult>` —
   delete every scenario's `refPoints/` cache so the next load re-imports from
   read-folder ZIPs. Per-scenario failures collected in `errors`; a missing cache

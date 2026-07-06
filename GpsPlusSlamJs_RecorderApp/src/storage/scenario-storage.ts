@@ -334,6 +334,10 @@ export async function ensureScenarioDirectory(
  *
  * @returns The directory handle, or `null` when storage is uninitialized or
  * the scenario does not exist and `create` was not requested.
+ * @throws Any other storage failure (`QuotaExceededError`,
+ * `TypeMismatchError` — a file occupying the scenario name — etc.): mapping
+ * those to `null` made the eager indexing pass skip the scenario and report
+ * SUCCESS with fewer points written instead of surfacing the error.
  */
 export async function getScenarioDirectoryHandle(
   scenarioName: string,
@@ -347,8 +351,18 @@ export async function getScenarioDirectoryHandle(
     return await scenRoot.getDirectoryHandle(scenarioName, {
       create: options.create === true,
     });
-  } catch {
-    return null;
+  } catch (err) {
+    // Only "missing scenario, create not requested" is knowledge about the
+    // scenario; everything else is a storage failure the caller must hear
+    // about loudly (see @throws above).
+    if (
+      options.create !== true &&
+      err instanceof DOMException &&
+      err.name === 'NotFoundError'
+    ) {
+      return null;
+    }
+    throw err;
   }
 }
 

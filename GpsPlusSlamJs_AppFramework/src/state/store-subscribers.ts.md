@@ -16,13 +16,9 @@ Uses `subscribeToSelector` for selective change detection — each state slice (
 
 ### `mapOverlay` dependency (optional)
 
-| Method                  | Signature                  | Wiring                                                                               |
-| ----------------------- | -------------------------- | ------------------------------------------------------------------------------------ |
-| `setGpsPosition`        | `(lat, lon) => void`       | Called when GPS positions change, with the latest GPS position.                      |
-| `addRawGpsPoint?`       | `(lat, lon) => void`       | Called per new GPS event with raw lat/lon (yellow breadcrumb polyline).              |
-| `addFusedPoint?`        | `(lat, lon) => void`       | Called per new GPS event with fused lat/lon (alignment × odom → GPS, cyan polyline). |
-| `addAlignmentSnapshot?` | `(lat, lon) => void`       | Called when alignment matrix changes — snapshot NUE position converted to lat/lon.   |
-| `addRefPoint?`          | `(lat, lon, name) => void` | Called when new reference points appear in state (incremental, name = ref point id). |
+- `setGpsPosition(lat, lon)` — called on GPS-position changes to center the map on the **same coordinate the blue dot shows**: the rebuilt `MapData.userPosition` (fused tip when an alignment exists, raw fix before the first solve). For a **render-less** overlay (minimal `setGpsPosition`-only shape) there is no rebuilt snapshot, so centering keeps the last raw fix. See [2026-07-06-recorder-live-map-user-dot-fused-pose-user-feedback.md](../../../GpsPlusSlamJs_Docs/docs/2026-07-06-recorder-live-map-user-dot-fused-pose-user-feedback.md) decisions 3, 5, 6.
+- `render?(data: MapData)` — draws the full shared trajectory snapshot (raw GPS + accuracy circles, fused path, alignment snapshots, user dot) via the shared `drawMapData` routine.
+- The previous incremental API (`addRawGpsPoint` / `addFusedPoint` / `addAlignmentSnapshot` / `addRefPoint`) **no longer exists** — the fused path recomputes wholesale from the latest matrix on every rebuild (D2, unified-trajectory-map Phase 3), and ref points are recorder-owned.
 
 ### `wireStoreSubscribers(store, deps)`
 
@@ -33,7 +29,7 @@ On each state change the subscriber:
 3. **GPS event markers** — incrementally adds markers for new GPS events (since the last notification). Sets the zero reference on the visualizer when first available.
 4. **Orbit target** — if `deps.onNewGpsPosition` is provided, calls it with the GPS world-space coordinates of each new event. Used in replay mode to auto-follow `OrbitControls` (Risk R9).
 5. **AR pose update** — if `deps.onNewOdomPose` is provided, calls it with `(odomPosition, odomRotation)` for each new event that has both position and rotation data. Used in replay mode to update the `arpose` Object3D so the camera follows the recorded trajectory.
-6. **Map overlay** — updates `deps.mapOverlay.setGpsPosition(lat, lon)` with the latest GPS position. For each new GPS event with an alignment matrix and zero reference, computes the fused GPS position via `fusedGpsFromOdom(alignmentMatrix, odomPos, zeroRef)` and calls `addFusedPoint`. When alignment matrix changes, calls `addAlignmentSnapshot` with the snapshot's GPS coordinates. Incrementally forwards new reference points via `addRefPoint(lat, lon, id)`. All optional methods are safely skipped if not provided. Skipped entirely if `mapOverlay` is `null`/`undefined`.
+6. **Map overlay** — on every GPS-positions or alignment-matrix change, `rebuildMap()` rebuilds the full `MapData` snapshot via `buildMapData` (D2: fused path always recomputed from the latest matrix) and hands it to `deps.mapOverlay.render`. On GPS changes it then centers via `setGpsPosition` on the rebuilt snapshot's `userPosition` — the same coordinate the blue dot shows (fused when aligned, raw before the first solve; raw also for a render-less overlay, which has no snapshot). Alignment-change redraws intentionally do **not** re-center (centering stays a GPS-event-rate concern). Skipped entirely if `mapOverlay` is `null`/`undefined`.
 7. **GPS lat/lng callback** — if `deps.onNewGpsLatLng` is provided, calls it with `(lat, lng)` for each new GPS event. Used in live recording to drive ref-point proximity detection for the dynamic button label.
 8. **GPS accuracy ellipsoid (rec31 investigation §3)** — when `deps.showAccuracySpheres === true`, each new GPS event additionally forwards `{ horizontal: gpsPoint.latLongAccuracy, vertical: gpsPoint.altitudeAccuracy }` to `addGpsEvent`. The visualizer then renders the raw-GPS marker as a non-uniform-scaled ellipsoid (see `../visualization/gps-event-markers.ts` §Marker Sizing). When the flag is `false`/omitted (the live-recording default), `undefined` is forwarded and the legacy fixed 8 cm sphere is drawn. See [../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-19-investigate-rec31-altitude-drop.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-19-investigate-rec31-altitude-drop.md).
 9. **Reference-point visualization (Finding 5, 2026-04-30)** — if `deps.refPointVisualizer` is provided, two additional subscriptions are wired:
@@ -106,11 +102,8 @@ Covered by `store-subscribers.test.ts` (46 test cases):
 - Alignment matrix: applied when present, updates fused markers, skipped when gpsData null
 - GPS event visualization: sets zero ref, incremental marker addition, skips incomplete data
 - Orbit target auto-follow: calls onNewGpsPosition with coordinates, last event with multiple, safe when callback absent (Risk R9)
-- Map overlay: updates with latest position, handles null gracefully, skips empty positions
-- Map overlay raw GPS: calls addRawGpsPoint per event, safe when method absent
-- Map overlay fused path (Phase 1b): calls addFusedPoint with alignment-corrected GPS coords, skips when alignment or zeroRef missing, safe when method absent
-- Map overlay alignment snapshots (Phase 1b): calls addAlignmentSnapshot with GPS coords on matrix change, skips when zeroRef missing, safe when method absent
-- Map overlay reference points (Phase 1b): calls addRefPoint incrementally for new ref points, safe when method absent
+- Map overlay centering (2026-07-06 fused-dot Slice B): centers on the rendered `MapData.userPosition` (fused ≠ raw when aligned), on the raw fix without alignment, on the raw fix for a render-less overlay; handles null overlay gracefully, skips empty positions
+- Map overlay rendering: full `MapData` snapshot per store change (raw path, fused path recomputed per matrix — snaps, empty when matrix/zeroRef missing —, alignment-snapshot GPS coords, `userHeadingDeg` wiring), safe when `render` absent
 - `showAccuracySpheres` flag (rec31 §3): flag on → forwards `{ horizontal, vertical }` from `latLongAccuracy`/`altitudeAccuracy`; flag off/default → forwards `undefined`; partial accuracy fields preserved (e.g. `altitudeAccuracy` missing → `vertical: undefined`)
 - Fresh counter: each `wireStoreSubscribers()` call starts from 0
 

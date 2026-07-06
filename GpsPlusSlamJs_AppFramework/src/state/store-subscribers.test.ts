@@ -559,8 +559,14 @@ describe('wireStoreSubscribers', () => {
 
   // --- Map overlay ---
 
-  it('updates map overlay with latest GPS position', () => {
-    // Why: the 2D map must track the user's position during live & replay
+  it('centers the map on the SAME coordinate the dot shows (fused when aligned)', () => {
+    // Why (2026-07-06 fused-dot feedback, Slice B): if the dot moves to the
+    // fused position but centering keeps following raw GPS, the dot walks
+    // off-center/off-screen exactly in the indoor scenario that motivated
+    // the fix. Centering must consume the rebuilt MapData's userPosition —
+    // one source of truth, no duplicated fused conversion. With alignment
+    // present, that is the fused tip, NOT the raw fix. See
+    // gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-06-recorder-live-map-user-dot-fused-pose-user-feedback.md.
     const gpsPoint = {
       id: 'gps-1',
       zeroRef: { lat: 50, lon: 8 },
@@ -588,7 +594,93 @@ describe('wireStoreSubscribers', () => {
       })
     );
 
+    // The rendered snapshot's userPosition (fused tip, per Slice A) is the
+    // single source of truth for centering.
+    const rendered = deps.mapOverlay.render.mock.calls.at(-1)?.[0];
+    expect(rendered?.userPosition).toBeTruthy();
+    expect(deps.mapOverlay.setGpsPosition).toHaveBeenCalledWith(
+      rendered!.userPosition!.lat,
+      rendered!.userPosition!.lng
+    );
+    // …and NOT the raw fix while an alignment exists.
+    expect(deps.mapOverlay.setGpsPosition).not.toHaveBeenCalledWith(
+      50.123,
+      8.456
+    );
+  });
+
+  it('centers the map on the raw fix while no alignment exists yet', () => {
+    // Why: pre-alignment the fused path is empty, so the dot shows the raw
+    // fix (decision 2) and centering must follow it — unchanged behavior.
+    const gpsPoint = {
+      id: 'gps-1',
+      zeroRef: { lat: 50, lon: 8 },
+      latitude: 50.123,
+      longitude: 8.456,
+      coordinates: [1, 0, 0] as Vector3,
+      weight: 1,
+      timestamp: Date.now(),
+    };
+
+    const mock = makeMockStore(makeState());
+    wireStoreSubscribers(mock.store, deps);
+
+    mock.setState(
+      makeState({
+        gpsData: {
+          zero: { lat: 50, lon: 8 },
+          gpsEvents: {
+            alignmentMatrix: null,
+            gpsPositions: [gpsPoint],
+            odometryPositions: [[0.5, 0, 0.5]],
+          },
+          odometryPath: { positions: [], rotations: [] },
+        } as unknown as CombinedRootState['gpsData'],
+      })
+    );
+
     expect(deps.mapOverlay.setGpsPosition).toHaveBeenCalledWith(50.123, 8.456);
+  });
+
+  it('centers a render-less mapOverlay on the raw fix (no MapData to follow)', () => {
+    // Why: the minimal { setGpsPosition } dep shape is supported; without
+    // render there is no rebuilt MapData, so centering keeps the raw fix
+    // (decision 6 of the 2026-07-06 doc) instead of paying a fused-path
+    // recompute for an overlay that draws nothing.
+    const setGpsPosition = vi.fn<(lat: number, lon: number) => void>();
+    const depsNoRender: StoreSubscriberDeps = {
+      ...deps,
+      mapOverlay: { setGpsPosition },
+    };
+
+    const mock = makeMockStore(makeState());
+    wireStoreSubscribers(mock.store, depsNoRender);
+
+    mock.setState(
+      makeState({
+        gpsData: {
+          zero: { lat: 50, lon: 8 },
+          gpsEvents: {
+            alignmentMatrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+            gpsPositions: [
+              {
+                id: 'gps-1',
+                zeroRef: { lat: 50, lon: 8 },
+                latitude: 50.123,
+                longitude: 8.456,
+                coordinates: [1, 0, 0] as Vector3,
+                weight: 1,
+                timestamp: Date.now(),
+              },
+            ],
+            odometryPositions: [[0.5, 0, 0.5]],
+          },
+          odometryPath: { positions: [], rotations: [] },
+        } as unknown as CombinedRootState['gpsData'],
+      })
+    );
+
+    expect(setGpsPosition).toHaveBeenCalledWith(50.123, 8.456);
   });
 
   it('handles null mapOverlay gracefully', () => {

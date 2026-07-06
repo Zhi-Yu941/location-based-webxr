@@ -61,7 +61,10 @@ export interface StoreSubscriberDeps {
    * Map overlay — renders the shared trajectory snapshot. Nullable (not
    * present in all modes).
    *
-   * `setGpsPosition` centers the map on the latest fix; `render` draws the
+   * `setGpsPosition` centers the map on the same coordinate the blue dot
+   * shows — the rebuilt `MapData.userPosition` (fused tip when aligned, raw
+   * fix before the first solve; raw also for a render-less overlay, which
+   * has no rebuilt snapshot to follow); `render` draws the
    * full {@link MapData} snapshot (raw GPS + accuracy circles, fused path,
    * alignment snapshots, user dot) via the shared `drawMapData` routine — the
    * SAME one the 2D session-summary map uses, so the live and summary maps
@@ -164,9 +167,14 @@ export function wireStoreSubscribers(
    * positions change — the change-gated subscriptions below provide the
    * throttling, so no extra debouncing is needed. The fused path is always
    * recomputed from the latest matrix inside `buildMapData` (D2).
+   *
+   * Returns the rendered `MapData` so the GPS subscription can center the map
+   * on the SAME coordinate the dot shows (fused when available — 2026-07-06
+   * fused-dot feedback, Slice B), or `null` when there is no overlay or it
+   * has no `render` (the minimal `setGpsPosition`-only dep shape).
    */
-  function rebuildMap(): void {
-    if (!deps.mapOverlay?.render) return;
+  function rebuildMap(): MapData | null {
+    if (!deps.mapOverlay?.render) return null;
     const state = store.getState();
     const gpsPositions = selectGpsPositions(state);
     const rawGpsPath = gpsPositions.map((p) => ({
@@ -174,16 +182,16 @@ export function wireStoreSubscribers(
       lng: p.longitude,
       accuracy: p.latLongAccuracy,
     }));
-    deps.mapOverlay.render(
-      buildMapData({
-        rawGpsPath,
-        odometryPositions: selectOdometryPositions(state),
-        odometryRotations: selectOdometryRotations(state),
-        alignmentMatrix: selectAlignmentMatrix(state),
-        zeroRef: selectZeroReference(state),
-        alignmentSnapshots: alignmentSnapshotGps,
-      })
-    );
+    const data = buildMapData({
+      rawGpsPath,
+      odometryPositions: selectOdometryPositions(state),
+      odometryRotations: selectOdometryRotations(state),
+      alignmentMatrix: selectAlignmentMatrix(state),
+      zeroRef: selectZeroReference(state),
+      alignmentSnapshots: alignmentSnapshotGps,
+    });
+    deps.mapOverlay.render(data);
+    return data;
   }
 
   // 1. Alignment matrix → apply to AR world group + capture snapshots
@@ -280,17 +288,32 @@ export function wireStoreSubscribers(
           }
         }
 
-        // Update map overlay GPS position (latest GPS point) for centering…
+        // Redraw the full trajectory snapshot first, then center the overlay
+        // on the SAME coordinate the blue dot shows — the rebuilt MapData's
+        // userPosition (fused tip when aligned, raw fix before the first
+        // solve). Centering on the raw fix while the dot is fused would walk
+        // the dot off-center exactly in the indoor scenario of the 2026-07-06
+        // fused-dot feedback (Slice B). For a render-less overlay (minimal
+        // `setGpsPosition`-only shape) there is no MapData — keep the raw fix
+        // rather than paying a fused-path recompute for a map that draws
+        // nothing (decision 6). Alignment-change redraws (subscription 1)
+        // intentionally do NOT re-center: centering stays a GPS-event-rate
+        // concern.
+        const mapData = rebuildMap();
         if (deps.mapOverlay && gpsPositions.length > 0) {
-          const lastGpsPoint = gpsPositions[gpsPositions.length - 1]!;
-          deps.mapOverlay.setGpsPosition(
-            lastGpsPoint.latitude,
-            lastGpsPoint.longitude
-          );
+          if (mapData?.userPosition) {
+            deps.mapOverlay.setGpsPosition(
+              mapData.userPosition.lat,
+              mapData.userPosition.lng
+            );
+          } else {
+            const lastGpsPoint = gpsPositions[gpsPositions.length - 1]!;
+            deps.mapOverlay.setGpsPosition(
+              lastGpsPoint.latitude,
+              lastGpsPoint.longitude
+            );
+          }
         }
-
-        // …then redraw the full trajectory snapshot.
-        rebuildMap();
       }
     )
   );

@@ -18,18 +18,18 @@ Orchestrates all replay building blocks (Iterations 1-5) into a single entry poi
 
 ### `ReplayModeController`
 
-| Method              | Signature                   | Description                                  |
-| ------------------- | --------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `play(speedFactor)` | `(number) => Promise<void>` | Start dispatching actions at the given speed |
-| `pause()`           | `() => void`                | Pause the replay                             |
-| `resume()`          | `() => Promise<void>`       | Resume from where we paused                  |
-| `setSpeed(factor)`  | `(number) => void`          | Change playback speed mid-replay             |
-| `getState()`        | `() => ReplayState`         | Get current engine state                     |
-| `getEngine()`       | `() => ReplayEngine`        | Get the underlying engine                    |
-| `getStore()`        | `() => RecorderStore`       | Get the replay store (R6: same instance)     |
-| `getActionCount()`  | `() => number`              | Total number of loaded actions               |
-| `setMapOverlay(o)`  | `(MapOverlay                | null) => void`                               | Set/clear the real map overlay target for the proxy (forwards setGpsPosition, render) and refresh the store-driven ref-point markers onto the just-attached map (via its `getLeafletMap()`) |
-| `dispose()`         | `() => void`                | Clean up scene, engine, and subscribers      |
+| Method              | Signature                      | Description                                                                                                                                                                                 |
+| ------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `play(speedFactor)` | `(number) => Promise<void>`    | Start dispatching actions at the given speed                                                                                                                                                |
+| `pause()`           | `() => void`                   | Pause the replay                                                                                                                                                                            |
+| `resume()`          | `() => Promise<void>`          | Resume from where we paused                                                                                                                                                                 |
+| `setSpeed(factor)`  | `(number) => void`             | Change playback speed mid-replay                                                                                                                                                            |
+| `getState()`        | `() => ReplayState`            | Get current engine state                                                                                                                                                                    |
+| `getEngine()`       | `() => ReplayEngine`           | Get the underlying engine                                                                                                                                                                   |
+| `getStore()`        | `() => RecorderStore`          | Get the replay store (R6: same instance)                                                                                                                                                    |
+| `getActionCount()`  | `() => number`                 | Total number of loaded actions                                                                                                                                                              |
+| `setMapOverlay(o)`  | `(MapOverlay \| null) => void` | Set/clear the real map overlay target for the proxy (forwards setGpsPosition, render) and refresh the store-driven ref-point markers onto the just-attached map (via its `getLeafletMap()`) |
+| `dispose()`         | `() => void`                   | Clean up scene, engine, and subscribers                                                                                                                                                     |
 
 ## Invariants & Assumptions
 

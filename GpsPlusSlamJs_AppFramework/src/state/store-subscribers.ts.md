@@ -52,6 +52,7 @@ Returns an unsubscribe function that removes all listeners from the store.
 - `onNewOdomPose` is optional — not provided in live recording mode (arpose stays at identity). In replay mode, the caller passes a callback that writes recorded odom position/rotation to the `arpose` Object3D. Skipped defensively if `odometryRotations[i]` is missing.
 - `onAlignmentSnapshot` is optional — not provided in live recording mode. In replay mode, the caller passes a callback that routes the snapshot NUE position to `updateOrbitTarget()` in `replay-scene.ts`, centering the orbit camera on alignment-snapshot points (Issue #3).
 - The `applyAlignmentMatrix` function and `gpsEventVisualizer`/`mapOverlay` methods are called synchronously during the store notification. No async operations.
+- **A throwing `mapOverlay.render` is contained** (PR #168 review): `rebuildMap()` wraps the consumer-supplied `render` in a try/catch (warn-logged) and still returns the built `MapData`, so `setGpsPosition` centering proceeds and the exception cannot escape the store listener — an uncaught subscriber throw would break the whole dispatch chain for that action, recurring on every GPS tick.
 - The `LatLong` type is `{ lat: number; lon: number }` from `gps-plus-slam-js`.
 
 ## Examples
@@ -96,14 +97,14 @@ unsub();
 
 ## Tests
 
-Covered by `store-subscribers.test.ts` (46 test cases):
+Covered by `store-subscribers.test.ts` (47 test cases):
 
 - Subscription lifecycle: subscribe, unsubscribe, no callbacks after unsubscribe
 - Alignment matrix: applied when present, updates fused markers, skipped when gpsData null
 - GPS event visualization: sets zero ref, incremental marker addition, skips incomplete data
 - Orbit target auto-follow: calls onNewGpsPosition with coordinates, last event with multiple, safe when callback absent (Risk R9)
 - Map overlay centering (2026-07-06 fused-dot Slice B): centers on the rendered `MapData.userPosition` (fused ≠ raw when aligned), on the raw fix without alignment, on the raw fix for a render-less overlay; handles null overlay gracefully, skips empty positions
-- Map overlay rendering: full `MapData` snapshot per store change (raw path, fused path recomputed per matrix — snaps, empty when matrix/zeroRef missing —, alignment-snapshot GPS coords, `userHeadingDeg` wiring), safe when `render` absent
+- Map overlay rendering: full `MapData` snapshot per store change (raw path, fused path recomputed per matrix — snaps, empty when matrix/zeroRef missing —, alignment-snapshot GPS coords, `userHeadingDeg` wiring), safe when `render` absent; a **throwing** `render` is contained (centering still runs, nothing escapes the listener)
 - `showAccuracySpheres` flag (rec31 §3): flag on → forwards `{ horizontal, vertical }` from `latLongAccuracy`/`altitudeAccuracy`; flag off/default → forwards `undefined`; partial accuracy fields preserved (e.g. `altitudeAccuracy` missing → `vertical: undefined`)
 - Fresh counter: each `wireStoreSubscribers()` call starts from 0
 

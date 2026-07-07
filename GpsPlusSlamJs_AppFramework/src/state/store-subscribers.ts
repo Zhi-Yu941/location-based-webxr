@@ -32,6 +32,9 @@ import {
   selectOdometryRotations,
   selectZeroReference,
 } from './app-selectors';
+import { createLogger } from '../utils/logger';
+
+const log = createLogger('StoreSubscribers');
 
 // Re-export SubscribableStore for backwards compatibility (it was
 // originally defined here and is part of the public API via index.ts).
@@ -190,7 +193,16 @@ export function wireStoreSubscribers(
       zeroRef: selectZeroReference(state),
       alignmentSnapshots: alignmentSnapshotGps,
     });
-    deps.mapOverlay.render(data);
+    // `render` is a consumer-supplied boundary (e.g. a Leaflet redraw that
+    // can fail transiently on a disposed container). A throw here must not
+    // escape the store listener — it would skip the follow-up centering AND
+    // break the whole dispatch chain for that action, recurring on every GPS
+    // tick — so contain it and still hand the snapshot to the caller.
+    try {
+      deps.mapOverlay.render(data);
+    } catch (err) {
+      log.warn('Map overlay render failed; continuing with centering:', err);
+    }
     return data;
   }
 

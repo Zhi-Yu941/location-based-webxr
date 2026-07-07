@@ -683,6 +683,50 @@ describe('wireStoreSubscribers', () => {
     expect(setGpsPosition).toHaveBeenCalledWith(50.123, 8.456);
   });
 
+  it('keeps centering the map when the overlay render throws', () => {
+    // Why: `mapOverlay.render` is an injected, consumer-supplied boundary
+    // (Leaflet redraws can fail transiently, e.g. a disposed container racing
+    // a late GPS tick). A render throw must neither skip `setGpsPosition`
+    // centering nor propagate out of the store listener — an uncaught
+    // subscriber exception breaks the whole dispatch chain for that action,
+    // and it would recur on every GPS tick (PR #168 review, CodeRabbit).
+    deps.mapOverlay.render.mockImplementation(() => {
+      throw new Error('leaflet redraw failed');
+    });
+
+    const mock = makeMockStore(makeState());
+    wireStoreSubscribers(mock.store, deps);
+
+    expect(() =>
+      mock.setState(
+        makeState({
+          gpsData: {
+            zero: { lat: 50, lon: 8 },
+            gpsEvents: {
+              alignmentMatrix: null,
+              gpsPositions: [
+                {
+                  id: 'gps-1',
+                  zeroRef: { lat: 50, lon: 8 },
+                  latitude: 50.123,
+                  longitude: 8.456,
+                  coordinates: [1, 0, 0] as Vector3,
+                  weight: 1,
+                  timestamp: Date.now(),
+                },
+              ],
+              odometryPositions: [[0.5, 0, 0.5]],
+            },
+            odometryPath: { positions: [], rotations: [] },
+          } as unknown as CombinedRootState['gpsData'],
+        })
+      )
+    ).not.toThrow();
+
+    expect(deps.mapOverlay.render).toHaveBeenCalled();
+    expect(deps.mapOverlay.setGpsPosition).toHaveBeenCalledWith(50.123, 8.456);
+  });
+
   it('handles null mapOverlay gracefully', () => {
     // Why: replay mode may not have a map overlay (optional dependency)
     const depsNoMap: StoreSubscriberDeps = {

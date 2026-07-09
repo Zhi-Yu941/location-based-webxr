@@ -53,10 +53,15 @@ jobs:
           # in .npmrc is still required so pnpm targets the public registry.
           registry-url: "https://registry.npmjs.org"
 
-      - name: Pin npm to latest
+      - name: Pin npm to latest 11.x
         # See the matching note in the private repo's publish.yml: ensures
-        # the freshest Trusted Publishing OIDC code path.
-        run: npm install -g npm@latest
+        # a fresh Trusted Publishing OIDC code path. Pinned to the 11.x
+        # line (not `latest`) since 2026-07-09: npm 12.0.0 (released
+        # 2026-07-08) crashes during publish with "Cannot find module
+        # 'sigstore'" in libnpmpublish's provenance step — it broke the
+        # app-framework@1.9.0 release run. Revisit once npm 12.x publishes
+        # cleanly.
+        run: npm install -g npm@11
 
       - name: Verify tag matches package.json version
         # Two-version model: package.json#version is the source of truth

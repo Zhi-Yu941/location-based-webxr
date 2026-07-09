@@ -19,7 +19,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { BlobWriter, ZipWriter, TextReader } from '@zip.js/zip.js';
+import { BlobWriter, ZipWriter, TextReader, Reader } from '@zip.js/zip.js';
 import {
   loadRecording,
   isMarkRefPointAction,
@@ -315,5 +315,84 @@ describe('readSidecarRefPoints — deep observation validation', () => {
     const ids = loaded.refPoints.map((d) => d.id);
     expect(ids).toContain('pointGood');
     expect(ids).not.toContain('pointBad');
+  });
+});
+
+/**
+ * Lazy ZipSource Reader input — full-chain equivalence.
+ *
+ * Why this test matters: the Investigation corpus gate validates 100+
+ * recording zips (2.4 GB total) and must not read whole archives into memory
+ * just to check a few KB of JSON — that breached its 60 s regression budget
+ * (gps-plus-slam repo:
+ * GpsPlusSlamJs_Investigation/docs/2026-07-09-regression-gate-budget-breach-followup.md).
+ * loadRecording therefore accepts any zip.js Reader. This test proves the
+ * full lazy chain (fd-backed ranged Reader → framework zip helpers →
+ * loadRecording) yields a LoadedRecording identical to the Uint8Array path,
+ * including loadRecording's concurrent triple use of the ONE shared Reader
+ * instance (Promise.all over actions + metadata + sidecar helpers). It runs
+ * against the framework SOURCE (vitest alias), so it guards the lazy path
+ * before the framework change is published to npm.
+ */
+describe('loadRecording — lazy ZipSource Reader input', () => {
+  /** Ranged reader over an open fd; reads only the byte ranges zip.js asks for. */
+  class NodeFdReader extends Reader<void> {
+    private readonly fd: number;
+    constructor(fd: number) {
+      super(undefined);
+      this.fd = fd;
+    }
+    override async init(): Promise<void> {
+      await super.init?.();
+      this.size = fs.fstatSync(this.fd).size;
+    }
+    readUint8Array(index: number, length: number): Promise<Uint8Array> {
+      const clamped = Math.min(length, Math.max(0, this.size - index));
+      const buf = Buffer.alloc(clamped);
+      let offset = 0;
+      while (offset < clamped) {
+        const n = fs.readSync(
+          this.fd,
+          buf,
+          offset,
+          clamped - offset,
+          index + offset
+        );
+        if (n === 0) break;
+        offset += n;
+      }
+      return Promise.resolve(
+        new Uint8Array(buf.buffer, buf.byteOffset, offset)
+      );
+    }
+  }
+
+  it('yields a LoadedRecording identical to the Uint8Array path (modern zip)', async () => {
+    if (!fs.existsSync(NEW_ZIP)) return; // CI without TestDataJs
+    const fd = fs.openSync(NEW_ZIP, 'r');
+    try {
+      const lazy = await loadRecording(new NodeFdReader(fd));
+      const eager = await loadRecording(readZip(NEW_ZIP));
+      expect(lazy.meta).toEqual(eager.meta);
+      expect(lazy.actions).toEqual(eager.actions);
+      expect(lazy.refPoints).toEqual(eager.refPoints);
+      expect(lazy.capabilities).toEqual(eager.capabilities);
+    } finally {
+      fs.closeSync(fd);
+    }
+  });
+
+  it('handles the migration path identically for a legacy (era ≤ 3) zip', async () => {
+    if (!fs.existsSync(OLD_ZIP)) return; // CI without TestDataJs
+    const fd = fs.openSync(OLD_ZIP, 'r');
+    try {
+      const lazy = await loadRecording(new NodeFdReader(fd));
+      const eager = await loadRecording(readZip(OLD_ZIP));
+      expect(lazy.capabilities.migrationApplied).toBe(true);
+      expect(lazy.actions).toEqual(eager.actions);
+      expect(lazy.refPoints).toEqual(eager.refPoints);
+    } finally {
+      fs.closeSync(fd);
+    }
   });
 });

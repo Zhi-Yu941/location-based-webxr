@@ -21,13 +21,49 @@ import {
   TextWriter,
   type Entry,
   type FileEntry,
+  type Reader,
 } from '@zip.js/zip.js';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('ZipReader');
 
-// Re-export Entry type so callers don't need to import @zip.js/zip.js directly
+// Re-export Entry type so callers don't need to import @zip.js/zip.js directly.
+// (Reader is deliberately NOT re-exported: implementers of lazy readers
+// subclass it from '@zip.js/zip.js' directly, and an unused re-export fails
+// the workspace knip gate.)
 export type { Entry } from '@zip.js/zip.js';
+
+/**
+ * Input accepted by the zip-reading helpers: either the full zip bytes
+ * (the original behavior) or any zip.js {@link Reader} — e.g. a ranged
+ * reader over a file descriptor — so callers scanning many large archives
+ * can read only the central directory + the entries they open instead of
+ * loading whole files into memory.
+ *
+ * Reader contract: a single Reader instance may back several helper calls
+ * concurrently (see `loadRecording` in gps-plus-slam-recorder, which fans
+ * out over three helpers via Promise.all), so `init()` must be idempotent
+ * and `readUint8Array(index, length)` must support interleaved ranged reads.
+ * The caller owns the underlying resource lifecycle (helpers close their
+ * ZipReader wrappers, never the Reader's resource).
+ */
+export type ZipSource = Uint8Array | Reader<unknown>;
+
+/**
+ * Wrap a {@link ZipSource} in a fresh zip.js ZipReader.
+ *
+ * Exported deliberately: consumers outside this workspace resolve this
+ * module from the published dist at runtime and probe
+ * `typeof toZipReader === 'function'` as the capability marker for lazy
+ * Reader support before passing anything other than Uint8Array (older
+ * published versions accept only Uint8Array). Do not rename or remove
+ * without treating it as a breaking API change.
+ */
+export function toZipReader(source: ZipSource): ZipReader<unknown> {
+  return new ZipReader(
+    source instanceof Uint8Array ? new Uint8ArrayReader(source) : source
+  );
+}
 
 /**
  * Maximum allowed uncompressed size (in bytes) for a single action or
@@ -57,11 +93,11 @@ export interface ZipActionEntry {
 /**
  * Read all entries from a zip file.
  *
- * @param data - The zip file content as a Uint8Array
+ * @param data - The zip content as a Uint8Array, or a zip.js Reader for lazy access
  * @returns Array of zip entries (directories and files)
  */
-export async function readZipEntries(data: Uint8Array): Promise<Entry[]> {
-  const reader = new ZipReader(new Uint8ArrayReader(data));
+export async function readZipEntries(data: ZipSource): Promise<Entry[]> {
+  const reader = toZipReader(data);
   try {
     return await reader.getEntries();
   } finally {
@@ -88,12 +124,12 @@ function extractActionIndex(filename: string): number {
  * Filters for JSON files in the actions/ directory, parses them, and returns
  * them sorted by their filename index (chronological order for replay).
  *
- * @param data - The zip file content as a Uint8Array
+ * @param data - The zip content as a Uint8Array, or a zip.js Reader for lazy access
  * @param maxFileSize - Maximum allowed uncompressed size per entry (defaults to MAX_ACTION_FILE_SIZE)
  * @returns Array of action entries sorted by index
  */
 export async function loadActionsFromZip(
-  data: Uint8Array,
+  data: ZipSource,
   maxFileSize: number = MAX_ACTION_FILE_SIZE
 ): Promise<ZipActionEntry[]> {
   const entries = await readZipEntries(data);
@@ -207,18 +243,15 @@ async function extractSessionMetadataFromReader(
  * Returns null if session.json is absent (graceful degradation for
  * recordings created before the metadata writing bug was fixed).
  *
- * @param data - The zip file content as a Uint8Array
+ * @param data - The zip content as a Uint8Array, or a zip.js Reader for lazy access
  * @param maxFileSize - Maximum allowed uncompressed size per entry (defaults to MAX_ACTION_FILE_SIZE)
  * @returns Parsed session metadata, or null if not found
  */
 export async function loadSessionMetadata(
-  data: Uint8Array,
+  data: ZipSource,
   maxFileSize: number = MAX_ACTION_FILE_SIZE
 ): Promise<Record<string, unknown> | null> {
-  return extractSessionMetadataFromReader(
-    new ZipReader(new Uint8ArrayReader(data)),
-    maxFileSize
-  );
+  return extractSessionMetadataFromReader(toZipReader(data), maxFileSize);
 }
 
 /**
@@ -388,11 +421,11 @@ export interface ZipSubdirEntry {
  * `relativePath` for deterministic iteration. Returns an empty array when
  * the subdir is absent (graceful degradation for older zips).
  *
- * @param data - The zip file content as a Uint8Array
+ * @param data - The zip content as a Uint8Array, or a zip.js Reader for lazy access
  * @param subdir - Top-level subdir to scan (no leading or trailing `/`)
  */
 export async function loadEntriesFromSubdir(
-  data: Uint8Array,
+  data: ZipSource,
   subdir: string
 ): Promise<ZipSubdirEntry[]> {
   if (!subdir || subdir.includes('/') || subdir.startsWith('.')) {

@@ -9,11 +9,14 @@
  */
 
 import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { Reader } from '@zip.js/zip.js';
 import {
   readZipEntries,
   loadActionsFromZip,
   loadSessionMetadata,
   loadSessionMetadataFromBlob,
+  loadEntriesFromSubdir,
+  toZipReader,
   MAX_ACTION_FILE_SIZE,
   type ZipActionEntry,
 } from './zip-reader';
@@ -697,5 +700,109 @@ describe('loadGpsPathFromBlob', () => {
     for (const c of coords) {
       expect(c.accuracy).toBe(7.5);
     }
+  });
+});
+
+describe('ZipSource lazy Reader input', () => {
+  // Why these tests matter: the corpus-validation gate in
+  // GpsPlusSlamJs_Investigation reads 100+ recording zips (2.4 GB) from disk,
+  // and loading whole archives into memory to validate a few KB of JSON
+  // breached its 60 s regression budget (see that repo's
+  // docs/2026-07-09-regression-gate-budget-breach-followup.md). The helpers
+  // therefore accept any zip.js Reader (ranged, lazy) in addition to
+  // Uint8Array. These tests prove the Reader path is result-equivalent to
+  // the Uint8Array path, that lazy getText works after the helper returned,
+  // and that ONE shared Reader instance survives the concurrent triple-use
+  // pattern of gps-plus-slam-recorder's loadRecording (Promise.all over
+  // loadActionsFromZip + loadSessionMetadata + loadEntriesFromSubdir).
+
+  /**
+   * Ranged reader that never hands zip.js the whole buffer — reads are served
+   * strictly by (index, length) slices, mimicking an fd-backed lazy reader.
+   * init() is deliberately idempotent so a single instance can back several
+   * ZipReader constructions (the shared-instance pattern of loadRecording).
+   */
+  class RangedTestReader extends Reader<void> {
+    private readonly data: Uint8Array;
+    constructor(data: Uint8Array) {
+      super(undefined);
+      this.data = data;
+    }
+    override async init(): Promise<void> {
+      await super.init?.();
+      this.size = this.data.length;
+    }
+    readUint8Array(index: number, length: number): Promise<Uint8Array> {
+      const end = Math.min(index + length, this.data.length);
+      return Promise.resolve(this.data.slice(index, end));
+    }
+  }
+
+  let zipData: Uint8Array;
+
+  beforeAll(async () => {
+    zipData = (await produceTestZip()).zipData;
+  });
+
+  it('exports toZipReader as the runtime capability marker', () => {
+    // Why: consumers outside this workspace (the Investigation project)
+    // resolve this module from the published dist at runtime and probe
+    // `typeof toZipReader === 'function'` before passing lazy Readers.
+    // Renaming or removing this export silently downgrades them to the
+    // eager whole-file path.
+    expect(typeof toZipReader).toBe('function');
+  });
+
+  it('readZipEntries returns the same entries for Reader and Uint8Array input', async () => {
+    const fromBytes = await readZipEntries(zipData);
+    const fromReader = await readZipEntries(new RangedTestReader(zipData));
+    expect(fromReader.map((e) => e.filename)).toEqual(
+      fromBytes.map((e) => e.filename)
+    );
+  });
+
+  it('loadActionsFromZip returns identical actions for Reader input', async () => {
+    const fromBytes = await loadActionsFromZip(zipData);
+    const fromReader = await loadActionsFromZip(new RangedTestReader(zipData));
+    expect(fromReader).toEqual(fromBytes);
+  });
+
+  it('loadSessionMetadata returns identical metadata for Reader input', async () => {
+    const fromBytes = await loadSessionMetadata(zipData);
+    const fromReader = await loadSessionMetadata(new RangedTestReader(zipData));
+    expect(fromReader).toEqual(fromBytes);
+  });
+
+  it('loadEntriesFromSubdir supports lazy getText after the helper returned', async () => {
+    // Why: loadEntriesFromSubdir closes its ZipReader before callers invoke
+    // getText() — the Reader path must keep serving ranged reads afterwards
+    // (the Uint8Array path gets this for free from the in-memory buffer).
+    const fromBytes = await loadEntriesFromSubdir(zipData, 'actions');
+    const fromReader = await loadEntriesFromSubdir(
+      new RangedTestReader(zipData),
+      'actions'
+    );
+    expect(fromReader.map((e) => e.relativePath)).toEqual(
+      fromBytes.map((e) => e.relativePath)
+    );
+    expect(fromReader.length).toBeGreaterThan(0);
+    expect(await fromReader[0]!.getText()).toBe(await fromBytes[0]!.getText());
+  });
+
+  it('one shared Reader instance survives concurrent triple use', async () => {
+    // Why: loadRecording runs loadActionsFromZip + loadSessionMetadata +
+    // readSidecarRefPoints over the SAME input via Promise.all. With a
+    // shared lazy Reader that means three ZipReaders over one Reader
+    // instance concurrently — init() re-entry and interleaved ranged reads
+    // must not corrupt results.
+    const shared = new RangedTestReader(zipData);
+    const [actionsResult, meta, subdir] = await Promise.all([
+      loadActionsFromZip(shared),
+      loadSessionMetadata(shared),
+      loadEntriesFromSubdir(shared, 'actions'),
+    ]);
+    expect(actionsResult).toEqual(await loadActionsFromZip(zipData));
+    expect(meta).toEqual(await loadSessionMetadata(zipData));
+    expect(subdir.length).toBeGreaterThan(0);
   });
 });

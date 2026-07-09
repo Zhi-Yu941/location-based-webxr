@@ -6,15 +6,23 @@ Production-ready utilities for reading recording session ZIP files exported by t
 
 ## Public API
 
-### `readZipEntries(data: Uint8Array): Promise<Entry[]>`
+### `ZipSource` (type) and `toZipReader(source: ZipSource): ZipReader`
+
+`ZipSource = Uint8Array | Reader<unknown>` is the input accepted by `readZipEntries`, `loadActionsFromZip`, `loadSessionMetadata`, and `loadEntriesFromSubdir`: either the full zip bytes (original behavior, byte-identical results) or any zip.js `Reader` — e.g. a ranged reader over a file descriptor — so callers scanning many large archives read only the central directory + the entries they open instead of loading whole files into memory (added 2026-07-09 for the Investigation corpus gate, see that repo's `docs/2026-07-09-regression-gate-budget-breach-followup.md`).
+
+- **Reader contract:** one Reader instance may back several helper calls concurrently (`loadRecording` fans out via `Promise.all`), so `init()` must be idempotent and `readUint8Array(index, length)` must support interleaved ranged reads. Helpers close their `ZipReader` wrappers but never the Reader's underlying resource — the caller owns that lifecycle. Lazy `getText()` on `ZipSubdirEntry` must keep working after the helper returned.
+- **`toZipReader` is the runtime capability marker:** external consumers resolving this module from the published dist probe `typeof toZipReader === 'function'` before passing Readers (older published versions accept only `Uint8Array`). Renaming/removing it is a breaking API change.
+- The zip.js `Reader` base class is deliberately not re-exported (lazy-reader implementers subclass it from `@zip.js/zip.js` directly; an unused re-export fails the workspace knip gate).
+
+### `readZipEntries(data: ZipSource): Promise<Entry[]>`
 
 Opens a ZIP file and returns all entries (directories and files). Uses `@zip.js/zip.js` internally. The reader is properly closed after enumeration.
 
-- **Input:** ZIP file bytes as `Uint8Array`
+- **Input:** ZIP bytes as `Uint8Array`, or a zip.js `Reader` (see `ZipSource`)
 - **Output:** Array of `Entry` objects from `@zip.js/zip.js`
 - **Errors:** Throws if the data is not a valid ZIP file
 
-### `loadActionsFromZip(data: Uint8Array, maxFileSize?: number): Promise<ZipActionEntry[]>`
+### `loadActionsFromZip(data: ZipSource, maxFileSize?: number): Promise<ZipActionEntry[]>`
 
 Extracts all action JSON files from the `actions/` directory in the ZIP, parses them, and returns them sorted by filename index (chronological order).
 
@@ -121,6 +129,6 @@ const meta = await loadSessionMetadata(data);
 
 ## Tests
 
-- Unit tests: `zip-reader.test.ts` — 32 tests covering entry reading, action loading, index extraction, payload preservation, graceful null return for missing `session.json`, size-limit enforcement for both actions and session metadata, warning logging for non-numeric action filenames, malformed JSON resilience (skip + warn + return remaining valid actions), `loadSessionMetadataFromBlob` (Blob-based metadata reading with BlobReader), and `loadGpsPathFromBlob` (GPS-only extraction including happy path, filtering, empty GPS, corrupted zip, File support, and chronological ordering).
+- Unit tests: `zip-reader.test.ts` — 48 tests covering entry reading, action loading, index extraction, payload preservation, graceful null return for missing `session.json`, size-limit enforcement for both actions and session metadata, warning logging for non-numeric action filenames, malformed JSON resilience (skip + warn + return remaining valid actions), `loadSessionMetadataFromBlob` (Blob-based metadata reading with BlobReader), `loadGpsPathFromBlob` (GPS-only extraction including happy path, filtering, empty GPS, corrupted zip, File support, and chronological ordering), and the `ZipSource` lazy-Reader path (result equivalence vs `Uint8Array` for all four helpers, lazy `getText()` after helper return, concurrent triple use of one shared Reader instance, `toZipReader` capability-marker pin).
 - Integration consumer: `recording-replay.integration.test.ts` — uses `loadActionsFromZip` and `loadSessionMetadata` for full replay verification.
 - Test data: produced programmatically via `produceTestZip()` from `test-utils/zip-round-trip-helpers.ts` — no static test zip files.

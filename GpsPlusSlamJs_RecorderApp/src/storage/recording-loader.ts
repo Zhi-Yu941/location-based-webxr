@@ -36,6 +36,7 @@ import {
   loadEntriesFromSubdir,
   type RecordedAction,
   type ZipActionEntry,
+  type ZipSource,
 } from 'gps-plus-slam-app-framework/storage/zip-reader';
 import { NullStorageBackend } from 'gps-plus-slam-app-framework/storage/null-storage-backend';
 import { migrateActionsIfNeeded } from './recording-migration';
@@ -185,7 +186,7 @@ export function pickGpsPoint(
 // ---------------------------------------------------------------------------
 
 async function readSidecarRefPoints(
-  zip: Uint8Array
+  zip: ZipSource
 ): Promise<RefPointDefinition[]> {
   const entries = await loadEntriesFromSubdir(zip, 'refPoints');
   const defs: RefPointDefinition[] = [];
@@ -324,10 +325,19 @@ function hasFusedObservation(defs: readonly RefPointDefinition[]): boolean {
 /**
  * Load a recording zip end-to-end, hiding format evolution from callers.
  *
- * @param zip Recording zip bytes.
+ * @param zip Recording zip bytes, or any zip.js Reader (e.g. a ranged reader
+ *   over a file descriptor) for lazy access to large archives. The Reader is
+ *   shared by three concurrent zip helpers (Promise.all below), so it must
+ *   have an idempotent `init()` and support interleaved ranged reads; the
+ *   caller owns its resource lifecycle and may release it as soon as this
+ *   promise settles (`getFinalState()` never re-reads the zip). Runtime
+ *   support for Readers requires a framework version exporting `toZipReader`
+ *   from `storage/zip-reader` — external callers resolving the framework
+ *   from npm should probe for it (see the Investigation project's
+ *   `loadRecordingFromDisk`).
  * @returns A normalized {@link LoadedRecording}.
  */
-export async function loadRecording(zip: Uint8Array): Promise<LoadedRecording> {
+export async function loadRecording(zip: ZipSource): Promise<LoadedRecording> {
   const [rawEntries, meta, sidecarDefs] = await Promise.all([
     loadActionsFromZip(zip),
     loadSessionMetadata(zip),

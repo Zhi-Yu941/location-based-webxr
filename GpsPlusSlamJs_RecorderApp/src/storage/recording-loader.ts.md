@@ -8,7 +8,9 @@ Background and motivation: [`2026-05-19-recording-loader-abstraction-plan.md`](.
 
 ## Public API
 
-- `loadRecording(zip: Uint8Array): Promise<LoadedRecording>`
+- `loadRecording(zip: ZipSource): Promise<LoadedRecording>`
+  - `ZipSource = Uint8Array | Reader<unknown>` (framework `storage/zip-reader`): pass the full zip bytes, or any zip.js `Reader` (e.g. an fd-backed ranged reader) so large archives are read lazily — central directory + JSON entries only, never image payloads. Added 2026-07-09 for the Investigation corpus gate's 60 s budget fix.
+  - Reader contract: one instance backs the three concurrent helpers below (Promise.all), so `init()` must be idempotent and ranged reads must interleave safely. Caller owns the resource lifecycle and may release it once the promise settles (`getFinalState()` never re-reads the zip). Runtime Reader support requires a framework build exporting `toZipReader` — external consumers resolving the framework from npm must probe for it.
   - Reads metadata, actions, and ref-point sidecars from `zip` in parallel.
   - Applies [`migrateActionsIfNeeded`](recording-migration.ts) to actions so callers always see the current schema.
   - Builds a unified `RefPointDefinition[]` from sidecar `refPoints/*.json` files **merged** with `gpsData/markReferencePoint` actions in the log. Sidecar wins per id; ids that appear only in actions get reconstructed defs.
@@ -62,5 +64,6 @@ const state = rec.getFinalState();
   - `2026-04-23_15-55-36utc.zip` (era ≥ 4): asserts sidecar present, session.json present, at least one curated name (`name !== id`).
   - `getFinalState()` is memoized (`first === second`).
   - `isMarkRefPointAction — pose-array length contract`: fixture-free unit tests that accept full-length poses (3/4) and reject short or empty `position`/`rotation` arrays, proving the guard blocks `undefined`-injecting payloads.
+  - `loadRecording — lazy ZipSource Reader input`: fd-backed ranged Reader yields a `LoadedRecording` deep-equal to the Uint8Array path for both the modern and the legacy (migration) fixture — the pre-publish guard for the lazy chain, running against framework source via the vitest alias.
 
 Tests skip themselves when `TestDataJs/` is not on disk (CI without test corpus).

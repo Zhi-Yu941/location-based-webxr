@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "description": "Open-source AR+GPS framework and recorder app for location-based WebXR experiences.",
-    "packageManager": "pnpm@11.11.0",
+    "packageManager": "pnpm@11.11.0+sha512.4463f65fd80ed80d69bc1d4bf163ee94f605c7380fc318bb5b2ebe15f8cd12d49c51a4d59e951b401e764d3b6ca751cbf51bc50ed7001a6bcb4935e684c34882",
     "scripts": {
         "build:framework": "pnpm run --filter gps-plus-slam-app-framework... build",
         "build:recorder": "pnpm run --filter gps-plus-slam-recorder... build",

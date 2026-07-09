@@ -1,0 +1,22 @@
+#!/bin/sh
+#
+# Pre-commit hook: blocks commits that contain the local pnpm link: override
+# used during the simplify loop (see gps-plus-slam repo,
+# GpsPlusSlamJs_Docs/docs/2026-07-09-simplify-loop-plan.md).
+#
+# Scoped to package.json/pnpm-lock.yaml: docs legitimately quote the link string.
+# Only ADDED lines count — removing a leftover link must stay committable.
+#
+# Install: git config core.hooksPath .githooks
+#
+
+if git diff --cached -- '*package.json' '*pnpm-lock.yaml' | grep '^+' | grep -qF 'link:../gps-plus-slam'; then
+  echo ""
+  echo "❌ BLOCKED: Staged changes add the local 'link:../gps-plus-slam' override."
+  echo "The simplify-loop link override (package.json / pnpm-lock.yaml) must never be committed."
+  echo "Run: git reset HEAD package.json pnpm-lock.yaml"
+  echo ""
+  exit 1
+fi
+
+exit 0

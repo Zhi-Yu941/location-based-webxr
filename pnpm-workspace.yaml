@@ -4,3 +4,25 @@ packages:
   - GpsPlusSlamJs_MinimalExample
   - GpsPlusSlamJs_AnchorStarter
   - GpsPlusSlamJs_QrTrackingDemo
+
+# pnpm 11: only these packages may run install/postinstall build scripts
+# (strictDepBuilds is on by default in v11, so anything else errors loudly
+# instead of silently skipping). Mirrors the private repo's allowlist:
+# @sentry/cli downloads its binary in postinstall (recorder sourcemap
+# upload); esbuild/playwright are the shared toolchain.
+allowBuilds:
+  "@sentry/cli": true
+  "@playwright/test": true
+  esbuild: true
+
+# Supply-chain embargo (decided 2026-07-09, see the private repo's
+# GpsPlusSlamJs_Docs/docs/2026-07-09-pnpm11-upgrade-and-publish-via-pnpm-plan.md
+# scope item 6): keep pnpm 11's default 24 h minimumReleaseAge for
+# third-party packages (written explicitly for self-documentation), but
+# exclude our own packages so the AppFramework's `gps-plus-slam-js: ^x.y.z`
+# range resolves immediately after a core publish instead of being blocked
+# for a day (coordinated-release flow).
+minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - gps-plus-slam-js
+  - gps-plus-slam-app-framework

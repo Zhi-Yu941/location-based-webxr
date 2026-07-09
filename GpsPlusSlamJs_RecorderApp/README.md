@@ -1308,7 +1308,7 @@ See the detailed implementation checklist in [docs/2026-02-19-replay-mode.md](..
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 22.14+ (24 LTS recommended); pnpm 11 via `corepack enable`
 - Android device with Chrome 142+ (for File System Access API)
 - WebXR-capable browser
 

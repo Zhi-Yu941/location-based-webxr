@@ -44,24 +44,14 @@ jobs:
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          # Node 24 is the current Active LTS. npm Trusted Publishing
-          # requires Node ≥22.14.0 / npm ≥11.5.1; Node 24 ships npm 11.x.
-          # See the matching note in the private repo's publish.yml.
+          # Node 24 is the current Active LTS, matching local dev and the
+          # pnpm 11 floor (Node ≥22.14). See the matching note in the
+          # private repo's publish.yml.
           node-version: "24"
           cache: "pnpm"
           # Even with Trusted Publishing (no token), the registry-url line
           # in .npmrc is still required so pnpm targets the public registry.
           registry-url: "https://registry.npmjs.org"
-
-      - name: Pin npm to latest 11.x
-        # See the matching note in the private repo's publish.yml: ensures
-        # a fresh Trusted Publishing OIDC code path. Pinned to the 11.x
-        # line (not `latest`) since 2026-07-09: npm 12.0.0 (released
-        # 2026-07-08) crashes during publish with "Cannot find module
-        # 'sigstore'" in libnpmpublish's provenance step — it broke the
-        # app-framework@1.9.0 release run. Revisit once npm 12.x publishes
-        # cleanly.
-        run: npm install -g npm@11
 
       - name: Verify tag matches package.json version
         # Two-version model: package.json#version is the source of truth
@@ -77,45 +67,87 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # The `prepublishOnly` script in AppFramework's package.json runs
-      # `build` + `verify:pack` automatically inside `pnpm publish`.
+      # ──────────────────────────────────────────────────────────────────
+      # Trusted-Publishing diagnostic step. Prints the GitHub OIDC claims
+      # that npm uses to authorize the publish, plus the Trusted Publisher
+      # list npm has actually saved for `gps-plus-slam-app-framework`.
+      # Runs before the real publish so the failed `Publish AppFramework`
+      # log captures both sides of any mismatch. Mirrors the identical
+      # step in the private repo's publish.yml — see
+      # `GpsPlusSlamJs_Docs/docs_guides/npm-publish-guide.md` §3.3 there.
       #
-      # No NODE_AUTH_TOKEN: authentication is via npm Trusted Publishing.
-      # The id-token: write permission above + the publisher registration
-      # on npmjs.com authorize this publish.
-      #
-      # --provenance surfaces a "Built and signed on GitHub Actions" badge
-      # on the npm page.
-      #
-      # Pre-releases land on the `next` dist-tag so `pnpm install
-      # gps-plus-slam-app-framework` keeps installing the GA `latest`.
+      # Why this lives here: the npm registry's failure mode for an OIDC
+      # authorization mismatch is the misleading
+      #   `404 Not Found - PUT https://registry.npmjs.org/<name>`
+      # — not a 401/403. The step is read-only and never blocks.
+      - name: Trusted-Publishing diagnostic (read-only)
+        if: always()
+        working-directory: GpsPlusSlamJs_AppFramework
+        env:
+          ACTIONS_ID_TOKEN_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
+        run: |
+          echo "::group::GitHub OIDC claims that will be presented to npm"
+          # Request an OIDC token with the npm audience and decode its
+          # payload (claims). This is exactly the token `pnpm publish`
+          # exchanges for an npm credential, so the values printed here
+          # are byte-for-byte what npm matches against the registered
+          # Trusted Publisher entry.
+          ID_TOKEN_RESPONSE=$(curl -sSL \
+            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=npm:registry.npmjs.org")
+          ID_TOKEN=$(echo "$ID_TOKEN_RESPONSE" | node -e 'process.stdin.on("data",d=>{try{process.stdout.write(JSON.parse(d).value||"")}catch(e){}})')
+          if [ -z "$ID_TOKEN" ]; then
+            echo "::warning::Could not obtain OIDC token. Response: $ID_TOKEN_RESPONSE"
+          else
+            # Decode the payload (middle segment of the JWT)
+            echo "$ID_TOKEN" | awk -F. '{print $2}' | base64 -d 2>/dev/null \
+              | node -e 'let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{try{const c=JSON.parse(d);for(const k of ["iss","aud","sub","repository","repository_owner","repository_id","repository_owner_id","workflow","workflow_ref","workflow_sha","job_workflow_ref","ref","ref_type","sha","environment","event_name","run_id","actor"]){if(k in c)console.log(`  ${k}: ${JSON.stringify(c[k])}`)}}catch(e){console.log("  (failed to parse)",e.message)}})'
+          fi
+          echo "::endgroup::"
+
+          echo "::group::Trusted Publisher entries npm has saved for gps-plus-slam-app-framework"
+          # Public registry endpoint — no auth needed, no Cloudflare gate
+          # (this is the API path, not the Cloudflare-gated web UI).
+          curl -sSL "https://registry.npmjs.org/-/package/gps-plus-slam-app-framework/access" \
+            | node -e 'let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{try{console.log(JSON.stringify(JSON.parse(d),null,2))}catch(e){console.log(d)}})' \
+            || echo "  (endpoint not reachable or not JSON)"
+          echo "::endgroup::"
+
+          echo "::group::What to compare"
+          echo "  Match these against the entries above:"
+          echo "    Owner:          cs-util-com  (OIDC: repository_owner)"
+          echo "    Repo:           location-based-webxr  (OIDC: repository, after the slash)"
+          echo "    Workflow:       publish.yml  (OIDC: workflow / workflow_ref filename)"
+          echo "    Environment:    (blank)      (OIDC: environment - must be absent or empty)"
+          echo "::endgroup::"
+
       - name: Publish AppFramework
         working-directory: GpsPlusSlamJs_AppFramework
-        # Use `npm publish` (not `pnpm publish`) for Trusted Publishing.
-        # As of pnpm 10 the CLI signs sigstore provenance but does not
-        # exchange the GitHub OIDC token for an npm publish credential,
-        # which makes the PUT go out unauthenticated and yields a
-        # misleading `404 Not Found` from the registry. The npm CLI
-        # bundled with Node 20 (npm ≥10) is the canonical Trusted
-        # Publishing implementation. See the matching comment in the
-        # private repo's `.github/workflows/publish.yml`.
+        # `pnpm publish` implements the npm Trusted Publishing OIDC token
+        # exchange natively since pnpm 11 (pnpm#9812; the early-11
+        # GitHub-Actions regression pnpm#11513 was fixed well before
+        # 11.10.0). The pnpm-10-era detour via the npm CLI — and with it
+        # the npm@11 pin that guarded against npm 12.0.0's broken publish
+        # — is gone: the npm CLI is no longer involved anywhere in the
+        # release path.
+        #
+        # `prepublishOnly` (`build` + `verify:pack`) runs automatically
+        # inside `pnpm publish`.
+        #
+        # No NODE_AUTH_TOKEN: the id-token write permission above + the
+        # publisher registration on npmjs.com authorize this publish.
+        #
+        # `--no-git-checks`: the CI checkout is in detached-HEAD state.
+        #
+        # `--provenance` is intentionally omitted: with Trusted Publishing
+        # the registry generates provenance attestations automatically.
+        #
+        # Pre-releases land on the `next` dist-tag so `pnpm install
+        # gps-plus-slam-app-framework` keeps installing the GA `latest`.
         run: |
-          # Run prepublishOnly explicitly (npm publish on a prebuilt tgz
-          # does NOT invoke it). Keeps `build` + `verify:pack` +
-          # `verify:community-key-lifetime` in the chain.
-          pnpm run prepublishOnly
-
-          # Pack into a deterministic filename. `pnpm pack` honours the
-          # same `files`/`exports` config as `pnpm publish`.
-          TARBALL=$(pnpm pack --pack-destination . --silent | tail -n 1)
-          echo "Built tarball: $TARBALL"
-
-          # Pre-releases land on the `next` dist-tag so
-          # `npm install gps-plus-slam-app-framework` keeps installing
-          # GA `latest`. `--provenance` is intentionally omitted: Trusted
-          # Publishing generates provenance automatically.
           if [ "${{ github.event.release.prerelease }}" = "true" ]; then
-            npm publish "$TARBALL" --access public --tag next
+            pnpm publish --access public --no-git-checks --tag next
           else
-            npm publish "$TARBALL" --access public
+            pnpm publish --access public --no-git-checks
           fi

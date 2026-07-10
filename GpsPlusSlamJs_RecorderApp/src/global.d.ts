@@ -74,7 +74,6 @@ declare global {
       // Tracking quality indicator hook
       updateTrackingQuality: (report: TrackingQualityReport) => void;
       // Mandatory storage selection hooks (Task 1a-fix)
-      setFolderSelected: (selected: boolean) => void;
       setFolderImportExpanded: (expanded: boolean, hint?: string) => void;
       /** Folder-import indexing progress bar (D2, 2026-07-05). */
       setFolderImportProgress: (state: FolderImportProgressState) => void;

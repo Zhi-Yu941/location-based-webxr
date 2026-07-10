@@ -244,9 +244,7 @@ vi.mock('./storage/ref-point-loader', () => ({
 
 vi.mock('gps-plus-slam-app-framework/visualization/reference-points', () => ({
   refPointVisualizer: {
-    displayPriorRefPoints: vi.fn(),
     setZeroRef: vi.fn(),
-    addCurrentRefPoint: vi.fn(),
   },
 }));
 
@@ -280,7 +278,6 @@ vi.mock('./ui/hud', () => ({
   showRecordingControls: vi.fn(),
   setStopButtonBusy: vi.fn(),
   showArReadyControls: vi.fn(),
-  setFolderSelected: vi.fn(),
   setSaveLocationSelected: vi.fn(),
   setFolderImportExpanded: vi.fn(),
   setFolderImportProgress: vi.fn(),

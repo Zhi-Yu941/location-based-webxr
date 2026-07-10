@@ -184,7 +184,6 @@ const {
     },
     mockRefPointVisualizer: {
       setZeroRef: vi.fn(),
-      displayPriorRefPoints: vi.fn(),
     },
     mockComputeFusedPath: vi.fn().mockReturnValue([]),
     mockCreateGpsErrorHandler: vi.fn().mockReturnValue(() => {}),

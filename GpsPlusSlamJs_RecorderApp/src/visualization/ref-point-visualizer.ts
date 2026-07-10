@@ -1,11 +1,17 @@
 /**
  * Reference Point Visualizer (recorder-side)
  *
- * Adapts the recorder's `RefPointMark` onto the pure-function
- * `syncGpsAnchoredMeshes` reconciler (prior=green, current=red). Holds one
- * `Map<id, THREE.Mesh>` per colour as the handle store between calls; all
- * other state (zero reference + the running list of current items) is in a
- * handful of fields.
+ * Renders the recorder's flat `refPoints` slice entries through the
+ * pure-function `syncGpsAnchoredMeshes` reconciler via the single
+ * `syncRefPoints` pipeline (one colour, insert animation), holding one
+ * `Map<id, THREE.Mesh>` as the handle store between calls plus the zero
+ * reference.
+ *
+ * The legacy two-colour prior/current API (`displayPriorRefPoints`,
+ * `addCurrentRefPoint`, their clears and `getCounts`) was removed 2026-07-10
+ * (quality-review D-1 — production used only `setZeroRef` + `syncRefPoints`;
+ * the legacy pipeline was kept alive only by its own tests, completing
+ * Step 5 of the 2026-05-27 slice-collapse plan).
  *
  * Replaces the previous implementation that delegated to the framework's
  * stateful `GpsAnchoredMeshManager` (now removed) — see
@@ -17,49 +23,19 @@ import type { LatLong } from 'gps-plus-slam-app-framework/core';
 import { getScene } from 'gps-plus-slam-app-framework/ar/webxr-session';
 import { registerFrameUpdate } from 'gps-plus-slam-app-framework/ar/frame-loop';
 import { VIS_COLORS } from 'gps-plus-slam-app-framework/visualization/vis-colors';
-import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
-import type { RefPointMark } from '../storage/ref-point-loader';
 import type { RefPointEntry } from '../state/ref-points-slice';
 import {
   syncGpsAnchoredMeshes,
   type GpsAnchoredItem,
 } from './sync-gps-anchored-meshes';
 
-const log = createLogger('RefPointVisualizer');
-
-function refPointToItem(refPoint: RefPointMark): GpsAnchoredItem | null {
-  if (!refPoint.gpsPosition) return null;
-  return {
-    id: refPoint.id,
-    lat: refPoint.gpsPosition.lat,
-    lon: refPoint.gpsPosition.lon,
-    altitude: refPoint.gpsPosition.altitude ?? 0,
-  };
-}
-
 // D5 (2026-06-16 user feedback): ref-point marker spheres GROW to double the
 // default radius (DEFAULT_RADIUS 0.1 → explicit 0.2) so they stay spottable
 // from a distance while the *other* GPS-anchored debug spheres
 // (`gps-event-markers.ts`) halve. The field tester "barely saw" the marker
 // amid the compass + point-cloud cubes; making it the only sphere that grows
-// keeps the scene informative without losing the marker. Set on every opts that
-// can render today: the live + replay path is `syncRefPoints` → REF_POINT_OPTS;
-// PRIOR_OPTS / CURRENT_OPTS are the legacy prior/current methods (slated for
-// removal in the 2026-05-27 slice-collapse plan) and get the radius too while
-// still wired, otherwise the change would silently do nothing on those paths.
+// keeps the scene informative without losing the marker.
 const REF_POINT_MARKER_RADIUS = 0.2;
-
-const PRIOR_OPTS = {
-  color: VIS_COLORS.PRIOR_REF_POINT.hex,
-  namePrefix: 'prior-ref',
-  radius: REF_POINT_MARKER_RADIUS,
-} as const;
-
-const CURRENT_OPTS = {
-  color: VIS_COLORS.CURRENT_REF_POINT.hex,
-  namePrefix: 'current-ref',
-  radius: REF_POINT_MARKER_RADIUS,
-} as const;
 
 // Used by `syncRefPoints`, the unified entry point that consumes the
 // recorder's flat `selectRefPointEntries` selector (Step 5.3 of
@@ -122,16 +98,7 @@ function refPointEntryToItem(entry: RefPointEntry): GpsAnchoredItem {
 
 export class RefPointVisualizer {
   private zeroRef: LatLong | null = null;
-  private priorHandles = new Map<string, THREE.Mesh>();
-  private currentItems: GpsAnchoredItem[] = [];
-  private currentHandles = new Map<string, THREE.Mesh>();
-  /**
-   * Handles for the unified `syncRefPoints` pipeline (Step 4 of
-   * 2026-05-27-collapse-refpoint-and-frame-slices-plan.md). Parallel to
-   * `priorHandles` / `currentHandles` during the transition; those two
-   * fields and their methods are removed in Step 5 along with the
-   * recorder-local `refPoints` slice.
-   */
+  /** Handles for the `syncRefPoints` pipeline (one mesh per ref-point id). */
   private refPointHandles = new Map<string, THREE.Mesh>();
   /**
    * Last entries handed to `syncRefPoints`, retained so that `setZeroRef`
@@ -155,58 +122,6 @@ export class RefPointVisualizer {
 
   getZeroRef(): LatLong | null {
     return this.zeroRef;
-  }
-
-  displayPriorRefPoints(refPoints: readonly RefPointMark[]): void {
-    if (!this.zeroRef) {
-      log.warn('No zero reference set');
-      return;
-    }
-    const scene = getScene();
-    if (!scene) {
-      log.warn('Scene not available');
-      return;
-    }
-    const items = refPoints
-      .map(refPointToItem)
-      .filter((it): it is GpsAnchoredItem => it !== null);
-    const skipped = refPoints.length - items.length;
-    this.priorHandles = syncGpsAnchoredMeshes(scene, this.priorHandles, items, {
-      zeroRef: this.zeroRef,
-      ...PRIOR_OPTS,
-    });
-    if (skipped > 0) {
-      log.info(
-        `Displayed ${items.length}/${refPoints.length} prior reference points (${skipped} without GPS)`
-      );
-    }
-  }
-
-  addCurrentRefPoint(refPoint: RefPointMark): void {
-    if (!this.zeroRef || !refPoint.gpsPosition) {
-      log.warn(
-        'Cannot add current ref point - missing zero ref or GPS position'
-      );
-      return;
-    }
-    const scene = getScene();
-    if (!scene) {
-      log.warn('Scene not available');
-      return;
-    }
-    const item = refPointToItem(refPoint);
-    if (!item) return;
-    // Append (or replace on duplicate id) and re-sync. The reconciler
-    // does an id-based diff so existing meshes are preserved.
-    const existingIdx = this.currentItems.findIndex((i) => i.id === item.id);
-    if (existingIdx >= 0) this.currentItems[existingIdx] = item;
-    else this.currentItems.push(item);
-    this.currentHandles = syncGpsAnchoredMeshes(
-      scene,
-      this.currentHandles,
-      this.currentItems,
-      { zeroRef: this.zeroRef, ...CURRENT_OPTS }
-    );
   }
 
   /**
@@ -250,30 +165,7 @@ export class RefPointVisualizer {
     this.refPointHandles = next;
   }
 
-  clearPriorRefPoints(): void {
-    const scene = getScene();
-    if (!scene) return;
-    this.priorHandles = syncGpsAnchoredMeshes(scene, this.priorHandles, [], {
-      zeroRef: this.zeroRef ?? { lat: 0, lon: 0 },
-      ...PRIOR_OPTS,
-    });
-  }
-
-  clearCurrentRefPoints(): void {
-    const scene = getScene();
-    if (!scene) return;
-    this.currentItems = [];
-    this.currentHandles = syncGpsAnchoredMeshes(
-      scene,
-      this.currentHandles,
-      [],
-      { zeroRef: this.zeroRef ?? { lat: 0, lon: 0 }, ...CURRENT_OPTS }
-    );
-  }
-
   clearAll(): void {
-    this.clearPriorRefPoints();
-    this.clearCurrentRefPoints();
     const scene = getScene();
     if (scene) {
       this.refPointHandles = syncGpsAnchoredMeshes(
@@ -287,20 +179,7 @@ export class RefPointVisualizer {
     this.lastRefPoints = [];
   }
 
-  getCounts(): { prior: number; current: number } {
-    return {
-      prior: this.priorHandles.size,
-      current: this.currentHandles.size,
-    };
-  }
-
-  /**
-   * Number of meshes currently managed by the unified `syncRefPoints`
-   * pipeline. Separate from `getCounts` so the legacy `{prior,current}`
-   * contract stays intact until Step 5 of
-   * 2026-05-27-collapse-refpoint-and-frame-slices-plan.md removes the
-   * old prior/current API entirely.
-   */
+  /** Number of meshes currently managed by the `syncRefPoints` pipeline. */
   getRefPointCount(): number {
     return this.refPointHandles.size;
   }

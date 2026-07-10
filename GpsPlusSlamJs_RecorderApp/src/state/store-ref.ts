@@ -29,6 +29,33 @@ export interface StoreRef<T> {
   subscribe(listener: (value: T) => void): () => void;
 }
 
+/**
+ * Attach a resource to the CURRENT store and re-attach on every store swap
+ * (quality-review G-11 — five recorder wirers hand-rolled this identical
+ * dance and one copy had already drifted; the F1 feedback doc records this
+ * exact stale-store bug class).
+ *
+ * `attach(store)` wires against the given store and returns its detach.
+ * Swap-specific resets (clearing a visualizer, resetting throttle counters)
+ * belong at the START of `attach` — they are no-ops on the initial
+ * attachment and run exactly once per swap after the previous detach.
+ * The returned disposer detaches the current attachment and stops following.
+ */
+export function followStore<T>(
+  storeRef: StoreRef<T>,
+  attach: (store: T) => () => void
+): () => void {
+  let detach = attach(storeRef.get());
+  const unsubscribeSwap = storeRef.subscribe((nextStore) => {
+    detach();
+    detach = attach(nextStore);
+  });
+  return () => {
+    detach();
+    unsubscribeSwap();
+  };
+}
+
 export function createStoreRef<T>(initial: T): StoreRef<T> {
   let current = initial;
   const listeners = new Set<(value: T) => void>();

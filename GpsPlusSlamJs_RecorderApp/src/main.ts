@@ -35,7 +35,6 @@ import {
   validateEnterButton,
   updatePermissionStatus,
   setPermissionsReady,
-  setFolderSelected,
   setSaveLocationSelected,
   setFolderImportExpanded,
   setFolderImportProgress,
@@ -548,7 +547,6 @@ const folderManager = createFolderManager({
   showError,
   updateStatus,
   populateScenarios,
-  setFolderSelected,
   setSaveLocationSelected,
   setFolderImportExpanded,
   validateEnterButton,
@@ -699,6 +697,12 @@ function disposeLoopClosureWiring(): void {
  * GpsPlusSlamJs_Docs/docs/2026-07-06-recorder-loop-closure-detector-wiring-plan.md.
  */
 function wireLoopClosureCapture(): void {
+  // Scratch tuples reused per frame (quality-review F-11): `processPose`
+  // snapshots the VALUES and never retains the arrays (guaranteed + pinned
+  // by test since quality-review H-3), so feeding reused scratch is safe and
+  // avoids two allocations per XR frame while the detector is enabled.
+  const scratchPos: [number, number, number] = [0, 0, 0];
+  const scratchRot: [number, number, number, number] = [0, 0, 0, 1];
   loopClosureUnregisterFrame = registerXrFrameUpdate(() => {
     // Lazy (re)bind to the CURRENT store: `store` swaps per recording
     // session, and dispatching into a stale store would silently drop the
@@ -716,15 +720,14 @@ function wireLoopClosureCapture(): void {
     if (!pose) {
       return;
     }
-    loopClosureHandler!.processPose(
-      [pose.position.x, pose.position.y, pose.position.z],
-      [
-        pose.orientation.x,
-        pose.orientation.y,
-        pose.orientation.z,
-        pose.orientation.w,
-      ]
-    );
+    scratchPos[0] = pose.position.x;
+    scratchPos[1] = pose.position.y;
+    scratchPos[2] = pose.position.z;
+    scratchRot[0] = pose.orientation.x;
+    scratchRot[1] = pose.orientation.y;
+    scratchRot[2] = pose.orientation.z;
+    scratchRot[3] = pose.orientation.w;
+    loopClosureHandler!.processPose(scratchPos, scratchRot);
   });
 }
 
@@ -801,7 +804,6 @@ export function resetMainState(): void {
   destroyConfirmDialog();
   folderManager.reset();
   replayHandlers.reset();
-  setFolderSelected(false);
   setSaveLocationSelected(false);
 }
 
@@ -2072,7 +2074,6 @@ if (
     // Tracking quality indicator hook
     updateTrackingQuality,
     // Mandatory storage selection hooks (Task 1a-fix)
-    setFolderSelected,
     setSaveLocationSelected,
     setFolderImportExpanded,
     // Folder-import indexing progress bar (D2, 2026-07-05)

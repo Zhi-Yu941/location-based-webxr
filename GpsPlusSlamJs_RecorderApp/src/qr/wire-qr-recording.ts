@@ -56,6 +56,7 @@ import type { QrCaptureOptions } from 'gps-plus-slam-app-framework/state/recordi
 import { recordQrDetection } from '../state/recorder-store';
 import type { RecorderStore } from '../state/recorder-store';
 import type { StoreRef } from '../state/store-ref';
+import { followStore } from '../state/store-ref';
 import { createQrDebugController } from './qr-debug-controller';
 
 export interface WireQrRecordingOptions {
@@ -158,14 +159,14 @@ export function wireQrRecording(options: WireQrRecordingOptions): () => void {
     });
   };
 
-  const attach = (store: RecorderStore): (() => void) =>
-    store.subscribe(scheduleUpdate);
-  let detach = attach(storeRef.get());
-  debug.update(); // reflect any pre-existing markers immediately (synchronous)
-  const unsubscribeSwap = storeRef.subscribe((nextStore) => {
-    detach();
-    detach = attach(nextStore);
-    debug.update(); // a store swap (Start Recording / replay) reflects immediately
+  // Store-swap following via the shared helper (quality-review G-11). The
+  // synchronous `debug.update()` inside attach reflects pre-existing markers
+  // immediately on the initial wiring AND on every store swap (Start
+  // Recording / replay) — the two paths used to duplicate the call.
+  const stopFollowing = followStore(storeRef, (store: RecorderStore) => {
+    const detach = store.subscribe(scheduleUpdate);
+    debug.update();
+    return detach;
   });
 
   return () => {
@@ -176,8 +177,7 @@ export function wireQrRecording(options: WireQrRecordingOptions): () => void {
       cancelAnimationFrame(rafId);
       rafId = null;
     }
-    detach();
-    unsubscribeSwap();
+    stopFollowing();
     debug.dispose();
   };
 }

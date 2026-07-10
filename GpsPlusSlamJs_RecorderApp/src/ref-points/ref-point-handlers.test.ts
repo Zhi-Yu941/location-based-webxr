@@ -65,9 +65,7 @@ const {
   mockExtractOdomRotation: vi
     .fn<(pose: ARPose) => Quaternion>()
     .mockReturnValue([0, 0, 0, 1] as Quaternion),
-  mockRefPointVisualizer: {
-    addCurrentRefPoint: vi.fn(),
-  },
+  mockRefPointVisualizer: {},
   mockShowError: vi.fn(),
   mockUpdateStatus: vi.fn(),
   mockShowToast: vi.fn(),

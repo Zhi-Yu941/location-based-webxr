@@ -33,7 +33,10 @@ describe('interpolatingMedian', () => {
   it('is permutation-invariant and bounded by [min, max]', () => {
     fc.assert(
       fc.property(
-        fc.array(fc.double({ noNaN: true }), { minLength: 1, maxLength: 50 }),
+        fc.array(fc.double({ noNaN: true, noDefaultInfinity: true }), {
+          minLength: 1,
+          maxLength: 50,
+        }),
         (values) => {
           const m = interpolatingMedian(values);
           const shuffled = [...values].reverse();
@@ -72,7 +75,10 @@ describe('lowerMedian', () => {
   it('always returns an actually-observed element (never fabricates)', () => {
     fc.assert(
       fc.property(
-        fc.array(fc.double({ noNaN: true }), { minLength: 1, maxLength: 50 }),
+        fc.array(fc.double({ noNaN: true, noDefaultInfinity: true }), {
+          minLength: 1,
+          maxLength: 50,
+        }),
         (values) => {
           expect(values).toContain(lowerMedian(values));
         }

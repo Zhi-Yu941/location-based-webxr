@@ -21,7 +21,6 @@
  *    NOT the GPS-aligned scene root. The reticle below follows this rule.
  */
 import {
-  applyChromiumProjectionLayerWorkaround,
   createEnableGpsArController,
   getArWorldGroup,
   getCamera,
@@ -34,7 +33,6 @@ import {
   createGpsPositionHandler,
   createSlamAppStore,
   selectAlignmentMatrix,
-  selectGpsPositions,
   selectZeroReference,
   startSession,
   updateDeviceOrientation,
@@ -50,7 +48,6 @@ import {
   createReticleMesh,
   enableArWorldGroupAlignment,
   updateReticle,
-  worldNueToGps,
 } from 'gps-plus-slam-app-framework/visualization';
 import type { LatLong, LatLongAlt } from 'gps-plus-slam-app-framework/core';
 import { Vector3 } from 'three';
@@ -191,12 +188,9 @@ function toGpsSeed(position: GpsPosition): LatLong | LatLongAlt {
 }
 
 function main(): void {
-  // Apply the Chromium WebXR camera-access tab-crash workaround before any
-  // session setup. It always forces the XRWebGLLayer fallback (required on
-  // every affected Chrome build, incl. Chrome 150) and additionally persists
-  // the baseLayer only on the affected Chrome window, so calling it
-  // unconditionally here is safe.
-  applyChromiumProjectionLayerWorkaround();
+  // NOTE: the Chromium WebXR camera-access tab-crash workaround is applied by
+  // the framework's initAR() itself since quality-review G-7 (default-on via
+  // isolationOptions) — no manual bootstrap call needed here any more.
 
   const statusEl = getElement<HTMLPreElement>('status');
   const button = getElement<HTMLButtonElement>('enter-ar');
@@ -209,13 +203,19 @@ function main(): void {
   let gpsFixCount = 0;
   let lastGps: LatLong | LatLongAlt | null = null;
 
+  // Skip the DOM write when the rendered text is unchanged (quality-review
+  // F-12) — the subscriber fires per store action.
+  let lastStatusText = '';
   function refreshStatus(): void {
-    statusEl.textContent = formatStatus({
+    const text = formatStatus({
       isRecording: store.getState().recording.isRecording,
       actionCount: store.getState().recording.actionCount,
       gpsPositionCount: gpsFixCount,
       failedWriteCount: store.getState().recording.failedWriteCount,
     });
+    if (text === lastStatusText) return;
+    lastStatusText = text;
+    statusEl.textContent = text;
   }
 
   // Flash a transient hint when the user taps before the first GPS fix, then
@@ -259,41 +259,24 @@ function main(): void {
     registerXrFrameUpdate(connector.update);
 
     // Default bootstrap (NO skipBootstrap): the anchor holds the tapped pose
-    // while sampling its own GPS-world pose, then makes its first lazy
-    // correction off-screen. The bootstrap source is the OBJECT's world pose
-    // (where it was actually placed), converted to GPS via `worldNueToGps` —
-    // NOT the phone's GPS fix. This pins the anchor to the tapped point, not the
-    // device, and only works because `enableArWorldGroupAlignment` makes the
-    // object's world position GPS-world NUE. Each framework selector is typed
-    // against a slightly different internal root shape; only the slices it reads
-    // exist at runtime, so the cast through `unknown` is safe (same pattern as
-    // selectGpsPositions / AnchorStarter).
-    const sampleScratch = new Vector3();
+    // while sampling its own GPS-world pose via the framework's built-in
+    // object-pose bootstrap source (quality-review G-6 — the hand-built
+    // closure this app used to carry is now the anchor's default), then
+    // makes its first lazy correction off-screen. This pins the anchor to
+    // the tapped point, not the device, and only works because
+    // `enableArWorldGroupAlignment` makes the object's world position
+    // GPS-world NUE. The selectors accept any store carrying the gpsData
+    // slice (quality-review G-2), so the former `as unknown as` casts are
+    // gone too.
     createGpsAnchor({
       object3D: anchorObject,
       arWorldGroup,
       camera,
       gpsPoint: lastGps,
       mode: ANCHOR_MODE,
-      getAlignmentMatrix: () =>
-        selectAlignmentMatrix(
-          store.getState() as unknown as Parameters<typeof selectAlignmentMatrix>[0]
-        ),
+      getAlignmentMatrix: () => selectAlignmentMatrix(store.getState()),
       getGpsZeroRef: (): LatLong | null =>
-        selectZeroReference(
-          store.getState() as unknown as Parameters<typeof selectZeroReference>[0]
-        ),
-      getCurrentGpsPoint: (): LatLongAlt | null => {
-        const zero = selectZeroReference(
-          store.getState() as unknown as Parameters<typeof selectZeroReference>[0]
-        );
-        const alignment = selectAlignmentMatrix(
-          store.getState() as unknown as Parameters<typeof selectAlignmentMatrix>[0]
-        );
-        // No GPS-world frame yet — skip this bootstrap tick (mirrors "no fix").
-        if (zero === null || alignment === null) return null;
-        return worldNueToGps(anchorObject.getWorldPosition(sampleScratch), zero);
-      },
+        selectZeroReference(store.getState()),
     });
   }
 
@@ -364,9 +347,6 @@ function main(): void {
 
   store.subscribe(refreshStatus);
   refreshStatus();
-  // `selectGpsPositions` is exercised in boot.test.ts; referenced here so the
-  // smoke test's selector stays wired to the example's real import graph.
-  void selectGpsPositions;
 
   void controller.refreshSupport();
 }

@@ -19,6 +19,7 @@
 
 import * as THREE from 'three';
 import { createLogger } from '../utils/logger';
+import { applyChromiumProjectionLayerWorkaround } from './chromium-camera-access-workaround';
 import { WEBXR_TO_NUE } from './webxr-nue-basis';
 import {
   ImageCaptureManager,
@@ -916,6 +917,18 @@ export async function initAR(
 
   currentArCrashIsolationOptions =
     validateArCrashIsolationOptions(isolationOptions);
+
+  // G-7 (2026-07-10 quality review): apply the Chromium camera-access
+  // tab-crash workaround here so every consumer gets it by default —
+  // forgetting the manual bootstrap call meant a Chrome tab crash. Runs
+  // before the renderer/session negotiation (three.js only probes the
+  // deleted prototypes at session start) and is idempotent, so apps that
+  // still call `applyChromiumProjectionLayerWorkaround()` at bootstrap are
+  // unaffected. Opt out via `isolationOptions` on unaffected devices
+  // (e.g. Quest) where forcing `XRWebGLLayer` could regress WebXR.
+  if (currentArCrashIsolationOptions.applyChromiumProjectionLayerWorkaround) {
+    applyChromiumProjectionLayerWorkaround();
+  }
 
   // Create Three.js renderer
   renderer = new THREE.WebGLRenderer({

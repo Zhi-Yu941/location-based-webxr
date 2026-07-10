@@ -331,8 +331,18 @@ export function createSlamAppStore<
     reducer,
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({
-        serializableCheck: enableDevChecks,
-        immutableCheck: enableDevChecks,
+        // E-7 (2026-07-10 quality review): both dev checks deep-walk on every
+        // dispatch, and `tracking/poseReceived` dispatches at 60–90 Hz — so
+        // the per-frame action (serializable) and the per-frame slice
+        // (immutable) are excluded specifically. Everything else stays fully
+        // checked in dev builds; RTK strips both checks from production
+        // builds entirely, so this is a dev-experience fix, not a prod one.
+        serializableCheck: enableDevChecks
+          ? { ignoredActions: ['tracking/poseReceived'] }
+          : false,
+        immutableCheck: enableDevChecks
+          ? { ignoredPaths: ['tracking'] }
+          : false,
       })
         .prepend(...prependedListeners)
         .concat(

@@ -81,7 +81,7 @@ import {
   nueQuaternionToWebXR as _nueQuaternionToWebXR,
 } from 'gps-plus-slam-js';
 import type { ARPose } from '../types/ar-types';
-import { getLastDeviceOrientation } from '../state/gps-event-coordinator';
+import { getLastDeviceOrientation } from '../sensors/device-orientation-cache';
 import {
   DEFAULT_RECORDING_OPTIONS,
   type ArCrashIsolationOptions,
@@ -984,6 +984,19 @@ export async function initAR(
   // (b) a store was injected via `setTrackingStore`. Without both we keep
   // the legacy no-op behaviour: `onXRFrame` never dispatches and no
   // callbacks ever fire. See docs/2026-05-13-tracking-state-slice-port-plan.md.
+  const hasTrackingCallbacks = onTrackingRestarted !== null;
+  const hasTrackingStore = trackingStore !== null;
+  if (hasTrackingCallbacks !== hasTrackingStore) {
+    // G-5 (2026-07-10 quality review): the two-call wiring
+    // (setTrackingStore + setTrackingCallbacks) used to no-op SILENTLY when
+    // half-forgotten — the exact stale-store bug class the F1 feedback doc
+    // records. Make the half-wired state loudly diagnosable.
+    log.warn(
+      trackingStore
+        ? 'Tracking pipeline half-wired: setTrackingStore() was called but setTrackingCallbacks() was not — no tracking callbacks will fire. Call both before initAR().'
+        : 'Tracking pipeline half-wired: setTrackingCallbacks() was called but setTrackingStore() was not — the tracking slice will not update. Call both before initAR().'
+    );
+  }
   if (onTrackingRestarted && trackingStore) {
     const store = trackingStore;
     // Start from a clean slate — the previous session may have left the

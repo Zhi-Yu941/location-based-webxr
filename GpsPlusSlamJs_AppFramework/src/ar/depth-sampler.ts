@@ -10,7 +10,7 @@
 import type { Matrix4 } from 'gps-plus-slam-js';
 import type { ARPose, DepthPoint, DepthSample } from '../types/ar-types';
 import type { RgbLookup } from './depth-rgb-lookup';
-import { extractOdomPosition } from '../state/gps-event-coordinator';
+import { extractOdomPosition } from '../types/ar-types';
 
 export type { DepthSample } from '../types/ar-types';
 

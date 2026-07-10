@@ -120,6 +120,7 @@ function startArInteraction(deps: {
 
   let hitTestSource: XRHitTestSource | null = null;
   let hitTestSourceRequested = false;
+  let sessionEnded = false;
   let selectWired = false;
   let unregisterFrameUpdate: (() => void) | null = null;
 
@@ -146,6 +147,7 @@ function startArInteraction(deps: {
       // Registered once with the other per-session setup so a hit-test retry
       // (which re-enters the request block below) cannot add duplicate listeners.
       session.addEventListener('end', () => {
+        sessionEnded = true;
         hitTestSource = null;
         hitTestSourceRequested = false;
         // Unregister THIS session's frame callback. `startArInteraction` runs
@@ -161,6 +163,14 @@ function startArInteraction(deps: {
       hitTestSourceRequested = true;
       requestHitTestSource(session)
         .then((source) => {
+          // Guard the race where the session ended while the request was in
+          // flight: cancel the now-orphaned source instead of retaining a dead
+          // handle (ported from AnchorStarter's reticle-hit-test.ts dispose
+          // guard — see quality-review finding A-5).
+          if (sessionEnded) {
+            source?.cancel();
+            return;
+          }
           hitTestSource = source;
         })
         .catch(() => {

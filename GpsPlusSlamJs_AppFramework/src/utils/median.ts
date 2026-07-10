@@ -21,9 +21,14 @@ export function interpolatingMedian(values: readonly number[]): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1]! + sorted[mid]!) / 2
-    : sorted[mid]!;
+  if (sorted.length % 2 !== 0) return sorted[mid]!;
+  const lo = sorted[mid - 1]!;
+  const hi = sorted[mid]!;
+  const mean = (lo + hi) / 2;
+  // lo + hi can overflow to ±Infinity for huge finite middle values; the
+  // half-then-add form is immune (only reached at magnitudes where halving
+  // loses no precision), keeping the result within [min, max].
+  return Number.isFinite(mean) ? mean : lo / 2 + hi / 2;
 }
 
 /**

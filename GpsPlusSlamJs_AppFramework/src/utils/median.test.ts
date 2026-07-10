@@ -30,6 +30,22 @@ describe('interpolatingMedian', () => {
     expect(input).toEqual([3, 1, 2]);
   });
 
+  // Why this test matters: (a + b) / 2 overflows to Infinity when the two
+  // middle values sum past Number.MAX_VALUE, violating the [min, max] bound
+  // (found by the fast-check property below in CI, seed 1636289138; shrunk
+  // counterexample pinned here so the bug stays deterministic).
+  it('does not overflow to Infinity for huge finite middle values', () => {
+    expect(
+      interpolatingMedian([2.9937604643020797e292, 1.7976931348623155e308])
+    ).toBeLessThanOrEqual(1.7976931348623155e308);
+    expect(interpolatingMedian([Number.MAX_VALUE, Number.MAX_VALUE])).toBe(
+      Number.MAX_VALUE
+    );
+    expect(interpolatingMedian([-Number.MAX_VALUE, -Number.MAX_VALUE])).toBe(
+      -Number.MAX_VALUE
+    );
+  });
+
   it('is permutation-invariant and bounded by [min, max]', () => {
     fc.assert(
       fc.property(

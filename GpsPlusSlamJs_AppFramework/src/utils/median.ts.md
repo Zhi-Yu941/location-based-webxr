@@ -12,6 +12,7 @@ The project's two median semantics as named helpers (2026-07-10 quality-review A
 ## Invariants & assumptions
 
 - Neither helper mutates its input (both sort a copy).
+- `interpolatingMedian` never overflows for finite inputs: the even-length mean falls back to `lo / 2 + hi / 2` when `lo + hi` exceeds `Number.MAX_VALUE`, so the result always stays within `[min, max]` (found by the fast-check bound property in CI on 2026-07-10).
 - `NaN` inputs are not filtered — the comparator leaves their order unspecified, matching the former private copies; callers pre-filter.
 - Choosing between the two variants is semantic, not stylistic: interpolating fabricates values, lower-middle never does.
 

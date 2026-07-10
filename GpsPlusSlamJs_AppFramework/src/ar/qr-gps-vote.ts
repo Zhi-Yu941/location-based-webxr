@@ -30,10 +30,8 @@ import type {
   RecordGpsEventPayload,
 } from 'gps-plus-slam-js';
 import type { Vector3 } from 'gps-plus-slam-js';
+import { calcGpsCoords } from 'gps-plus-slam-js';
 import { buildObjectPoints, transformPoint, type Pose } from './qr-pose.js';
-
-/** Mean meters per degree of latitude (WGS-84 average). */
-export const METERS_PER_DEG_LAT = 111320;
 
 /** Absolute geo pose of the printed QR, from the level file. */
 export interface QrGeoPose {
@@ -146,15 +144,22 @@ export function offsetGeo(
   center: QrGeoPose,
   enu: Enu
 ): { latitude: number; longitude: number; altitude: number } {
-  const dLat = enu.north / METERS_PER_DEG_LAT;
-  const metersPerDegLon =
-    METERS_PER_DEG_LAT * Math.cos((center.lat * Math.PI) / 180);
-  // Guard the degenerate pole case where cos(lat) → 0.
-  const dLon =
-    Math.abs(metersPerDegLon) < 1e-9 ? 0 : enu.east / metersPerDegLon;
+  // Delegates to the library's `calcGpsCoords` (quality-review A-3 — this
+  // used to re-implement the conversion with 111320 m/deg on BOTH axes; the
+  // library uses the polar/equatorial split, a ≈0.17 % latitude difference,
+  // <2 mm at QR scale). NUE convention: [0]=North, [1]=Up, [2]=East; the Up
+  // component is ignored by calcGpsCoords and composed onto the altitude here.
+  // Guard the degenerate pole case where cos(lat) → 0 would blow up the
+  // longitude division inside the library helper.
+  const nearPole = Math.abs(Math.cos((center.lat * Math.PI) / 180)) < 1e-14;
+  const { lat, lon } = calcGpsCoords({ lat: center.lat, lon: center.lon }, [
+    enu.north,
+    enu.up,
+    nearPole ? 0 : enu.east,
+  ]);
   return {
-    latitude: center.lat + dLat,
-    longitude: center.lon + dLon,
+    latitude: lat,
+    longitude: lon,
     altitude: center.alt + enu.up,
   };
 }

@@ -11,12 +11,12 @@
 
 import { describe, it, expect } from 'vitest';
 import type { Quaternion } from 'gps-plus-slam-js';
+import { calcGpsCoords, calcRelativeCoordsInMeters } from 'gps-plus-slam-js';
 import { buildObjectPoints, transformPoint, type Pose } from './qr-pose';
 import {
   buildQrGpsVotes,
   localPlaneToEnu,
   offsetGeo,
-  METERS_PER_DEG_LAT,
   type QrGeoPose,
 } from './qr-gps-vote';
 
@@ -40,19 +40,40 @@ describe('localPlaneToEnu', () => {
 });
 
 describe('offsetGeo', () => {
-  it('converts North/East/Up offsets to lat/lon/alt deltas', () => {
-    const geo = offsetGeo(qrGeo, { east: 0, north: METERS_PER_DEG_LAT, up: 5 });
-    expect(geo.latitude).toBeCloseTo(qrGeo.lat + 1, 9);
-    expect(geo.longitude).toBeCloseTo(qrGeo.lon, 9);
+  // Why these tests matter: offsetGeo delegates to the library's
+  // calcGpsCoords (quality-review A-3) so QR votes use the SAME geodesy as
+  // every other lat/lon conversion in the stack — these pin the delegation,
+  // the altitude composition, and the pole guard the library helper lacks.
+  it('matches the library calcGpsCoords conversion and composes altitude', () => {
+    const enu = { east: 12.5, north: -7.25, up: 5 };
+    const geo = offsetGeo(qrGeo, enu);
+    const expected = calcGpsCoords({ lat: qrGeo.lat, lon: qrGeo.lon }, [
+      enu.north,
+      enu.up,
+      enu.east,
+    ]);
+    expect(geo.latitude).toBe(expected.lat);
+    expect(geo.longitude).toBe(expected.lon);
     expect(geo.altitude).toBe(405);
   });
 
-  it('scales longitude by cos(latitude)', () => {
-    const metersPerDegLon =
-      METERS_PER_DEG_LAT * Math.cos((qrGeo.lat * Math.PI) / 180);
-    const geo = offsetGeo(qrGeo, { east: metersPerDegLon, north: 0, up: 0 });
-    expect(geo.longitude).toBeCloseTo(qrGeo.lon + 1, 9);
-    expect(geo.latitude).toBeCloseTo(qrGeo.lat, 9);
+  it('round-trips through the library inverse (calcRelativeCoordsInMeters)', () => {
+    const enu = { east: 3.2, north: 8.9, up: 0 };
+    const geo = offsetGeo(qrGeo, enu);
+    const back = calcRelativeCoordsInMeters(
+      { lat: qrGeo.lat, lon: qrGeo.lon },
+      { lat: geo.latitude, lon: geo.longitude }
+    );
+    // NUE: [0]=North, [2]=East. Small ellipsoid-vs-plane error at ~10 m scale.
+    expect(back[0]).toBeCloseTo(enu.north, 3);
+    expect(back[2]).toBeCloseTo(enu.east, 3);
+  });
+
+  it('yields a zero longitude offset at the pole instead of a division blow-up', () => {
+    const poleGeo: QrGeoPose = { lat: 90, lon: 8.7, alt: 0, headingDeg: 0 };
+    const geo = offsetGeo(poleGeo, { east: 5, north: 0, up: 0 });
+    expect(Number.isFinite(geo.longitude)).toBe(true);
+    expect(geo.longitude).toBeCloseTo(poleGeo.lon, 6);
   });
 });
 

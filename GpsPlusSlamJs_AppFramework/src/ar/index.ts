@@ -210,7 +210,6 @@ export {
 
 // --- qr-gps-vote ---
 export {
-  METERS_PER_DEG_LAT,
   type QrGeoPose,
   type QrGpsVoteInput,
   type Enu,

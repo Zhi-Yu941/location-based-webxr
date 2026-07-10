@@ -28,9 +28,13 @@ A QR does **not** rigidly re-anchor the scene; it votes (heavily) via the normal
   meters (vertical-QR convention: +y = up, +x along `headingDeg` clockwise from
   North → `east = x·sin h`, `north = x·cos h`).
 - `offsetGeo(center, enu): {latitude, longitude, altitude}` — apply an ENU meter
-  offset to a geo pose (equirectangular; exact enough for sub-meter corners;
-  guards the cos(lat)→0 pole case).
-- `QrGeoPose`, `QrGpsVoteInput`, `Enu`, `METERS_PER_DEG_LAT` (111320).
+  offset to a geo pose. Delegates to the library's `calcGpsCoords` (quality-review
+  A-3 — same geodesy as every other conversion in the stack; the former local
+  111320-both-axes approximation differed by ≈0.17 % in latitude, <2 mm at QR
+  scale) and keeps the cos(lat)→0 pole guard the library helper lacks. Altitude
+  is composed locally (`center.alt + enu.up`).
+- `QrGeoPose`, `QrGpsVoteInput`, `Enu`. (The former `METERS_PER_DEG_LAT` export
+  was removed with the delegation — no consumer existed in either workspace root.)
 
 ## Invariants & assumptions
 

@@ -19,6 +19,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { createGpsAnchor, type GpsAnchorSamplePoint } from './gps-anchor.js';
+import { worldNueToGps } from './frame-conversions.js';
 import { clearFrameUpdates } from '../ar/frame-loop.js';
 import { makeNonTrivialAlignment } from '../test-utils/non-trivial-alignment.js';
 
@@ -122,6 +123,43 @@ describe('createGpsAnchor — bootstrap', () => {
     expect(anchor.isFullyAnchored).toBe(true);
     expect(anchor.gpsPoint.lat).toBeCloseTo(48.003, 6);
     expect(anchor.gpsPoint.lon).toBeCloseTo(11.0, 6);
+    anchor.dispose();
+  });
+
+  it('defaults to the object-pose bootstrap source when getCurrentGpsPoint is omitted (quality-review G-6)', () => {
+    // Why this test matters: the object-pose sampler used to be hand-built in
+    // every consumer and was the subtlest piece of anchor wiring — a wrong
+    // re-derivation anchored silently wrong. The built-in default must
+    // (a) skip ticks until zero AND alignment exist, and (b) sample the
+    // OBJECT's world position converted via worldNueToGps.
+    const env = makeAnchorEnv();
+    env.object3D.position.set(10, 2, 20); // GPS-world NUE metres
+    env.object3D.updateMatrixWorld(true);
+    const zero = { lat: 48.0, lon: 11.0 };
+    let alignment: readonly number[] | null = null;
+    const anchor = createGpsAnchor({
+      ...env,
+      gpsPoint: zero,
+      getAlignmentMatrix: () => alignment,
+      getGpsZeroRef: () => zero,
+      secondsToAccumulateGpsPose: 1,
+    });
+
+    // No alignment yet → the sampler must skip (no commit).
+    anchor.__tickForTests(1, 1);
+    expect(anchor.phase).toBe('bootstrap');
+
+    // Alignment appears → the next tick samples the object pose and commits.
+    alignment = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    anchor.__tickForTests(1, 3);
+    expect(anchor.phase).toBe('anchored');
+    const expected = worldNueToGps({ x: 10, y: 2, z: 20 }, zero);
+    expect(anchor.gpsPoint.lat).toBeCloseTo(expected.lat, 9);
+    expect(anchor.gpsPoint.lon).toBeCloseTo(expected.lon, 9);
+    expect((anchor.gpsPoint as { altitude?: number }).altitude).toBeCloseTo(
+      2,
+      9
+    );
     anchor.dispose();
   });
 

@@ -19,7 +19,7 @@ import {
 } from '../core/index.js';
 import { registerFrameUpdate } from '../ar/frame-loop.js';
 import { isObjectInCameraFrustum } from './frustum-visibility.js';
-import { nueToArLocal } from './frame-conversions.js';
+import { nueToArLocal, worldNueToGps } from './frame-conversions.js';
 import { interpolatingMedian } from '../utils/median.js';
 
 export type GpsAnchorMode = 'snap-when-offscreen' | 'snap-every-tick';
@@ -41,8 +41,19 @@ export interface GpsAnchorOptions {
   readonly skipBootstrap?: boolean;
   readonly getAlignmentMatrix: () => readonly number[] | null;
   readonly getGpsZeroRef: () => LatLong | null;
-  /** Returns the current GPS reading at "now", or null when no fix yet. */
-  readonly getCurrentGpsPoint: () => GpsAnchorSamplePoint | null;
+  /**
+   * Returns the current bootstrap sample, or null to skip this tick.
+   *
+   * OPTIONAL since quality-review G-6: when omitted, the anchor samples the
+   * OBJECT's own world pose converted to GPS via `worldNueToGps` (the
+   * "object-pose" source) — pinning the anchor to the placed point, not the
+   * device. This was previously hand-built (scratch vector + zero/alignment
+   * guards) in every consumer and was the subtlest piece of anchor wiring:
+   * re-deriving it incorrectly anchored silently wrong. Provide a custom
+   * reader only when the samples should come from somewhere else (e.g. the
+   * phone's GPS fix).
+   */
+  readonly getCurrentGpsPoint?: () => GpsAnchorSamplePoint | null;
   /**
    * Optional callback invoked whenever the bootstrap median is committed (the
    * anchor's GPS reference is (re)assigned). Receives the exact committed point
@@ -63,6 +74,36 @@ export interface GpsAnchorOptions {
   /** Wait window (seconds) at phase entry during which no samples are taken. Default 0. */
   readonly settlingSeconds?: number;
   readonly heightAboveGround?: number | null;
+}
+
+/**
+ * Built-in "object-pose" bootstrap source (quality-review G-6): samples the
+ * object's world pose converted to GPS. Requires a GPS-world frame — the
+ * world position is GPS-world NUE only once an alignment exists (via
+ * `enableArWorldGroupAlignment`), so ticks are skipped until zero AND
+ * alignment are available (mirrors "no fix yet").
+ */
+function createObjectPoseSampler(
+  options: Pick<
+    GpsAnchorOptions,
+    'object3D' | 'getGpsZeroRef' | 'getAlignmentMatrix'
+  >
+): () => GpsAnchorSamplePoint | null {
+  const scratch = new THREE.Vector3();
+  return () => {
+    const zero = options.getGpsZeroRef();
+    if (zero === null || zero === undefined) return null;
+    const alignment = options.getAlignmentMatrix();
+    if (alignment === null || alignment === undefined) return null;
+    return worldNueToGps(options.object3D.getWorldPosition(scratch), zero);
+  };
+}
+
+/** A caller-provided bootstrap reader wins; otherwise the built-in object-pose source. */
+function resolveBootstrapSampler(
+  options: GpsAnchorOptions
+): () => GpsAnchorSamplePoint | null {
+  return options.getCurrentGpsPoint ?? createObjectPoseSampler(options);
 }
 
 export interface GpsAnchor {
@@ -167,6 +208,7 @@ export function createGpsAnchor(options: GpsAnchorOptions): GpsAnchor {
 
   // Scratch vectors — reused across ticks to avoid per-frame allocs.
   const scratchTarget = new THREE.Vector3();
+  const getCurrentGpsPoint = resolveBootstrapSampler(options);
   const scratchCamWorld = new THREE.Vector3();
   const scratchObjWorld = new THREE.Vector3();
 
@@ -326,7 +368,7 @@ export function createGpsAnchor(options: GpsAnchorOptions): GpsAnchor {
     // Sample at most once per second.
     if (lastSampleAtElapsed !== null && elapsed - lastSampleAtElapsed < 1)
       return;
-    const sample = options.getCurrentGpsPoint();
+    const sample = getCurrentGpsPoint();
     if (sample === null || sample === undefined) return;
     samples.push(sample);
     lastSampleAtElapsed = elapsed;

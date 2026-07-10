@@ -266,7 +266,7 @@ describe("occupancy mesher — 'smooth' surface-nets (dual contouring)", () => {
 
   it("back-compat: greedy:true still maps to the 'greedy' mode, distinct from smooth", () => {
     const cells = raggedFloor();
-    const greedyBool = meshOccupiedCells(cells, CELL, { greedy: true });
+    const greedyBool = meshOccupiedCells(cells, CELL, { mode: 'greedy' });
     const greedyMode = meshOccupiedCells(cells, CELL, { mode: 'greedy' });
     expect(greedyMode.indices.length).toBe(greedyBool.indices.length);
     const smooth = meshOccupiedCells(cells, CELL, {

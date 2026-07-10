@@ -21,7 +21,7 @@ AABB list feeds a **compound box collider** (the better voxel-physics fit). See
 - `Aabb` — `{ center: [x,y,z], halfExtents: [hx,hy,hz] }`, raw-WebXR metres.
 - `OccupancyMeshResult` — the typed-array bundle above (transferable to a Web Worker).
 - `MeshMode` — `'per-face' | 'greedy' | 'smooth' | 'corner-fit'`.
-- `MeshOccupiedCellsOptions` — `{ mode?: MeshMode; greedy?: boolean; getCellPoint?: (cell) => Vector3 | null }`. `mode` takes precedence; the legacy `greedy` boolean is a back-compat shim (`true → 'greedy'`, else `'per-face'`). All modes stay simultaneously usable — none replaces another.
+- `MeshOccupiedCellsOptions` — `{ mode?: MeshMode; getCellPoint?: (cell) => Vector3 | null }`. Default mode `'per-face'`. (The deprecated `greedy` boolean shim was removed 2026-07-10, quality-review C-3 — use `{ mode: 'greedy' }`.) All modes stay simultaneously usable — none replaces another.
 
 ## Modes
 

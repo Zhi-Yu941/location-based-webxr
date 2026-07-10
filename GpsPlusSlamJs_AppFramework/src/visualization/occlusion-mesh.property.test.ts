@@ -95,7 +95,7 @@ describe('OcclusionMesh.setDebugStyle — properties', () => {
             const { positions, indices } = meshOccupiedCells(
               op.cells,
               CELL_SIZE,
-              { greedy: true }
+              { mode: 'greedy' }
             );
             occluder.applyMeshData(positions, indices);
           } else {

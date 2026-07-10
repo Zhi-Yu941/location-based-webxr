@@ -20,6 +20,7 @@ import {
 import { registerFrameUpdate } from '../ar/frame-loop.js';
 import { isObjectInCameraFrustum } from './frustum-visibility.js';
 import { nueToArLocal } from './frame-conversions.js';
+import { interpolatingMedian } from '../utils/median.js';
 
 export type GpsAnchorMode = 'snap-when-offscreen' | 'snap-every-tick';
 export type GpsAnchorPhase = 'bootstrap' | 'anchored';
@@ -114,25 +115,16 @@ function isDescendantOf(
   return false;
 }
 
-function median(values: number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 === 0) {
-    return (sorted[mid - 1]! + sorted[mid]!) / 2;
-  }
-  return sorted[mid]!;
-}
-
 function medianPoint(
   samples: readonly GpsAnchorSamplePoint[]
 ): LatLong | LatLongAlt {
-  const lat = median(samples.map((s) => s.lat));
-  const lon = median(samples.map((s) => s.lon));
+  const lat = interpolatingMedian(samples.map((s) => s.lat));
+  const lon = interpolatingMedian(samples.map((s) => s.lon));
   const alts = samples
     .map((s) => ('altitude' in s ? s.altitude : undefined))
     .filter((a): a is number => typeof a === 'number');
   if (alts.length > 0) {
-    return { lat, lon, altitude: median(alts) };
+    return { lat, lon, altitude: interpolatingMedian(alts) };
   }
   return { lat, lon };
 }

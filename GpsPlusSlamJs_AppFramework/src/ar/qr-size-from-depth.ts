@@ -33,6 +33,7 @@ import { vec3 } from 'gl-matrix';
 import type { Vector3 } from 'gps-plus-slam-js';
 import type { DepthPoint } from '../types/ar-types.js';
 import type { DepthUnprojector } from './depth-unprojection.js';
+import { interpolatingMedian } from '../utils/median.js';
 
 /** Where the size lifecycle currently sits for one marker (Note 3 / Note 4). */
 export type QrSizeStatus =
@@ -77,16 +78,6 @@ const PLANE_INLIER_FLOOR_M = 0.005;
 
 function dist(a: Vector3, b: Vector3): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-}
-
-/** Median of a numeric list (mean of the middle two for even n). */
-function median(values: readonly number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  const n = sorted.length;
-  const mid = n >> 1;
-  return n % 2 === 1
-    ? (sorted[mid] as number)
-    : ((sorted[mid - 1] as number) + (sorted[mid] as number)) / 2;
 }
 
 /**
@@ -171,7 +162,7 @@ export function estimateQrSizeFromDepth(
   const relErr = Math.max(edgeErr, diagErr, planeErr);
   const quality = Math.max(0, Math.min(1, 1 - relErr));
 
-  return { sizeM: median(edges), quality };
+  return { sizeM: interpolatingMedian(edges), quality };
 }
 
 // --- Dense plane-fit size estimate (WS-A) ------------------------------
@@ -336,7 +327,7 @@ export function fitPlaneRobust(points: readonly Vector3[]): PlaneFit | null {
       const d = nx * (p[0] - a[0]) + ny * (p[1] - a[1]) + nz * (p[2] - a[2]);
       return d * d;
     });
-    const medSq = median(sq);
+    const medSq = interpolatingMedian(sq);
     if (!best || medSq < best.medSq) {
       best = { normal: [nx, ny, nz], p0: a, medSq };
     }
@@ -459,7 +450,7 @@ export function estimateQrSizeFromDepthDense(
   const relErr = Math.max(edgeErr, diagErr, planeErr);
   const quality = Math.max(0, Math.min(1, 1 - relErr));
 
-  return { sizeM: median(edges), quality };
+  return { sizeM: interpolatingMedian(edges), quality };
 }
 
 // --- Running-median accumulator (the Note 3 size lifecycle) ------------
@@ -525,11 +516,11 @@ export function createQrSizeAccumulator(
     if (sizes.length === 0) return { ...UNKNOWN };
     // The point estimate is the median — robust to a minority of bad frames
     // (a late burst of outliers can't pull it while the history is majority-good).
-    const med = median(sizes);
+    const med = interpolatingMedian(sizes);
     // Robust dispersion: MAD about the median → σ ≈ 1.4826·MAD. The reported
     // `spreadM` is the standard-error of that σ, so it shrinks ~1/√N as evidence
     // accumulates (the "converges to a very exact value the longer it is seen").
-    const mad = median(sizes.map((s) => Math.abs(s - med)));
+    const mad = interpolatingMedian(sizes.map((s) => Math.abs(s - med)));
     const sigma = 1.4826 * mad;
     const spreadM = sigma / Math.sqrt(sizes.length);
     if (sizes.length >= minSamples && spreadM <= maxSpreadM)

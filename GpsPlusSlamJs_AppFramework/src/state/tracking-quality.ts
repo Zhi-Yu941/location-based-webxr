@@ -39,6 +39,7 @@ import type { ReadonlyMat4 } from 'gl-matrix';
 import type { GpsPoint, LatLong, Matrix4, Vector3 } from 'gps-plus-slam-js';
 import { calcGpsCoords, distanceInMeters } from 'gps-plus-slam-js';
 import { geodesicAngleRad } from '../utils/geodesic-angle.js';
+import { interpolatingMedian } from '../utils/median.js';
 import type { CombinedRootState } from './combined-root-state';
 import {
   selectAlignmentMatrix,
@@ -205,15 +206,6 @@ function bearingDeg(north: number, east: number): number {
   let deg = (rad * 180) / Math.PI;
   if (deg < 0) deg += 360;
   return deg;
-}
-
-function median(values: readonly number[]): number {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1]! + sorted[mid]!) / 2
-    : sorted[mid]!;
 }
 
 /**
@@ -512,7 +504,7 @@ export function computeResidualConsensus(
       count: normalised.length,
     };
   }
-  const medianNorm = median(normalised);
+  const medianNorm = interpolatingMedian(normalised);
   const medianResidualM = rawResidualSum / rawResidualCount;
   const score = clamp01(
     1 / (1 + medianNorm / options.residualConfidenceTargetM)
@@ -573,7 +565,7 @@ export function computeGpsAccuracy(
       countTotal: gpsPositions.length - start,
     };
   }
-  const medianM = median(accs);
+  const medianM = interpolatingMedian(accs);
   return {
     score: rampDown(medianM, goodMedianM, badMedianM),
     medianM,

@@ -81,7 +81,10 @@ content (replace)**:
     [`placement-view.ts`](src/placement-view.ts.md) — pure view-models that
     map the framework metric + FSM to render-ready strings (the async-UX
     in-progress → final contract is tested here).
-  - [`capability.ts`](src/capability.ts.md) — the E1 decision + message.
+  - The E1 capability decision + message come from the framework's
+    [`ar/capability-checker`](../GpsPlusSlamJs_AppFramework/src/ar/capability-checker.ts.md)
+    (promoted from this app; `main.ts` supplies the app-specific
+    `contextLabel`).
   - [`placement-decision.ts`](src/placement-decision.ts.md) — the pure
     surface/alignment gate for the Place press (places only when a reticle
     surface AND a GPS alignment are present, else returns an actionable hint).

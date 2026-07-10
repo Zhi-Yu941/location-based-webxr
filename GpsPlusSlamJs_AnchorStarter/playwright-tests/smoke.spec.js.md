@@ -19,8 +19,9 @@
     names the missing **WebXR** capability plus the "AR-capable phone" guidance.
 - **Invariants & assumptions:**
   - The capability gate depends only on WebXR being absent; geolocation state is
-    irrelevant because `isFullySupported` requires **both** (see
-    [capability.ts.md](../src/capability.ts.md)).
+    irrelevant because `isFullySupported` requires **both** (see the framework's
+    [ar/capability-checker.ts.md](../../GpsPlusSlamJs_AppFramework/src/ar/capability-checker.ts.md),
+    which replaced the app-local `capability.ts`).
   - Selectors use the existing `data-testid` attributes already present in
     [index.html](../index.html) — no markup changes were needed.
   - Waiting uses `locator.waitFor`/`expect` only — no `waitForTimeout` (repo

@@ -20,7 +20,9 @@
   the prod-inert guarantee in [seams.ts.md](seams.ts.md).
 - **Key flow:**
   - `main()` probes `checkWebXRSupport` + `checkGeolocationPermission`; if not
-    fully supported, shows `capabilityMessage` (E1) and disables Start.
+    fully supported, shows `capabilityMessage` (E1, from the framework's
+    [ar/capability-checker](../../GpsPlusSlamJs_AppFramework/src/ar/capability-checker.ts.md)
+    with `contextLabel: "the persistent-anchor flow"`) and disables Start.
   - `startAr()` (user gesture): `createSlamAppStore({ NullStorageBackend })` →
     `getSeams().setTrackingStore` **+ `getSeams().setTrackingCallbacks`** (BOTH
     are required before
@@ -110,7 +112,9 @@
   [placement-decision](placement-decision.ts.md),
   [url-anchor-state](url-anchor-state.ts.md),
   [guidance-view](guidance-view.ts.md), [placement-view](placement-view.ts.md),
-  [capability](capability.ts.md), [marker](marker.ts.md)). The reticle loop
+  [marker](marker.ts.md)) and in the framework
+  ([ar/capability-checker](../../GpsPlusSlamJs_AppFramework/src/ar/capability-checker.ts.md),
+  which replaced the app-local `capability.ts`). The reticle loop
   ([reticle-hit-test](reticle-hit-test.ts.md)) is device-only glue. The
   placement glue — including the reticle gate (place when a surface is present,
   hint when not) and the failure cleanup that prevents leaked / overlapping

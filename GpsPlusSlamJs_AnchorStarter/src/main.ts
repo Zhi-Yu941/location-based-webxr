@@ -33,6 +33,10 @@ import { NullStorageBackend } from "gps-plus-slam-app-framework/storage";
 import { applyChromiumProjectionLayerWorkaround } from "gps-plus-slam-app-framework/ar/chromium-camera-access-workaround";
 import { getCurrentArPose } from "gps-plus-slam-app-framework/ar/webxr-session";
 import {
+  isFullySupported,
+  capabilityMessage,
+} from "gps-plus-slam-app-framework/ar/capability-checker";
+import {
   stopGpsWatch,
   stopOrientationWatch,
   type GpsPosition,
@@ -59,7 +63,6 @@ import {
 } from "./url-anchor-state.js";
 import { toGuidanceView } from "./guidance-view.js";
 import { toPlacementView } from "./placement-view.js";
-import { isFullySupported, capabilityMessage } from "./capability.js";
 import { getSeams } from "./seams.js";
 import { decideAnchorPlacement } from "./placement-decision.js";
 import { coldStartOverrideEnabledFromSearch } from "./cold-start-override-flag.js";
@@ -649,7 +652,10 @@ async function main(): Promise<void> {
     // E1: honest, capability-gated message instead of a crash.
     dom.startButton.disabled = true;
     dom.capabilityMessage.hidden = false;
-    dom.capabilityMessage.textContent = capabilityMessage(support) ?? "";
+    dom.capabilityMessage.textContent =
+      capabilityMessage(support, {
+        contextLabel: "the persistent-anchor flow",
+      }) ?? "";
     return;
   }
 

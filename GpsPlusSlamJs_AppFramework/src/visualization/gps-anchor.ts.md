@@ -47,9 +47,14 @@ consulted.
   `getCurrentGpsPoint`. Optional: `skipBootstrap`, `onBootstrapComplete`,
   `mode`, `floorY`,
   `distanceThreshold` (default 2 m), `angleThresholdInDegrees`
-  (default 15°), `targetPosRefreshRateInSec` (default 3 s),
+  (default 15°),
   `secondsToAccumulateGpsPose` (default 7 samples at 1 Hz),
   `settlingSeconds` (default 0), `heightAboveGround`.
+  (The declared-but-never-wired `targetPosRefreshRateInSec` option was
+  removed 2026-07-10, quality-review E-3 — the steady-state target is now
+  cached on the `(zeroRef, alignmentMatrix, gpsPoint)` reference identities,
+  so the geo trig + inversion run only when an input actually changes,
+  with no refresh timer needed.)
 - `createGpsAnchor(options) → GpsAnchor` — the factory.
 - `interface GpsAnchor` — `phase`, `isFullyAnchored`, `gpsPoint`,
   `markMovedExternally()`, `setGpsPoint(point)`, `dispose()`.

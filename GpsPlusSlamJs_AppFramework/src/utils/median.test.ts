@@ -40,7 +40,10 @@ describe('interpolatingMedian', () => {
         (values) => {
           const m = interpolatingMedian(values);
           const shuffled = [...values].reverse();
-          expect(interpolatingMedian(shuffled)).toBe(m);
+          // `===` (not toBe/Object.is): a stable sort can order -0 and 0
+          // differently for a permutation, making the median -0 vs 0 —
+          // numerically identical values.
+          expect(interpolatingMedian(shuffled) === m).toBe(true);
           expect(m).toBeGreaterThanOrEqual(Math.min(...values));
           expect(m).toBeLessThanOrEqual(Math.max(...values));
         }

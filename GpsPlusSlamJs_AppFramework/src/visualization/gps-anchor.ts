@@ -58,7 +58,6 @@ export interface GpsAnchorOptions {
   readonly floorY?: () => number | null;
   readonly distanceThreshold?: number;
   readonly angleThresholdInDegrees?: number;
-  readonly targetPosRefreshRateInSec?: number;
   /** Number of 1 Hz samples collected during bootstrap. Default 7. */
   readonly secondsToAccumulateGpsPose?: number;
   /** Wait window (seconds) at phase entry during which no samples are taken. Default 0. */
@@ -243,6 +242,17 @@ export function createGpsAnchor(options: GpsAnchorOptions): GpsAnchor {
    * matrix yet — an AR-local object cannot be placed without knowing the
    * AR↔NUE transform).
    */
+  // E-3 target cache (2026-07-10 quality review): the geo trig + 4×4
+  // inversion below depend only on (zeroRef, alignmentMatrix, gpsPoint) —
+  // all ~1 Hz reference identities — yet used to be recomputed every XR
+  // frame per anchor. `scratchTarget` keeps the last computed AR-local
+  // target while all three references are unchanged. (The declared-but-
+  // never-wired `targetPosRefreshRateInSec` option was removed in favour of
+  // this reference-keyed cache — no timer needed.)
+  let lastTargetZeroRef: unknown = null;
+  let lastTargetAlignmentRef: unknown = null;
+  let lastTargetGpsPointRef: unknown = null;
+
   const maybeCommitSteadyState = (): void => {
     const zero = options.getGpsZeroRef();
     if (zero === null || zero === undefined) return;
@@ -255,16 +265,25 @@ export function createGpsAnchor(options: GpsAnchorOptions): GpsAnchor {
     // frame — see the alignment-frame bug doc referenced above.)
     if (currentAlignment === null || currentAlignment === undefined) return;
 
-    const targetAlt =
-      'altitude' in gpsPoint && typeof gpsPoint.altitude === 'number'
-        ? gpsPoint.altitude
-        : 0;
-    const nue = calcRelativeCoordsInMeters(zero, gpsPoint, targetAlt, 0);
-    // GPS-world NUE → AR-local: `alignment⁻¹ · nue`. Centralised in
-    // `nueToArLocal` so the frame conversion has one tested home (see its
-    // sidecar). Writes into the reused `scratchTarget` to avoid per-tick
-    // allocation.
-    nueToArLocal(currentAlignment, [nue[0], nue[1], nue[2]], scratchTarget);
+    if (
+      zero !== lastTargetZeroRef ||
+      currentAlignment !== lastTargetAlignmentRef ||
+      gpsPoint !== lastTargetGpsPointRef
+    ) {
+      const targetAlt =
+        'altitude' in gpsPoint && typeof gpsPoint.altitude === 'number'
+          ? gpsPoint.altitude
+          : 0;
+      const nue = calcRelativeCoordsInMeters(zero, gpsPoint, targetAlt, 0);
+      // GPS-world NUE → AR-local: `alignment⁻¹ · nue`. Centralised in
+      // `nueToArLocal` so the frame conversion has one tested home (see its
+      // sidecar). Writes into the reused `scratchTarget` to avoid per-tick
+      // allocation.
+      nueToArLocal(currentAlignment, [nue[0], nue[1], nue[2]], scratchTarget);
+      lastTargetZeroRef = zero;
+      lastTargetAlignmentRef = currentAlignment;
+      lastTargetGpsPointRef = gpsPoint;
+    }
 
     // Distance-scaled threshold: `scale = 1 + 10 × distanceFromCamera/100`.
     options.camera.getWorldPosition(scratchCamWorld);

@@ -25,7 +25,6 @@ import {
   selectQrSize,
   selectStableQrPose,
 } from "gps-plus-slam-app-framework/state";
-import { applyChromiumProjectionLayerWorkaround } from "gps-plus-slam-app-framework/ar/chromium-camera-access-workaround";
 
 import { getSeams } from "./seams.js";
 import { createQrDemoStore, type QrDemoStore } from "./demo-store.js";
@@ -207,8 +206,8 @@ async function startAr(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  // Chromium WebXR camera-access tab-crash workaround (safe to call always).
-  applyChromiumProjectionLayerWorkaround();
+  // The Chromium WebXR camera-access tab-crash workaround is applied by the
+  // framework's initAR (on by default) — no manual call needed here.
   renderHud();
 
   const support = await getSeams().checkSupport();

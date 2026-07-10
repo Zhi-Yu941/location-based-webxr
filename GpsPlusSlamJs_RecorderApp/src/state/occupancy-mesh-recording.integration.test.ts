@@ -110,7 +110,7 @@ describe.skipIf(!HAS_ZIP)(
 
         const t1 = performance.now();
         const greedy = meshOccupiedCells(cells, grid.cellSizeM, {
-          greedy: true,
+          mode: 'greedy',
         });
         const tGreedy = performance.now() - t1;
 

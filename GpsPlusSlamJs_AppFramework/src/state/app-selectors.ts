@@ -50,7 +50,7 @@ const EMPTY_FRAME_TILES: readonly ArImageCapture[] = [];
  * in every consumer, and a renamed slice would have compiled and failed at
  * runtime.
  */
-export type RootWithGpsData = Pick<CombinedRootState, 'gpsData'>;
+type RootWithGpsData = Pick<CombinedRootState, 'gpsData'>;
 
 const selectGpsData = (state: RootWithGpsData) => state.gpsData;
 

@@ -1264,10 +1264,12 @@ function onXRFrame(time: number, frame: XRFrame | undefined): void {
     imageCaptureManager.onFrame(time);
   }
 
-  // Check if we need to sample depth
+  // Check if we need to sample depth. The provider is lazy (quality-review
+  // E-4): the sampler only invokes it when a sample is due, so the
+  // getDepthInformation + wrap cost is paid ~1×/interval instead of every
+  // render frame.
   if (depthSampler) {
-    const depthInfo = getDepthInfoFromFrame(frame, pose);
-    depthSampler.onFrame(time, depthInfo);
+    depthSampler.onFrame(time, () => getDepthInfoFromFrame(frame, pose));
   }
 
   // Check if we need to capture a camera frame for CV. The source throttles to

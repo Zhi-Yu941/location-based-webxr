@@ -15,7 +15,7 @@ Samples sparse depth points from the WebXR depth sensing API at a configurable i
 - **`getSampleCount(): number`** — number of samples captured since last `start()`.
 - **`getConfig(): DepthSamplerConfig`** — returns a copy of the current config.
 - **`updateConfig(config: Partial<DepthSamplerConfig>): void`** — applies partial overrides (the plumbing seam for the user's `depth.*` recording options, called by `startDepthCapture(config)`). Invalid values (non-finite, non-positive, fractional `gridSize`) are ignored defensively.
-- **`onFrame(timestamp: number, depthInfo: DepthInfo | null): void`** — call once per XR frame. Throttles sampling to `intervalMs`.
+- **`onFrame(timestamp: number, acquireDepthInfo: () => DepthInfo | null): void`** — call once per XR frame with a LAZY provider (quality-review E-4, 2026-07-10: the caller used to acquire+wrap depth every frame while ~59/60 acquisitions were thrown away at the interval check; the provider is now invoked only when a sample is due). Throttles sampling to `intervalMs`. Unavailability detection is preserved: `lastSampleTime` only advances on emitted samples, so while depth is unavailable the sampler stays due and probes every frame.
 
 ### `wrapXRDepthInfo(raw, projectionMatrix)` (function)
 
@@ -47,7 +47,9 @@ const sampler = new DepthSampler({
 });
 sampler.start();
 // In XR frame loop:
-sampler.onFrame(xrFrame.predictedDisplayTime, depthInfo);
+sampler.onFrame(xrFrame.predictedDisplayTime, () =>
+  getDepthInfoFromFrame(frame, pose)
+);
 ```
 
 ## Tests

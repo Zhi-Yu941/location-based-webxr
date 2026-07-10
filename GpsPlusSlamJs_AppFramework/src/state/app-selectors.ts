@@ -41,7 +41,18 @@ const EMPTY_FRAME_TILES: readonly ArImageCapture[] = [];
 // the output selector is skipped and the cached result is returned.
 // ---------------------------------------------------------------------------
 
-const selectGpsData = (state: CombinedRootState) => state.gpsData;
+/**
+ * Minimal root these selectors read (quality-review G-2). Typed as a Pick of
+ * the `gpsData` slice ONLY, so ANY consumer store that mounts the library's
+ * gpsData reducer is structurally assignable — the former full
+ * `CombinedRootState` parameter forced `as unknown as` casts (MinimalExample),
+ * a `sel()` helper (AnchorStarter), or a re-declared root type (RecorderApp)
+ * in every consumer, and a renamed slice would have compiled and failed at
+ * runtime.
+ */
+export type RootWithGpsData = Pick<CombinedRootState, 'gpsData'>;
+
+const selectGpsData = (state: RootWithGpsData) => state.gpsData;
 
 // ---------------------------------------------------------------------------
 // Memoized selectors
@@ -104,7 +115,7 @@ export const selectZeroReference = createSelector(
  * across those dispatches — subscribers like `wireFrameTileSubscribers` only
  * re-run when frames actually change.
  */
-const selectOdometryPathPoints = (state: CombinedRootState) =>
+const selectOdometryPathPoints = (state: RootWithGpsData) =>
   state.gpsData?.odometryPath?.points;
 
 /**

@@ -109,13 +109,15 @@ Earlier passes: intervalMs/gridSize/minConfidence were first re-tuned in the [20
 
 `depth.gridSize` default is 32 (32×32 = 1024 points per sample, since the 2026-07-01 fast-reconstruction re-tune — see "Depth/occupancy defaults" above) so the AR-space occupancy grid populates fast enough for on-device verification (2026-06-11 port plan §1). The depth options reach the sampler via `startDepthCapture(config)` → `DepthSampler.updateConfig` — before that plumbing existed they were dead knobs. `depth.rgb` (default **true**) toggles the Iter-8 RGB voxel coloring (one small per-sample camera-color blit+readback); non-boolean persisted values fall back to the default, so pre-Iter-8 stored options keep the feature on.
 
+`images.intervalMs` min/step were lowered 1000/500 → **250/250** (2026-07-10) so splat-style object scans can reach 4 Hz — the capture pipeline self-limits via `captureInProgress` if a device cannot sustain that cadence. See `GpsPlusSlamJs_Docs/docs/2026-07-10-splat-orbit-capture-rate-finding.md`.
+
 ## Validation Constraints
 
 | Setting                                       | Min  | Max   |
 | --------------------------------------------- | ---- | ----- |
 | `depth.intervalMs`                            | 500  | 5000  |
 | `depth.gridSize`                              | 2    | 64    |
-| `images.intervalMs`                           | 1000 | 10000 |
+| `images.intervalMs`                           | 250  | 10000 |
 | `images.quality`                              | 0.3  | 1.0   |
 | `images.resolutionDivisor`                    | 1    | 8     |
 | `qualityFilter.blurRelativeThreshold`         | 0.05 | 0.95  |

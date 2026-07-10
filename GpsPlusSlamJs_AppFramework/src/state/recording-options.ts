@@ -561,9 +561,20 @@ export const DEPTH_CONSTRAINTS = {
   gridSize: { min: 2, max: 64, step: 1 },
 } as const;
 
-/** Validation constraints for image options */
+/**
+ * Validation constraints for image options.
+ *
+ * `intervalMs` min/step lowered 1000/500 → 250/250 (2026-07-10) so
+ * splat-style object scans can capture up to 4 Hz — at the old 1 Hz floor a
+ * slow orbit yields ~1 frame/m, too sparse for Gaussian-splat reconstruction
+ * (50–150+ frames/object). An interval faster than the readback+encode path
+ * cannot overlap captures: `captureInProgress` serialises them and the
+ * interval is measured from the actual capture time, so the pipeline
+ * self-limits. See
+ * GpsPlusSlamJs_Docs/docs/2026-07-10-splat-orbit-capture-rate-finding.md.
+ */
 export const IMAGE_CONSTRAINTS = {
-  intervalMs: { min: 1000, max: 10000, step: 500 },
+  intervalMs: { min: 250, max: 10000, step: 250 },
   quality: { min: 0.3, max: 1.0, step: 0.1 },
   resolutionDivisor: { min: 1, max: 8, step: 1 },
 } as const;

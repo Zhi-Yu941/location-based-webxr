@@ -1445,6 +1445,22 @@ describe('settings-modal', () => {
       expect(valueDisplay?.textContent).toBe('4.0s');
     });
 
+    it('shows sub-second image intervals in ms (splat-scan cadence)', () => {
+      // Why this test matters: IMAGE_CONSTRAINTS.intervalMs.min dropped to
+      // 250 ms (2026-07-10 splat-orbit finding) and `(250/1000).toFixed(1)`
+      // would render a misleading "0.3s" — sub-second values must show exact
+      // milliseconds (mirroring the QR interval display).
+      const slider = document.getElementById(
+        'images-interval'
+      ) as HTMLInputElement;
+      const valueDisplay = document.getElementById('images-interval-value');
+
+      slider.value = '250';
+      slider.dispatchEvent(new Event('input'));
+
+      expect(valueDisplay?.textContent).toBe('250 ms');
+    });
+
     it('updates images quality value display', () => {
       const slider = document.getElementById(
         'images-quality'

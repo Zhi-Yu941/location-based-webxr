@@ -27,6 +27,15 @@ import { showConfirmDialog } from './confirm-dialog';
 
 const log = createLogger('SettingsModal');
 
+/**
+ * Image-interval display: sub-second values (possible since the 250 ms
+ * IMAGE_CONSTRAINTS minimum, 2026-07-10 splat-orbit finding) show exact
+ * milliseconds — `(250/1000).toFixed(1)` would render a misleading "0.3s".
+ */
+function formatImageInterval(ms: number): string {
+  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms} ms`;
+}
+
 // --- State ---
 
 /** Current working copy of options (not saved until user clicks Save) */
@@ -321,7 +330,7 @@ export function initSettingsModal(
     if (workingOptions && imagesIntervalSlider && imagesIntervalValue) {
       const value = parseInt(imagesIntervalSlider.value, 10);
       workingOptions.images.intervalMs = value;
-      imagesIntervalValue.textContent = `${(value / 1000).toFixed(1)}s`;
+      imagesIntervalValue.textContent = formatImageInterval(value);
     }
   });
 
@@ -807,7 +816,9 @@ function populateForm(options: RecordingOptions): void {
     imagesIntervalSlider.value = String(options.images.intervalMs);
   }
   if (imagesIntervalValue) {
-    imagesIntervalValue.textContent = `${(options.images.intervalMs / 1000).toFixed(1)}s`;
+    imagesIntervalValue.textContent = formatImageInterval(
+      options.images.intervalMs
+    );
   }
   if (imagesQualitySlider) {
     imagesQualitySlider.min = String(IMAGE_CONSTRAINTS.quality.min);

@@ -138,7 +138,7 @@ export const DEFAULT_TRACKING_QUALITY_OPTIONS: Required<TrackingQualityOptions> 
     residualConfidenceTargetM: 3,
     gpsAccuracyFloorM: 1,
     degradedHoldoff: 3,
-    convergenceEmaAlpha: 0.3, // §4.8b — corpus-tunable, see Finding 4
+    convergenceEmaAlpha: 0.25, // §4.8b — corpus-tunable, see Finding 4. Re-tuned 0.3 → 0.25 with quality-review E-1: the EMA now advances per OBSERVATION (not per frame), so slightly more damping per step is needed to keep the F4 indoor-corpus convergence range < 0.2.
   };
 
 // ---------------------------------------------------------------------------
@@ -1074,6 +1074,17 @@ export function createTrackingQualityListenerMiddleware(
 
   // Use `isAnyOf` matcher equivalent via predicate.
   const listenerMiddleware = createListenerMiddleware();
+
+  // E-1 (2026-07-10 quality review): `tracking/poseReceived` is dispatched on
+  // EVERY XR frame (60–90 Hz) but the only report input that changes on pose
+  // actions is the tracking phase — every other input moves on GPS/session
+  // actions, which always recompute. Skip the O(history) recompute (incl.
+  // `computeCoverage`'s full walk + sort) when the phase is unchanged and a
+  // report already exists. Side benefit: the §4.8 degraded-holdoff counter now
+  // advances per sub-threshold OBSERVATION as its documentation always said,
+  // instead of per frame (which collapsed the holdoff to ~50 ms).
+  let lastPoseActionPhase: string | null = null;
+
   listenerMiddleware.startListening({
     predicate: (action: Action) => inputActionPredicate(action),
     effect: (action, api) => {
@@ -1083,6 +1094,7 @@ export function createTrackingQualityListenerMiddleware(
         action.type === TRACKING_QUALITY_INPUT_ACTIONS.startSession ||
         action.type === TRACKING_QUALITY_INPUT_ACTIONS.resetTracking
       ) {
+        lastPoseActionPhase = null;
         const tq = (state as unknown as RootWithTrackingQuality)
           .trackingQuality;
         if (
@@ -1094,6 +1106,20 @@ export function createTrackingQualityListenerMiddleware(
           api.dispatch(resetTrackingQuality());
         }
         return;
+      }
+
+      if (
+        action.type === TRACKING_QUALITY_INPUT_ACTIONS.poseReceived ||
+        action.type === TRACKING_QUALITY_INPUT_ACTIONS.poseLost
+      ) {
+        const phase = selectTrackingPhase(state);
+        const existingReport =
+          (state as unknown as RootWithTrackingQuality).trackingQuality
+            ?.report ?? null;
+        if (phase === lastPoseActionPhase && existingReport !== null) {
+          return;
+        }
+        lastPoseActionPhase = phase;
       }
 
       // Buffer maintenance on alignment-affecting actions.

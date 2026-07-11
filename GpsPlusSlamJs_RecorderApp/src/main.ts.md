@@ -36,30 +36,32 @@ This module is the entry point that runs on page load. It also exports the follo
   always distinguish between unique reference points (`refPointDefs.length`) and
   total observations (`flattenRefPointsToMarks(refPointDefs).length`). Use format:
   `"N ref points (M observations)"` to avoid confusion.
-- **Best-effort AR scene layers**: the frame-tile visualizer (F3.5d) and the
-  occupancy-grid cubes (2026-06-11 depth occupancy-grid port plan, Iter 5) are
-  each wired after `initAR` inside their own `try/catch` — a failure logs a
-  warning and recording continues without that layer. Both are torn down in
-  `resetMainState()` (unsubscribe + dispose; the occupancy grid itself is a
-  plain in-memory structure dropped with its reference). **They are also
-  disposed on re-entry**: `handleEnterAR` runs again on every "back to setup →
-  Enter AR" cycle and `onBackToSetup` performs no teardown, so each block first
-  disposes-and-nulls its prior subscriber + visualizer before constructing new
-  ones — otherwise the orphaned `storeRef` swap-listener (registered by
-  `wireOccupancyGridSubscribers`) and the previous visualizer's GPU resources
-  would leak (same leak class the tracking-quality subscription guards inline).
-  The cube visualizer
-  is parented under `arWorldGroup` (NOT the scene root): the grid's cells are
-  raw-WebXR coordinates that must ride the alignment matrix like the camera
-  (port plan Iter 7 reparenting fix).
+- **AR-session resource lifecycle — `arSessionScope`**
+  ([utils/ar-session-scope.ts](utils/ar-session-scope.ts.md), 2026-07-11
+  lifecycle-scope plan): every AR-session-scoped resource (visualizers,
+  subscriptions, frame-loop handles, the lazily created map overlay) registers
+  its teardown in the module-level `arSessionScope` at its creation site.
+  `handleEnterAR` starts with `arSessionScope.dispose()` (the re-enter guard:
+  `handleEnterAR` runs again on every "back to setup → Enter AR" cycle and
+  `onBackToSetup` performs no teardown) and `resetMainState()` is
+  `arSessionScope.dispose()` plus the app-lifetime resets. Disposal runs in
+  reverse creation order — per block, subscriptions unwind before the
+  visualizers they feed. Gated layers (stats overlay, compass cubes, frame
+  tiles, live occluder, loop-closure capture, QR recording) go through
+  `arSessionScope.wire(name, enabled, factory)`, which also owns the
+  best-effort try/catch: a wiring failure logs a warning and recording
+  continues without that layer. The occupancy-grid block is wired with
+  `enabled: true` (the grid always exists for COLMAP export; only the cube
+  mesh is gated). The cube visualizer is parented under `arWorldGroup` (NOT
+  the scene root): the grid's cells are raw-WebXR coordinates that must ride
+  the alignment matrix like the camera (port plan Iter 7 reparenting fix).
 - **Live QR recording + debug viz** (opt-in, `recording-options.qr.enabled`;
   recorder live-QR WS-2/WS-5). When enabled, `handleEnterAR` registers the
   camera-frame callback **before** `initAR` (`setCameraFrameCallback`, forwarding
   frames to the producer held in `qrProducer`) and, after AR init inside its own
   best-effort `try/catch`, calls `wireQrRecording` (under `arWorldGroup`) to build
-  the thin RAW producer + the WS-5 debug axis+cube subscriber. Torn down in
-  `resetMainState()` and disposed-first on re-entry (same leak-guard pattern as
-  the occupancy/frame-tile layers). See
+  the thin RAW producer + the WS-5 debug axis+cube subscriber (teardown
+  registered in `arSessionScope` like the occupancy/frame-tile layers). See
   [qr/wire-qr-recording.ts.md](qr/wire-qr-recording.ts.md). Disabled by default,
   so an existing recording is byte-for-byte unaffected.
 - **Live debug-overlay toggles** (`recording-options.visualization.*`, Finding B
@@ -85,9 +87,9 @@ This module is the entry point that runs on page load. It also exports the follo
     [2026-07-03 long-session fps plan](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-03-long-session-fps-and-voxel-grid-scaling-plan.md)) —
     mounts the Stats.js FPS/ms/MB panel row
     ([ui/stats-overlay.ts](ui/stats-overlay.ts.md)) into the `#app` dom-overlay
-    root and advances it from the `setFrameCallback` tick. Teardown is
-    unconditional at Enter-AR (panels never stack) and in `resetMainState` (no
-    frozen panels on the setup screen). The occupancy wirer additionally gets
+    root and advances it from the `setFrameCallback` tick. Teardown runs via
+    `arSessionScope` on re-enter (panels never stack) and in `resetMainState`
+    (no frozen panels on the setup screen). The occupancy wirer additionally gets
     `onGridSize` telemetry (one `[OccupancyGrid] <n> cells` log per ~30 s) so a
     log export correlates grid growth with the fps trend.
 

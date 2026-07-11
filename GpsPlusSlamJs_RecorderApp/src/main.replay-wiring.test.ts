@@ -239,9 +239,6 @@ vi.mock('gps-plus-slam-app-framework/visualization/camera-follower', () => ({
 vi.mock('gps-plus-slam-app-framework/visualization/gps-compass-cubes', () => ({
   createGpsCompassCubes: vi.fn(),
 }));
-vi.mock('gps-plus-slam-app-framework/visualization/map-overlay', () => ({
-  MapOverlay: vi.fn(),
-}));
 vi.mock(
   'gps-plus-slam-app-framework/visualization/leaflet-map-overlay',
   () => ({

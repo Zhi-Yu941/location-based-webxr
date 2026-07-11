@@ -156,7 +156,7 @@ export {
   loadGpsPathFromBlob,
 } from './storage/index.js';
 
-// Visualization: export from map-overlay (not leaflet-map-overlay) for DEFAULT_ZOOM etc.
+// Visualization
 export * from './visualization/index.js';
 
 // Licensing: bundled community license key (default for createSlamAppStore)

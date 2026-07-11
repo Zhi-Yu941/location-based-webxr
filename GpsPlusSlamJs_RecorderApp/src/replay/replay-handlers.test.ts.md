@@ -33,7 +33,7 @@ Tests for the extracted replay handlers module (`replay-handlers.ts`), verifying
 | `handleReplayCameraToggle`   | toggles camera mode and updates button                 | Delegates to replay-scene + UI                                     |
 | `handleReplayMapToggle`      | no-op when no replay controller                        | Guard: can't create overlay without active replay                  |
 |                              | no-op when replay scene not initialized                | Guard: needs scene, camera                                         |
-|                              | lazily creates MapOverlay on first toggle              | Overlay created with scene, camera, mapParent from CameraFollower  |
+|                              | lazily creates LeafletMapOverlay on first toggle       | Overlay created with scene, camera, mapParent from CameraFollower  |
 |                              | reuses overlay and calls toggle on subsequent calls    | Singleton per replay session                                       |
 |                              | sets GPS position from store on overlay creation       | Overlay starts with last known GPS                                 |
 |                              | calls setMapOverlay on controller                      | Wires proxy so store subscribers can update map                    |

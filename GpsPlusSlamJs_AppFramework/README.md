@@ -341,7 +341,6 @@ H3-based proximity matching for GPS-anchored points (renamed from `ref-points/` 
 | Export                         | Description                                            |
 | ------------------------------ | ------------------------------------------------------ |
 | `LeafletMapOverlay`            | 2D Leaflet map integrated via CSS3D into a 3D scene.   |
-| `MapOverlay`                   | Tile-based 3D map overlay (no Leaflet dependency).     |
 | `GpsEventVisualizer`           | Three.js spheres for GPS event positions.              |
 | `createAlignmentLerper()`      | Smooth alignment matrix interpolation.                 |
 | `createCameraFollower()`       | Camera that tracks a moving target.                    |

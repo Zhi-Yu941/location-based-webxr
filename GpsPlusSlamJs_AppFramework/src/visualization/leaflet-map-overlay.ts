@@ -1,9 +1,10 @@
 /**
  * Leaflet Map Overlay Module
  *
- * Replaces the old single-tile MapOverlay with a full Leaflet map
- * embedded in 3D space via Three.js CSS3DObject. The Leaflet map
- * provides native multi-tile rendering, pan/zoom, and overlay support.
+ * A full Leaflet map embedded in 3D space via Three.js CSS3DObject
+ * (it replaced the old single-tile MapOverlay, deleted 2026-07-11).
+ * The Leaflet map provides native multi-tile rendering, pan/zoom, and
+ * overlay support.
  *
  * The Leaflet map container (a real DOM element) is wrapped in a
  * CSS3DObject and positioned as a child of the camera or CameraFollower.

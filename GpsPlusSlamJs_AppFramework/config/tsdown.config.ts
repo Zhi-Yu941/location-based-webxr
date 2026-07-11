@@ -150,7 +150,6 @@ const entryFiles = [
   'src/visualization/leaflet-map-overlay.ts',
   'src/visualization/lerp-utils.ts',
   'src/visualization/map-data.ts',
-  'src/visualization/map-overlay.ts',
   'src/visualization/map-overlay-draw.ts',
   'src/visualization/three-dispose.ts',
   'src/visualization/vis-colors.ts',

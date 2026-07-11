@@ -49,7 +49,7 @@ import { FrameTileVisualizer } from '../visualization/frame-tile-visualizer';
 import { decodeFrameTexture } from '../visualization/frame-texture-decoder';
 import { wireFrameTileSubscribers } from '../visualization/wire-frame-tile-subscribers';
 import { OccupancyGrid } from 'gps-plus-slam-app-framework/ar/occupancy-grid';
-import { loadRecordingOptions } from 'gps-plus-slam-app-framework/state/recording-options';
+import { loadRecordingOptions } from '../state/recording-options';
 import { OccupancyCubesVisualizer } from '../visualization/occupancy-cubes-visualizer';
 import {
   createOccluderSink,

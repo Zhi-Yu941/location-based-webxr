@@ -83,10 +83,10 @@ import {
 import type { ARPose } from '../types/ar-types';
 import { getLastDeviceOrientation } from '../sensors/device-orientation-cache';
 import {
-  DEFAULT_RECORDING_OPTIONS,
+  DEFAULT_AR_CRASH_ISOLATION,
   type ArCrashIsolationOptions,
   validateArCrashIsolationOptions,
-} from '../state/recording-options';
+} from './ar-crash-isolation';
 import { SCENE_NODE } from './scene-node-names';
 import {
   createCss3dRendererManager,
@@ -254,7 +254,7 @@ export function resetWebXRState(): void {
   latestCameraWidth = 0;
   latestCameraHeight = 0;
   currentArCrashIsolationOptions = {
-    ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation,
+    ...DEFAULT_AR_CRASH_ISOLATION,
   };
   cleanupBlitResources();
 }
@@ -510,7 +510,7 @@ let cameraAccessLoggedOnce = false;
 let getCameraTextureNullCount = 0;
 const GET_CAMERA_TEXTURE_LOG_THRESHOLD = 5;
 let currentArCrashIsolationOptions: ArCrashIsolationOptions = {
-  ...DEFAULT_RECORDING_OPTIONS.arCrashIsolation,
+  ...DEFAULT_AR_CRASH_ISOLATION,
 };
 
 /**

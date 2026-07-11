@@ -19,10 +19,15 @@ const entryFiles = [
 
   // ar/
   'src/ar/index.ts',
+  'src/ar/ar-crash-isolation.ts',
   'src/ar/bresenham3d.ts',
   'src/ar/camera-blit-capture.ts',
   'src/ar/capability-checker.ts',
   'src/ar/capture-failure-tracker.ts',
+  // Motion-filter config types + defaults — deep-imported by the recorder's
+  // recording-options catalog (G-1 move); the `./ar/*` exports wildcard
+  // advertises this subpath, so it must be built per-file.
+  'src/ar/capture-motion-gate.ts',
   'src/ar/chromium-camera-access-workaround.ts',
   'src/ar/depth-grid-lookup.ts',
   'src/ar/depth-sampler.ts',
@@ -95,7 +100,6 @@ const entryFiles = [
   // Deep-imported by the recorder's qr-debug-controller (selectDerivedQrPlacement)
   // — same barrel-avoidance rationale as the ar/qr-* entries above.
   'src/state/qr-detected-slice.ts',
-  'src/state/recording-options.ts',
   'src/state/recording-replayer.ts',
   'src/state/replay-engine.ts',
   'src/state/store-subscribers.ts',

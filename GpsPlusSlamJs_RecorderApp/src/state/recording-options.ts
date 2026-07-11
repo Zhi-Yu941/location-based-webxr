@@ -5,17 +5,44 @@
  * (depth sampling, image capture) to improve performance on lower-end devices.
  *
  * Options persist in localStorage across sessions.
+ *
+ * The RECORDER owns this catalog (moved out of the framework's `state/` layer
+ * on 2026-07-11, G-1 move — see
+ * `GpsPlusSlamJs_Docs/docs/2026-07-11-recording-options-altitude-move-plan.md`).
+ * Two group building blocks stay framework-owned and are consumed here:
+ * - `arCrashIsolation` — type/defaults/validator from
+ *   `gps-plus-slam-app-framework/ar/ar-crash-isolation` (the framework reads
+ *   the flags in `webxr-session.ts`); re-exported below for recorder callers.
+ * - `OccluderDebugStyle` (+ its values array) from
+ *   `gps-plus-slam-app-framework/visualization/occlusion-mesh` (the consumer
+ *   of the style); re-exported below for recorder callers.
  */
 
-import { createLogger } from '../utils/logger';
+import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
 import {
   DEFAULT_MOTION_FILTER,
   type MotionFilterConfig,
-} from '../ar/capture-motion-gate';
+} from 'gps-plus-slam-app-framework/ar/capture-motion-gate';
 import {
   DEFAULT_QUALITY_FILTER,
   type QualityFilterConfig,
-} from '../ar/image-quality';
+} from 'gps-plus-slam-app-framework/ar/image-quality';
+import {
+  DEFAULT_AR_CRASH_ISOLATION,
+  validateArCrashIsolationOptions,
+  type ArCrashIsolationOptions,
+} from 'gps-plus-slam-app-framework/ar/ar-crash-isolation';
+import {
+  OCCLUDER_DEBUG_STYLES,
+  type OccluderDebugStyle,
+} from 'gps-plus-slam-app-framework/visualization/occlusion-mesh';
+
+// Re-exported so recorder import sites keep sourcing the style union from the
+// catalog (the framework owns the definition — see the header comment).
+// `ArCrashIsolationOptions` is deliberately NOT re-exported: no recorder site
+// imports it standalone; import it from
+// `gps-plus-slam-app-framework/ar/ar-crash-isolation` if that changes.
+export type { OccluderDebugStyle };
 
 const log = createLogger('RecordingOptions');
 
@@ -81,36 +108,6 @@ export interface CompassDebugOptions {
 export interface LoopClosureDebugOptions {
   /** Wire the live loop-closure handler into the AR frame loop. Default OFF. */
   detectorEnabled: boolean;
-}
-
-/**
- * Diagnostic flags for isolating pre-recording AR startup crashes.
- * These gates affect XR session negotiation and frame-loop behavior,
- * independently of recording-time image/depth capture.
- */
-export interface ArCrashIsolationOptions {
-  enableDomOverlay: boolean;
-  enableCameraAccess: boolean;
-  enableDepthSensingFeature: boolean;
-  enableCss3dRenderer: boolean;
-  enableCameraTextureAcquisition: boolean;
-  /**
-   * Apply the Chromium WebXR camera-access tab-crash workaround at app
-   * bootstrap. The workaround always deletes
-   * `XRWebGLBinding.prototype.createProjectionLayer` /
-   * `XRRenderState.prototype.layers` (forcing `XRWebGLLayer`) — required on
-   * every affected Chrome build observed on-device, including Chrome 150 — and
-   * additionally persists the `baseLayer` across
-   * `XRSession.prototype.updateRenderState` only for Chrome builds inside the
-   * affected window (148.0.7778.12 up to 149.0.7821).
-   *
-   * Default `true`. Opt-out is offered because forcing `XRWebGLLayer` may break
-   * WebXR on unaffected (e.g. Quest) devices.
-   *
-   * @see GpsPlusSlamJs_AppFramework/src/ar/chromium-camera-access-workaround.ts
-   * @see https://github.com/mrdoob/three.js/issues/33404
-   */
-  applyChromiumProjectionLayerWorkaround: boolean;
 }
 
 /**
@@ -192,31 +189,6 @@ export interface ImageCaptureOptions {
  */
 const OCCLUDER_MESH_MODES = ['greedy', 'corner-fit', 'smooth'] as const;
 export type OccluderMeshMode = (typeof OCCLUDER_MESH_MODES)[number];
-
-/**
- * Debug-visualization style for the **persistent occluder** mesh (2026-07-02
- * debug-viz-styles plan) — which visible debug skin(s) `OcclusionMesh` renders
- * on top of the invisible depth-only occluder:
- * - `'off'` — no debug rendering (the shipped default; occlusion is invisible).
- * - `'matcap'` — the original shiny semi-transparent cyan skin.
- * - `'depth-shaded'` — matcap + camera-distance fade + white fresnel rim, so
- *   overlapping near/far surfaces read as separate shells.
- * - `'wireframe'` — the raw triangulation as GL lines (mesh-structure
- *   inspection: triangle density, mesher seams, degenerate spots).
- * - `'depth-shaded-wireframe'` — both of the above composed.
- *
- * Values array module-private (validation only; the settings `<select>`
- * options are hardcoded in the recorder's `index.html`), type exported —
- * mirroring `OCCLUDER_MESH_MODES` / {@link OccluderMeshMode}.
- */
-const OCCLUDER_DEBUG_STYLES = [
-  'off',
-  'matcap',
-  'depth-shaded',
-  'wireframe',
-  'depth-shaded-wireframe',
-] as const;
-export type OccluderDebugStyle = (typeof OCCLUDER_DEBUG_STYLES)[number];
 
 export interface OccupancyOptions {
   /**
@@ -431,8 +403,16 @@ export interface QrCaptureOptions {
 /**
  * User-configurable recording options.
  * Persisted to localStorage for cross-session consistency.
+ *
+ * Deliberately a `type` alias (not an `interface`): object-literal type
+ * aliases get an implicit index signature, so a `RecordingOptions` value is
+ * assignable to the framework's OPAQUE
+ * `SessionMetadata.recordingOptions?: Record<string, unknown>` slot
+ * (`state/recording-slice.ts`) without a spread/cast at every dispatch site.
+ * An interface would not be (interfaces can be augmented, so TS refuses the
+ * implicit index signature).
  */
-export interface RecordingOptions {
+export type RecordingOptions = {
   /** Depth sampling configuration */
   depth: DepthCaptureOptions;
   /** Image capture configuration */
@@ -451,7 +431,7 @@ export interface RecordingOptions {
   compassDebug: CompassDebugOptions;
   /** Live loop-closure capture toggles (experimental, default OFF) */
   loopClosureDebug: LoopClosureDebugOptions;
-}
+};
 
 // --- Constants ---
 
@@ -488,14 +468,9 @@ export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
     // Same spread/alias rationale — blur/blackness image gate (off by default).
     qualityFilter: { ...DEFAULT_QUALITY_FILTER },
   },
-  arCrashIsolation: {
-    enableDomOverlay: true,
-    enableCameraAccess: true,
-    enableDepthSensingFeature: true,
-    enableCss3dRenderer: true,
-    enableCameraTextureAcquisition: true,
-    applyChromiumProjectionLayerWorkaround: true,
-  },
+  // Spread so this default group does not ALIAS the framework's
+  // DEFAULT_AR_CRASH_ISOLATION (same rationale as the filter groups above).
+  arCrashIsolation: { ...DEFAULT_AR_CRASH_ISOLATION },
   occupancy: {
     cellSizeM: 0.15, // 15 cm voxels — matches OccupancyGrid's own default (Unity parity); balances detail vs speed
     minConfidence: 3, // ≥3 observations to render a voxel — the FAST-reconstruction noise floor (2026-07-01; ~1.5s dwell before a surface meshes vs 2.5s at 5, +25% early coverage; 1 = legacy/unfiltered)
@@ -670,14 +645,12 @@ export const QR_CONSTRAINTS = {
 } as const;
 
 /**
- * Validate and normalize AR crash isolation flags.
- * Missing or invalid values fall back to defaults.
- */
-/**
  * Boolean-or-default (quality-review C-1): persisted/external values are
  * untrusted, so anything that is not a real boolean falls back to the
  * default. Shared by every validator below — the ~30 hand-rolled copies of
- * this ternary are exactly the drift a helper prevents.
+ * this ternary are exactly the drift a helper prevents. (The framework's
+ * `ar/ar-crash-isolation.ts` keeps its own local copy so its validator stays
+ * dependency-free.)
  */
 function boolOr(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
@@ -691,38 +664,6 @@ function boolOr(value: unknown, fallback: boolean): boolean {
  */
 function numOr(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-}
-
-export function validateArCrashIsolationOptions(
-  options: Partial<ArCrashIsolationOptions>
-): ArCrashIsolationOptions {
-  const defaults = DEFAULT_RECORDING_OPTIONS.arCrashIsolation;
-  return {
-    enableDomOverlay: boolOr(
-      options.enableDomOverlay,
-      defaults.enableDomOverlay
-    ),
-    enableCameraAccess: boolOr(
-      options.enableCameraAccess,
-      defaults.enableCameraAccess
-    ),
-    enableDepthSensingFeature: boolOr(
-      options.enableDepthSensingFeature,
-      defaults.enableDepthSensingFeature
-    ),
-    enableCss3dRenderer: boolOr(
-      options.enableCss3dRenderer,
-      defaults.enableCss3dRenderer
-    ),
-    enableCameraTextureAcquisition: boolOr(
-      options.enableCameraTextureAcquisition,
-      defaults.enableCameraTextureAcquisition
-    ),
-    applyChromiumProjectionLayerWorkaround: boolOr(
-      options.applyChromiumProjectionLayerWorkaround,
-      defaults.applyChromiumProjectionLayerWorkaround
-    ),
-  };
 }
 
 /**
@@ -1103,6 +1044,11 @@ export function validateFrameTileDisplayOptions(
 /**
  * Validate and normalize a full RecordingOptions object.
  * Merges with defaults and clamps invalid values.
+ *
+ * The `arCrashIsolation` group delegates to the FRAMEWORK's
+ * `validateArCrashIsolationOptions` (`ar/ar-crash-isolation.ts`) — the
+ * framework owns that group's type/defaults/validator because it consumes the
+ * flags itself in `webxr-session.ts`.
  */
 export function validateRecordingOptions(
   options: RecordingOptionsInput

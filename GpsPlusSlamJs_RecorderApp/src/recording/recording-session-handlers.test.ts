@@ -15,7 +15,7 @@ import type { RecorderStore } from '../state/recorder-store';
 import {
   DEFAULT_RECORDING_OPTIONS,
   type RecordingOptions,
-} from 'gps-plus-slam-app-framework/state/recording-options';
+} from '../state/recording-options';
 import type { StoreSubscriberDeps } from 'gps-plus-slam-app-framework/state/store-subscribers';
 import type { MapData } from 'gps-plus-slam-app-framework/visualization/map-data';
 import {

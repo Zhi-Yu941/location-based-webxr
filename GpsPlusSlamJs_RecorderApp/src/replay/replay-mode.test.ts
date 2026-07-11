@@ -142,7 +142,7 @@ const { mockReplayRecordingOptions } = vi.hoisted(() => ({
     visualization: { statsOverlay: false },
   },
 }));
-vi.mock('gps-plus-slam-app-framework/state/recording-options', () => ({
+vi.mock('../state/recording-options', () => ({
   loadRecordingOptions: vi.fn(() => mockReplayRecordingOptions),
 }));
 vi.mock('../ui/stats-overlay', () => ({

@@ -176,7 +176,8 @@ export function wrapXRDepthInfo(
 // 2026-06-30 re-tune (intervalMs 500 / gridSize 24) — those denser defaults are
 // a recorder-specific decision sourced from DEFAULT_RECORDING_OPTIONS; bumping
 // this library default would silently re-tune unrelated apps. See
-// recording-options.ts.md (F1) for the rationale.
+// the recorder's recording-options.ts.md (F1) for the rationale (the catalog
+// moved app-side on 2026-07-11: GpsPlusSlamJs_RecorderApp/src/state/).
 const DEFAULT_CONFIG: DepthSamplerConfig = {
   intervalMs: 1000,
   gridSize: 16,

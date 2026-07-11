@@ -2,6 +2,13 @@
  * AR module — WebXR session management, scene hierarchy, image/depth capture.
  */
 
+// --- ar-crash-isolation (XR session-negotiation diagnostic flags) ---
+export {
+  type ArCrashIsolationOptions,
+  DEFAULT_AR_CRASH_ISOLATION,
+  validateArCrashIsolationOptions,
+} from './ar-crash-isolation.js';
+
 // --- camera-blit-capture ---
 export {
   type CameraBlitCaptureConfig,

@@ -389,7 +389,7 @@ vi.mock('gps-plus-slam-app-framework/state/gps-event-coordinator', () => ({
   extractOdomRotation: vi.fn().mockReturnValue([0, 0, 0, 1]),
 }));
 
-vi.mock('gps-plus-slam-app-framework/state/recording-options', () => ({
+vi.mock('./state/recording-options', () => ({
   loadRecordingOptions: vi.fn().mockReturnValue({
     qr: { enabled: false, intervalMs: 125, captureSize: 1024 },
     images: { enabled: false, intervalMs: 1000, quality: 0.8 },
@@ -990,8 +990,7 @@ describe('AR Partial Init Failure Cleanup (Issue #10)', () => {
   it('requests depth occlusion as a session feature when liveOcclusion is on', async () => {
     const { initAR } =
       await import('gps-plus-slam-app-framework/ar/webxr-session');
-    const { loadRecordingOptions } =
-      await import('gps-plus-slam-app-framework/state/recording-options');
+    const { loadRecordingOptions } = await import('./state/recording-options');
     const { handleEnterARForTesting, setRecordingOptionsForTesting } =
       await import('./main');
 

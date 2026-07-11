@@ -308,7 +308,7 @@ vi.mock('gps-plus-slam-app-framework/state/gps-event-coordinator', () => ({
   extractOdomPosition: vi.fn().mockReturnValue([0, 0, 0]),
   extractOdomRotation: vi.fn().mockReturnValue([0, 0, 0, 1]),
 }));
-vi.mock('gps-plus-slam-app-framework/state/recording-options', () => ({
+vi.mock('./state/recording-options', () => ({
   loadRecordingOptions: vi.fn(() => mockRecordingOptions),
 }));
 vi.mock('gps-plus-slam-app-framework/sensors/gps', () => ({

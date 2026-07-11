@@ -346,7 +346,7 @@ vi.mock('gps-plus-slam-app-framework/state/gps-event-coordinator', () => ({
   extractOdomPosition: vi.fn().mockReturnValue([0, 0, 0]),
   extractOdomRotation: vi.fn().mockReturnValue([0, 0, 0, 1]),
 }));
-vi.mock('gps-plus-slam-app-framework/state/recording-options', () => ({
+vi.mock('./state/recording-options', () => ({
   loadRecordingOptions: vi.fn().mockReturnValue({
     qr: { enabled: false, intervalMs: 125, captureSize: 1024 },
     images: { enabled: false, intervalMs: 1000, quality: 0.8 },
@@ -501,7 +501,7 @@ import {
   resetMainState,
   setRecordingOptionsForTesting,
 } from './main';
-import { loadRecordingOptions } from 'gps-plus-slam-app-framework/state/recording-options';
+import { loadRecordingOptions } from './state/recording-options';
 import { getOccupancyGrid } from './state/occupancy-grid-provider';
 import {
   setDepthCaptureCallback,

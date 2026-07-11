@@ -58,4 +58,4 @@ registerSessionDisposer(() => occ.dispose());
 - [depth-sampler.ts.md](depth-sampler.ts.md) — `DepthInfo` / `wrapXRDepthInfo` (the shared per-frame source).
 - [webxr-session.ts.md](webxr-session.ts.md) — the `requestDepthOcclusion` session flag that negotiates `cpu-optimized` depth for this occluder.
 - [occlusion-mesh.ts.md](../visualization/occlusion-mesh.ts.md) — the persistent companion occluder.
-- [recording-options.ts.md](../state/recording-options.ts.md) — the `occupancy.liveOcclusion` toggle.
+- [recording-options.ts.md](../../../GpsPlusSlamJs_RecorderApp/src/state/recording-options.ts.md) — the `occupancy.liveOcclusion` toggle.

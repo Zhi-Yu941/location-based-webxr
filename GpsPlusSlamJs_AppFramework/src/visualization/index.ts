@@ -67,7 +67,12 @@ export {
 export { GpsEventVisualizer, gpsEventVisualizer } from './gps-event-markers.js';
 
 // --- occlusion-mesh (persistent depth-only occluder of the occupancy grid) ---
-export { type OcclusionMeshOptions, OcclusionMesh } from './occlusion-mesh.js';
+export {
+  type OcclusionMeshOptions,
+  type OccluderDebugStyle,
+  OCCLUDER_DEBUG_STYLES,
+  OcclusionMesh,
+} from './occlusion-mesh.js';
 
 // --- leaflet-map-overlay ---
 export {

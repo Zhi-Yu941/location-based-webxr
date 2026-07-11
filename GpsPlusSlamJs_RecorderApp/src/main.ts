@@ -189,7 +189,7 @@ import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
 import {
   loadRecordingOptions,
   type RecordingOptions,
-} from 'gps-plus-slam-app-framework/state/recording-options';
+} from './state/recording-options';
 import { initSettingsModal } from './ui/settings-modal';
 import {
   createStatsOverlay,

@@ -24,7 +24,7 @@
  * excludes.
  */
 
-import type { ArCrashIsolationOptions } from '../state/recording-options';
+import type { ArCrashIsolationOptions } from './ar-crash-isolation';
 import type { GpsPosition, RawDeviceOrientation } from '../sensors/gps';
 import {
   requestGeolocationPermission as defaultRequestGeolocationPermission,

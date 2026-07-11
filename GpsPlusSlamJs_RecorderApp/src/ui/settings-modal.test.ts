@@ -26,7 +26,7 @@ import {
 import {
   loadRecordingOptions,
   DEFAULT_RECORDING_OPTIONS,
-} from 'gps-plus-slam-app-framework/state/recording-options';
+} from '../state/recording-options';
 
 const { mockGetBuildInfo } = vi.hoisted(() => ({
   mockGetBuildInfo: vi.fn(() => ({

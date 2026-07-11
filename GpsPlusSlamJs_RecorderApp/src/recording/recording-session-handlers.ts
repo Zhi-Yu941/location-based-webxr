@@ -21,7 +21,7 @@ import type { RecorderStore } from '../state/recorder-store';
 import { wireStoreSubscribers } from 'gps-plus-slam-app-framework/state/store-subscribers';
 import { refPointEntriesToMarkerData } from '../ui/ref-point-map-markers';
 import { selectRefPointEntries } from '../state/ref-points-slice';
-import type { RecordingOptions } from 'gps-plus-slam-app-framework/state/recording-options';
+import type { RecordingOptions } from '../state/recording-options';
 import { formatTimestamp } from 'gps-plus-slam-app-framework/storage/file-system-utils';
 import {
   startSession as startStorageSession,

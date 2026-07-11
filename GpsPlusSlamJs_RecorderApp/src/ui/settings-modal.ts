@@ -20,7 +20,7 @@ import {
   type RecordingOptions,
   type OccluderMeshMode,
   type OccluderDebugStyle,
-} from 'gps-plus-slam-app-framework/state/recording-options';
+} from '../state/recording-options';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
 import { getBuildInfo } from '../utils/build-info';
 import { showConfirmDialog } from './confirm-dialog';

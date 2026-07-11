@@ -110,7 +110,7 @@ export type {
 
 export type { RefPointsState } from './ref-points-slice';
 
-export type { RecordingOptions } from 'gps-plus-slam-app-framework/state/recording-options';
+export type { RecordingOptions } from './recording-options';
 export type { StorageBackend } from 'gps-plus-slam-app-framework/storage/storage-backend';
 export type { SessionMetadata as OpfsSessionMetadata } from 'gps-plus-slam-app-framework/storage/opfs-storage';
 

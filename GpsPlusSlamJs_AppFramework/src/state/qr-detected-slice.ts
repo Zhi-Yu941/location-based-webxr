@@ -46,6 +46,7 @@ import {
   type DerivedQrPlacement,
   type RawQrObservation,
 } from '../ar/qr-derived-pose.js';
+import { lowerMedian } from '../utils/median.js';
 
 // Re-exported so consumers of the slice keep importing the size lifecycle types
 // from one place. They are DEFINED in `ar/qr-size-from-depth.ts` (where size is
@@ -330,13 +331,6 @@ export function selectResolvedQrSizeM(
 
 // --- Derived helpers ---------------------------------------------------
 
-/** Per-axis median of a numeric list (returns the lower-middle for even n). */
-function medianOf(values: readonly number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor((sorted.length - 1) / 2);
-  return sorted[mid] as number;
-}
-
 /**
  * Robust per-axis median of the world positions across a marker's detection
  * window — the "running estimate" the bounded buffer enables (Note 3). Outliers
@@ -354,7 +348,7 @@ export function medianQrPosition(
   const xs = poses.map((p) => p.position[0]);
   const ys = poses.map((p) => p.position[1]);
   const zs = poses.map((p) => p.position[2]);
-  return [medianOf(xs), medianOf(ys), medianOf(zs)];
+  return [lowerMedian(xs), lowerMedian(ys), lowerMedian(zs)];
 }
 
 /**

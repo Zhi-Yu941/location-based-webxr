@@ -203,7 +203,9 @@ describe('wireFrameTileSubscribers', () => {
     });
     nextStore.dispatch(setZeroPos({ lat: 50, lon: 8 }));
     storeRef.set(nextStore);
-    expect(visualizer.clear).toHaveBeenCalledTimes(1);
+    // 2 = the harmless no-op clear on the initial attachment (followStore
+    // attach-start contract, quality-review G-11) + the real swap clear.
+    expect(visualizer.clear).toHaveBeenCalledTimes(2);
 
     // The new store's processed-set is reset, so the same imageFile is
     // accepted again on the new store.
@@ -314,7 +316,9 @@ describe('wireFrameTileSubscribers', () => {
     });
     nextStore.dispatch(setZeroPos({ lat: 50, lon: 8 }));
     storeRef.set(nextStore);
-    expect(visualizer.clear).toHaveBeenCalledTimes(1);
+    // 2 = the harmless no-op clear on the initial attachment (followStore
+    // attach-start contract, quality-review G-11) + the real swap clear.
+    expect(visualizer.clear).toHaveBeenCalledTimes(2);
 
     resolveDecode?.(texture);
     await flushMicrotasks();

@@ -68,16 +68,22 @@ export function createQrDepthResolver(options?: {
   maxSamples?: number;
 }): QrDepthResolver {
   const maxSamples = options?.maxSamples ?? DEFAULT_QR_DEPTH_HISTORY;
-  let samples: DepthSample[] = [];
+  const samples: DepthSample[] = [];
   let last: DepthSample | null = null;
+  // F-9 (2026-07-10 quality review): the same depth sample is typically
+  // resolved 4–8× per sample per marker; rebuilding the context each time
+  // was redundant. Memo keyed on the resolved sample's identity.
+  let lastResolvedSample: DepthSample | null = null;
+  let lastContext: QrSizeDepthContext | null = null;
 
   return {
     append(sample: DepthSample): void {
       if (sample === last) return; // same object → already recorded
       last = sample;
       samples.push(sample);
-      if (samples.length > maxSamples) {
-        samples = samples.slice(samples.length - maxSamples);
+      // In-place trim (no fresh array per overflowing sample).
+      while (samples.length > maxSamples) {
+        samples.shift();
       }
     },
     resolveDepthAt(timestamp: number): QrSizeDepthContext | null {
@@ -88,11 +94,17 @@ export function createQrDepthResolver(options?: {
           if (!best || s.timestamp > best.timestamp) best = s;
         }
       }
-      return best ? createQrSizeDepthContext(best) : null;
+      if (!best) return null;
+      if (best === lastResolvedSample) return lastContext;
+      lastResolvedSample = best;
+      lastContext = createQrSizeDepthContext(best);
+      return lastContext;
     },
     reset(): void {
-      samples = [];
+      samples.length = 0;
       last = null;
+      lastResolvedSample = null;
+      lastContext = null;
     },
   };
 }

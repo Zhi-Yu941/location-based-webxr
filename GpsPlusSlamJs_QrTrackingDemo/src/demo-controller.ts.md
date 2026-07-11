@@ -16,7 +16,9 @@ axis + cube. Geo-less: never casts a GPS vote.
   `solvePose` (defaults to `solveQrPose` + a pure-JS `PlanarPnpSquare`; inject a
   canned pose in tests), `onStatus`/`now`/ scheduler tuning.
 - `DemoSolvePose = (input: Omit<SolveQrPoseInput,'solver'>) => QrPoseSolution | null`.
-- `DepthContext = { unprojector, depthAt(sx,sy), cameraPose, projectionMatrix }`.
+- `DepthContext extends QrSizeDepthContext` (the framework's shared
+  `{ unprojector, depthAt(sx,sy) }` measurer context, which the seams already
+  build via `createQrSizeDepthContext`) `+ { cameraPose, projectionMatrix }`.
   `projectionMatrix` is the detector frame's view projection — PnP intrinsics come
   from `intrinsicsFromProjection(projectionMatrix, image.width, image.height)`.
 

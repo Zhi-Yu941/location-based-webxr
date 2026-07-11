@@ -25,6 +25,8 @@
  *   a shared config type + a small stateful window + a pure decision).
  */
 
+import { lowerMedian } from '../utils/median.js';
+
 /**
  * User-/consumer-facing configuration for the image-quality gate. Shared by both
  * config shapes that carry it — `ImageCaptureConfig` (what `ImageCaptureManager`
@@ -186,16 +188,6 @@ export interface QualityVerdict {
 }
 
 /**
- * Lower-middle median (matches the project's other `medianOf` helpers, e.g.
- * `qr-pose-aggregation.ts`). Caller guarantees a non-empty array.
- */
-function medianOf(values: readonly number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor((sorted.length - 1) / 2);
-  return sorted[mid] as number;
-}
-
-/**
  * The self-calibrating blur+blackness verdict, with the rolling sharpness
  * history that makes the blur check scene-relative (§5). Stateful but pure (no
  * DOM/worker): one instance per recording session, fed each analysed frame's
@@ -258,7 +250,8 @@ export class ImageQualityGate {
     // 2. Blur — relative to the established baseline (cold start accepts).
     let blurry = false;
     if (this.history.length >= this.minSamples) {
-      const threshold = config.blurRelativeThreshold * medianOf(this.history);
+      const threshold =
+        config.blurRelativeThreshold * lowerMedian(this.history);
       if (sharpness < threshold) blurry = true;
     }
 

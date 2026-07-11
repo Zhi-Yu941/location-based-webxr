@@ -40,11 +40,7 @@ import {
   findNearbyGeoAnchor,
 } from 'gps-plus-slam-app-framework/geo/h3-proximity';
 import { webxrToNUE } from 'gps-plus-slam-app-framework/core';
-import type {
-  Vector3,
-  Quaternion,
-  Matrix4,
-} from 'gps-plus-slam-app-framework/core';
+import type { Vector3, Quaternion } from 'gps-plus-slam-app-framework/core';
 import type { RecorderStore } from '../state/recorder-store';
 
 const log = createLogger('RefPointHandlers');
@@ -149,7 +145,6 @@ export function createRefPointHandlers(
     odomRotation: Quaternion,
     gpsPoint: GpsPoint,
     timestamp: number,
-    _alignmentMatrix: Matrix4 | null | undefined,
     fusedGpsPoint:
       | { latitude: number; longitude: number; altitude?: number }
       | undefined
@@ -218,23 +213,12 @@ export function createRefPointHandlers(
     }
   }
 
-  function visualizeRefPoint(
-    _refPointId: string,
-    _odomPosition: Vector3,
-    _odomRotation: Quaternion,
-    _lastGpsPoint: GpsPoint,
-    _timestamp: number,
-    _fusedGpsPoint?: { latitude: number; longitude: number; altitude?: number }
-  ): void {
-    // No-op as of Step 5.7a-2: the red current-session sphere is now
-    // driven exclusively by `wireRefPointSubscribers`, which subscribes
-    // to `selectRefPointEntries` over the V2 slice. (The previous
-    // `ref-point-mark-listener` middleware was deleted along with the
-    // parallel `gpsData/markReferencePoint` dispatch in 5.7a-1.)
-    // Keeping the function as a documented seam in case future visual
-    // side effects (e.g., animation, audio cue) need to attach to the
-    // live-mark flow only.
-  }
+  // NOTE: the former `visualizeRefPoint` no-op seam was removed 2026-07-10
+  // (quality-review D-2). The red current-session sphere is driven
+  // exclusively by `wireRefPointSubscribers` subscribing to
+  // `selectRefPointEntries` over the V2 slice (since Step 5.7a-2); a future
+  // live-mark-only side effect (animation, audio cue) should hook into the
+  // mark flow directly rather than reviving a 6-argument no-op.
 
   // --- Main handler ---
 
@@ -365,7 +349,6 @@ export function createRefPointHandlers(
         odomRotation,
         lastGpsPoint,
         timestamp,
-        alignmentMatrix,
         fusedGpsPoint
       );
 
@@ -396,16 +379,6 @@ export function createRefPointHandlers(
           observation
         );
       }
-
-      // Visualize in scene
-      visualizeRefPoint(
-        refPointId,
-        odomPosition,
-        odomRotation,
-        lastGpsPoint,
-        timestamp,
-        fusedGpsPoint
-      );
 
       updateStatus(`Marked reference point: ${refPointId}`);
 

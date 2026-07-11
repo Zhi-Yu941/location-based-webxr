@@ -27,6 +27,20 @@ import { showConfirmDialog } from './confirm-dialog';
 
 const log = createLogger('SettingsModal');
 
+/**
+ * Image-interval display: sub-second values (possible since the 250 ms
+ * IMAGE_CONSTRAINTS minimum, 2026-07-10 splat-orbit finding) show exact
+ * milliseconds — `(250/1000).toFixed(1)` would render a misleading "0.3s".
+ * Values ≥1s use just enough decimals for the 250 ms slider step: one for
+ * half-second multiples ("1.5s", "2.0s"), two otherwise ("1.25s", "1.75s") —
+ * `toFixed(1)` alone would round 1250 to a misleading "1.3s" (PR #178 review).
+ */
+function formatImageInterval(ms: number): string {
+  if (ms < 1000) return `${ms} ms`;
+  const decimals = ms % 500 === 0 ? 1 : 2;
+  return `${(ms / 1000).toFixed(decimals)}s`;
+}
+
 // --- State ---
 
 /** Current working copy of options (not saved until user clicks Save) */
@@ -321,7 +335,7 @@ export function initSettingsModal(
     if (workingOptions && imagesIntervalSlider && imagesIntervalValue) {
       const value = parseInt(imagesIntervalSlider.value, 10);
       workingOptions.images.intervalMs = value;
-      imagesIntervalValue.textContent = `${(value / 1000).toFixed(1)}s`;
+      imagesIntervalValue.textContent = formatImageInterval(value);
     }
   });
 
@@ -807,7 +821,9 @@ function populateForm(options: RecordingOptions): void {
     imagesIntervalSlider.value = String(options.images.intervalMs);
   }
   if (imagesIntervalValue) {
-    imagesIntervalValue.textContent = `${(options.images.intervalMs / 1000).toFixed(1)}s`;
+    imagesIntervalValue.textContent = formatImageInterval(
+      options.images.intervalMs
+    );
   }
   if (imagesQualitySlider) {
     imagesQualitySlider.min = String(IMAGE_CONSTRAINTS.quality.min);

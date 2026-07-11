@@ -151,11 +151,11 @@ describe('AR Types', () => {
       });
 
       sampler.start();
-      sampler.onFrame(0, {
+      sampler.onFrame(0, () => ({
         width: 100,
         height: 100,
         getDepthInMeters: () => 2.5,
-      });
+      }));
       sampler.stop();
 
       expect(capturedSamples).toHaveLength(1);
@@ -205,11 +205,11 @@ describe('AR Types', () => {
       });
 
       sampler.start();
-      sampler.onFrame(0, {
+      sampler.onFrame(0, () => ({
         width: 100,
         height: 100,
         getDepthInMeters: () => 2.5,
-      });
+      }));
       sampler.stop();
 
       expect(capturedSamples).toHaveLength(1);

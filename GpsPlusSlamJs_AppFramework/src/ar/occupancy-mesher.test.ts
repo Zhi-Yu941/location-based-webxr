@@ -142,7 +142,7 @@ describe('meshOccupiedCells', () => {
   describe('greedy merge', () => {
     it('keeps a single voxel at 6 quads (nothing to merge)', () => {
       const culled = meshOccupiedCells([[0, 0, 0]], 0.15);
-      const greedy = meshOccupiedCells([[0, 0, 0]], 0.15, { greedy: true });
+      const greedy = meshOccupiedCells([[0, 0, 0]], 0.15, { mode: 'greedy' });
       expect(faceCount(greedy.indices)).toBe(6);
       expect(faceCount(greedy.indices)).toBe(faceCount(culled.indices));
     });
@@ -152,7 +152,7 @@ describe('meshOccupiedCells', () => {
       for (let x = 0; x < 5; x++)
         for (let y = 0; y < 5; y++) cells.push([x, y, 0]);
       const culled = meshOccupiedCells(cells, 0.15);
-      const greedy = meshOccupiedCells(cells, 0.15, { greedy: true });
+      const greedy = meshOccupiedCells(cells, 0.15, { mode: 'greedy' });
       // Culled: 25 top + 25 bottom + 4 sides × 5 = 70 unit faces.
       expect(faceCount(culled.indices)).toBe(70);
       // Greedy: top + bottom (1 each) + 4 side strips (1 each) = 6 quads.
@@ -163,7 +163,7 @@ describe('meshOccupiedCells', () => {
       const cells: GridCell[] = [];
       for (let x = 0; x < 3; x++)
         for (let y = 0; y < 3; y++) cells.push([x, y, 0]);
-      const greedy = meshOccupiedCells(cells, 0.15, { greedy: true });
+      const greedy = meshOccupiedCells(cells, 0.15, { mode: 'greedy' });
       expect(greedy.aabbs).toHaveLength(9);
     });
   });

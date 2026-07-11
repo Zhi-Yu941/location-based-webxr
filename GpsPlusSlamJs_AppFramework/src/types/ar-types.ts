@@ -55,6 +55,32 @@ export interface ARPose {
 }
 
 /**
+ * Extract the raw odometry position tuple from an {@link ARPose}.
+ *
+ * Returns the raw WebXR position without coordinate conversion — the reducer
+ * applies the WebXR→NUE transform when storing into state (raw-storage
+ * pattern, see docs/2026-04-09-raw-storage-convert-on-read.md).
+ * WebXR local-floor frame: X=East, Y=Up, Z=South (toward viewer / backward).
+ *
+ * Lives next to the type (quality-review G-8 — it used to sit in
+ * `state/gps-event-coordinator.ts`, forcing an ar→state import in
+ * `ar/depth-sampler.ts`).
+ */
+export function extractOdomPosition(arPose: ARPose): Vector3 {
+  return [arPose.position.x, arPose.position.y, arPose.position.z];
+}
+
+/** Extract the raw odometry rotation tuple from an {@link ARPose}. */
+export function extractOdomRotation(arPose: ARPose): Quaternion {
+  return [
+    arPose.orientation.x,
+    arPose.orientation.y,
+    arPose.orientation.z,
+    arPose.orientation.w,
+  ];
+}
+
+/**
  * An sRGB color triple, 0–255 integers per channel. Kept as plain ints so
  * persisted JSON stays compact (~3 bytes/point in practice).
  */

@@ -10,7 +10,7 @@
 import type { Matrix4 } from 'gps-plus-slam-js';
 import type { ARPose, DepthPoint, DepthSample } from '../types/ar-types';
 import type { RgbLookup } from './depth-rgb-lookup';
-import { extractOdomPosition } from '../state/gps-event-coordinator';
+import { extractOdomPosition } from '../types/ar-types';
 
 export type { DepthSample } from '../types/ar-types';
 
@@ -291,17 +291,32 @@ export class DepthSampler {
   }
 
   /**
-   * Called each frame with depth information.
+   * Called each frame with a LAZY depth provider (quality-review E-4: the
+   * caller used to acquire + wrap the depth info every frame while this
+   * method threw ~59 of 60 acquisitions away at the interval check — the
+   * provider is now invoked only when a sample is due).
+   *
+   * Unavailability detection is preserved by construction:
+   * `lastSampleTime` only advances when a sample is EMITTED, so while depth
+   * is unavailable the sampler stays "due" and probes the provider every
+   * frame — exactly the cadence the old per-frame acquisition gave
+   * `checkDepthUnavailability` (Field Test Readiness Issue #8).
    *
    * @param timestamp - Current frame timestamp in milliseconds
-   * @param depthInfo - WebXR depth information, or null if unavailable
+   * @param acquireDepthInfo - Returns the frame's depth info, or null if
+   *   unavailable. Only invoked when a sample is due.
    */
-  onFrame(timestamp: number, depthInfo: DepthInfo | null): void {
+  onFrame(timestamp: number, acquireDepthInfo: () => DepthInfo | null): void {
     if (!this.running) {
       return;
     }
 
-    // Check if depth data is unavailable
+    // Interval gate FIRST — skip the acquisition entirely between samples.
+    if (timestamp - this.lastSampleTime < this.config.intervalMs) {
+      return;
+    }
+
+    const depthInfo = acquireDepthInfo();
     if (!depthInfo) {
       // Check if we should fire the unavailable callback
       // (Field Test Readiness Issue #8: Depth sensing not confirmed)
@@ -311,11 +326,6 @@ export class DepthSampler {
 
     // Mark that we've received depth data
     this.depthReceived = true;
-
-    // Check interval
-    if (timestamp - this.lastSampleTime < this.config.intervalMs) {
-      return;
-    }
 
     // Get current pose
     const pose = this.callbacks.getCurrentPose();

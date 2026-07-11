@@ -305,7 +305,7 @@ export class OcclusionMesh {
     if (this.disposed) return;
     const meshOptions: MeshOccupiedCellsOptions = this.mode
       ? { mode: this.mode, getCellPoint }
-      : { greedy: this.greedy };
+      : { mode: this.greedy ? 'greedy' : 'per-face' };
     const { positions, indices, aabbs } = meshOccupiedCells(
       cells,
       cellSizeM,
@@ -435,17 +435,6 @@ export class OcclusionMesh {
       this.arSpaceNode.remove(this.wireframeSkin);
       this.wireframeSkin = null;
     }
-  }
-
-  /**
-   * Toggle the matcap debug rendering of the occluder mesh.
-   *
-   * @deprecated Superseded by {@link setDebugStyle} (2026-07-02) — this is a
-   * thin wrapper mapping `enabled ? 'matcap' : 'off'`, kept so existing
-   * consumers of the boolean API keep working unchanged.
-   */
-  setDebugVisualization(enabled: boolean): void {
-    this.setDebugStyle(enabled ? 'matcap' : 'off');
   }
 
   /** A debug skin mesh sharing the occluder's geometry, transform and culling

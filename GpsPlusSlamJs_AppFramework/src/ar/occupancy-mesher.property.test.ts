@@ -186,7 +186,7 @@ describe('meshOccupiedCells — properties', () => {
     fc.assert(
       fc.property(cellsArb, (cells) => {
         const culled = meshOccupiedCells(cells, CELL_SIZE);
-        const greedy = meshOccupiedCells(cells, CELL_SIZE, { greedy: true });
+        const greedy = meshOccupiedCells(cells, CELL_SIZE, { mode: 'greedy' });
         const culledFaces = recoverUnitFaces(culled.positions);
         const greedyFaces = recoverUnitFaces(greedy.positions);
         // Same surface coverage…

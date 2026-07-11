@@ -10,12 +10,9 @@
 import { describe, it, expect } from 'vitest';
 import * as fc from 'fast-check';
 import type { Quaternion } from 'gps-plus-slam-js';
+import { calcRelativeCoordsInMeters } from 'gps-plus-slam-js';
 import { type Pose } from './qr-pose';
-import {
-  buildQrGpsVotes,
-  METERS_PER_DEG_LAT,
-  type QrGeoPose,
-} from './qr-gps-vote';
+import { buildQrGpsVotes, type QrGeoPose } from './qr-gps-vote';
 
 const IDENTITY: Quaternion = [0, 0, 0, 1];
 
@@ -32,16 +29,23 @@ const arbPos = fc.tuple(
   fc.double({ min: -50, max: 50, noNaN: true })
 );
 
-/** Back-convert a geo corner to an ENU offset from the QR center. */
+/**
+ * Back-convert a geo corner to an ENU offset from the QR center via the
+ * library's inverse (`calcRelativeCoordsInMeters`, NUE [0]=North [2]=East) —
+ * a genuine round-trip through the same geodesy `offsetGeo` delegates to
+ * since quality-review A-3.
+ */
 function geoToEnu(
   center: QrGeoPose,
   corner: { latitude: number; longitude: number; altitude: number }
 ) {
-  const metersPerDegLon =
-    METERS_PER_DEG_LAT * Math.cos((center.lat * Math.PI) / 180);
+  const nue = calcRelativeCoordsInMeters(
+    { lat: center.lat, lon: center.lon },
+    { lat: corner.latitude, lon: corner.longitude }
+  );
   return {
-    east: (corner.longitude - center.lon) * metersPerDegLon,
-    north: (corner.latitude - center.lat) * METERS_PER_DEG_LAT,
+    east: nue[2],
+    north: nue[0],
     up: corner.altitude - center.alt,
   };
 }

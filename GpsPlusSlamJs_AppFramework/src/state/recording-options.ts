@@ -561,9 +561,20 @@ export const DEPTH_CONSTRAINTS = {
   gridSize: { min: 2, max: 64, step: 1 },
 } as const;
 
-/** Validation constraints for image options */
+/**
+ * Validation constraints for image options.
+ *
+ * `intervalMs` min/step lowered 1000/500 → 250/250 (2026-07-10) so
+ * splat-style object scans can capture up to 4 Hz — at the old 1 Hz floor a
+ * slow orbit yields ~1 frame/m, too sparse for Gaussian-splat reconstruction
+ * (50–150+ frames/object). An interval faster than the readback+encode path
+ * cannot overlap captures: `captureInProgress` serialises them and the
+ * interval is measured from the actual capture time, so the pipeline
+ * self-limits. See
+ * GpsPlusSlamJs_Docs/docs/2026-07-10-splat-orbit-capture-rate-finding.md.
+ */
 export const IMAGE_CONSTRAINTS = {
-  intervalMs: { min: 1000, max: 10000, step: 500 },
+  intervalMs: { min: 250, max: 10000, step: 250 },
   quality: { min: 0.3, max: 1.0, step: 0.1 },
   resolutionDivisor: { min: 1, max: 8, step: 1 },
 } as const;
@@ -662,35 +673,55 @@ export const QR_CONSTRAINTS = {
  * Validate and normalize AR crash isolation flags.
  * Missing or invalid values fall back to defaults.
  */
+/**
+ * Boolean-or-default (quality-review C-1): persisted/external values are
+ * untrusted, so anything that is not a real boolean falls back to the
+ * default. Shared by every validator below — the ~30 hand-rolled copies of
+ * this ternary are exactly the drift a helper prevents.
+ */
+function boolOr(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+/**
+ * Finite-number-or-default (quality-review C-1): anything that is not a
+ * FINITE number falls back to the default. The finiteness guard was applied
+ * inconsistently across the hand-rolled validators; it is now uniform.
+ * Range/step constraints beyond finiteness stay at the call sites.
+ */
+function numOr(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
 export function validateArCrashIsolationOptions(
   options: Partial<ArCrashIsolationOptions>
 ): ArCrashIsolationOptions {
   const defaults = DEFAULT_RECORDING_OPTIONS.arCrashIsolation;
   return {
-    enableDomOverlay:
-      typeof options.enableDomOverlay === 'boolean'
-        ? options.enableDomOverlay
-        : defaults.enableDomOverlay,
-    enableCameraAccess:
-      typeof options.enableCameraAccess === 'boolean'
-        ? options.enableCameraAccess
-        : defaults.enableCameraAccess,
-    enableDepthSensingFeature:
-      typeof options.enableDepthSensingFeature === 'boolean'
-        ? options.enableDepthSensingFeature
-        : defaults.enableDepthSensingFeature,
-    enableCss3dRenderer:
-      typeof options.enableCss3dRenderer === 'boolean'
-        ? options.enableCss3dRenderer
-        : defaults.enableCss3dRenderer,
-    enableCameraTextureAcquisition:
-      typeof options.enableCameraTextureAcquisition === 'boolean'
-        ? options.enableCameraTextureAcquisition
-        : defaults.enableCameraTextureAcquisition,
-    applyChromiumProjectionLayerWorkaround:
-      typeof options.applyChromiumProjectionLayerWorkaround === 'boolean'
-        ? options.applyChromiumProjectionLayerWorkaround
-        : defaults.applyChromiumProjectionLayerWorkaround,
+    enableDomOverlay: boolOr(
+      options.enableDomOverlay,
+      defaults.enableDomOverlay
+    ),
+    enableCameraAccess: boolOr(
+      options.enableCameraAccess,
+      defaults.enableCameraAccess
+    ),
+    enableDepthSensingFeature: boolOr(
+      options.enableDepthSensingFeature,
+      defaults.enableDepthSensingFeature
+    ),
+    enableCss3dRenderer: boolOr(
+      options.enableCss3dRenderer,
+      defaults.enableCss3dRenderer
+    ),
+    enableCameraTextureAcquisition: boolOr(
+      options.enableCameraTextureAcquisition,
+      defaults.enableCameraTextureAcquisition
+    ),
+    applyChromiumProjectionLayerWorkaround: boolOr(
+      options.applyChromiumProjectionLayerWorkaround,
+      defaults.applyChromiumProjectionLayerWorkaround
+    ),
   };
 }
 
@@ -704,18 +735,15 @@ export function validateCompassDebugOptions(
 ): CompassDebugOptions {
   const defaults = DEFAULT_RECORDING_OPTIONS.compassDebug;
   return {
-    coldStartOverride:
-      typeof options.coldStartOverride === 'boolean'
-        ? options.coldStartOverride
-        : defaults.coldStartOverride,
-    rotationPrior:
-      typeof options.rotationPrior === 'boolean'
-        ? options.rotationPrior
-        : defaults.rotationPrior,
-    webXRConsistency:
-      typeof options.webXRConsistency === 'boolean'
-        ? options.webXRConsistency
-        : defaults.webXRConsistency,
+    coldStartOverride: boolOr(
+      options.coldStartOverride,
+      defaults.coldStartOverride
+    ),
+    rotationPrior: boolOr(options.rotationPrior, defaults.rotationPrior),
+    webXRConsistency: boolOr(
+      options.webXRConsistency,
+      defaults.webXRConsistency
+    ),
   };
 }
 
@@ -729,10 +757,7 @@ export function validateLoopClosureDebugOptions(
 ): LoopClosureDebugOptions {
   const defaults = DEFAULT_RECORDING_OPTIONS.loopClosureDebug;
   return {
-    detectorEnabled:
-      typeof options.detectorEnabled === 'boolean'
-        ? options.detectorEnabled
-        : defaults.detectorEnabled,
+    detectorEnabled: boolOr(options.detectorEnabled, defaults.detectorEnabled),
   };
 }
 
@@ -747,32 +772,17 @@ export function validateVisualizationOptions(
 ): VisualizationOptions {
   const defaults = DEFAULT_RECORDING_OPTIONS.visualization;
   return {
-    frameTiles:
-      typeof options.frameTiles === 'boolean'
-        ? options.frameTiles
-        : defaults.frameTiles,
-    occupancyCubes:
-      typeof options.occupancyCubes === 'boolean'
-        ? options.occupancyCubes
-        : defaults.occupancyCubes,
-    gpsAlignmentMarkers:
-      typeof options.gpsAlignmentMarkers === 'boolean'
-        ? options.gpsAlignmentMarkers
-        : defaults.gpsAlignmentMarkers,
-    compassCubes:
-      typeof options.compassCubes === 'boolean'
-        ? options.compassCubes
-        : defaults.compassCubes,
-    headingUpMap:
-      typeof options.headingUpMap === 'boolean'
-        ? options.headingUpMap
-        : defaults.headingUpMap,
+    frameTiles: boolOr(options.frameTiles, defaults.frameTiles),
+    occupancyCubes: boolOr(options.occupancyCubes, defaults.occupancyCubes),
+    gpsAlignmentMarkers: boolOr(
+      options.gpsAlignmentMarkers,
+      defaults.gpsAlignmentMarkers
+    ),
+    compassCubes: boolOr(options.compassCubes, defaults.compassCubes),
+    headingUpMap: boolOr(options.headingUpMap, defaults.headingUpMap),
     // Same boolean-or-default policy, but the default is OFF (debug tool) — a
     // corrupt value must never switch the overlay on by itself.
-    statsOverlay:
-      typeof options.statsOverlay === 'boolean'
-        ? options.statsOverlay
-        : defaults.statsOverlay,
+    statsOverlay: boolOr(options.statsOverlay, defaults.statsOverlay),
   };
 }
 
@@ -798,21 +808,14 @@ export function validateQrOptions(
 ): QrCaptureOptions {
   const defaults = DEFAULT_RECORDING_OPTIONS.qr;
   return {
-    enabled:
-      typeof options.enabled === 'boolean' ? options.enabled : defaults.enabled,
+    enabled: boolOr(options.enabled, defaults.enabled),
     intervalMs: clamp(
-      typeof options.intervalMs === 'number' &&
-        Number.isFinite(options.intervalMs)
-        ? options.intervalMs
-        : defaults.intervalMs,
+      numOr(options.intervalMs, defaults.intervalMs),
       QR_CONSTRAINTS.intervalMs.min,
       QR_CONSTRAINTS.intervalMs.max
     ),
     captureSize: clamp(
-      typeof options.captureSize === 'number' &&
-        Number.isFinite(options.captureSize)
-        ? options.captureSize
-        : defaults.captureSize,
+      numOr(options.captureSize, defaults.captureSize),
       QR_CONSTRAINTS.captureSize.min,
       QR_CONSTRAINTS.captureSize.max
     ),
@@ -828,12 +831,9 @@ export function validateDepthOptions(
 ): DepthCaptureOptions {
   const defaults = DEFAULT_RECORDING_OPTIONS.depth;
   return {
-    enabled:
-      typeof options.enabled === 'boolean' ? options.enabled : defaults.enabled,
+    enabled: boolOr(options.enabled, defaults.enabled),
     intervalMs: clamp(
-      typeof options.intervalMs === 'number'
-        ? options.intervalMs
-        : defaults.intervalMs,
+      numOr(options.intervalMs, defaults.intervalMs),
       DEPTH_CONSTRAINTS.intervalMs.min,
       DEPTH_CONSTRAINTS.intervalMs.max
     ),
@@ -843,13 +843,11 @@ export function validateDepthOptions(
     // fractional gridSize, so without this an out-of-band value would survive
     // validation yet silently fall back to the sampler's default at runtime.
     gridSize: clamp(
-      typeof options.gridSize === 'number' && Number.isFinite(options.gridSize)
-        ? Math.round(options.gridSize)
-        : defaults.gridSize,
+      Math.round(numOr(options.gridSize, defaults.gridSize)),
       DEPTH_CONSTRAINTS.gridSize.min,
       DEPTH_CONSTRAINTS.gridSize.max
     ),
-    rgb: typeof options.rgb === 'boolean' ? options.rgb : defaults.rgb,
+    rgb: boolOr(options.rgb, defaults.rgb),
   };
 }
 
@@ -866,29 +864,19 @@ export function validateMotionFilterOptions(
 ): MotionFilterConfig {
   const defaults = DEFAULT_RECORDING_OPTIONS.images.motionFilter;
   return {
-    enabled:
-      typeof options.enabled === 'boolean' ? options.enabled : defaults.enabled,
+    enabled: boolOr(options.enabled, defaults.enabled),
     maxAngularVelocity: clamp(
-      typeof options.maxAngularVelocity === 'number' &&
-        Number.isFinite(options.maxAngularVelocity)
-        ? options.maxAngularVelocity
-        : defaults.maxAngularVelocity,
+      numOr(options.maxAngularVelocity, defaults.maxAngularVelocity),
       MOTION_FILTER_CONSTRAINTS.maxAngularVelocity.min,
       MOTION_FILTER_CONSTRAINTS.maxAngularVelocity.max
     ),
     maxLinearVelocity: clamp(
-      typeof options.maxLinearVelocity === 'number' &&
-        Number.isFinite(options.maxLinearVelocity)
-        ? options.maxLinearVelocity
-        : defaults.maxLinearVelocity,
+      numOr(options.maxLinearVelocity, defaults.maxLinearVelocity),
       MOTION_FILTER_CONSTRAINTS.maxLinearVelocity.min,
       MOTION_FILTER_CONSTRAINTS.maxLinearVelocity.max
     ),
     maxWaitMs: clamp(
-      typeof options.maxWaitMs === 'number' &&
-        Number.isFinite(options.maxWaitMs)
-        ? options.maxWaitMs
-        : defaults.maxWaitMs,
+      numOr(options.maxWaitMs, defaults.maxWaitMs),
       MOTION_FILTER_CONSTRAINTS.maxWaitMs.min,
       MOTION_FILTER_CONSTRAINTS.maxWaitMs.max
     ),
@@ -909,29 +897,19 @@ export function validateQualityFilterOptions(
 ): QualityFilterConfig {
   const defaults = DEFAULT_RECORDING_OPTIONS.images.qualityFilter;
   return {
-    enabled:
-      typeof options.enabled === 'boolean' ? options.enabled : defaults.enabled,
+    enabled: boolOr(options.enabled, defaults.enabled),
     blurRelativeThreshold: clamp(
-      typeof options.blurRelativeThreshold === 'number' &&
-        Number.isFinite(options.blurRelativeThreshold)
-        ? options.blurRelativeThreshold
-        : defaults.blurRelativeThreshold,
+      numOr(options.blurRelativeThreshold, defaults.blurRelativeThreshold),
       QUALITY_FILTER_CONSTRAINTS.blurRelativeThreshold.min,
       QUALITY_FILTER_CONSTRAINTS.blurRelativeThreshold.max
     ),
     minMeanLuminance: clamp(
-      typeof options.minMeanLuminance === 'number' &&
-        Number.isFinite(options.minMeanLuminance)
-        ? options.minMeanLuminance
-        : defaults.minMeanLuminance,
+      numOr(options.minMeanLuminance, defaults.minMeanLuminance),
       QUALITY_FILTER_CONSTRAINTS.minMeanLuminance.min,
       QUALITY_FILTER_CONSTRAINTS.minMeanLuminance.max
     ),
     maxWaitMs: clamp(
-      typeof options.maxWaitMs === 'number' &&
-        Number.isFinite(options.maxWaitMs)
-        ? options.maxWaitMs
-        : defaults.maxWaitMs,
+      numOr(options.maxWaitMs, defaults.maxWaitMs),
       QUALITY_FILTER_CONSTRAINTS.maxWaitMs.min,
       QUALITY_FILTER_CONSTRAINTS.maxWaitMs.max
     ),
@@ -947,24 +925,19 @@ export function validateImageOptions(
 ): ImageCaptureOptions {
   const defaults = DEFAULT_RECORDING_OPTIONS.images;
   return {
-    enabled:
-      typeof options.enabled === 'boolean' ? options.enabled : defaults.enabled,
+    enabled: boolOr(options.enabled, defaults.enabled),
     intervalMs: clamp(
-      typeof options.intervalMs === 'number'
-        ? options.intervalMs
-        : defaults.intervalMs,
+      numOr(options.intervalMs, defaults.intervalMs),
       IMAGE_CONSTRAINTS.intervalMs.min,
       IMAGE_CONSTRAINTS.intervalMs.max
     ),
     quality: clamp(
-      typeof options.quality === 'number' ? options.quality : defaults.quality,
+      numOr(options.quality, defaults.quality),
       IMAGE_CONSTRAINTS.quality.min,
       IMAGE_CONSTRAINTS.quality.max
     ),
     resolutionDivisor: clamp(
-      typeof options.resolutionDivisor === 'number'
-        ? options.resolutionDivisor
-        : defaults.resolutionDivisor,
+      numOr(options.resolutionDivisor, defaults.resolutionDivisor),
       IMAGE_CONSTRAINTS.resolutionDivisor.min,
       IMAGE_CONSTRAINTS.resolutionDivisor.max
     ),
@@ -1054,10 +1027,7 @@ export function validateOccupancyOptions(
     .occluderDebugViz;
   return {
     cellSizeM: clamp(
-      typeof options.cellSizeM === 'number' &&
-        Number.isFinite(options.cellSizeM)
-        ? options.cellSizeM
-        : defaults.cellSizeM,
+      numOr(options.cellSizeM, defaults.cellSizeM),
       OCCUPANCY_CONSTRAINTS.cellSizeM.min,
       OCCUPANCY_CONSTRAINTS.cellSizeM.max
     ),
@@ -1065,10 +1035,7 @@ export function validateOccupancyOptions(
     // integer threshold; NaN/non-finite falls back to the default (clamp would
     // otherwise pass NaN straight through, and getOccupiedCells expects an int).
     minConfidence: clamp(
-      typeof options.minConfidence === 'number' &&
-        Number.isFinite(options.minConfidence)
-        ? Math.round(options.minConfidence)
-        : defaults.minConfidence,
+      Math.round(numOr(options.minConfidence, defaults.minConfidence)),
       OCCUPANCY_CONSTRAINTS.minConfidence.min,
       OCCUPANCY_CONSTRAINTS.minConfidence.max
     ),
@@ -1081,10 +1048,7 @@ export function validateOccupancyOptions(
     ),
     // The legacy single-toggle never drove a live occluder, so there is nothing
     // to migrate here — boolean-or-default only.
-    liveOcclusion:
-      typeof options.liveOcclusion === 'boolean'
-        ? options.liveOcclusion
-        : defaults.liveOcclusion,
+    liveOcclusion: boolOr(options.liveOcclusion, defaults.liveOcclusion),
     // Present new field wins (unknown value → default 'off'); absent → migrate
     // the legacy occluderDebugViz boolean. See resolveOccluderDebugStyle.
     occluderDebugStyle: resolveOccluderDebugStyle(
@@ -1103,10 +1067,7 @@ export function validateOccupancyOptions(
     // whole meters — the grid throws on invalid radii, so garbage must never
     // pass through.
     occluderRadiusM: clamp(
-      typeof options.occluderRadiusM === 'number' &&
-        Number.isFinite(options.occluderRadiusM)
-        ? Math.round(options.occluderRadiusM)
-        : defaults.occluderRadiusM,
+      Math.round(numOr(options.occluderRadiusM, defaults.occluderRadiusM)),
       OCCUPANCY_CONSTRAINTS.occluderRadiusM.min,
       OCCUPANCY_CONSTRAINTS.occluderRadiusM.max
     ),
@@ -1126,17 +1087,13 @@ export function validateFrameTileDisplayOptions(
   const defaults = DEFAULT_RECORDING_OPTIONS.frameTileDisplay;
   return {
     divisor: clamp(
-      typeof options.divisor === 'number' && Number.isFinite(options.divisor)
-        ? Math.round(options.divisor)
-        : defaults.divisor,
+      Math.round(numOr(options.divisor, defaults.divisor)),
       FRAME_TILE_DISPLAY_CONSTRAINTS.divisor.min,
       FRAME_TILE_DISPLAY_CONSTRAINTS.divisor.max
     ),
     // Same number-or-default policy; 0 stays 0 (the explicit "unlimited").
     maxTiles: clamp(
-      typeof options.maxTiles === 'number' && Number.isFinite(options.maxTiles)
-        ? Math.round(options.maxTiles)
-        : defaults.maxTiles,
+      Math.round(numOr(options.maxTiles, defaults.maxTiles)),
       FRAME_TILE_DISPLAY_CONSTRAINTS.maxTiles.min,
       FRAME_TILE_DISPLAY_CONSTRAINTS.maxTiles.max
     ),

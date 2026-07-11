@@ -1,6 +1,6 @@
 {
   "name": "gps-plus-slam-app-framework",
-  "version": "1.9.1",
+  "version": "1.10.0",
   "description": "Reusable AR+GPS app framework layer — WebXR session management, Three.js visualization, GPS sensors, storage abstractions, replay engine, and store wiring for gps-plus-slam-js.",
   "type": "module",
   "files": [
@@ -42,7 +42,7 @@
     "test:unit": "node ../scripts/run-vitest-scoped.mjs run --coverage --config=config/vitest.config.ts",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "typecheck:tests": "tsc -p tsconfig.vitest.json --noEmit",
-    "lint": "eslint . --config config/eslint.config.mjs --max-warnings 37",
+    "lint": "eslint . --config config/eslint.config.mjs --max-warnings 36",
     "test:watch": "vitest --config config/vitest.config.ts",
     "bench": "vitest bench --run --config config/vitest.bench.config.ts",
     "bench:watch": "vitest bench --config config/vitest.bench.config.ts",
@@ -55,7 +55,7 @@
   "dependencies": {
     "@reduxjs/toolkit": "^2.11.2",
     "gl-matrix": "3.4.4",
-    "gps-plus-slam-js": "^1.9.1"
+    "gps-plus-slam-js": "^1.10.0"
   },
   "peerDependencies": {
     "@sentry/browser": ">=10.0.0",

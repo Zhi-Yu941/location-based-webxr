@@ -347,7 +347,7 @@ describe('OcclusionMesh', () => {
 
       // Worker path (applyMeshData → swapGeometry) — same skins, new geometry.
       const { positions, indices } = meshOccupiedCells([[1, 0, 0]], 0.15, {
-        greedy: true,
+        mode: 'greedy',
       });
       occluder.applyMeshData(positions, indices);
       geometry = occluderMesh(parent)!.geometry;
@@ -506,18 +506,18 @@ describe('OcclusionMesh', () => {
    * transparent phase after opaque content, which would stop it occluding opaque
    * objects; the additive skin avoids that entirely.)
    *
-   * Since 2026-07-02 `setDebugVisualization` is a deprecated thin wrapper over
-   * `setDebugStyle` (`enabled ? 'matcap' : 'off'`) — these tests double as the
-   * wrapper's regression suite, so existing consumers keep working unchanged.
+   * The deprecated boolean `setDebugVisualization` wrapper was removed 2026-07-10
+   * (quality-review C-4; it had no production callers) — these tests now pin the
+   * equivalent `setDebugStyle('matcap' | 'off')` behaviour directly.
    */
-  describe('setDebugVisualization', () => {
+  describe('matcap debug skin via setDebugStyle', () => {
     it('adds a visible semi-transparent matcap skin while keeping the depth-only occluder', () => {
       const parent = new THREE.Group();
       const occluder = new OcclusionMesh(parent);
       occluder.update([[0, 0, 0]], 0.15);
 
       expect(debugSkin(parent)).toBeUndefined();
-      occluder.setDebugVisualization(true);
+      occluder.setDebugStyle('matcap');
 
       // The invisible depth-only occluder is still present and still occludes.
       const depthMesh = occluderMesh(parent);
@@ -544,10 +544,10 @@ describe('OcclusionMesh', () => {
       const parent = new THREE.Group();
       const occluder = new OcclusionMesh(parent);
       occluder.update([[0, 0, 0]], 0.15);
-      occluder.setDebugVisualization(true);
+      occluder.setDebugStyle('matcap');
       expect(debugSkin(parent)).toBeDefined();
 
-      occluder.setDebugVisualization(false);
+      occluder.setDebugStyle('off');
       expect(debugSkin(parent)).toBeUndefined();
       expect(occluderMesh(parent)).toBeDefined();
       occluder.dispose();
@@ -556,7 +556,7 @@ describe('OcclusionMesh', () => {
     it('keeps the skin geometry + normals in sync across re-mesh', () => {
       const parent = new THREE.Group();
       const occluder = new OcclusionMesh(parent);
-      occluder.setDebugVisualization(true); // enabled before any geometry
+      occluder.setDebugStyle('matcap'); // enabled before any geometry
       occluder.update([[0, 0, 0]], 0.15);
 
       const skin = debugSkin(parent)!;
@@ -569,7 +569,7 @@ describe('OcclusionMesh', () => {
       const parent = new THREE.Group();
       const occluder = new OcclusionMesh(parent);
       occluder.update([[0, 0, 0]], 0.15);
-      occluder.setDebugVisualization(true);
+      occluder.setDebugStyle('matcap');
 
       // clear() (e.g. a store swap) must keep the visible matcap skin in sync
       // with the depth-only mesh — otherwise the skin keeps rendering the old,
@@ -588,8 +588,8 @@ describe('OcclusionMesh', () => {
       const parent = new THREE.Group();
       const occluder = new OcclusionMesh(parent);
       occluder.update([[0, 0, 0]], 0.15);
-      occluder.setDebugVisualization(true);
-      occluder.setDebugVisualization(true); // no duplicate skin
+      occluder.setDebugStyle('matcap');
+      occluder.setDebugStyle('matcap'); // no duplicate skin
       expect(
         meshes(parent).filter(
           (m) => m.material instanceof THREE.MeshMatcapMaterial
@@ -598,7 +598,7 @@ describe('OcclusionMesh', () => {
 
       occluder.dispose();
       expect(debugSkin(parent)).toBeUndefined();
-      expect(() => occluder.setDebugVisualization(true)).not.toThrow();
+      expect(() => occluder.setDebugStyle('matcap')).not.toThrow();
     });
   });
 });

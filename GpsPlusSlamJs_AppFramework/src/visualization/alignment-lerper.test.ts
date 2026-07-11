@@ -312,4 +312,45 @@ describe('AlignmentLerper', () => {
     // Dispose should be safe to call for lifecycle symmetry.
     expect(() => lerper.dispose()).not.toThrow();
   });
+
+  // ---- E-5: epsilon-snap convergence ----
+
+  it('snaps exactly to the target once within epsilon and stops touching the group', () => {
+    // Why (quality-review E-5): before the snap, the lerper decomposed,
+    // lerped, recomposed AND ran a whole-subtree updateMatrixWorld(true)
+    // every frame FOREVER — the exponential lerp never reaches the target.
+    // After convergence the matrix must equal the target exactly and
+    // further update() calls must leave the group untouched.
+    lerper.setTarget(identityArray());
+    lerper.update(0.016); // instant first apply (converged immediately)
+    lerper.setTarget(translationArray(10, 0, 0));
+    for (let i = 0; i < 300; i++) {
+      lerper.update(0.016);
+    }
+    // Exact equality — the convergence path snaps to the stored target.
+    const pos = extractPosition(arWorldGroup.matrix);
+    expect(pos.x).toBe(10);
+
+    // Canary: external write survives further update() calls — proves the
+    // converged lerper no longer recomposes per frame.
+    arWorldGroup.matrix.elements[12] = 123;
+    lerper.update(0.016);
+    expect(arWorldGroup.matrix.elements[12]).toBe(123);
+  });
+
+  it('resumes lerping when a new target arrives after convergence', () => {
+    lerper.setTarget(identityArray());
+    lerper.update(0.016);
+    lerper.setTarget(translationArray(10, 0, 0));
+    for (let i = 0; i < 300; i++) {
+      lerper.update(0.016);
+    }
+    expect(extractPosition(arWorldGroup.matrix).x).toBe(10);
+
+    lerper.setTarget(translationArray(-4, 0, 0));
+    for (let i = 0; i < 300; i++) {
+      lerper.update(0.016);
+    }
+    expect(extractPosition(arWorldGroup.matrix).x).toBe(-4);
+  });
 });

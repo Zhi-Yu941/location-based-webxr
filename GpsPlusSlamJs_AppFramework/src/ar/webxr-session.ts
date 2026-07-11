@@ -19,6 +19,7 @@
 
 import * as THREE from 'three';
 import { createLogger } from '../utils/logger';
+import { applyChromiumProjectionLayerWorkaround } from './chromium-camera-access-workaround';
 import { WEBXR_TO_NUE } from './webxr-nue-basis';
 import {
   ImageCaptureManager,
@@ -80,7 +81,7 @@ import {
   nueQuaternionToWebXR as _nueQuaternionToWebXR,
 } from 'gps-plus-slam-js';
 import type { ARPose } from '../types/ar-types';
-import { getLastDeviceOrientation } from '../state/gps-event-coordinator';
+import { getLastDeviceOrientation } from '../sensors/device-orientation-cache';
 import {
   DEFAULT_RECORDING_OPTIONS,
   type ArCrashIsolationOptions,
@@ -917,6 +918,18 @@ export async function initAR(
   currentArCrashIsolationOptions =
     validateArCrashIsolationOptions(isolationOptions);
 
+  // G-7 (2026-07-10 quality review): apply the Chromium camera-access
+  // tab-crash workaround here so every consumer gets it by default —
+  // forgetting the manual bootstrap call meant a Chrome tab crash. Runs
+  // before the renderer/session negotiation (three.js only probes the
+  // deleted prototypes at session start) and is idempotent, so apps that
+  // still call `applyChromiumProjectionLayerWorkaround()` at bootstrap are
+  // unaffected. Opt out via `isolationOptions` on unaffected devices
+  // (e.g. Quest) where forcing `XRWebGLLayer` could regress WebXR.
+  if (currentArCrashIsolationOptions.applyChromiumProjectionLayerWorkaround) {
+    applyChromiumProjectionLayerWorkaround();
+  }
+
   // Create Three.js renderer
   renderer = new THREE.WebGLRenderer({
     antialias: true,
@@ -971,6 +984,19 @@ export async function initAR(
   // (b) a store was injected via `setTrackingStore`. Without both we keep
   // the legacy no-op behaviour: `onXRFrame` never dispatches and no
   // callbacks ever fire. See docs/2026-05-13-tracking-state-slice-port-plan.md.
+  const hasTrackingCallbacks = onTrackingRestarted !== null;
+  const hasTrackingStore = trackingStore !== null;
+  if (hasTrackingCallbacks !== hasTrackingStore) {
+    // G-5 (2026-07-10 quality review): the two-call wiring
+    // (setTrackingStore + setTrackingCallbacks) used to no-op SILENTLY when
+    // half-forgotten — the exact stale-store bug class the F1 feedback doc
+    // records. Make the half-wired state loudly diagnosable.
+    log.warn(
+      trackingStore
+        ? 'Tracking pipeline half-wired: setTrackingStore() was called but setTrackingCallbacks() was not — no tracking callbacks will fire. Call both before initAR().'
+        : 'Tracking pipeline half-wired: setTrackingCallbacks() was called but setTrackingStore() was not — the tracking slice will not update. Call both before initAR().'
+    );
+  }
   if (onTrackingRestarted && trackingStore) {
     const store = trackingStore;
     // Start from a clean slate — the previous session may have left the
@@ -1251,10 +1277,12 @@ function onXRFrame(time: number, frame: XRFrame | undefined): void {
     imageCaptureManager.onFrame(time);
   }
 
-  // Check if we need to sample depth
+  // Check if we need to sample depth. The provider is lazy (quality-review
+  // E-4): the sampler only invokes it when a sample is due, so the
+  // getDepthInformation + wrap cost is paid ~1×/interval instead of every
+  // render frame.
   if (depthSampler) {
-    const depthInfo = getDepthInfoFromFrame(frame, pose);
-    depthSampler.onFrame(time, depthInfo);
+    depthSampler.onFrame(time, () => getDepthInfoFromFrame(frame, pose));
   }
 
   // Check if we need to capture a camera frame for CV. The source throttles to

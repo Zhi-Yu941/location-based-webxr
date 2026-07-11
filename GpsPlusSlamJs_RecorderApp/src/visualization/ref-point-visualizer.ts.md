@@ -2,10 +2,13 @@
 
 ## Purpose
 
-Recorder-side `RefPointVisualizer` that adapts the recorder's `RefPointMark`
-domain type onto the pure-function `syncGpsAnchoredMeshes` reconciler
-(prior=green, current=red). Holds one `Map<id, THREE.Mesh>` per colour
-between calls plus a single `zeroRef` field; no other state.
+Recorder-side `RefPointVisualizer` that renders the flat `refPoints` slice
+entries through the pure-function `syncGpsAnchoredMeshes` reconciler via the
+single `syncRefPoints` pipeline. Holds one `Map<id, THREE.Mesh>` between
+calls plus the `zeroRef` and the cached `lastRefPoints`; no other state.
+(The legacy two-colour prior/current API was removed 2026-07-10,
+quality-review D-1, completing Step 5 of the 2026-05-27 slice-collapse plan —
+production had used only `setZeroRef` + `syncRefPoints`.)
 
 ## Public API
 
@@ -30,18 +33,9 @@ between calls plus a single `zeroRef` field; no other state.
     the animation was scheduled.
   - `getRefPointCount(): number` — number of meshes managed by
     `syncRefPoints`.
-  - `displayPriorRefPoints(marks)` — _legacy_; replaces the prior group;
-    marks without `gpsPosition` are skipped. Removed in Step 5 along
-    with the recorder `refPoints` slice.
-  - `addCurrentRefPoint(mark)` — _legacy_; appends to the current group.
-    Removed in Step 5.
-  - `clearPriorRefPoints()` / `clearCurrentRefPoints()` / `clearAll()` —
-    `clearAll` also clears the unified `syncRefPoints` handles, resets
-    the zero ref, and drops the cached `lastRefPoints` so a later
-    `setZeroRef` does not replay stale entries.
-  - `getCounts(): { prior, current }` — _legacy_; counts for the
-    prior/current pipelines only. Use `getRefPointCount()` for the
-    unified pipeline.
+  - `clearAll()` — clears the `syncRefPoints` handles, resets the zero
+    ref, and drops the cached `lastRefPoints` so a later `setZeroRef`
+    does not replay stale entries.
 - `const refPointVisualizer` — singleton consumed by
   `recording-session-handlers` and `replay-mode`.
 
@@ -50,14 +44,12 @@ between calls plus a single `zeroRef` field; no other state.
 - **Marker radius `REF_POINT_MARKER_RADIUS = 0.2` m (D5, 2026-06-16 user
   feedback).** Ref-point markers are the **only** GPS-anchored spheres that
   grow — to double the `syncGpsAnchoredMeshes` default (`DEFAULT_RADIUS` 0.1) —
-  set on `REF_POINT_OPTS` (the live + replay `syncRefPoints` path) and on the
-  legacy `PRIOR_OPTS` / `CURRENT_OPTS` while still wired. The other
+  set on `REF_POINT_OPTS` (the live + replay `syncRefPoints` path). The other
   GPS-anchored debug spheres (`gps-event-markers.ts` in AppFramework) halve, so
   the marker the user cares about stays spottable amid the compass +
   point-cloud cubes (which stay ON). A test locks the **rendered geometry
   radius**, not just the opts literal.
-- Mesh name format: `ref-point-${id}` (unified) and `prior-ref-${id}` /
-  `current-ref-${id}` (legacy, removed in Step 5).
+- Mesh name format: `ref-point-${id}`.
 - The insert animation fires **exactly once per id** — a re-render with
   the same id leaves the existing mesh untouched.
 - **One sphere per H3 cell id; latest live observation wins the position.**
@@ -87,7 +79,7 @@ between calls plus a single `zeroRef` field; no other state.
 
 ## Tests
 
-- See [ref-point-visualizer.test.ts](ref-point-visualizer.test.ts). Behavioural tests preserved verbatim across the manager-to-reconciler refactor so the move is provably semantics-preserving.
+- See [ref-point-visualizer.test.ts](ref-point-visualizer.test.ts) — setZeroRef/getZeroRef, clearAll (session reset), and the syncRefPoints pipeline (radius pin, insert animation, cached replay, shared-id last-write-wins). The legacy prior/current suites were removed with the API (quality-review D-1).
 
 ## Related docs
 

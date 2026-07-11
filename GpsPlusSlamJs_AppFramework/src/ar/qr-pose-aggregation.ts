@@ -39,6 +39,7 @@ import { quat } from 'gl-matrix';
 import type { Pose } from './qr-pose.js';
 import type { Quaternion, Vector3 } from 'gps-plus-slam-js';
 import { geodesicAngleRad } from '../utils/geodesic-angle.js';
+import { lowerMedian } from '../utils/median.js';
 
 const RAD2DEG = 180 / Math.PI;
 const DEG2RAD = Math.PI / 180;
@@ -184,19 +185,13 @@ export function averageRotation(
 
 // --- per-axis median position ------------------------------------------
 
-/** Per-axis median of a numeric list (lower-middle for even n, matching
- * `medianQrPosition` in the slice so the two agree on the same data). */
-function medianOf(values: readonly number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor((sorted.length - 1) / 2);
-  return sorted[mid] as number;
-}
-
 function medianPosition(positions: readonly Vector3[]): Vector3 {
+  // Lower-middle median so each axis is an actually-observed value, matching
+  // `medianQrPosition` in the slice so the two agree on the same data.
   return [
-    medianOf(positions.map((p) => p[0])),
-    medianOf(positions.map((p) => p[1])),
-    medianOf(positions.map((p) => p[2])),
+    lowerMedian(positions.map((p) => p[0])),
+    lowerMedian(positions.map((p) => p[1])),
+    lowerMedian(positions.map((p) => p[2])),
   ];
 }
 

@@ -109,7 +109,7 @@ describe('DepthSampler', () => {
     it('affects the next sample (gridSize change takes effect)', () => {
       sampler.updateConfig({ gridSize: 4 });
       sampler.start();
-      sampler.onFrame(0, createMockDepthInfo(4));
+      sampler.onFrame(0, () => createMockDepthInfo(4));
       const sample = vi.mocked(callbacks.onSampleCaptured).mock.calls[0][0];
       expect(sample.points).toHaveLength(16);
     });
@@ -149,7 +149,7 @@ describe('DepthSampler', () => {
     it('resets sample count on start', () => {
       sampler.start();
       // Simulate a sample via onFrame
-      sampler.onFrame(1000, createMockDepthInfo(3));
+      sampler.onFrame(1000, () => createMockDepthInfo(3));
       expect(sampler.getSampleCount()).toBe(1);
 
       sampler.stop();
@@ -160,42 +160,42 @@ describe('DepthSampler', () => {
 
   describe('onFrame', () => {
     it('does not sample when not running', () => {
-      sampler.onFrame(1000, createMockDepthInfo(3));
+      sampler.onFrame(1000, () => createMockDepthInfo(3));
       expect(callbacks.onSampleCaptured).not.toHaveBeenCalled();
     });
 
     it('samples immediately on first frame after start', () => {
       sampler.start();
-      sampler.onFrame(0, createMockDepthInfo(3));
+      sampler.onFrame(0, () => createMockDepthInfo(3));
       expect(callbacks.onSampleCaptured).toHaveBeenCalledOnce();
     });
 
     it('respects sampling interval', () => {
       sampler.start();
-      sampler.onFrame(0, createMockDepthInfo(3));
-      sampler.onFrame(500, createMockDepthInfo(3)); // Too soon
-      sampler.onFrame(1000, createMockDepthInfo(3)); // Should sample
+      sampler.onFrame(0, () => createMockDepthInfo(3));
+      sampler.onFrame(500, () => createMockDepthInfo(3)); // Too soon
+      sampler.onFrame(1000, () => createMockDepthInfo(3)); // Should sample
 
       expect(callbacks.onSampleCaptured).toHaveBeenCalledTimes(2);
     });
 
     it('does not sample if depth info is null', () => {
       sampler.start();
-      sampler.onFrame(0, null);
+      sampler.onFrame(0, () => null);
       expect(callbacks.onSampleCaptured).not.toHaveBeenCalled();
     });
 
     it('does not sample if pose is null', () => {
       vi.mocked(callbacks.getCurrentPose).mockReturnValue(null);
       sampler.start();
-      sampler.onFrame(0, createMockDepthInfo(3));
+      sampler.onFrame(0, () => createMockDepthInfo(3));
       expect(callbacks.onSampleCaptured).not.toHaveBeenCalled();
     });
 
     it('increments sample count on successful sample', () => {
       sampler.start();
-      sampler.onFrame(0, createMockDepthInfo(3));
-      sampler.onFrame(1000, createMockDepthInfo(3));
+      sampler.onFrame(0, () => createMockDepthInfo(3));
+      sampler.onFrame(1000, () => createMockDepthInfo(3));
 
       expect(sampler.getSampleCount()).toBe(2);
     });
@@ -211,7 +211,7 @@ describe('DepthSampler', () => {
      */
     it('provides cameraPos in raw WebXR convention and timestamp as epoch ms', () => {
       sampler.start();
-      sampler.onFrame(0, createMockDepthInfo(3));
+      sampler.onFrame(0, () => createMockDepthInfo(3));
 
       const sample = vi.mocked(callbacks.onSampleCaptured).mock.calls[0][0];
       expect(sample.cameraPos).toEqual([1, 2, 3]);
@@ -223,7 +223,7 @@ describe('DepthSampler', () => {
     it('samples grid of points from depth buffer', () => {
       const gridSampler = new DepthSampler(callbacks, { gridSize: 3 });
       gridSampler.start();
-      gridSampler.onFrame(0, createMockDepthInfo(3));
+      gridSampler.onFrame(0, () => createMockDepthInfo(3));
 
       const sample = vi.mocked(callbacks.onSampleCaptured).mock.calls[0][0];
       // 3x3 grid = 9 points
@@ -238,7 +238,7 @@ describe('DepthSampler', () => {
       };
       const gridSampler = new DepthSampler(callbacks, config);
       gridSampler.start();
-      gridSampler.onFrame(0, createMockDepthInfo(3));
+      gridSampler.onFrame(0, () => createMockDepthInfo(3));
 
       const sample = vi.mocked(callbacks.onSampleCaptured).mock.calls[0][0];
       // Should have points at normalized coords like (0.25, 0.25), (0.5, 0.5), (0.75, 0.75)
@@ -250,7 +250,7 @@ describe('DepthSampler', () => {
 
     it('includes depth values in meters', () => {
       sampler.start();
-      sampler.onFrame(0, createMockDepthInfo(3));
+      sampler.onFrame(0, () => createMockDepthInfo(3));
 
       const sample = vi.mocked(callbacks.onSampleCaptured).mock.calls[0][0];
       for (const point of sample.points) {
@@ -269,7 +269,7 @@ describe('DepthSampler', () => {
      */
     it('copies the projectionMatrix from depth info into the emitted sample', () => {
       sampler.start();
-      sampler.onFrame(0, createMockDepthInfo(3, TEST_PROJECTION_MATRIX));
+      sampler.onFrame(0, () => createMockDepthInfo(3, TEST_PROJECTION_MATRIX));
 
       const sample = vi.mocked(callbacks.onSampleCaptured).mock.calls[0][0];
       expect(sample.projectionMatrix).toEqual(TEST_PROJECTION_MATRIX);
@@ -277,7 +277,7 @@ describe('DepthSampler', () => {
 
     it('omits projectionMatrix when depth info has none (back-compat)', () => {
       sampler.start();
-      sampler.onFrame(0, createMockDepthInfo(3));
+      sampler.onFrame(0, () => createMockDepthInfo(3));
 
       const sample = vi.mocked(callbacks.onSampleCaptured).mock.calls[0][0];
       expect(sample.projectionMatrix).toBeUndefined();
@@ -292,7 +292,7 @@ describe('DepthSampler', () => {
       };
       const largeSampler = new DepthSampler(callbacks, config);
       largeSampler.start();
-      largeSampler.onFrame(0, createMockDepthInfo(5));
+      largeSampler.onFrame(0, () => createMockDepthInfo(5));
 
       const sample = vi.mocked(callbacks.onSampleCaptured).mock.calls[0][0];
       // 5x5 grid = 25 points
@@ -316,7 +316,7 @@ describe('DepthSampler', () => {
           };
           const propSampler = new DepthSampler(callbacks, config);
           propSampler.start();
-          propSampler.onFrame(0, createMockDepthInfo(gridSize));
+          propSampler.onFrame(0, () => createMockDepthInfo(gridSize));
 
           const sample = vi
             .mocked(callbacks.onSampleCaptured)
@@ -341,7 +341,7 @@ describe('DepthSampler', () => {
           };
           const propSampler = new DepthSampler(callbacks, config);
           propSampler.start();
-          propSampler.onFrame(0, createMockDepthInfo(gridSize));
+          propSampler.onFrame(0, () => createMockDepthInfo(gridSize));
 
           const sample = vi
             .mocked(callbacks.onSampleCaptured)
@@ -380,11 +380,11 @@ describe('DepthSampler', () => {
           propSampler.start();
 
           // First sample at t=0
-          propSampler.onFrame(0, createMockDepthInfo(2));
+          propSampler.onFrame(0, () => createMockDepthInfo(2));
           // Too early - should not sample
-          propSampler.onFrame(intervalMs - 1, createMockDepthInfo(2));
+          propSampler.onFrame(intervalMs - 1, () => createMockDepthInfo(2));
           // Exactly on interval - should sample
-          propSampler.onFrame(intervalMs, createMockDepthInfo(2));
+          propSampler.onFrame(intervalMs, () => createMockDepthInfo(2));
 
           expect(intervalCallbacks.onSampleCaptured).toHaveBeenCalledTimes(2);
 
@@ -417,8 +417,8 @@ describe('DepthSampler', () => {
         { gridSize: 2 }
       );
       rgbSampler.start();
-      rgbSampler.onFrame(0, createMockDepthInfo(2));
-      rgbSampler.onFrame(100, createMockDepthInfo(2)); // within interval — no sample
+      rgbSampler.onFrame(0, () => createMockDepthInfo(2));
+      rgbSampler.onFrame(100, () => createMockDepthInfo(2)); // within interval — no sample
 
       expect(acquireRgbLookup).toHaveBeenCalledTimes(1);
       const sample = vi.mocked(callbacks.onSampleCaptured).mock.calls[0][0];
@@ -441,7 +441,7 @@ describe('DepthSampler', () => {
       );
       rgbSampler.updateConfig({ rgb: false });
       rgbSampler.start();
-      rgbSampler.onFrame(0, createMockDepthInfo(2));
+      rgbSampler.onFrame(0, () => createMockDepthInfo(2));
 
       expect(acquireRgbLookup).not.toHaveBeenCalled();
       const sample = vi.mocked(callbacks.onSampleCaptured).mock.calls[0][0];
@@ -459,7 +459,7 @@ describe('DepthSampler', () => {
 
     it('emits color-less points when no acquireRgbLookup callback is provided (back-compat)', () => {
       sampler.start();
-      sampler.onFrame(0, createMockDepthInfo(3));
+      sampler.onFrame(0, () => createMockDepthInfo(3));
       const sample = vi.mocked(callbacks.onSampleCaptured).mock.calls[0][0];
       expect(sample.points[0].rgb).toBeUndefined();
       // The field must be ABSENT, not undefined, so persisted JSON is
@@ -473,7 +473,7 @@ describe('DepthSampler', () => {
         { gridSize: 2 }
       );
       rgbSampler.start();
-      rgbSampler.onFrame(0, createMockDepthInfo(2));
+      rgbSampler.onFrame(0, () => createMockDepthInfo(2));
       const sample = vi.mocked(callbacks.onSampleCaptured).mock.calls[0][0];
       expect(sample.points.every((p) => p.rgb === undefined)).toBe(true);
       rgbSampler.stop();
@@ -490,7 +490,9 @@ describe('DepthSampler', () => {
         { gridSize: 2 }
       );
       rgbSampler.start();
-      expect(() => rgbSampler.onFrame(0, createMockDepthInfo(2))).not.toThrow();
+      expect(() =>
+        rgbSampler.onFrame(0, () => createMockDepthInfo(2))
+      ).not.toThrow();
       const sample = vi.mocked(callbacks.onSampleCaptured).mock.calls[0][0];
       expect(sample.points).toHaveLength(4);
       expect(sample.points[0].rgb).toBeUndefined();
@@ -508,7 +510,7 @@ describe('DepthSampler', () => {
         { gridSize: 2 }
       );
       rgbSampler.start();
-      rgbSampler.onFrame(0, createMockDepthInfo(2));
+      rgbSampler.onFrame(0, () => createMockDepthInfo(2));
       const sample = vi.mocked(callbacks.onSampleCaptured).mock.calls[0][0];
       const withRgb = sample.points.filter((p) => p.rgb !== undefined);
       const withoutRgb = sample.points.filter((p) => p.rgb === undefined);
@@ -540,7 +542,7 @@ describe('DepthSampler', () => {
 
       testSampler.start();
       mockTime = 1000;
-      testSampler.onFrame(1000, null); // No depth data
+      testSampler.onFrame(1000, () => null); // No depth data
 
       expect(onDepthUnavailable).not.toHaveBeenCalled();
 
@@ -562,7 +564,7 @@ describe('DepthSampler', () => {
 
       testSampler.start();
       mockTime = 5001; // Past threshold
-      testSampler.onFrame(5001, null); // No depth data
+      testSampler.onFrame(5001, () => null); // No depth data
 
       expect(onDepthUnavailable).toHaveBeenCalledTimes(1);
 
@@ -585,9 +587,9 @@ describe('DepthSampler', () => {
       testSampler.start();
       mockTime = 1000;
       // Receive valid depth data
-      testSampler.onFrame(1000, createMockDepthInfo(3));
+      testSampler.onFrame(1000, () => createMockDepthInfo(3));
       mockTime = 6000;
-      testSampler.onFrame(6000, null); // Depth later becomes unavailable
+      testSampler.onFrame(6000, () => null); // Depth later becomes unavailable
 
       expect(onDepthUnavailable).not.toHaveBeenCalled();
 
@@ -609,9 +611,9 @@ describe('DepthSampler', () => {
 
       testSampler.start();
       mockTime = 6000;
-      testSampler.onFrame(6000, null);
-      testSampler.onFrame(7000, null);
-      testSampler.onFrame(8000, null);
+      testSampler.onFrame(6000, () => null);
+      testSampler.onFrame(7000, () => null);
+      testSampler.onFrame(8000, () => null);
 
       expect(onDepthUnavailable).toHaveBeenCalledTimes(1);
 
@@ -631,7 +633,7 @@ describe('DepthSampler', () => {
 
       testSampler.start();
 
-      expect(() => testSampler.onFrame(1000, null)).not.toThrow();
+      expect(() => testSampler.onFrame(1000, () => null)).not.toThrow();
 
       testSampler.stop();
       performanceSpy.mockRestore();
@@ -643,13 +645,13 @@ describe('DepthSampler', () => {
 
     it('hasReceivedDepth returns true after receiving depth', () => {
       sampler.start();
-      sampler.onFrame(1000, createMockDepthInfo(3));
+      sampler.onFrame(1000, () => createMockDepthInfo(3));
       expect(sampler.hasReceivedDepth()).toBe(true);
     });
 
     it('hasReceivedDepth resets to false on start', () => {
       sampler.start();
-      sampler.onFrame(1000, createMockDepthInfo(3));
+      sampler.onFrame(1000, () => createMockDepthInfo(3));
       sampler.stop();
       sampler.start();
       expect(sampler.hasReceivedDepth()).toBe(false);

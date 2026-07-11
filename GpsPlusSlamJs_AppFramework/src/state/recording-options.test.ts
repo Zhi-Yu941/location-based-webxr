@@ -295,7 +295,7 @@ describe('recording-options', () => {
     });
 
     it('clamps intervalMs below minimum to minimum', () => {
-      const result = validateImageOptions({ intervalMs: 500 });
+      const result = validateImageOptions({ intervalMs: 100 });
       expect(result.intervalMs).toBe(IMAGE_CONSTRAINTS.intervalMs.min);
     });
 
@@ -1239,7 +1239,7 @@ describe('recording-options', () => {
         depth: { enabled: true, intervalMs: 50, gridSize: 100, rgb: true }, // invalid
         images: {
           enabled: true,
-          intervalMs: 500,
+          intervalMs: 100,
           quality: 0.1,
           resolutionDivisor: 0,
           motionFilter: { ...DEFAULT_RECORDING_OPTIONS.images.motionFilter },
@@ -1545,6 +1545,21 @@ describe('recording-options', () => {
       expect(IMAGE_CONSTRAINTS.quality.min).toBeLessThan(
         IMAGE_CONSTRAINTS.quality.max
       );
+    });
+
+    /**
+     * Why this test matters: the 2026-07-10 splat-orbit finding
+     * (GpsPlusSlamJs_Docs/docs/2026-07-10-splat-orbit-capture-rate-finding.md)
+     * showed the old 1000 ms minimum caps a slow object orbit at ~1 frame/s —
+     * too sparse for Gaussian-splat reconstruction (50–150+ frames/object).
+     * min/step were lowered 1000/500 → 250/250 so the slider reaches 4 Hz.
+     * Overlap safety: `captureInProgress` serialises captures and the
+     * interval is measured from the ACTUAL capture time, so an interval
+     * faster than the readback+encode path self-limits instead of queueing.
+     */
+    it('IMAGE_CONSTRAINTS allows sub-second capture for splat-style object scans', () => {
+      expect(IMAGE_CONSTRAINTS.intervalMs.min).toBe(250);
+      expect(IMAGE_CONSTRAINTS.intervalMs.step).toBe(250);
     });
 
     it('OCCUPANCY_CONSTRAINTS spans 1–20 cm and brackets the default', () => {

@@ -64,8 +64,11 @@
     spawn → `PLACE_FAILED` (revert + error line) and `dispose()`s any partially
     created `anchor` so a retry can never accumulate overlapping markers.
   - `spawnAnchor()` builds `createGpsAnchor` with `getAlignmentMatrix` /
-    `getGpsZeroRef` bound to the live store, and `getCurrentGpsPoint` bound to
-    the marker's own **GPS-world (NUE) world pose** via `worldNueToGps`. Its
+    `getGpsZeroRef` bound to the live store; the bootstrap GPS source is the
+    framework anchor's **built-in object-pose sampler** (quality-review G-6 —
+    the hand-built `getCurrentGpsPoint`/`worldNueToGps` closure this app used
+    to carry is now the anchor default), sampling the marker's own
+    **GPS-world (NUE) world pose**. Its
     optional `{ worldPosition }` places the marker at the reticle hit point
     (world→`arWorldGroup`-local); `{ onBootstrapComplete }` is forwarded to the
     anchor so the cache-miss path can persist the committed median into `?show=`.
@@ -96,16 +99,16 @@
     the AR render loop automatically.
   - `lastGps` always carries a finite altitude (defaults to `0`) so the anchor
     seed is a well-formed `LatLongAlt`.
-  - **Cache-miss bootstrap source is the marker's own world pose**
-    (`getCurrentGpsPoint` → `worldNueToGps(marker.getWorldPosition(), zero)`),
+  - **Cache-miss bootstrap source is the marker's own world pose** (the
+    framework anchor's built-in object-pose sampler, quality-review G-6),
     matching the MinimalExample — the marker is positioned at the reticle hit
     point, so the anchor commits to the point the user aimed at, not the device.
     This works only because `enableArWorldGroupAlignment` makes the marker's
     world position GPS-world NUE. The persisted `?show=` is the **committed
     bootstrap median** (via `onBootstrapComplete`), so the shared link equals
     the anchor's committed reference by construction and stays correct across
-    re-bootstraps. (Cache-hit uses `skipBootstrap`, so its `getCurrentGpsPoint`
-    is never sampled and the URL GPS is the decoded one.)
+    re-bootstraps. (Cache-hit uses `skipBootstrap`, so the bootstrap sampler
+    never runs and the URL GPS is the decoded one.)
 - **Tests:** glue is verified manually via `pnpm dev` on an AR device. The
   decision logic it composes is unit-tested in the sibling modules
   ([setup-state-machine](setup-state-machine.ts.md),

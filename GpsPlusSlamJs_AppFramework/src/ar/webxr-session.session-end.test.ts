@@ -195,6 +195,36 @@ describe('session-end hook (F3)', () => {
     expect(events).toHaveLength(1);
   });
 
+  /**
+   * Why this test matters:
+   * The CSS3D overlay (Leaflet minimap host, Approach E) is a DOM element the
+   * manager appends next to the WebGL canvas; leaking it across sessions
+   * leaves a stale absolutely-positioned layer over the next session's view.
+   * The old getLiveCss3dManager tests (deleted with the getter in
+   * surface-reduction step 3) only ever saw the getter's null default — this
+   * pins the actual lifecycle observably: initAR creates the overlay when
+   * `enableCss3dRenderer` is on, and the session-end teardown
+   * (resetWebXRState → css3dManager.dispose()) removes it from the DOM.
+   */
+  it('creates the CSS3D overlay on init and removes it on session end', async () => {
+    await initAR(container, {
+      ...MINIMAL_ISOLATION,
+      enableCss3dRenderer: true,
+    });
+
+    // The overlay is a non-canvas element the manager appended to the
+    // container (the canvas itself is the WebGL renderer's).
+    const overlay = Array.from(container.children).find(
+      (el) => el.tagName !== 'CANVAS'
+    );
+    expect(overlay).toBeDefined();
+
+    capturedEndListener?.(); // system-initiated end — full teardown
+
+    expect(Array.from(container.children)).not.toContain(overlay);
+    expect(container.children).toHaveLength(0);
+  });
+
   it('requestedByApp does not stay latched after an app-initiated end', async () => {
     // A failed/aborted endARSession() must not make a LATER system-initiated
     // end masquerade as app-initiated.

@@ -101,6 +101,20 @@ export type { ARPose } from '../types/ar-types';
 
 const log = createLogger('WebXR');
 
+// ---------------------------------------------------------------------------
+// Exported for unit testing only
+//
+// The five pure helpers in this block are internal building blocks of the XR
+// frame loop / session wiring — no production code outside this module
+// imports them, and they are deliberately NOT re-exported by the ar/ barrel.
+// They stay `export`ed so `webxr-session.test.ts` can pin their contracts
+// directly (2026-07-11 surface-reduction step 3, matching the documented
+// test-only-export precedent from the 2026-07-10 quality review, B-5). If one
+// of them ever gains a production consumer, move it out of this block and add
+// it to the barrel.
+// ---------------------------------------------------------------------------
+
+/** Runtime guard for `XRView.camera` candidates (finite, positive dimensions). */
 export function isXRCameraLike(value: unknown): value is XRCameraLike {
   if (typeof value !== 'object' || value === null) {
     return false;
@@ -172,6 +186,76 @@ export function shouldLogCameraAccessDiagnostic(
 ): boolean {
   return pose !== null && !alreadyLogged && captureActive;
 }
+
+/**
+ * Extract the reset transform from an XRReferenceSpaceEvent-like object.
+ *
+ * Distinguishes three cases per OdometryTrackingRestartedPayload semantics:
+ * - Transform property missing (older browsers) → returns `undefined`
+ * - Transform property present but null (runtime can't determine delta) → returns `null`
+ * - Transform property present with data → returns `ResetTransformData`
+ *
+ * This is a pure function extracted for testability.
+ *
+ * @param event - The event object, cast to a record with an optional transform property
+ * @returns ResetTransformData, null, or undefined
+ */
+export function extractResetTransformData(
+  event: Record<string, unknown>
+): ResetTransformData | null | undefined {
+  if (!('transform' in event)) {
+    return undefined;
+  }
+  const transform = event.transform as {
+    position: DOMPointReadOnly;
+    orientation: DOMPointReadOnly;
+  } | null;
+  if (!transform) {
+    return null;
+  }
+  const pos = transform.position;
+  const ori = transform.orientation;
+  return {
+    position: [pos.x, pos.y, pos.z],
+    orientation: [ori.x, ori.y, ori.z, ori.w],
+  };
+}
+
+/**
+ * Extract pose data from an XRViewerPose.
+ * Returns null if pose or views are unavailable.
+ *
+ * This is a pure function extracted for testability.
+ *
+ * @param pose - The XRViewerPose from frame.getViewerPose()
+ * @returns ARPose with position and orientation, or null
+ */
+export function extractPoseFromViewer(
+  pose: XRViewerPose | null
+): ARPose | null {
+  if (!pose) {
+    return null;
+  }
+
+  const view = pose.views[0];
+  if (!view) {
+    return null;
+  }
+
+  const { position, orientation } = view.transform;
+
+  return {
+    position: { x: position.x, y: position.y, z: position.z },
+    orientation: {
+      x: orientation.x,
+      y: orientation.y,
+      z: orientation.z,
+      w: orientation.w,
+    },
+  };
+}
+
+// ------------------------- (end test-only exports) -------------------------
 
 let renderer: THREE.WebGLRenderer | null = null;
 let scene: THREE.Scene | null = null;
@@ -577,74 +661,6 @@ function acquireCameraFrameRgba(): RgbaImage | null {
 }
 
 /**
- * Extract the reset transform from an XRReferenceSpaceEvent-like object.
- *
- * Distinguishes three cases per OdometryTrackingRestartedPayload semantics:
- * - Transform property missing (older browsers) → returns `undefined`
- * - Transform property present but null (runtime can't determine delta) → returns `null`
- * - Transform property present with data → returns `ResetTransformData`
- *
- * This is a pure function extracted for testability.
- *
- * @param event - The event object, cast to a record with an optional transform property
- * @returns ResetTransformData, null, or undefined
- */
-export function extractResetTransformData(
-  event: Record<string, unknown>
-): ResetTransformData | null | undefined {
-  if (!('transform' in event)) {
-    return undefined;
-  }
-  const transform = event.transform as {
-    position: DOMPointReadOnly;
-    orientation: DOMPointReadOnly;
-  } | null;
-  if (!transform) {
-    return null;
-  }
-  const pos = transform.position;
-  const ori = transform.orientation;
-  return {
-    position: [pos.x, pos.y, pos.z],
-    orientation: [ori.x, ori.y, ori.z, ori.w],
-  };
-}
-
-/**
- * Extract pose data from an XRViewerPose.
- * Returns null if pose or views are unavailable.
- *
- * This is a pure function extracted for testability.
- *
- * @param pose - The XRViewerPose from frame.getViewerPose()
- * @returns ARPose with position and orientation, or null
- */
-export function extractPoseFromViewer(
-  pose: XRViewerPose | null
-): ARPose | null {
-  if (!pose) {
-    return null;
-  }
-
-  const view = pose.views[0];
-  if (!view) {
-    return null;
-  }
-
-  const { position, orientation } = view.transform;
-
-  return {
-    position: { x: position.x, y: position.y, z: position.z },
-    orientation: {
-      x: orientation.x,
-      y: orientation.y,
-      z: orientation.z,
-      w: orientation.w,
-    },
-  };
-}
-
-/**
  * Get the current raw AR pose from the latest XR frame.
  * This is updated every frame and should be called when GPS arrives
  * to get the AR pose at that moment.
@@ -688,6 +704,12 @@ export interface SessionFeatureOptions {
 /**
  * Build XR session init options.
  * Extracted as a pure function for testability.
+ *
+ * Exported for unit testing only (surface-reduction step 3, B-5 precedent):
+ * production code reaches this exclusively through {@link initAR}; the export
+ * exists so `webxr-session.test.ts` can pin the full session-negotiation
+ * matrix (isolation flags × session features) without mocking a renderer and
+ * `navigator.xr` for every combination. Not re-exported by the ar/ barrel.
  *
  * @param rootElement - The DOM element for DOM overlay
  * @param isolationOptions - Crash-isolation diagnostic flags (DOM overlay,
@@ -790,10 +812,14 @@ export async function isWebXRSupported(): Promise<boolean> {
  * Note: these apply to WebGL content only. The CSS3D minimap is composited by
  * the browser from the camera fov alone — near/far do not clip it (F1 in the
  * same feedback doc).
+ *
+ * Module-private since surface-reduction step 3 (no consumer outside this
+ * file): the values are pinned observably on the constructed camera by the
+ * `createSceneHierarchy` frustum test in `webxr-session.test.ts`.
  */
-export const AR_CAMERA_FOV = 70;
-export const AR_CAMERA_NEAR = 0.01;
-export const AR_CAMERA_FAR = 200;
+const AR_CAMERA_FOV = 70;
+const AR_CAMERA_NEAR = 0.01;
+const AR_CAMERA_FAR = 200;
 
 /**
  * Create the scene hierarchy with proper AR/GPS frame separation.
@@ -1935,23 +1961,4 @@ export function stopCameraFrameCapture(): void {
  */
 export function getCameraFrameCount(): number {
   return cameraFrameSource?.getFrameCount() ?? 0;
-}
-
-/**
- * The current longer-edge resolution (px) of the camera-frame blit — the
- * {@link DEFAULT_CAMERA_FRAME_CAPTURE_SIZE} default unless overridden via
- * `startCameraFrameCapture({ captureSize })`. Exposed for diagnostics and to
- * let tests assert the on-device-tuned default without reaching into module
- * state.
- */
-export function getCameraFrameCaptureSize(): number {
-  return cameraFrameCaptureSize;
-}
-
-/**
- * Get the CSS3D renderer manager for live AR mode.
- * Returns null if no AR session is active or CSS3D was not created.
- */
-export function getLiveCss3dManager(): Css3dRendererManager | null {
-  return css3dManager;
 }

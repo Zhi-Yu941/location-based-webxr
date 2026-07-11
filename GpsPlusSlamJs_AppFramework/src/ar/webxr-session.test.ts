@@ -36,13 +36,8 @@ import {
   startCameraFrameCapture,
   stopCameraFrameCapture,
   getCameraFrameCount,
-  getCameraFrameCaptureSize,
   DEFAULT_CAMERA_FRAME_CAPTURE_SIZE,
-  getLiveCss3dManager,
   getDepthInfoFromFrame,
-  AR_CAMERA_FOV,
-  AR_CAMERA_NEAR,
-  AR_CAMERA_FAR,
   type ARPose,
 } from './webxr-session.js';
 import { createMockPose } from '../test-utils/browser-mocks.js';
@@ -521,20 +516,21 @@ describe('createSceneHierarchy', () => {
    * Why this test matters:
    * F2 (2026-07-04 user feedback): objects 100–200 m away popped in late
    * because the far plane was a hard-coded literal 100 in the camera
-   * constructor. The frustum values are named exported constants (a single
-   * source of truth — live AR and replay both go through
-   * createSceneHierarchy()), and far is 200 m to cover the reported range.
-   * Depth precision stays comfortable: far/near = 2×10⁴ on a 24-bit buffer.
+   * constructor. The frustum lives in the module-private AR_CAMERA_*
+   * constants (a single source of truth — live AR and replay both go
+   * through createSceneHierarchy(); the constants were un-exported in
+   * surface-reduction step 3 because nothing outside the module consumed
+   * them), and far is 200 m to cover the reported range. Pinning the values
+   * on the constructed camera keeps the F2 regression guard: a silent
+   * revert of any constant trips this test. Depth precision stays
+   * comfortable: far/near = 2×10⁴ on a 24-bit buffer.
    */
-  it('camera frustum uses the exported AR_CAMERA_* constants with far = 200 m (F2)', () => {
+  it('camera frustum is fov 70°, near 0.01 m, far 200 m (F2)', () => {
     const { camera } = createSceneHierarchy();
 
-    expect(AR_CAMERA_FOV).toBe(70);
-    expect(AR_CAMERA_NEAR).toBe(0.01);
-    expect(AR_CAMERA_FAR).toBe(200);
-    expect(camera.fov).toBe(AR_CAMERA_FOV);
-    expect(camera.near).toBe(AR_CAMERA_NEAR);
-    expect(camera.far).toBe(AR_CAMERA_FAR);
+    expect(camera.fov).toBe(70);
+    expect(camera.near).toBe(0.01);
+    expect(camera.far).toBe(200);
   });
 
   /**
@@ -1112,36 +1108,14 @@ describe('camera frame capture (B2)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// CSS3D renderer manager getter (Approach E)
-// ---------------------------------------------------------------------------
-
-describe('getLiveCss3dManager', () => {
-  beforeEach(() => {
-    resetWebXRState();
-  });
-
-  /**
-   * Why this test matters:
-   * Before initAR() is called, the CSS3D manager should be null.
-   * initAR() requires WebXR and can't run in jsdom, so we verify
-   * the getter returns null in the default state.
-   */
-  it('returns null before AR initialization', () => {
-    expect(getLiveCss3dManager()).toBeNull();
-  });
-
-  /**
-   * Why this test matters:
-   * resetWebXRState must dispose and null out the CSS3D manager
-   * to prevent memory leaks and stale DOM overlays between sessions.
-   */
-  it('resetWebXRState clears the CSS3D manager', () => {
-    // Manager starts as null; reset should keep it null and not throw
-    resetWebXRState();
-    expect(getLiveCss3dManager()).toBeNull();
-  });
-});
+// NOTE: the getLiveCss3dManager tests that lived here were deleted together
+// with the getter (surface-reduction step 3 — zero consumers). They only ever
+// observed the getter's null default (initAR never ran in this file, so the
+// manager was never non-null) and thus pinned no lifecycle behaviour. The
+// CSS3D manager lifecycle is now pinned OBSERVABLY in
+// webxr-session.session-end.test.ts: initAR (real path, mocked renderer)
+// appends the CSS3D overlay element when `enableCss3dRenderer` is on, and
+// session teardown removes it from the DOM.
 
 // ---------------------------------------------------------------------------
 // extractResetTransformData — distinguishes missing vs null vs present
@@ -1356,8 +1330,11 @@ describe('camera-frame capture-size default (WS-C on-device sweep)', () => {
     expect(DEFAULT_CAMERA_FRAME_CAPTURE_SIZE).toBe(1024);
   });
 
-  it('resetWebXRState restores the live capture size to the tuned default', () => {
-    resetWebXRState();
-    expect(getCameraFrameCaptureSize()).toBe(DEFAULT_CAMERA_FRAME_CAPTURE_SIZE);
-  });
+  // NOTE: the companion test "resetWebXRState restores the live capture size
+  // to the tuned default" was deleted with the getCameraFrameCaptureSize()
+  // getter (surface-reduction step 3 — zero consumers). It could never fail:
+  // a non-default size is only settable via startCameraFrameCapture() on a
+  // LIVE cameraFrameSource, which this jsdom file cannot create, so the test
+  // asserted default-in/default-out. The reset of the internal slot is one of
+  // the ~30 resets pinned collectively by the session-end teardown tests.
 });

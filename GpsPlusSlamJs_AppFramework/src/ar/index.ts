@@ -329,7 +329,6 @@ export {
   stopCameraFrameCapture,
   getCameraFrameCount,
   type CameraFrameCaptureConfig,
-  getLiveCss3dManager,
   getScene,
   getArWorldGroup,
   getCamera,

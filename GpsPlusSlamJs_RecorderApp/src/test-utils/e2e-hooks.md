@@ -6,7 +6,7 @@ The Playwright `window.testHooks` surface plus the map-browser fixture builders,
 
 ## Public API
 
-- `installE2eTestHooks(deps: E2eHookDeps): void` — assigns `window.testHooks` as ONE object literal. `deps.ensureMapBrowserRoot` is injected from `main.ts` (the same full-bleed root container the real replay path uses).
+- `installE2eTestHooks(deps: E2eHookDeps): void` — assigns `window.testHooks` as ONE object literal. `deps.ensureMapBrowserRoot` is injected from `main.ts` and implemented in [ui/map-browser-launcher.ts](../ui/map-browser-launcher.ts.md) (the same full-bleed root container the real replay path uses).
 
 ## Invariants & assumptions
 

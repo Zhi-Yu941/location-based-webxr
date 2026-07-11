@@ -25,7 +25,7 @@ When `onBackfill` is provided AND legacy recordings carrying coverage have strea
 - on success → "Embedded N ✓" (or "Embedded N, M failed") then auto-hides after `PROGRESS_DONE_LINGER_MS`;
 - on throw → re-enables with "Upgrade failed — tap to retry".
 
-The actual rewrite + permission + per-file safety live in `storage/coverage-backfill.ts`; this component only renders the CTA and its states. The caller (`main.launchMapBrowser`) supplies `onBackfill`, accumulating candidates from the stream and surfacing a toast/error on completion.
+The actual rewrite + permission + per-file safety live in `storage/coverage-backfill.ts`; this component only renders the CTA and its states. The caller (`launchMapBrowser` in [map-browser-launcher.ts](map-browser-launcher.ts.md), extracted from `main.ts` 2026-07-11) supplies `onBackfill`, accumulating candidates from the stream and surfacing a toast/error on completion.
 
 ## Layout (D3a — Google-Maps idiom, not a split/modal)
 

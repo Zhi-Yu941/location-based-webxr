@@ -168,12 +168,10 @@ import {
   discoverScenariosFromZipMetadata,
 } from './ui/session-browser';
 import type { SessionEntry } from './ui/session-browser';
-import { createMapBrowser, type MapBrowserInstance } from './ui/map-browser';
-import { streamRecordingIndex } from './ui/recording-index';
 import {
-  backfillCoverageIntoZips,
-  type BackfillCandidate,
-} from './storage/coverage-backfill';
+  launchMapBrowser,
+  ensureMapBrowserRoot,
+} from './ui/map-browser-launcher';
 import { createReplayHandlers } from './replay/replay-handlers';
 import { createRefPointHandlers } from './ref-points/ref-point-handlers';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
@@ -388,133 +386,18 @@ const refPointHandlers = createRefPointHandlers({
 
 // Folder manager — encapsulates folder selection, save location, scenario management
 // (Finding #7 decomposition Step 4: extracted from main.ts to storage/folder-manager.ts)
-// --- Map-centric recording browser (Step 4C) ---
-
-let mapBrowser: MapBrowserInstance | null = null;
-/** Aborts the in-flight coverage stream when the browser is torn down. */
-let mapBrowserAbort: AbortController | null = null;
-
-/** Remove the map browser, abort any in-flight stream, and drop its container. */
-function teardownMapBrowser(): void {
-  mapBrowserAbort?.abort();
-  mapBrowserAbort = null;
-  mapBrowser?.destroy();
-  mapBrowser = null;
-  document.getElementById('map-browser-root')?.remove();
-}
-
-/**
- * Present the map-centric browser as the primary replay selector (D3a) for an
- * opened replay folder. The map is mounted **immediately** (empty) and
- * recordings are **streamed** onto it as each is indexed — metadata-present
- * ones first/instantly, legacy ones as their GPS path is read — so the user
- * sees and can use the map right away instead of blocking on the full index
- * (Slice A). A progress pill counts up and then hides on completion.
- *
- * Picking a tour starts a single-tour replay (D3) and tears the browser down.
- * The owned `AbortController` cancels the stream if the browser is closed or
- * another folder is opened mid-index, so a torn-down map never receives tiles.
- */
-async function launchMapBrowser(
-  folderHandle: FileSystemDirectoryHandle
-): Promise<void> {
-  teardownMapBrowser();
-
-  const container = ensureMapBrowserRoot();
-  const abort = new AbortController();
-  mapBrowserAbort = abort;
-
-  // Legacy recordings that carry coverage worth embedding into their zips — the
-  // one-time backfill candidates (B1), accumulated as the index streams in.
-  const backfillCandidates: BackfillCandidate[] = [];
-
-  const browser = createMapBrowser(container, {
-    onPlayTour: (recording) => {
-      teardownMapBrowser();
-      void replayHandlers.startReplayForEntry(recording.entry);
-    },
-    onClose: teardownMapBrowser,
-    onBackfill: async () => {
-      const result = await backfillCoverageIntoZips(
-        folderHandle,
-        backfillCandidates,
-        { signal: abort.signal }
-      );
-      if (result.permissionDenied) {
-        showError(
-          "Couldn't get write access — recordings will be re-indexed each open."
-        );
-      } else if (result.failed > 0) {
-        showToast(
-          `Embedded coverage into ${result.embedded} recordings (${result.failed} failed)`,
-          { severity: 'warning' }
-        );
-      } else if (result.embedded > 0) {
-        showToast(
-          `Embedded coverage into ${result.embedded} recordings — future loads will be instant`
-        );
-      }
-      return result;
-    },
-  });
-  if (!browser) {
-    teardownMapBrowser();
-    return;
-  }
-  mapBrowser = browser;
-
-  try {
-    await streamRecordingIndex(folderHandle, {
-      onTotal: (total) => {
-        if (total === 0) {
-          // Nothing to browse spatially — leave the modal list as the fallback
-          // (don't show an empty map).
-          teardownMapBrowser();
-          return;
-        }
-        browser.setIndexingProgress(0, total);
-      },
-      onRecording: (rec) => {
-        browser.addRecording(rec);
-        if (rec.backfilled && rec.cells.length > 0) {
-          backfillCandidates.push({
-            fileHandle: rec.entry.fileHandle,
-            filename: rec.entry.filename,
-            cells: rec.cells,
-          });
-        }
-      },
-      onProgress: ({ done, total }) => browser.setIndexingProgress(done, total),
-      signal: abort.signal,
-    });
-  } catch (err) {
-    // An aborted stream (browser closed / folder switched) is expected — only
-    // surface genuine failures.
-    if (!abort.signal.aborted) {
-      log.error('Map browser coverage stream failed', err);
-      showError('Failed to index recordings for the map — see logs.');
-    }
-  }
-}
-
-/** Create (or reuse) the full-bleed root container for the map browser. */
-function ensureMapBrowserRoot(): HTMLElement {
-  let container = document.getElementById('map-browser-root');
-  if (!container) {
-    container = document.createElement('div');
-    container.id = 'map-browser-root';
-    container.className = 'fixed inset-0 z-[80]';
-    document.body.appendChild(container);
-  }
-  return container;
-}
-
 const folderManager = createFolderManager({
   getStore: () => store,
   getIsReplayMode: () => replayHandlers.getIsReplayMode(),
   setReplayZipScenariosCache: (cache) =>
     replayHandlers.setReplayZipScenariosCache(cache),
-  onReplayFolderScanned: (folderHandle) => launchMapBrowser(folderHandle),
+  // Map-centric recording browser (Step 4C) — app-lifetime state lives in
+  // ui/map-browser-launcher.ts; only the single-tour replay entry point is
+  // injected because it belongs to main's replay handlers.
+  onReplayFolderScanned: (folderHandle) =>
+    launchMapBrowser(folderHandle, {
+      startReplayForEntry: (entry) => replayHandlers.startReplayForEntry(entry),
+    }),
   showError,
   updateStatus,
   populateScenarios,

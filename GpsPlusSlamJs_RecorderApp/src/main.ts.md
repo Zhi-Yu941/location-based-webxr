@@ -105,6 +105,16 @@ This module is the entry point that runs on page load. It also exports the follo
     `onGridSize` telemetry (one `[OccupancyGrid] <n> cells` log per ~30 s) so a
     log export correlates grid growth with the fps trend.
 
+- **Map-centric recording browser (Step 4C) lives in
+  [ui/map-browser-launcher.ts](ui/map-browser-launcher.ts.md)** (extracted from
+  main.ts 2026-07-11): main.ts only wires `launchMapBrowser` into the
+  folder-manager's `onReplayFolderScanned` dep — injecting
+  `startReplayForEntry` from the replay handlers as the launcher's single
+  composition-root dependency — and injects `ensureMapBrowserRoot` into the
+  Playwright e2e hooks. The browser is **app-lifetime** state (replay/setup
+  screen), so it is intentionally NOT registered in `arSessionScope`; its
+  teardown is driven by its own UI paths inside the launcher module.
+
 - **Playwright hooks live in [test-utils/e2e-hooks.ts](test-utils/e2e-hooks.md)**:
   main.ts only triggers `installE2eTestHooks` through a dynamic import guarded
   by `import.meta.env.DEV && !VITEST`, so the fixture scaffolding never

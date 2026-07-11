@@ -49,7 +49,12 @@ entirely after confirming they were only transitively pulled in.
   and would otherwise flag them as unused files (an `error`-severity
   gate). There is intentionally **no** `src/ref-points/index.ts` entry —
   that module does not exist in this package; a stale entry produced a
-  "no matches" configuration hint.
+  "no matches" configuration hint. `redux` is in `ignoreDependencies`:
+  no source file imports it directly, but it must be a **direct**
+  dependency so tsdown externalizes redux types in the built d.ts
+  instead of bundling them into a private, non-`exports`-reachable
+  chunk (TS2883 in `composite` consumers). Pinned by
+  [tests/repo-config/framework-dts-portability.test.js](tests/repo-config/framework-dts-portability.test.js).
 - **GpsPlusSlamJs_RecorderApp** — main entry is auto-detected from
   `package.json` "main"/"module"; we explicitly list `src/global.d.ts`,
   `playwright-tests/**`, and the stylelint config. Non-source tooling

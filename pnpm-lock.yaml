@@ -101,6 +101,9 @@ importers:
       gps-plus-slam-js:
         specifier: ^1.10.0
         version: 1.10.0
+      redux:
+        specifier: ^5.0.1
+        version: 5.0.1
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1

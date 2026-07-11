@@ -245,8 +245,8 @@ test.describe('Test Hooks Match Real Behavior', () => {
       'getRawGpsMarkerWorldSizes',
       // Tracking quality indicator hook (F1)
       'updateTrackingQuality',
-      // Mandatory storage selection hooks (Task 1a-fix)
-      'setFolderSelected',
+      // Mandatory storage selection hook (Task 1a-fix; the optional-folder
+      // twin setFolderSelected was removed end-to-end in quality-review D-3)
       'setSaveLocationSelected',
       // Optional folder-import collapse hook (D5)
       'setFolderImportExpanded',

@@ -98,18 +98,20 @@ export async function setPermissionsReady(page, { validate = true } = {}) {
 
 /**
  * Helper to set mandatory storage as selected via testHooks.
- * This simulates completing the two-step storage setup (Task 1a-fix).
+ * This simulates completing the storage setup (Task 1a-fix). Only the save
+ * location is mandatory — the read folder is optional (D5) and its
+ * write-only `folderSelected` flag was removed end-to-end (quality-review
+ * D-3), so save-location selection alone drives Enter-AR readiness.
  *
  * @param {import('@playwright/test').Page} page - Playwright page object
  * @param {Object} [options] - Optional settings
  * @param {boolean} [options.validate=true] - Whether to call validateEnterButton after setting
  */
 export async function setStorageReady(page, { validate = true } = {}) {
-  await page.waitForFunction(() => window.testHooks?.setFolderSelected, {
+  await page.waitForFunction(() => window.testHooks?.setSaveLocationSelected, {
     timeout: TEST_HOOKS_TIMEOUT_MS,
   });
   await page.evaluate((shouldValidate) => {
-    window.testHooks.setFolderSelected(true);
     window.testHooks.setSaveLocationSelected(true);
     if (shouldValidate) {
       window.testHooks.validateEnterButton();
@@ -151,8 +153,8 @@ export async function waitForTestHooks(page) {
       window.testHooks?.getRawGpsMarkerWorldSizes &&
       // Tracking quality indicator hook (F1)
       window.testHooks?.updateTrackingQuality &&
-      // Mandatory storage selection hooks (Task 1a-fix)
-      window.testHooks?.setFolderSelected &&
+      // Mandatory storage selection hook (Task 1a-fix; the optional-folder
+      // twin setFolderSelected was removed end-to-end in quality-review D-3)
       window.testHooks?.setSaveLocationSelected &&
       // Optional folder-import collapse hook (D5)
       window.testHooks?.setFolderImportExpanded &&

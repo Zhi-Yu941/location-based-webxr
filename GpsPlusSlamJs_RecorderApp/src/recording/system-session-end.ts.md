@@ -10,8 +10,8 @@ recording still running, stale history) into a clean, explained exit.
 ## Public API
 
 - `createSystemSessionEndHandler(deps)` → `(info: SessionEndInfo) => Promise<void>`
-  - The returned function is registered with the framework's
-    `setSessionEndCallback` (in `main.ts`, during `handleEnterAR`). It returns
+  - The returned function is passed to the framework via `initAR`'s
+    `callbacks.onSessionEnd` (in `main.ts`, during `handleEnterAR`). It returns
     a promise **only so tests can await it** — the framework treats it as
     fire-and-forget and every rejection is handled internally.
 - `SystemSessionEndDeps` — injected collaborators, all thin wrappers over
@@ -40,21 +40,23 @@ recording still running, stale history) into a clean, explained exit.
 - Screen `ar` → `replaceScreen('setup')` + setup UI + informational toast.
 - Screens `setup`/`summary` → no-op (nothing AR-bound left to clean up).
 - Re-registration: the framework clears the callback on every session end
-  (`resetWebXRState()`), so `main.ts` registers it on **each** Enter AR.
+  (`resetWebXRState()`), so `main.ts` re-passes it via the `initAR` callbacks
+  struct on **each** Enter AR.
 
 ## Examples
 
 ```typescript
-setSessionEndCallback(
-  createSystemSessionEndHandler({
-    getCurrentScreen,
-    stopRecording: () => recordingSessionHandlers.handleStopRecording(),
-    replaceScreen: replaceScreenState,
-    showSetupUi: showSetupModal,
-    showToast: (message) => showToast(message),
-    showError,
-  })
-);
+const handler = createSystemSessionEndHandler({
+  getCurrentScreen,
+  stopRecording: () => recordingSessionHandlers.handleStopRecording(),
+  replaceScreen: replaceScreenState,
+  showSetupUi: showSetupModal,
+  showToast: (message) => showToast(message),
+  showError,
+});
+await initAR(container, isolationOptions, sessionFeatures, {
+  onSessionEnd: (info) => void handler(info),
+});
 ```
 
 ## Tests

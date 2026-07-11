@@ -7,7 +7,7 @@
  * recording (or switches into replay). Any subscriber that captured the
  * boot-time `store` reference in a closure keeps reading the stale store
  * after the swap. The previous F1 fix re-pointed the producer
- * (`setTrackingStore(newStore)`); this module is the consumer-side
+ * (`rebindTrackingStore(newStore)`); this module is the consumer-side
  * analogue: an emitter that fires whenever the active store identity
  * changes, so subscribers can re-attach to the new store instead of
  * silently regressing.

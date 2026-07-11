@@ -8,7 +8,7 @@
 - **Public API:**
   - `interface AnchorStarterSeams` — the set of framework/marker functions a fake
     may override (`checkWebXRSupport`, `checkGeolocationPermission`, `initAR`,
-    `getArWorldGroup`, `endARSession`, `getCamera`, `setTrackingStore`, `setTrackingCallbacks`,
+    `getArWorldGroup`, `endARSession`, `getCamera`,
     `startGpsWatch`, `startOrientationWatch`,
     `requestDeviceOrientationPermission`, `createGpsAnchor`,
     `enableArWorldGroupAlignment`, `selectTrackingQuality`,
@@ -16,11 +16,12 @@
     `selectAlignmentMatrix` lets the e2e fake drive the placement alignment gate
     (a desktop browser never computes a real alignment); `startReticleHitTest`
     lets it drive the hit-test reticle (surface present / absent) deterministically.
-    `setTrackingStore` / `setTrackingCallbacks` are routed through the seam (not
-    imported directly) so the e2e suite can assert `main.ts` wires BOTH before
-    `initAR` — the framework forwards per-frame poses only when both are present,
-    and dropping either silently pins the onboarding guidance to "AR tracking
-    lost" (regression guard in `placement-flow.spec.js`).
+    Since the framework's setter fold, the tracking store + restart callback
+    ride into `initAR` as its `callbacks.tracking` group (they arrive TOGETHER;
+    without the group the framework forwards no per-frame poses and the
+    onboarding guidance silently pins to "AR tracking lost"). `initAR` is
+    routed through the seam so the e2e fake can intercept the call and assert
+    the group was passed (regression guard in `placement-flow.spec.js`).
   - `realSeams: AnchorStarterSeams` — the production seams (the unmodified
     imports), exported for the prod-inert unit test.
   - `getSeams(): AnchorStarterSeams` — returns `realSeams` unless a DEV-only

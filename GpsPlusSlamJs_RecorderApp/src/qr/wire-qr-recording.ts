@@ -67,8 +67,8 @@ export interface WireQrRecordingOptions {
   /** QR capture settings (`enabled` is assumed true by the caller's gate). */
   qr: QrCaptureOptions;
   /**
-   * Receives the created producer so the pre-`initAR` camera-frame callback
-   * (`setCameraFrameCallback`, which must be registered before the source is
+   * Receives the created producer so the camera-frame callback passed to
+   * `initAR` (`callbacks.cameraFrame.onFrame`, wired before the source is
    * built) can forward frames to it. Called with `null` on dispose.
    */
   setProducer: (producer: QrDetectionController | null) => void;

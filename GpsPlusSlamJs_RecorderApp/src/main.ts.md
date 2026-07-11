@@ -22,7 +22,18 @@ This module is the entry point that runs on page load. It also exports the follo
 2. **Initialize UI** - Wires up button callbacks to handler functions
 3. **Initialize Session Summary** - Wires up summary panel callbacks
 4. **Handle folder selection** - Calls `initStorage()`, populates scenario dropdown
-5. **Handle Enter AR** - Calls `initAR()` to start WebXR session
+5. **Handle Enter AR** - Builds ONE `ArSessionCallbacks` struct (depth,
+   optional cameraFrame, tracking {store + onRestarted/onLost/onRecovered},
+   imageCapture incl. a stable `qualityAnalyzer` wrapper, the per-frame
+   `onFrame` tick, `onSessionEnd`) and passes it as `initAR()`'s 4th argument
+   (the framework's pre-init setters were folded into `initAR` — surface
+   reduction step 1). The closures read module-level `let`s at fire time, so
+   resources created after init (and per-recording swaps) are picked up.
+   Mid-session mutations go through two narrow seams: the framework's
+   `rebindTrackingStore` (store swap per recording) and main's
+   `activeImageQualityAnalyzer` ref (per-recording quality-gate Worker behind
+   the stable `qualityAnalyzer` wrapper; fail-open `{ accept: true }` while
+   null).
 6. **Handle recording controls** - Start/stop recording, mark reference points
 7. **Handle stop recording** - Collects summary data and shows Session Summary panel
 
@@ -56,9 +67,10 @@ This module is the entry point that runs on page load. It also exports the follo
   the scene root): the grid's cells are raw-WebXR coordinates that must ride
   the alignment matrix like the camera (port plan Iter 7 reparenting fix).
 - **Live QR recording + debug viz** (opt-in, `recording-options.qr.enabled`;
-  recorder live-QR WS-2/WS-5). When enabled, `handleEnterAR` registers the
-  camera-frame callback **before** `initAR` (`setCameraFrameCallback`, forwarding
-  frames to the producer held in `qrProducer`) and, after AR init inside its own
+  recorder live-QR WS-2/WS-5). When enabled, `handleEnterAR` includes the
+  camera-frame group in the `ArSessionCallbacks` struct passed to `initAR`
+  (`callbacks.cameraFrame.onFrame` forwards frames to the producer held in
+  `qrProducer`) and, after AR init inside its own
   best-effort `try/catch`, calls `wireQrRecording` (under `arWorldGroup`) to build
   the thin RAW producer + the WS-5 debug axis+cube subscriber (teardown
   registered in `arSessionScope` like the occupancy/frame-tile layers). See
@@ -87,7 +99,7 @@ This module is the entry point that runs on page load. It also exports the follo
     [2026-07-03 long-session fps plan](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-03-long-session-fps-and-voxel-grid-scaling-plan.md)) —
     mounts the Stats.js FPS/ms/MB panel row
     ([ui/stats-overlay.ts](ui/stats-overlay.ts.md)) into the `#app` dom-overlay
-    root and advances it from the `setFrameCallback` tick. Teardown runs via
+    root and advances it from the initAR `callbacks.onFrame` tick. Teardown runs via
     `arSessionScope` on re-enter (panels never stack) and in `resetMainState`
     (no frozen panels on the setup screen). The occupancy wirer additionally gets
     `onGridSize` telemetry (one `[OccupancyGrid] <n> cells` log per ~30 s) so a

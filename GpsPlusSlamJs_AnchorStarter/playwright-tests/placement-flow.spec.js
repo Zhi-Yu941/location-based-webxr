@@ -82,12 +82,13 @@ test.describe("Anchor starter — Tier 1 placement flow", () => {
     page,
   }) => {
     // Regression guard for the "guidance stuck on AR tracking lost" bug. The
-    // framework only forwards per-frame AR poses into the store when BOTH
-    // setTrackingStore AND setTrackingCallbacks are wired before initAR; drop
-    // either and tracking.phase never leaves `initializing`, pinning the
-    // onboarding guidance to "AR tracking lost" forever. The guidance e2e
-    // assertions above fake selectTrackingQuality directly, so they would NOT
-    // catch the missing wiring — this test observes the seam calls themselves.
+    // framework only forwards per-frame AR poses into the store when initAR
+    // receives its `callbacks.tracking` group (store + restart callback
+    // together, since the setter fold); drop the group and tracking.phase
+    // never leaves `initializing`, pinning the onboarding guidance to
+    // "AR tracking lost" forever. The guidance e2e assertions above fake
+    // selectTrackingQuality directly, so they would NOT catch the missing
+    // wiring — this test observes the initAR call the fake intercepts.
     await bootAnchorStarter(page);
 
     const wiring = await page.evaluate(() => ({

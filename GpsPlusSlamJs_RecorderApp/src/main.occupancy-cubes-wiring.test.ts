@@ -145,18 +145,11 @@ vi.mock('gps-plus-slam-app-framework/ar/webxr-session', () => ({
   isWebXRSupported: vi.fn().mockResolvedValue(true),
   getCurrentArPose: vi.fn().mockReturnValue(null),
   applyAlignmentMatrix: vi.fn(),
-  setImageCaptureCallback: vi.fn(),
   startImageCapture: vi.fn(),
   stopImageCapture: vi.fn(),
-  setDepthCaptureCallback: vi.fn(),
   startDepthCapture: vi.fn(),
   stopDepthCapture: vi.fn(),
-  setFrameCallback: vi.fn(),
-  setTrackingLostCallback: vi.fn(),
-  setTrackingCallbacks: vi.fn(),
-  setTrackingRecoveredCallback: vi.fn(),
-  setTrackingStore: vi.fn(),
-  setSessionEndCallback: vi.fn(),
+  rebindTrackingStore: vi.fn(),
   getScene: mockGetScene,
   getCamera: mockGetCamera,
   getArWorldGroup: mockGetArWorldGroup,
@@ -504,8 +497,7 @@ import {
 import { loadRecordingOptions } from './state/recording-options';
 import { getOccupancyGrid } from './state/occupancy-grid-provider';
 import {
-  setDepthCaptureCallback,
-  setImageCaptureCallback,
+  initAR,
   type CapturedImage,
 } from 'gps-plus-slam-app-framework/ar/webxr-session';
 import {
@@ -772,7 +764,8 @@ describe('Occupancy-grid cube wiring in live AR', () => {
   it('forwards captured depth samples to recordDepthSample unmodified', async () => {
     await handleEnterARForTesting();
 
-    const handler = vi.mocked(setDepthCaptureCallback).mock.calls[0]?.[0];
+    // Since the setter fold, the depth handler rides into initAR's callbacks.
+    const handler = vi.mocked(initAR).mock.calls[0]?.[3]?.depth?.onCaptured;
     expect(handler).toBeDefined();
 
     const sample: DepthSample = {
@@ -805,7 +798,9 @@ describe('Occupancy-grid cube wiring in live AR', () => {
   it('forwards every persistable CapturedImage field into the add2dImage payload', async () => {
     await handleEnterARForTesting();
 
-    const handler = vi.mocked(setImageCaptureCallback).mock.calls[0]?.[0];
+    // Since the setter fold, the image handler rides into initAR's callbacks.
+    const handler =
+      vi.mocked(initAR).mock.calls[0]?.[3]?.imageCapture?.onCaptured;
     expect(handler).toBeDefined();
 
     const image: CapturedImage = {

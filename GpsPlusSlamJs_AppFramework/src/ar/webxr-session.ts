@@ -220,6 +220,10 @@ export function resetWebXRState(): void {
   getScreenRotation = null;
   onCaptureFailed = null;
   onSuspiciousImage = null;
+  // Per-session since the setter fold (2026-07-11 surface-reduction step 1):
+  // the analyzer arrives with the other init-time callbacks and is cleared
+  // with them. Hosts re-pass it on the next initAR (they own the Worker).
+  imageQualityAnalyzer = null;
   if (trackingPhaseUnsubscribe) {
     trackingPhaseUnsubscribe();
     trackingPhaseUnsubscribe = null;
@@ -285,47 +289,47 @@ let latestArPose: ARPose | null = null;
 let imageCaptureManager: ImageCaptureManager | null = null;
 
 /**
- * Callback for when an image is captured (set via setImageCaptureCallback)
+ * Callback for when an image is captured (initAR `callbacks.imageCapture`)
  */
 let onImageCaptured: ((image: CapturedImage) => void) | null = null;
 
 /**
- * Callback for when image capture fails (set via setImageCaptureCallback)
+ * Callback for when image capture fails (initAR `callbacks.imageCapture`)
  */
 let onCaptureFailed: (() => void) | null = null;
 
 /**
  * Callback for when a captured image appears suspicious/black
- * (set via setImageCaptureCallback)
+ * (initAR `callbacks.imageCapture`)
  */
 let onSuspiciousImage: ((blobSize: number, frameIndex: number) => void) | null =
   null;
 
 /**
- * Screen rotation getter (set via setImageCaptureCallback)
+ * Screen rotation getter (initAR `callbacks.imageCapture`)
  */
 let getScreenRotation: (() => number) | null = null;
 
 /**
- * Off-thread image-quality analyzer (set via {@link setImageQualityAnalyzer}).
+ * Off-thread image-quality analyzer (initAR `callbacks.imageCapture.qualityAnalyzer`).
  * Device-specific (a Web Worker in the recorder), so it is INJECTED rather than
  * built here. Forwarded to `ImageCaptureManager` as its `analyzeFrame` callback;
  * the manager only invokes it when `config.qualityFilter.enabled`. `null` ⇒ the
- * legacy save-immediately path.
+ * legacy save-immediately path. Per-session: cleared by resetWebXRState() like
+ * every other init-time callback (the host re-passes it each session).
  */
 let imageQualityAnalyzer:
   | ((frame: CapturedFrame) => Promise<FrameQualityVerdict>)
   | null = null;
 
 /**
- * Redux store injected by the host (`setTrackingStore`). When present
- * together with `onTrackingRestarted`, `onXRFrame` dispatches
- * `poseReceived`/`poseLost`, the XR reference-space reset listener
- * dispatches `originReset`, and a `subscribeToSelector` translation
- * surface translates phase transitions back into the existing
- * `onTrackingLost` / `onTrackingRestarted` / `onTrackingRecovered`
- * callbacks. When the store is absent the tracking pipeline simply
- * no-ops.
+ * Redux store injected by the host (initAR `callbacks.tracking.store`;
+ * swapped mid-session via {@link rebindTrackingStore}). When present,
+ * `onXRFrame` dispatches `poseReceived`/`poseLost`, the XR reference-space
+ * reset listener dispatches `originReset`, and a subscription translates
+ * phase transitions back into the host's `onTrackingLost` /
+ * `onTrackingRestarted` / `onTrackingRecovered` callbacks. When the store
+ * is absent the tracking pipeline simply no-ops.
  */
 let trackingStore: TrackingSubscribableStore | null = null;
 
@@ -337,21 +341,21 @@ let trackingStore: TrackingSubscribableStore | null = null;
 let trackingPhaseUnsubscribe: (() => void) | null = null;
 
 /**
- * Callback for when tracking restarts (set via setTrackingCallbacks)
+ * Callback for when tracking restarts (initAR `callbacks.tracking.onRestarted`)
  */
 let onTrackingRestarted:
   | ((payload: OdometryTrackingRestartedPayload) => void)
   | null = null;
 
 /**
- * Callback for when tracking is lost (set via setTrackingLostCallback)
+ * Callback for when tracking is lost (initAR `callbacks.tracking.onLost`)
  * Field Test Readiness Issue #3: Provide user feedback when tracking is lost
  */
 let onTrackingLost: (() => void) | null = null;
 
 /**
  * Callback for when tracking recovers seamlessly without origin reset (Case 1).
- * Set via setTrackingRecoveredCallback.
+ * initAR `callbacks.tracking.onRecovered`.
  */
 let onTrackingRecovered: (() => void) | null = null;
 
@@ -368,7 +372,7 @@ export interface SessionEndInfo {
 
 /**
  * Host callback fired exactly once whenever the XRSession ends — on BOTH the
- * app-initiated and the system-initiated path (set via setSessionEndCallback).
+ * app-initiated and the system-initiated path (initAR `callbacks.onSessionEnd`).
  * Cleared by resetWebXRState() like every other module-level callback.
  */
 let onSessionEnd: ((info: SessionEndInfo) => void) | null = null;
@@ -388,7 +392,7 @@ let endRequestedByApp = false;
 let depthSampler: DepthSampler | null = null;
 
 /**
- * Callback for when a depth sample is captured (set via setDepthCaptureCallback)
+ * Callback for when a depth sample is captured (initAR `callbacks.depth`)
  */
 let onDepthCaptured: ((sample: DepthSample) => void) | null = null;
 
@@ -480,7 +484,7 @@ let cameraFrameCaptureSize = DEFAULT_CAMERA_FRAME_CAPTURE_SIZE;
  */
 let cameraFrameSource: CameraFrameSource | null = null;
 
-/** Callback for each throttled camera RGBA frame (set via setCameraFrameCallback). */
+/** Callback for each throttled camera RGBA frame (initAR `callbacks.cameraFrame`). */
 let onCameraFrame: ((image: RgbaImage) => void) | null = null;
 
 /**
@@ -888,16 +892,104 @@ export function createSceneHierarchy(): {
 }
 
 /**
+ * Host callbacks for one AR session, passed to {@link initAR} as a single
+ * struct (2026-07-11 surface-reduction step 1 — replaces the 13 pre-init
+ * setter exports, which forced every consumer to know a call order and
+ * allowed half-wired states like a tracking store without its callbacks).
+ *
+ * Everything here is INIT-TIME wiring: initAR unpacks the struct once into
+ * the module-level slots the frame path reads directly (no per-frame
+ * indirection), and `resetWebXRState()` clears every slot at session end —
+ * re-pass the struct with each `initAR`. The single mid-session mutation the
+ * apps need (the recorder swapping its Redux store per recording) has its own
+ * narrow function, {@link rebindTrackingStore}.
+ */
+export interface ArSessionCallbacks {
+  /**
+   * Periodic JPEG image capture (recording). Presence wires the capture
+   * slots; `startImageCapture()` is what begins capturing.
+   */
+  imageCapture?: {
+    /** Called when an image is successfully captured. */
+    onCaptured: (image: CapturedImage) => void;
+    /** Returns current device screen rotation (0, 90, 180, 270). */
+    getScreenRotation: () => number;
+    /** Called when image capture fails (e.g. low memory). */
+    onFailed?: () => void;
+    /** Called when a captured image appears black/empty. */
+    onSuspicious?: (blobSize: number, frameIndex: number) => void;
+    /**
+     * Off-thread blur/blackness analyzer for the drop+retry quality gate
+     * (a Web Worker in the recorder — the host owns its lifecycle). Only
+     * invoked when the capture config's `qualityFilter.enabled` is true.
+     * Absent ⇒ the legacy save-immediately path.
+     */
+    qualityAnalyzer?: (frame: CapturedFrame) => Promise<FrameQualityVerdict>;
+  };
+  /**
+   * Tracking-state pipeline. Store and callbacks arrive TOGETHER — the
+   * half-wired store/callbacks split of the old two-setter API is
+   * structurally impossible. Presence of this group activates per-frame
+   * `poseReceived`/`poseLost` dispatches and the phase→callback translation.
+   */
+  tracking?: {
+    /** The host store carrying the tracking slice. */
+    store: TrackingSubscribableStore;
+    /** Tracking restarted after loss with an origin reset (Case 2). */
+    onRestarted?: (payload: OdometryTrackingRestartedPayload) => void;
+    /** Tracking lost (pose became null). */
+    onLost?: () => void;
+    /** Tracking recovered seamlessly, same coordinate frame (Case 1). */
+    onRecovered?: () => void;
+  };
+  /**
+   * Depth sampling. Presence creates the DepthSampler at init;
+   * `startDepthCapture()` is what begins sampling.
+   */
+  depth?: {
+    /** Called for each captured depth sample. */
+    onCaptured: (sample: DepthSample) => void;
+    /** Called once if depth was requested but is unavailable. */
+    onUnavailable?: () => void;
+  };
+  /**
+   * Throttled camera RGBA frames for CV (QR detection today). Presence
+   * creates the CameraFrameSource at init; `startCameraFrameCapture()` is
+   * what begins delivering frames.
+   */
+  cameraFrame?: {
+    /** Called with each throttled top-left-origin RGBA frame. */
+    onFrame: (image: RgbaImage) => void;
+  };
+  /**
+   * Per-frame callback, invoked every XR frame after pose updates but before
+   * render (e.g. map overlay position updates).
+   */
+  onFrame?: () => void;
+  /**
+   * Fired exactly once whenever the XRSession ends — app-initiated
+   * ({@link endARSession}) AND system-initiated (e.g. the Android back
+   * gesture). `info.requestedByApp` discriminates the two. Fired AFTER the
+   * full teardown, so the host can start a fresh session from inside it.
+   */
+  onSessionEnd?: (info: SessionEndInfo) => void;
+}
+
+/**
  * Initialize the AR session and Three.js renderer.
  * @param container - DOM element to host the AR canvas and CSS3D overlay.
  * @param isolationOptions - Crash-isolation diagnostic flags.
  * @param sessionFeatures - Opt-in standard WebXR features (e.g.
  *   `requestHitTest`) forwarded to the session negotiation.
+ * @param callbacks - Host callbacks for this session (see
+ *   {@link ArSessionCallbacks}); unpacked once into module slots that
+ *   `resetWebXRState()` clears at session end.
  */
 export async function initAR(
   container: HTMLElement,
   isolationOptions: Partial<ArCrashIsolationOptions> = {},
-  sessionFeatures: SessionFeatureOptions = {}
+  sessionFeatures: SessionFeatureOptions = {},
+  callbacks: ArSessionCallbacks = {}
 ): Promise<void> {
   if (!navigator.xr) {
     throw new Error('WebXR not available');
@@ -914,6 +1006,26 @@ export async function initAR(
       'AR session already initialized — call endARSession() before initAR() again'
     );
   }
+
+  // Unpack the callbacks struct ONCE into the module-level slots the frame
+  // path reads directly — resetWebXRState() cleared them at the previous
+  // session end, and assigning unconditionally (absent ⇒ null) keeps this
+  // init deterministic even after an aborted initAR. No per-frame
+  // indirection is introduced: onXRFrame keeps reading the module vars.
+  onImageCaptured = callbacks.imageCapture?.onCaptured ?? null;
+  getScreenRotation = callbacks.imageCapture?.getScreenRotation ?? null;
+  onCaptureFailed = callbacks.imageCapture?.onFailed ?? null;
+  onSuspiciousImage = callbacks.imageCapture?.onSuspicious ?? null;
+  imageQualityAnalyzer = callbacks.imageCapture?.qualityAnalyzer ?? null;
+  trackingStore = callbacks.tracking?.store ?? null;
+  onTrackingRestarted = callbacks.tracking?.onRestarted ?? null;
+  onTrackingLost = callbacks.tracking?.onLost ?? null;
+  onTrackingRecovered = callbacks.tracking?.onRecovered ?? null;
+  onDepthCaptured = callbacks.depth?.onCaptured ?? null;
+  onDepthUnavailable = callbacks.depth?.onUnavailable ?? null;
+  onCameraFrame = callbacks.cameraFrame?.onFrame ?? null;
+  onFrameCallback = callbacks.onFrame ?? null;
+  onSessionEnd = callbacks.onSessionEnd ?? null;
 
   currentArCrashIsolationOptions =
     validateArCrashIsolationOptions(isolationOptions);
@@ -979,25 +1091,13 @@ export async function initAR(
 
   await renderer.xr.setSession(xrSession);
 
-  // Initialize the tracking pipeline if (a) the host supplied an
-  // `onTrackingRestarted` callback (i.e. tracking is wanted at all) and
-  // (b) a store was injected via `setTrackingStore`. Without both we keep
-  // the legacy no-op behaviour: `onXRFrame` never dispatches and no
+  // Initialize the tracking pipeline when the host supplied the `tracking`
+  // callbacks group. The store and its callbacks arrive together in one
+  // struct, so the old half-wired store/callbacks split (G-5, 2026-07-10
+  // quality review) is structurally impossible now. Without the group we
+  // keep the legacy no-op behaviour: `onXRFrame` never dispatches and no
   // callbacks ever fire. See docs/2026-05-13-tracking-state-slice-port-plan.md.
-  const hasTrackingCallbacks = onTrackingRestarted !== null;
-  const hasTrackingStore = trackingStore !== null;
-  if (hasTrackingCallbacks !== hasTrackingStore) {
-    // G-5 (2026-07-10 quality review): the two-call wiring
-    // (setTrackingStore + setTrackingCallbacks) used to no-op SILENTLY when
-    // half-forgotten — the exact stale-store bug class the F1 feedback doc
-    // records. Make the half-wired state loudly diagnosable.
-    log.warn(
-      trackingStore
-        ? 'Tracking pipeline half-wired: setTrackingStore() was called but setTrackingCallbacks() was not — no tracking callbacks will fire. Call both before initAR().'
-        : 'Tracking pipeline half-wired: setTrackingCallbacks() was called but setTrackingStore() was not — the tracking slice will not update. Call both before initAR().'
-    );
-  }
-  if (onTrackingRestarted && trackingStore) {
+  if (trackingStore) {
     const store = trackingStore;
     // Start from a clean slate — the previous session may have left the
     // slice in any phase. The subscription created below starts with its
@@ -1101,7 +1201,7 @@ function subscribeToTrackingPhase(
 ): () => void {
   // `prev` is closure-local so the mirror state is naturally scoped to a
   // single subscription. Disposing the subscription (or replacing the
-  // store via `setTrackingStore`) discards this closure, so the next
+  // store via `rebindTrackingStore`) discards this closure, so the next
   // subscription always starts fresh at 'initializing'.
   let prev: TrackingPhase = 'initializing';
   return store.subscribe(() => {
@@ -1143,11 +1243,11 @@ function subscribeToTrackingPhase(
 
 /**
  * Dispatch the per-frame `poseReceived` / `poseLost` action into the
- * tracking slice. No-op when no store is bound or when tracking wiring
- * was not requested.
+ * tracking slice. No-op when no store is bound (tracking wiring was not
+ * requested via initAR `callbacks.tracking`).
  */
 function updateTrackingState(arPose: ARPose | null): void {
-  if (!trackingStore || !onTrackingRestarted) {
+  if (!trackingStore) {
     return;
   }
 
@@ -1503,23 +1603,6 @@ export function nueQuaternionToWebXR(
 }
 
 /**
- * Register a host callback fired exactly once whenever the XRSession ends —
- * app-initiated ({@link endARSession}) AND system-initiated (e.g. the Android
- * back gesture, which ends an immersive session directly and uncancelably).
- * `info.requestedByApp` discriminates the two. Fired AFTER the full teardown,
- * so the host can immediately start a fresh session from inside the callback.
- *
- * Cleared by resetWebXRState() (i.e. after every session end) like the other
- * module-level callbacks — re-register before/with each new session.
- * Pass `null` to unregister. F3, 2026-07-04 user feedback.
- */
-export function setSessionEndCallback(
-  cb: ((info: SessionEndInfo) => void) | null
-): void {
-  onSessionEnd = cb;
-}
-
-/**
  * The ONE teardown for a session that has ended, shared by both trigger
  * paths via the XRSession 'end' listener. Before F3 the system-initiated
  * path (back gesture) only nulled `xrSession`/`latestArPose`, leaving the
@@ -1602,44 +1685,8 @@ export async function endARSession(): Promise<void> {
 }
 
 /**
- * Set up image capture callbacks.
- * Call this before starting image capture to wire up the callback handlers.
- *
- * @param onCaptured - Called when an image is successfully captured
- * @param screenRotationGetter - Returns current device screen rotation (0, 90, 180, 270)
- * @param onFailed - Optional callback for when image capture fails (e.g., low memory)
- * @param onSuspicious - Optional callback for when a captured image appears black/empty
- */
-export function setImageCaptureCallback(
-  onCaptured: (image: CapturedImage) => void,
-  screenRotationGetter: () => number,
-  onFailed?: () => void,
-  onSuspicious?: (blobSize: number, frameIndex: number) => void
-): void {
-  onImageCaptured = onCaptured;
-  getScreenRotation = screenRotationGetter;
-  onCaptureFailed = onFailed ?? null;
-  onSuspiciousImage = onSuspicious ?? null;
-}
-
-/**
- * Inject (or clear) the off-thread image-quality analyzer used by the blur/
- * blackness drop+retry gate. Pass the recorder's Web Worker-backed analyzer to
- * enable the gate, or `null` to clear it (legacy save-immediately path). Must be
- * set BEFORE {@link startImageCapture} for the active recording — the manager
- * reads it once when constructed. The analyzer only runs when the capture
- * config's `qualityFilter.enabled` is true, so injecting it is harmless when the
- * gate is off. Ownership/disposal of the worker is the caller's responsibility.
- */
-export function setImageQualityAnalyzer(
-  analyzer: ((frame: CapturedFrame) => Promise<FrameQualityVerdict>) | null
-): void {
-  imageQualityAnalyzer = analyzer;
-}
-
-/**
  * Start capturing images during recording.
- * Must call setImageCaptureCallback first.
+ * Requires the `imageCapture` callbacks group to have been passed to initAR.
  *
  * @param config - Optional capture configuration. Accepts the whole user
  *   image-options section (`intervalMs`, `quality`, `resolutionDivisor`; any
@@ -1777,18 +1824,27 @@ export function getImageCaptureFrameCount(): number {
 }
 
 /**
- * Inject the Redux store used by the tracking-state slice pipeline.
+ * Re-point the tracking pipeline at a NEW store mid-session.
  *
- * MUST be called before `initAR()` whenever the host also wires tracking
- * callbacks via `setTrackingCallbacks`. Without a store the tracking
- * pipeline silently no-ops.
+ * This is the ONE mutation that deliberately survived the fold of the
+ * pre-init setters into initAR's `callbacks` (surface-reduction step 1):
+ * it is a genuine RUNTIME need, not init-time wiring — the recorder swaps
+ * its Redux store for every recording started inside a single AR session,
+ * and without re-pointing, every per-frame `poseReceived` dispatch would
+ * keep flowing into the orphaned previous store, pinning the new store's
+ * `tracking.phase` at 'initializing' (Finding #1, 2026-05-23 user
+ * feedback). Everything else about a session's callbacks stays fixed from
+ * `initAR` until `resetWebXRState()`.
+ *
+ * Matches the old `setTrackingStore` semantics exactly: an active phase
+ * subscription to the previous store is torn down before swapping (the
+ * phase subscription itself is only (re)established inside `initAR`).
+ * No-op pipeline when tracking was not wired at init (the host callbacks
+ * stay whatever `initAR` set).
  *
  * @param store — any store satisfying {@link TrackingSubscribableStore}.
- *   `null` clears the binding (useful for teardown in tests).
  */
-export function setTrackingStore(
-  store: TrackingSubscribableStore | null
-): void {
+export function rebindTrackingStore(store: TrackingSubscribableStore): void {
   // If we already have an active phase subscription to a different store,
   // tear it down before swapping. The new subscription is established
   // inside `initAR`, not here, because we also want it to survive
@@ -1801,56 +1857,9 @@ export function setTrackingStore(
 }
 
 /**
- * Set up tracking state callbacks.
- * Call this BEFORE initAR() to enable tracking restart detection.
- *
- * @param onRestarted - Called when tracking restarts after being lost
- */
-export function setTrackingCallbacks(
-  onRestarted: (payload: OdometryTrackingRestartedPayload) => void
-): void {
-  onTrackingRestarted = onRestarted;
-}
-
-/**
- * Set a callback for when AR tracking is lost.
- * Call this BEFORE initAR() to enable tracking loss notifications.
- * Field Test Readiness Issue #3: Provide user feedback when tracking is lost.
- *
- * @param callback - Called when tracking is lost (pose becomes null)
- */
-export function setTrackingLostCallback(callback: () => void): void {
-  onTrackingLost = callback;
-}
-
-/**
- * Set a callback for when AR tracking recovers seamlessly (Case 1: same coordinate frame).
- * Call this BEFORE initAR() to enable seamless recovery notifications.
- *
- * @param callback - Called when tracking recovers without origin reset
- */
-export function setTrackingRecoveredCallback(callback: () => void): void {
-  onTrackingRecovered = callback;
-}
-
-/**
- * Set up depth capture callback.
- * Call this BEFORE initAR() to enable depth sampling.
- *
- * @param onCaptured - Called when a depth sample is captured
- * @param onUnavailable - Called once if depth is unavailable after threshold
- */
-export function setDepthCaptureCallback(
-  onCaptured: (sample: DepthSample) => void,
-  onUnavailable?: () => void
-): void {
-  onDepthCaptured = onCaptured;
-  onDepthUnavailable = onUnavailable ?? null;
-}
-
-/**
  * Start depth sampling during recording.
- * Must call setDepthCaptureCallback before initAR.
+ * Requires the `depth` callbacks group to have been passed to initAR
+ * (the sampler is created there).
  *
  * @param config - optional sampler overrides (typically the user's
  *   `depth.intervalMs`/`depth.gridSize` recording options); applied via
@@ -1906,27 +1915,12 @@ export interface CameraFrameCaptureConfig {
 }
 
 /**
- * Set the per-frame camera RGBA callback (B2) — the generic CV frame feed (QR
- * detection today, object detection / OpenCV later). Call this BEFORE initAR to
- * enable in-session camera frame capture; `startCameraFrameCapture` then begins
- * delivering frames.
- *
- * The callback receives a **top-left-origin** RGBA image (no JPEG round-trip),
- * captured at the throttled detection cadence — feed it straight to a
- * `BarcodeDetector` / OpenCV front-end. Mirrors `setDepthCaptureCallback`.
- *
- * @param onFrame - Called with each throttled camera frame, or `null` to clear.
- */
-export function setCameraFrameCallback(
-  onFrame: ((image: RgbaImage) => void) | null
-): void {
-  onCameraFrame = onFrame;
-}
-
-/**
- * Start camera frame capture during an AR session. Must call
- * setCameraFrameCallback before initAR (the source is created there). No-op if
- * the source was not initialized (callback not set before initAR).
+ * Start camera frame capture during an AR session. Requires the
+ * `cameraFrame` callbacks group to have been passed to initAR (the source is
+ * created there); the callback receives **top-left-origin** RGBA images (no
+ * JPEG round-trip) at the throttled detection cadence — feed them straight to
+ * a `BarcodeDetector` / OpenCV front-end (B2). No-op if the source was not
+ * initialized (group not passed to initAR).
  *
  * The source is the single cadence owner: drive your detection scheduler from
  * the delivered frames with its own `minIntervalMs: 0` (Option A).
@@ -1987,18 +1981,6 @@ export function getCameraFrameCount(): number {
  */
 export function getCameraFrameCaptureSize(): number {
   return cameraFrameCaptureSize;
-}
-
-/**
- * Set a per-frame callback for custom updates.
- * The callback is invoked every XR frame after pose updates but before render.
- * Useful for updating elements that need to follow the camera smoothly
- * (e.g., map overlay position).
- *
- * @param callback - Function to call each frame, or null to clear
- */
-export function setFrameCallback(callback: (() => void) | null): void {
-  onFrameCallback = callback;
 }
 
 /**

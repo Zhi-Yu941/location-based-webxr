@@ -34,24 +34,17 @@ import {
   endARSession,
   applyAlignmentMatrix,
   nuePositionToWebXR,
-  setImageCaptureCallback,
   startImageCapture,
   stopImageCapture,
   getImageCaptureFrameCount,
-  setTrackingCallbacks,
-  setTrackingLostCallback,
-  setTrackingRecoveredCallback,
-  setDepthCaptureCallback,
   startDepthCapture,
   stopDepthCapture,
   getDepthSampleCount,
-  setCameraFrameCallback,
   startCameraFrameCapture,
   stopCameraFrameCapture,
   getCameraFrameCount,
   getCameraFrameCaptureSize,
   DEFAULT_CAMERA_FRAME_CAPTURE_SIZE,
-  setFrameCallback,
   getLiveCss3dManager,
   getDepthInfoFromFrame,
   AR_CAMERA_FOV,
@@ -1136,19 +1129,6 @@ describe('image capture functions', () => {
 
   /**
    * Why this test matters:
-   * setImageCaptureCallback should be callable before AR is initialized
-   */
-  it('setImageCaptureCallback does not throw before AR init', () => {
-    const onCaptured = vi.fn();
-    const getRotation = () => 0;
-
-    expect(() =>
-      setImageCaptureCallback(onCaptured, getRotation)
-    ).not.toThrow();
-  });
-
-  /**
-   * Why this test matters:
    * startImageCapture should gracefully handle missing renderer
    */
   it('startImageCapture does not throw when renderer not initialized', () => {
@@ -1157,7 +1137,8 @@ describe('image capture functions', () => {
 
   /**
    * Why this test matters:
-   * startImageCapture should gracefully handle missing callbacks
+   * startImageCapture should gracefully handle a session initialized without
+   * the `imageCapture` callbacks group (the slots stay null).
    */
   it('startImageCapture does not throw when callbacks not set', () => {
     // Just test it doesn't throw
@@ -1219,76 +1200,9 @@ describe('image capture functions', () => {
   });
 });
 
-describe('tracking callbacks', () => {
-  beforeEach(() => {
-    resetWebXRState();
-  });
-
-  /**
-   * Why this test matters:
-   * setTrackingCallbacks should be callable before AR is initialized
-   */
-  it('setTrackingCallbacks does not throw before AR init', () => {
-    const onRestarted = vi.fn();
-    expect(() => setTrackingCallbacks(onRestarted)).not.toThrow();
-  });
-
-  /**
-   * Why this test matters:
-   * Field Test Readiness Issue #3 - setTrackingLostCallback allows
-   * the main module to be notified when AR tracking is lost.
-   */
-  it('setTrackingLostCallback does not throw before AR init', () => {
-    const onLost = vi.fn();
-    expect(() => setTrackingLostCallback(onLost)).not.toThrow();
-  });
-
-  /**
-   * Why this test matters:
-   * After resetWebXRState, the tracking lost callback should be cleared.
-   */
-  it('resetWebXRState clears tracking lost callback', () => {
-    const onLost = vi.fn();
-    setTrackingLostCallback(onLost);
-    resetWebXRState();
-    // Callback should be cleared - we can verify by setting a new one
-    expect(() => setTrackingLostCallback(vi.fn())).not.toThrow();
-  });
-
-  /**
-   * Why this test matters:
-   * setTrackingRecoveredCallback allows the app to be notified when
-   * tracking recovers seamlessly (Case 1: same coordinate frame),
-   * e.g. to clear the "⚠️ LOST" UI warning.
-   */
-  it('setTrackingRecoveredCallback does not throw before AR init', () => {
-    const onRecovered = vi.fn();
-    expect(() => setTrackingRecoveredCallback(onRecovered)).not.toThrow();
-  });
-
-  /**
-   * Why this test matters:
-   * After resetWebXRState, the tracking recovered callback should be cleared.
-   */
-  it('resetWebXRState clears tracking recovered callback', () => {
-    setTrackingRecoveredCallback(vi.fn());
-    resetWebXRState();
-    expect(() => setTrackingRecoveredCallback(vi.fn())).not.toThrow();
-  });
-});
-
 describe('depth capture functions', () => {
   beforeEach(() => {
     resetWebXRState();
-  });
-
-  /**
-   * Why this test matters:
-   * setDepthCaptureCallback should be callable before AR is initialized
-   */
-  it('setDepthCaptureCallback does not throw before AR init', () => {
-    const onCaptured = vi.fn();
-    expect(() => setDepthCaptureCallback(onCaptured)).not.toThrow();
   });
 
   /**
@@ -1387,19 +1301,9 @@ describe('camera frame capture (B2)', () => {
 
   /**
    * Why this test matters:
-   * setCameraFrameCallback must be callable before AR is initialized (it only
-   * stashes the callback; the source is created in initAR), mirroring
-   * setDepthCaptureCallback.
-   */
-  it('setCameraFrameCallback does not throw before AR init', () => {
-    expect(() => setCameraFrameCallback(vi.fn())).not.toThrow();
-    expect(() => setCameraFrameCallback(null)).not.toThrow();
-  });
-
-  /**
-   * Why this test matters:
    * startCameraFrameCapture must gracefully no-op when the frame source was
-   * never created (callback not set before initAR), not throw.
+   * never created (the `cameraFrame` callbacks group was not passed to
+   * initAR), not throw.
    */
   it('startCameraFrameCapture does not throw when source not initialized', () => {
     expect(() => startCameraFrameCapture()).not.toThrow();
@@ -1424,47 +1328,6 @@ describe('camera frame capture (B2)', () => {
    */
   it('getCameraFrameCount returns 0 when not capturing', () => {
     expect(getCameraFrameCount()).toBe(0);
-  });
-});
-
-describe('frame callback', () => {
-  beforeEach(() => {
-    resetWebXRState();
-  });
-
-  /**
-   * Why this test matters:
-   * setFrameCallback should be callable before AR is initialized.
-   * This allows consumers to register callbacks during setup.
-   */
-  it('setFrameCallback does not throw before AR init', () => {
-    const callback = vi.fn();
-    expect(() => setFrameCallback(callback)).not.toThrow();
-  });
-
-  /**
-   * Why this test matters:
-   * Setting callback to null should be safe and not throw.
-   * This is used to clear callbacks when no longer needed.
-   */
-  it('setFrameCallback accepts null to clear callback', () => {
-    const callback = vi.fn();
-    setFrameCallback(callback);
-    expect(() => setFrameCallback(null)).not.toThrow();
-  });
-
-  /**
-   * Why this test matters:
-   * resetWebXRState should clear the frame callback to prevent
-   * stale callbacks from being invoked after state reset.
-   */
-  it('resetWebXRState clears the frame callback', () => {
-    const callback = vi.fn();
-    setFrameCallback(callback);
-    resetWebXRState();
-    // After reset, setting a new callback should work (proves old was cleared)
-    const newCallback = vi.fn();
-    expect(() => setFrameCallback(newCallback)).not.toThrow();
   });
 });
 
@@ -1641,7 +1504,7 @@ describe('DOM hardcoding audit regressions', () => {
     );
     const endBlock = source.slice(
       source.indexOf('function endARSession'),
-      source.indexOf('function setImageCaptureCallback')
+      source.indexOf('function startImageCapture')
     );
     // Must still end the actual XR session — resetWebXRState() only nulls
     // the reference, it never calls XRSession.end().

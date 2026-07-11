@@ -511,21 +511,6 @@ async function startAr(): Promise<void> {
   });
   store.subscribe(onStoreChanged);
 
-  // Tracking-state pipeline must be wired before initAR. The framework's
-  // per-frame `updateTrackingState()` only dispatches `poseReceived`/`poseLost`
-  // into the store when BOTH a store is injected AND a tracking-restart
-  // callback is registered — otherwise it silently no-ops, `tracking.phase`
-  // never leaves `initializing`, and the tracking-quality report (and thus the
-  // onboarding guidance) stays pinned to "AR tracking lost" with no progress.
-  // The callback also re-bases odometry after an origin reset so alignment
-  // continues correctly across tracking restarts (same contract as the
-  // recorder). Routed through the seam so the e2e suite can assert the wiring
-  // actually happens (the fakes record both calls).
-  getSeams().setTrackingStore(store);
-  getSeams().setTrackingCallbacks((payload) => {
-    store?.dispatch(odometryTrackingRestarted(payload));
-  });
-
   const appContainer = el("app");
   try {
     // This example places its anchor under a screen-centre hit-test reticle —
@@ -535,6 +520,17 @@ async function startAr(): Promise<void> {
     // each frame, but DO request `hit-test` so the cache-miss reticle works.
     // `dom-overlay` and the CSS3D renderer stay on so the overlay UI still
     // composites in AR.
+    //
+    // Tracking-state pipeline: the store + restart callback ride into initAR
+    // as its `callbacks.tracking` group (they arrive TOGETHER since the
+    // framework's setter fold). Without the group the framework's per-frame
+    // `updateTrackingState()` silently no-ops, `tracking.phase` never leaves
+    // `initializing`, and the tracking-quality report (and thus the onboarding
+    // guidance) stays pinned to "AR tracking lost" with no progress. The
+    // onRestarted callback re-bases odometry after an origin reset so
+    // alignment continues correctly across tracking restarts (same contract as
+    // the recorder). Routed through the seam so the e2e suite can assert the
+    // wiring actually happens (the fake initAR records the group).
     await getSeams().initAR(
       appContainer,
       {
@@ -543,6 +539,14 @@ async function startAr(): Promise<void> {
         enableCameraTextureAcquisition: false,
       },
       { requestHitTest: true },
+      {
+        tracking: {
+          store,
+          onRestarted: (payload) => {
+            store?.dispatch(odometryTrackingRestarted(payload));
+          },
+        },
+      },
     );
   } catch (err) {
     await failStart(err, "Failed to start the AR session.");

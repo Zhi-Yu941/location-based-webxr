@@ -10,8 +10,8 @@
  * fixed contract:
  *  - BOTH end paths (system gesture and app-initiated endARSession()) run the
  *    full resetWebXRState() teardown,
- *  - the host callback registered via setSessionEndCallback() fires exactly
- *    once per session end with the correct `requestedByApp` discriminator
+ *  - the host callback passed via initAR's `callbacks.onSessionEnd` fires
+ *    exactly once per session end with the correct `requestedByApp` discriminator
  *    (endARSession()'s own session.end() fires the same 'end' event — the
  *    module must not double-fire),
  *  - a throwing callback never breaks the teardown.
@@ -56,7 +56,6 @@ import {
   initAR,
   endARSession,
   resetWebXRState,
-  setSessionEndCallback,
   getScene,
   type SessionEndInfo,
 } from './webxr-session.js';
@@ -103,7 +102,6 @@ describe('session-end hook (F3)', () => {
   });
 
   afterEach(() => {
-    setSessionEndCallback(null);
     resetWebXRState();
     vi.unstubAllGlobals();
     container.remove();
@@ -111,9 +109,13 @@ describe('session-end hook (F3)', () => {
 
   it('system-initiated end runs full teardown and fires the callback with requestedByApp=false', async () => {
     const events: SessionEndInfo[] = [];
-    setSessionEndCallback((info) => events.push(info));
 
-    await initAR(container, MINIMAL_ISOLATION);
+    await initAR(
+      container,
+      MINIMAL_ISOLATION,
+      {},
+      { onSessionEnd: (info) => events.push(info) }
+    );
     expect(container.querySelectorAll('canvas')).toHaveLength(1);
 
     // Simulate the Android back gesture: the browser ends the session and
@@ -129,9 +131,13 @@ describe('session-end hook (F3)', () => {
 
   it('app-initiated endARSession() fires the callback exactly once with requestedByApp=true', async () => {
     const events: SessionEndInfo[] = [];
-    setSessionEndCallback((info) => events.push(info));
 
-    await initAR(container, MINIMAL_ISOLATION);
+    await initAR(
+      container,
+      MINIMAL_ISOLATION,
+      {},
+      { onSessionEnd: (info) => events.push(info) }
+    );
     await endARSession();
 
     // The mock end() fired the 'end' event (like a real browser) and
@@ -143,11 +149,16 @@ describe('session-end hook (F3)', () => {
   });
 
   it('a throwing callback does not break the teardown', async () => {
-    setSessionEndCallback(() => {
-      throw new Error('host callback exploded');
-    });
-
-    await initAR(container, MINIMAL_ISOLATION);
+    await initAR(
+      container,
+      MINIMAL_ISOLATION,
+      {},
+      {
+        onSessionEnd: () => {
+          throw new Error('host callback exploded');
+        },
+      }
+    );
 
     expect(() => capturedEndListener?.()).not.toThrow();
     expect(getScene()).toBeNull();
@@ -159,13 +170,18 @@ describe('session-end hook (F3)', () => {
     // callback) so a stale host handler can never fire for a session it was
     // not registered for.
     const events: SessionEndInfo[] = [];
-    setSessionEndCallback((info) => events.push(info));
 
-    await initAR(container, MINIMAL_ISOLATION);
+    await initAR(
+      container,
+      MINIMAL_ISOLATION,
+      {},
+      { onSessionEnd: (info) => events.push(info) }
+    );
     capturedEndListener?.(); // system end — fires + tears down + clears
     expect(events).toHaveLength(1);
 
-    await initAR(container, MINIMAL_ISOLATION); // host did NOT re-register
+    // Host did NOT re-pass the callback for the second session.
+    await initAR(container, MINIMAL_ISOLATION);
     capturedEndListener?.();
 
     expect(events).toHaveLength(1);
@@ -177,10 +193,14 @@ describe('session-end hook (F3)', () => {
     const events: SessionEndInfo[] = [];
 
     await initAR(container, MINIMAL_ISOLATION);
-    await endARSession(); // no callback registered yet — nothing fires
+    await endARSession(); // no callback registered — nothing fires
 
-    setSessionEndCallback((info) => events.push(info));
-    await initAR(container, MINIMAL_ISOLATION);
+    await initAR(
+      container,
+      MINIMAL_ISOLATION,
+      {},
+      { onSessionEnd: (info) => events.push(info) }
+    );
     capturedEndListener?.(); // system end of the SECOND session
 
     expect(events).toEqual([{ requestedByApp: false }]);

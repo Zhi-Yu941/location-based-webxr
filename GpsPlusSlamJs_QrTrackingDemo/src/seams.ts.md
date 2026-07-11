@@ -21,11 +21,13 @@ plan defers the Recorder's live camera wiring).
   from production; unit tests ignore it.
 - PROD `getDepthContext` builds an unprojector + nearest-neighbour depth lookup +
   camera pose + the view `projectionMatrix` from the latest `DepthSample`
-  (`setDepthCaptureCallback`). The `projectionMatrix` feeds PnP intrinsics
-  (`intrinsicsFromProjection`) in the controller.
+  (the `depth` group passed to the framework `initAR`). The `projectionMatrix`
+  feeds PnP intrinsics (`intrinsicsFromProjection`) in the controller.
 - PROD frames come from the framework's generic **camera-frame RGBA capture**
-  (B2): `initAR` registers `setCameraFrameCallback` (before the framework
-  `initAR`, like the depth callback) to forward each throttled **top-left RGBA**
+  (B2): the seam's `initAR` passes the framework `initAR` a
+  `callbacks.cameraFrame` group (alongside the depth group — the framework's
+  pre-init setters were folded into `initAR`) that forwards each throttled
+  **top-left RGBA**
   frame to the active consumer; `startFrameSource(onImage, { intervalMs })` sets
   that consumer and calls `startCameraFrameCapture({ intervalMs })` — the source
   is the single cadence owner (Option A; the controller runs `minIntervalMs: 0`).

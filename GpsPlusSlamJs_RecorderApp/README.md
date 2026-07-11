@@ -518,20 +518,24 @@ function eulerToQuaternion(
 When AR tracking is lost and resumes, the system automatically handles alignment correction:
 
 ```typescript
-// Wire tracking callbacks before initAR():
-setTrackingLostCallback(() => {
-  updateArInfo('⚠️ LOST');
-  showError('AR tracking lost. Try moving to a well-lit area...');
-});
-
-setTrackingCallbacks((payload) => {
-  store.dispatch(odometryTrackingRestarted(payload));
-  log.info('AR tracking restarted — alignment correction dispatched');
-});
-
-setTrackingRecoveredCallback(() => {
-  updateArInfo('');
-  log.info('AR tracking recovered (same coordinate frame)');
+// Tracking store + callbacks ride into initAR as ONE callbacks group
+// (the framework's pre-init setters were folded into initAR):
+await initAR(container, isolationOptions, sessionFeatures, {
+  tracking: {
+    store,
+    onLost: () => {
+      updateArInfo('⚠️ LOST');
+      showError('AR tracking lost. Try moving to a well-lit area...');
+    },
+    onRestarted: (payload) => {
+      store.dispatch(odometryTrackingRestarted(payload));
+      log.info('AR tracking restarted — alignment correction dispatched');
+    },
+    onRecovered: () => {
+      updateArInfo('');
+      log.info('AR tracking recovered (same coordinate frame)');
+    },
+  },
 });
 ```
 

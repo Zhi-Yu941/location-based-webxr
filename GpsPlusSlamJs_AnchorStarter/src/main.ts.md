@@ -24,23 +24,22 @@
     [ar/capability-checker](../../GpsPlusSlamJs_AppFramework/src/ar/capability-checker.ts.md)
     with `contextLabel: "the persistent-anchor flow"`) and disables Start.
   - `startAr()` (user gesture): `createSlamAppStore({ NullStorageBackend })` →
-    `getSeams().setTrackingStore` **+ `getSeams().setTrackingCallbacks`** (BOTH
-    are required before
-    `initAR`: the framework's per-frame `updateTrackingState()` only dispatches
-    `poseReceived`/`poseLost` into the store when a store **and** a restart
-    callback are wired — wiring only the store leaves `tracking.phase` stuck at
-    `initializing`, which pins the tracking-quality report and the onboarding
-    guidance to "AR tracking lost" forever; the callback also dispatches
-    `odometryTrackingRestarted(payload)` so alignment survives origin resets.
-    Both go through the seam so the Tier 1 e2e suite can assert the wiring
-    actually happens — `placement-flow.spec.js` checks both calls fired during
-    boot) →
     `initAR` (with the camera/depth crash-surface flags
     `enableCameraAccess` / `enableDepthSensingFeature` /
-    `enableCameraTextureAcquisition` set to `false`, and `requestHitTest: true`
-    in the session-features arg so the cache-miss reticle works; this example
-    places 3D anchors under a screen-centre hit-test reticle and never reads the
-    camera image; `dom-overlay` / CSS3D stay on for the overlay UI) →
+    `enableCameraTextureAcquisition` set to `false`, `requestHitTest: true`
+    in the session-features arg so the cache-miss reticle works, and the
+    **`callbacks.tracking` group** — store + `onRestarted` arrive TOGETHER
+    since the framework's setter fold. Without the group the framework's
+    per-frame `updateTrackingState()` dispatches no `poseReceived`/`poseLost`,
+    leaving `tracking.phase` stuck at `initializing`, which pins the
+    tracking-quality report and the onboarding guidance to "AR tracking lost"
+    forever; the `onRestarted` callback dispatches
+    `odometryTrackingRestarted(payload)` so alignment survives origin resets.
+    `initAR` goes through the seam so the Tier 1 e2e suite can assert the
+    wiring actually happens — `placement-flow.spec.js` checks the group rode
+    into the boot `initAR` call. This example places 3D anchors under a
+    screen-centre hit-test reticle and never reads the camera image;
+    `dom-overlay` / CSS3D stay on for the overlay UI) →
     `startSession` (so the GPS coordinator
     feeds alignment) → `enableArWorldGroupAlignment({ store, arWorldGroup })`
     (lerps the alignment onto `arWorldGroup` so the camera + anchor ride it

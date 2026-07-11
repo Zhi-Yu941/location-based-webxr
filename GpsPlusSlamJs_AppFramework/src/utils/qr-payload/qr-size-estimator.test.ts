@@ -152,22 +152,31 @@ describe('estimateQrSize — qrcode oracle boundary agreement', () => {
 
   for (const ec of EC_LEVELS) {
     for (const probe of MODE_PROBES) {
-      it(`agrees on every v1–25 ${probe.label} boundary at EC ${ec}`, () => {
-        for (let version = 1; version <= 25; version++) {
-          const maxChars = maxCharsFitting(probe.char, ec, version);
-          const atBoundary = probe.char.repeat(maxChars);
-          expect(
-            oracleVersion(atBoundary, ec),
-            `${probe.label}×${maxChars} @ EC ${ec} should need v${version}`
-          ).toBe(version);
-          // One more char must overflow this version for the oracle too.
-          const overflowed = probe.char.repeat(maxChars + 1);
-          expect(
-            oracleVersion(overflowed, ec),
-            `${probe.label}×${maxChars + 1} @ EC ${ec} should exceed v${version}`
-          ).toBeGreaterThan(version);
+      it(
+        `agrees on every v1–25 ${probe.label} boundary at EC ${ec}`,
+        // Wall-clock heavy (25 binary-searched oracle QR encodes per probe;
+        // ~2–5 s each in isolation) but the assertions are structural, so a
+        // generous budget weakens nothing. At the 5 s default these tests sit
+        // at 90–100 % of budget and flake whenever the suite grows and files
+        // run in parallel (observed 2026-07-11 at 5,028 ms).
+        { timeout: 60_000 },
+        () => {
+          for (let version = 1; version <= 25; version++) {
+            const maxChars = maxCharsFitting(probe.char, ec, version);
+            const atBoundary = probe.char.repeat(maxChars);
+            expect(
+              oracleVersion(atBoundary, ec),
+              `${probe.label}×${maxChars} @ EC ${ec} should need v${version}`
+            ).toBe(version);
+            // One more char must overflow this version for the oracle too.
+            const overflowed = probe.char.repeat(maxChars + 1);
+            expect(
+              oracleVersion(overflowed, ec),
+              `${probe.label}×${maxChars + 1} @ EC ${ec} should exceed v${version}`
+            ).toBeGreaterThan(version);
+          }
         }
-      });
+      );
     }
   }
 

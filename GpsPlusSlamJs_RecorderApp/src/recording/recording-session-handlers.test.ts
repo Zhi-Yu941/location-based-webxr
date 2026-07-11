@@ -263,10 +263,12 @@ vi.mock('gps-plus-slam-app-framework/ar/capture-failure-tracker', () => ({
   createCaptureFailureTracker: mockCreateCaptureFailureTracker,
 }));
 
+// NOTE: setImageQualityAnalyzer is no longer a framework export (setter fold,
+// surface-reduction step 1) — it is an injected dep from main.ts now, so
+// `mockSetImageQualityAnalyzer` is wired through createMockDeps below instead.
 vi.mock('gps-plus-slam-app-framework/ar/webxr-session', () => ({
   startImageCapture: mockStartImageCapture,
   stopImageCapture: mockStopImageCapture,
-  setImageQualityAnalyzer: mockSetImageQualityAnalyzer,
   startDepthCapture: mockStartDepthCapture,
   stopDepthCapture: mockStopDepthCapture,
   getImageCaptureFrameCount: mockGetImageCaptureFrameCount,
@@ -438,7 +440,8 @@ function createMockDeps(
       .mockResolvedValue({ refPointCount: 0, observationCount: 0 }),
     collectTrackerErrors: vi.fn(),
     applyAlignmentMatrix: vi.fn(),
-    setTrackingStore: vi.fn(),
+    rebindTrackingStore: vi.fn(),
+    setImageQualityAnalyzer: mockSetImageQualityAnalyzer,
     ...overrides,
   };
 }
@@ -561,22 +564,24 @@ describe('handleStartRecording', () => {
     expect(deps.setStore).toHaveBeenCalled();
   });
 
-  it('should re-point the AR session at the new store via setTrackingStore', async () => {
+  it('should re-point the AR session at the new store via rebindTrackingStore', async () => {
     // Why (Finding #1, 2026-05-23 user feedback): when a recording starts a
     // fresh Redux store, the WebXR session must be re-pointed at the new
     // store. Otherwise `poseReceived` keeps flowing into the orphaned old
     // store, the new store's `tracking.phase` stays 'initializing', and the
     // tracking-quality phase gate keeps the HUD on "AR LOST" forever — the
-    // exact symptom reported in the field test.
+    // exact symptom reported in the field test. Since the setter fold this
+    // goes through the framework's narrow `rebindTrackingStore` (the one
+    // runtime mutation that survived the move to initAR callbacks).
     const newStore = createMockStore();
-    const setTrackingStoreMock = vi.fn();
+    const rebindTrackingStoreMock = vi.fn();
     const localDeps = createMockDeps({
       createNewStore: vi.fn().mockReturnValue(newStore),
-      setTrackingStore: setTrackingStoreMock,
+      rebindTrackingStore: rebindTrackingStoreMock,
     });
     const localHandlers = createRecordingSessionHandlers(localDeps);
     await localHandlers.handleStartRecording();
-    expect(setTrackingStoreMock).toHaveBeenCalledWith(newStore);
+    expect(rebindTrackingStoreMock).toHaveBeenCalledWith(newStore);
   });
 
   it('should generate a session name from timestamp', async () => {

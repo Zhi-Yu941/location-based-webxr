@@ -51,20 +51,13 @@ import { destroyConfirmDialog } from './ui/confirm-dialog';
 import {
   initAR,
   endARSession,
-  setImageCaptureCallback,
-  setDepthCaptureCallback,
-  setCameraFrameCallback,
-  setFrameCallback,
-  setTrackingLostCallback,
-  setTrackingCallbacks,
-  setTrackingRecoveredCallback,
-  setTrackingStore,
-  setSessionEndCallback,
+  rebindTrackingStore,
   getCurrentArPose,
   getScene,
   getCamera,
   getArWorldGroup,
   getDepthInfoFromFrame,
+  type ArSessionCallbacks,
   type CapturedImage,
   type DepthSample,
 } from 'gps-plus-slam-app-framework/ar/webxr-session';
@@ -282,8 +275,8 @@ let unsubscribeFrameTiles: (() => void) | null = null;
 
 // Perf stats overlay (visualization.statsOverlay, OFF by default) — Step 0 of
 // the 2026-07-03 long-session fps plan. Mounted into the #app dom-overlay root
-// at Enter-AR, advanced from the setFrameCallback tick; teardown registered
-// in arSessionScope (same lifecycle as the frame-tile visualizer).
+// at Enter-AR, advanced from the initAR `callbacks.onFrame` tick; teardown
+// registered in arSessionScope (same lifecycle as the frame-tile visualizer).
 let statsOverlay: StatsOverlayHandle | null = null;
 
 // Occupancy-grid cubes (2026-06-11 depth occupancy-grid port plan): the
@@ -315,10 +308,23 @@ let loopClosureUnregisterFrame: (() => void) | null = null;
 
 // Live QR recording (opt-in, recording-options `qr`). The thin RAW producer
 // (created in handleEnterAR when enabled) receives camera frames via the
-// `setCameraFrameCallback` registered before initAR; `wireQrRecording` owns the
+// `cameraFrame` group passed to initAR; `wireQrRecording` owns the
 // producer + the WS-5 debug-viz subscriber and returns a dispose handle.
 let qrProducer: QrDetectionController | null = null;
 let unsubscribeQrRecording: (() => void) | null = null;
+
+// Off-thread image-quality analyzer for the CURRENT recording (null between
+// recordings / when the gate is off). Recordings start and stop WITHIN one AR
+// session, so the per-recording Worker cannot be passed to initAR directly —
+// instead initAR gets a STABLE delegating wrapper (see handleEnterAR's
+// `imageCapture.qualityAnalyzer`) and recording-session-handlers swaps this
+// ref via its injected `setImageQualityAnalyzer` dep. Fail-open: while the
+// ref is null the wrapper accepts every frame, matching the framework's
+// no-analyzer path.
+type ImageQualityAnalyzerFn = NonNullable<
+  NonNullable<ArSessionCallbacks['imageCapture']>['qualityAnalyzer']
+>;
+let activeImageQualityAnalyzer: ImageQualityAnalyzerFn | null = null;
 
 // HUD tracking-quality subscription. `subscribeHudToTrackingQuality` returns a
 // dispose function that detaches both the per-store subscription and the
@@ -349,7 +355,13 @@ const recordingSessionHandlers = createRecordingSessionHandlers({
     store = newStore;
     storeRef.set(newStore);
   },
-  setTrackingStore,
+  rebindTrackingStore,
+  // The per-recording quality-gate Worker analyzer: stored in main's
+  // `activeImageQualityAnalyzer` ref, which the stable wrapper passed to
+  // initAR (`imageCapture.qualityAnalyzer`) delegates to.
+  setImageQualityAnalyzer: (analyzer) => {
+    activeImageQualityAnalyzer = analyzer;
+  },
   createNewStore,
   getRecordingOptions: () => recordingOptions,
   getMapOverlay: () => mapOverlay,
@@ -1207,59 +1219,6 @@ async function handleEnterAR(): Promise<void> {
       );
     }
 
-    // Set up depth capture callback BEFORE initAR (sampler is created during init)
-    // Field Test Readiness Issue #8: Pass unavailable callback to warn user
-    setDepthCaptureCallback(handleDepthSampleCaptured, () => {
-      log.warn('Depth sensing unavailable - device may not support it');
-      showError(
-        'Depth sensing unavailable. Your device may not support this feature.'
-      );
-    });
-
-    // Live QR (opt-in): register the camera-frame callback BEFORE initAR (the
-    // frame source is created during init). Only when QR is enabled, so a
-    // disabled session never builds the source. The producer is created after
-    // initAR (handleEnterAR's arWorldGroup block) and forwarded frames here.
-    if (recordingOptions.qr.enabled) {
-      setCameraFrameCallback((image) => qrProducer?.offerFrame(image));
-    }
-
-    // Set up tracking lost callback to warn user when AR tracking fails
-    setTrackingLostCallback(() => {
-      updateArInfo('⚠️ LOST');
-      // Stop feeding poses + forget the last pose: the pose jump across a
-      // loss must never be recorded as a loop closure.
-      loopClosureHandler?.setTrackingActive(false);
-      showError(
-        'AR tracking lost. Try moving to a well-lit area with more visual features.'
-      );
-    });
-
-    // Wire tracking restart detection BEFORE initAR() — this enables the
-    // tracking slice and XRReferenceSpace reset event listener.
-    // When tracking resumes after an origin reset (Case 2), the store's
-    // odometryTrackingRestarted reducer clears stale data and accumulates
-    // offsets so alignment continues correctly across resets.
-    setTrackingStore(store);
-    setTrackingCallbacks((payload) => {
-      store.dispatch(odometryTrackingRestarted(payload));
-      // Origin reset: clear the loop-closure handler's last-pose memory
-      // (deactivate ⇒ reset) before re-arming — the reference-space jump is
-      // an origin correction, not a relocalization loop closure.
-      loopClosureHandler?.setTrackingActive(false);
-      loopClosureHandler?.setTrackingActive(true);
-      updateArInfo('');
-      log.info('AR tracking restarted — alignment correction dispatched');
-    });
-
-    // Wire seamless recovery callback (Case 1: same coordinate frame).
-    // Clears the "LOST" UI warning without dispatching alignment correction.
-    setTrackingRecoveredCallback(() => {
-      loopClosureHandler?.setTrackingActive(true);
-      updateArInfo('');
-      log.info('AR tracking recovered (same coordinate frame)');
-    });
-
     // Live loop-closure capture (experimental, default OFF): the per-frame
     // feed is registered only when the operator opted in — OFF keeps the
     // frame loop untouched (zero cost).
@@ -1282,41 +1241,157 @@ async function handleEnterAR(): Promise<void> {
       showToast: (message) => showToast(message),
       showError,
     });
-    // Fire-and-forget: the handler resolves its own errors (showError); the
-    // framework callback contract is synchronous.
-    setSessionEndCallback((info) => {
-      void systemSessionEndHandler(info);
-    });
 
     const appContainer = document.getElementById('app');
     if (!appContainer) {
       throw new Error('Missing #app container element');
     }
+
+    // Per-frame tick state for `callbacks.onFrame` below (map overlay /
+    // follower / lerper updates at render cadence, ~60+ Hz, not GPS cadence).
+    let lastFrameTime = performance.now();
+
+    // ONE callbacks struct for the whole session (surface-reduction step 1 —
+    // replaces the former pre/post-init setter calls; initAR unpacks it once
+    // and resetWebXRState clears every slot at session end). The closures
+    // read module-level `let`s (store, qrProducer, loopClosureHandler,
+    // statsOverlay, …) at FIRE time, so resources created after initAR — and
+    // per-recording swaps — are picked up without re-registration.
+    const sessionCallbacks: ArSessionCallbacks = {
+      // Field Test Readiness Issue #8: warn the user when depth is unavailable
+      depth: {
+        onCaptured: handleDepthSampleCaptured,
+        onUnavailable: () => {
+          log.warn('Depth sensing unavailable - device may not support it');
+          showError(
+            'Depth sensing unavailable. Your device may not support this feature.'
+          );
+        },
+      },
+      // Live QR (opt-in): only when QR is enabled, so a disabled session never
+      // builds the camera-frame source. The producer is created after initAR
+      // (handleEnterAR's arWorldGroup block) and forwarded frames here.
+      ...(recordingOptions.qr.enabled
+        ? {
+            cameraFrame: {
+              onFrame: (image) => qrProducer?.offerFrame(image),
+            },
+          }
+        : {}),
+      // Tracking pipeline: store + callbacks together. Enables the tracking
+      // slice and the XRReferenceSpace reset event listener. When tracking
+      // resumes after an origin reset (Case 2), the store's
+      // odometryTrackingRestarted reducer clears stale data and accumulates
+      // offsets so alignment continues correctly across resets. Recordings
+      // swap the store mid-session via rebindTrackingStore (see
+      // recording-session-handlers).
+      tracking: {
+        store,
+        onRestarted: (payload) => {
+          store.dispatch(odometryTrackingRestarted(payload));
+          // Origin reset: clear the loop-closure handler's last-pose memory
+          // (deactivate ⇒ reset) before re-arming — the reference-space jump
+          // is an origin correction, not a relocalization loop closure.
+          loopClosureHandler?.setTrackingActive(false);
+          loopClosureHandler?.setTrackingActive(true);
+          updateArInfo('');
+          log.info('AR tracking restarted — alignment correction dispatched');
+        },
+        onLost: () => {
+          updateArInfo('⚠️ LOST');
+          // Stop feeding poses + forget the last pose: the pose jump across a
+          // loss must never be recorded as a loop closure.
+          loopClosureHandler?.setTrackingActive(false);
+          showError(
+            'AR tracking lost. Try moving to a well-lit area with more visual features.'
+          );
+        },
+        // Seamless recovery (Case 1: same coordinate frame) — clears the
+        // "LOST" UI warning without dispatching an alignment correction.
+        onRecovered: () => {
+          loopClosureHandler?.setTrackingActive(true);
+          updateArInfo('');
+          log.info('AR tracking recovered (same coordinate frame)');
+        },
+      },
+      // Image capture (Issue #11: onFailed tracks capture failures; user
+      // feedback: onSuspicious logs black/empty frames).
+      imageCapture: {
+        onCaptured: handleImageCaptured,
+        getScreenRotation,
+        onFailed: () => recordingSessionHandlers.recordCaptureFailure(),
+        onSuspicious: (blobSize: number, frameIndex: number) => {
+          // Log suspicious images so they appear in the expandable log panel
+          log.error(
+            `Suspicious image detected at frame ${frameIndex}: ` +
+              `size ${blobSize} bytes - image may be black/empty. ` +
+              `This can occur when WebGL hasn't composited the frame yet.`
+          );
+        },
+        // Stable wrapper over the PER-RECORDING quality-gate Worker analyzer
+        // (recordings start/stop within one AR session, so the Worker itself
+        // cannot be an init-time constant). While no recording-owned analyzer
+        // is active the wrapper accepts every frame — same fail-open outcome
+        // as the framework's no-analyzer path; the manager only calls it when
+        // qualityFilter.enabled anyway.
+        qualityAnalyzer: (frame) =>
+          activeImageQualityAnalyzer
+            ? activeImageQualityAnalyzer(frame)
+            : Promise.resolve({ accept: true }),
+      },
+      // Issue #14: Map overlay is created lazily on first toggle. Per-frame
+      // callback for smooth map position updates and follower tracking —
+      // called every XR frame (~60+ Hz) rather than on GPS events (~1 Hz).
+      onFrame: () => {
+        const now = performance.now();
+        const dt = (now - lastFrameTime) / 1000;
+        lastFrameTime = now;
+
+        // Advance the perf stats panels (FPS/ms/MB) once per rendered XR frame.
+        statsOverlay?.update();
+
+        // Update alignment lerper (Issue 4) — interpolate arWorldGroup.matrix
+        alignmentLerper?.update(dt);
+
+        // Update follower position (lerp toward camera world position)
+        const camera = getCamera();
+        if (cameraFollower && camera) {
+          cameraFollower.update(camera, dt);
+        }
+
+        if (mapOverlay?.isVisible()) {
+          // Pass the live render camera so heading-up rotation is computed
+          // relative to where the user is actually looking (the same camera
+          // the CSS3D overlay is composited through). See the 2026-06-29 plan.
+          mapOverlay.updatePosition(dt, camera ?? undefined);
+        }
+      },
+      // F3 (2026-07-04): react to a SYSTEM-initiated session end (Android back
+      // gesture ends the XRSession directly — uncancelable). Mid-recording
+      // this auto-stops + saves and lands on the summary with a toast; in
+      // AR_READY it returns to setup. The framework clears this callback on
+      // every session end, so it rides along on each Enter AR.
+      // Fire-and-forget: the handler resolves its own errors (showError); the
+      // framework callback contract is synchronous.
+      onSessionEnd: (info) => {
+        void systemSessionEndHandler(info);
+      },
+    };
+
     // Live depth occluder (opt-in, off by default): request the
     // `cpu-optimized` depth-sensing feature for the live occluder even when
     // depth *recording* is off, so the session negotiates the depth stream the
     // occluder consumes. The render-side integration (the full-screen
     // DepthOccluder fed per frame) is wired below once arWorldGroup exists; its
     // on-device occlusion quality is still being tuned.
-    await initAR(appContainer, recordingOptions.arCrashIsolation, {
-      requestDepthOcclusion: recordingOptions.occupancy.liveOcclusion === true,
-    });
-
-    // Set up image capture callback (must be done after AR init)
-    // Issue #11: Pass onCaptureFailed callback to track capture failures
-    // User feedback: Pass onSuspiciousImage callback to log black/empty frames
-    setImageCaptureCallback(
-      handleImageCaptured,
-      getScreenRotation,
-      () => recordingSessionHandlers.recordCaptureFailure(),
-      (blobSize: number, frameIndex: number) => {
-        // Log suspicious images so they appear in the expandable log panel
-        log.error(
-          `Suspicious image detected at frame ${frameIndex}: ` +
-            `size ${blobSize} bytes - image may be black/empty. ` +
-            `This can occur when WebGL hasn't composited the frame yet.`
-        );
-      }
+    await initAR(
+      appContainer,
+      recordingOptions.arCrashIsolation,
+      {
+        requestDepthOcclusion:
+          recordingOptions.occupancy.liveOcclusion === true,
+      },
+      sessionCallbacks
     );
 
     // Issue 8: Create CameraFollower at scene root (not arWorldGroup)
@@ -1346,7 +1421,7 @@ async function handleEnterAR(): Promise<void> {
 
       // Perf stats overlay (Step 0 of the 2026-07-03 long-session fps plan).
       // Mounted into the #app dom-overlay root so it composites over the AR
-      // view; advanced once per XR frame in the setFrameCallback tick below.
+      // view; advanced once per XR frame in the `callbacks.onFrame` tick.
       arSessionScope.wire('Stats overlay', viz.statsOverlay, () => {
         statsOverlay = createStatsOverlay(appContainer);
         return () => {
@@ -1579,35 +1654,6 @@ async function handleEnterAR(): Promise<void> {
         };
       });
     }
-
-    // Issue #14: Map overlay is created lazily on first toggle (not here)
-    // Register per-frame callback for smooth map position updates and follower tracking
-    // This is called every XR frame (~60+ Hz) rather than on GPS events (~1 Hz)
-    let lastFrameTime = performance.now();
-    setFrameCallback(() => {
-      const now = performance.now();
-      const dt = (now - lastFrameTime) / 1000;
-      lastFrameTime = now;
-
-      // Advance the perf stats panels (FPS/ms/MB) once per rendered XR frame.
-      statsOverlay?.update();
-
-      // Update alignment lerper (Issue 4) — interpolate arWorldGroup.matrix
-      alignmentLerper?.update(dt);
-
-      // Update follower position (lerp toward camera world position)
-      const camera = getCamera();
-      if (cameraFollower && camera) {
-        cameraFollower.update(camera, dt);
-      }
-
-      if (mapOverlay?.isVisible()) {
-        // Pass the live render camera so heading-up rotation is computed
-        // relative to where the user is actually looking (the same camera the
-        // CSS3D overlay is composited through). See the 2026-06-29 plan.
-        mapOverlay.updatePosition(dt, camera ?? undefined);
-      }
-    });
 
     // Issue #2 fix: Update status to match AR_READY state per Application State Machine
     updateStatus('AR active - Tap Start to record');

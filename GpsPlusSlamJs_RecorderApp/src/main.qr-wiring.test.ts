@@ -62,21 +62,13 @@ vi.mock('gps-plus-slam-app-framework/ar/webxr-session', () => ({
   isWebXRSupported: vi.fn().mockResolvedValue(true),
   getCurrentArPose: vi.fn().mockReturnValue(null),
   applyAlignmentMatrix: vi.fn(),
-  setImageCaptureCallback: vi.fn(),
   startImageCapture: vi.fn(),
   stopImageCapture: vi.fn(),
-  setDepthCaptureCallback: vi.fn(),
   startDepthCapture: vi.fn(),
   stopDepthCapture: vi.fn(),
-  setCameraFrameCallback: vi.fn(),
   startCameraFrameCapture: vi.fn(),
   stopCameraFrameCapture: vi.fn(),
-  setFrameCallback: vi.fn(),
-  setTrackingLostCallback: vi.fn(),
-  setTrackingCallbacks: vi.fn(),
-  setTrackingRecoveredCallback: vi.fn(),
-  setTrackingStore: vi.fn(),
-  setSessionEndCallback: vi.fn(),
+  rebindTrackingStore: vi.fn(),
   getScene: mockGetScene,
   getCamera: mockGetCamera,
   getArWorldGroup: mockGetArWorldGroup,
@@ -394,7 +386,7 @@ vi.mock('./storage/folder-manager', () => ({
 
 // Import after all mocks are set up.
 import { handleEnterARForTesting, resetMainState } from './main';
-import { setCameraFrameCallback } from 'gps-plus-slam-app-framework/ar/webxr-session';
+import { initAR } from 'gps-plus-slam-app-framework/ar/webxr-session';
 
 describe('Live-QR wiring in live AR (qr.enabled)', () => {
   beforeEach(() => {
@@ -410,11 +402,14 @@ describe('Live-QR wiring in live AR (qr.enabled)', () => {
     `;
   });
 
-  it('registers the camera-frame callback (before initAR) and wires QR recording when enabled', async () => {
+  it('passes the camera-frame callback to initAR and wires QR recording when enabled', async () => {
     await handleEnterARForTesting();
 
-    // Camera-frame callback registered (the producer's frame feed).
-    expect(setCameraFrameCallback).toHaveBeenCalledTimes(1);
+    // Camera-frame callback rides into initAR's callbacks struct (the
+    // producer's frame feed) — since the setter fold this replaces the old
+    // "setCameraFrameCallback called before initAR" ordering assertion.
+    const callbacks = vi.mocked(initAR).mock.calls[0]?.[3];
+    expect(typeof callbacks?.cameraFrame?.onFrame).toBe('function');
 
     // QR recording wired once, after AR init, with the expected options.
     expect(mockWireQrRecording).toHaveBeenCalledTimes(1);

@@ -61,7 +61,6 @@ import {
   getCurrentArPose,
   startImageCapture,
   stopImageCapture,
-  setImageQualityAnalyzer,
   startDepthCapture,
   stopDepthCapture,
   getImageCaptureFrameCount,
@@ -177,9 +176,20 @@ export interface RecordingSessionDeps {
    * recording. Without this, the new store's `tracking.phase` stays at
    * `'initializing'` and the tracking-quality phase gate keeps the HUD
    * pinned to "AR LOST" for the entire recording (Finding #1,
-   * 2026-05-23 user feedback).
+   * 2026-05-23 user feedback). Main injects the framework's
+   * `rebindTrackingStore` — the one runtime mutation that survived the
+   * fold of the pre-init setters into initAR's callbacks struct.
    */
-  setTrackingStore: (store: RecorderStore) => void;
+  rebindTrackingStore: (store: RecorderStore) => void;
+  /**
+   * Swap the off-thread image-quality analyzer for the CURRENT recording
+   * (or clear it with `null`). Recordings start/stop within one AR session,
+   * so the per-recording Worker cannot be an initAR-time constant — main.ts
+   * passes initAR a stable wrapper delegating to the ref this setter writes.
+   */
+  setImageQualityAnalyzer: (
+    analyzer: ImageQualityClient['analyze'] | null
+  ) => void;
   /** Create a fresh store instance. */
   createNewStore: () => RecorderStore;
   /** Read the current recording options (owned by main.ts). */
@@ -402,7 +412,7 @@ export function createRecordingSessionHandlers(
     // now, every `poseReceived` dispatch flows into the orphaned store and
     // the new store's `tracking.phase` never leaves `'initializing'`, which
     // pins the tracking-quality HUD to "AR LOST" for the whole recording.
-    deps.setTrackingStore(store);
+    deps.rebindTrackingStore(store);
 
     // Generate session name from timestamp
     const now = new Date();
@@ -510,7 +520,7 @@ export function createRecordingSessionHandlers(
           imageQualityClient = createImageQualityAnalyzer(
             imageConfig.qualityFilter
           );
-          setImageQualityAnalyzer(imageQualityClient.analyze);
+          deps.setImageQualityAnalyzer(imageQualityClient.analyze);
           log.info('Image-quality gate enabled (off-thread blur/blackness)');
         } catch (err) {
           // The worker is constructed synchronously; on a locked-down
@@ -519,14 +529,14 @@ export function createRecordingSessionHandlers(
           // recording rather than aborting a session whose GPS/orientation
           // watches are already running.
           imageQualityClient = null;
-          setImageQualityAnalyzer(null);
+          deps.setImageQualityAnalyzer(null);
           log.warn(
             'Image-quality gate unavailable (worker init failed) — recording without it',
             err
           );
         }
       } else {
-        setImageQualityAnalyzer(null);
+        deps.setImageQualityAnalyzer(null);
       }
       startImageCapture(imageConfig);
       log.info(
@@ -634,7 +644,7 @@ export function createRecordingSessionHandlers(
     stopImageCapture();
     // Tear down the off-thread quality analyzer (worker) for this recording
     // and clear the injected callback so the next recording starts clean.
-    setImageQualityAnalyzer(null);
+    deps.setImageQualityAnalyzer(null);
     imageQualityClient?.dispose();
     imageQualityClient = null;
     hideFrameCount();

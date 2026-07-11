@@ -3,8 +3,10 @@
 - **Purpose:** main-thread client for the off-thread blur/blackness gate. Owns
   the init/ready handshake, id-correlated async `analyze` calls, and disposal —
   the shape the (removed) QR demo's `worker-pnp-client` had. The returned
-  `analyze` is injected into the framework via `setImageQualityAnalyzer`, which
-  forwards it to `ImageCaptureManager` as the `analyzeFrame` callback.
+  `analyze` is injected through the recording-session-handlers' `setImageQualityAnalyzer` dep
+  (main.ts stores it behind the stable `imageCapture.qualityAnalyzer` wrapper it
+  passes to `initAR`), which forwards it to `ImageCaptureManager` as the
+  `analyzeFrame` callback.
 
 - **Public API:**
   - `WorkerLike` — the minimal `Worker` surface used (`postMessage`, `terminate`,

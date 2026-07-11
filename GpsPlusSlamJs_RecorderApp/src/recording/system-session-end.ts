@@ -2,7 +2,7 @@
  * System-Session-End Handler (F3, 2026-07-04 user feedback)
  *
  * The app's reaction to the framework's session-end callback
- * (`setSessionEndCallback` in gps-plus-slam-app-framework). On Android
+ * (initAR `callbacks.onSessionEnd` in gps-plus-slam-app-framework). On Android
  * Chrome the system back gesture ends an immersive XRSession directly —
  * uncancelable, no popstate, no beforeunload — so no dialog can be shown
  * beforehand. The framework tears the AR view down; this handler makes the
@@ -57,8 +57,8 @@ export interface SystemSessionEndDeps {
 }
 
 /**
- * Create the callback to register with the framework's
- * `setSessionEndCallback`. Returns a promise so tests can await the async
+ * Create the callback to pass to the framework via initAR's
+ * `callbacks.onSessionEnd`. Returns a promise so tests can await the async
  * work; the framework treats the callback as fire-and-forget and all
  * rejections are handled internally.
  */

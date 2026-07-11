@@ -21,6 +21,11 @@ framework does not own button DOM (unlike three.js' `ARButton`).
     `running → stopping → ready`. No-op when not `running`.
 - Types: `EnableGpsArStatus`, `EnableGpsArState`, `EnableGpsArConfig`,
   `EnableGpsArResult`, `EnableGpsArDeps`, `EnableGpsArController`.
+- `EnableGpsArConfig.callbacks?: ArSessionCallbacks` — the per-session AR
+  callbacks (tracking store, depth, image capture, `onFrame`, `onSessionEnd`)
+  forwarded verbatim as `initAR`'s 4th argument. Since the framework folded its
+  pre-init setter exports into `initAR` (surface-reduction step 1), this option
+  is the ONLY way controller-driven apps wire those callbacks.
 
 ### `EnableGpsArStatus`
 

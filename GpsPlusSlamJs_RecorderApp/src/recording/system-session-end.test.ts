@@ -4,7 +4,7 @@
  * Why these tests matter:
  * On Android Chrome the system back gesture ends the immersive XRSession
  * directly — uncancelable, no popstate. The framework now runs full teardown
- * and notifies the app via setSessionEndCallback. This handler is the app's
+ * and notifies the app via initAR's `callbacks.onSessionEnd`. This handler is the app's
  * reaction: a single back gesture mid-recording must yield a clean,
  * explained exit (auto-stop + save + summary + toast) instead of the old
  * "haunted scene" (black camera, recording still running, stale history).

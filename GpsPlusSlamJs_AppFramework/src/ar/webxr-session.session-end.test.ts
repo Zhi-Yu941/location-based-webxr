@@ -57,6 +57,8 @@ import {
   endARSession,
   resetWebXRState,
   getScene,
+  getCamera,
+  getArWorldGroup,
   type SessionEndInfo,
 } from './webxr-session.js';
 
@@ -144,7 +146,13 @@ describe('session-end hook (F3)', () => {
     // endARSession() also runs its own finally-teardown — the callback must
     // still fire exactly once.
     expect(events).toEqual([{ requestedByApp: true }]);
+    // Full scene-graph leak proof (moved here from webxr-session.test.ts when
+    // the replay injection setters it seeded through were deleted —
+    // surface-reduction step 2): no stale refs may survive into the next
+    // session via getScene()/getCamera()/getArWorldGroup().
     expect(getScene()).toBeNull();
+    expect(getCamera()).toBeNull();
+    expect(getArWorldGroup()).toBeNull();
     expect(container.querySelectorAll('canvas')).toHaveLength(0);
   });
 

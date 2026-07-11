@@ -10,8 +10,6 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import * as THREE from 'three';
-import { Scene, Group, PerspectiveCamera } from 'three';
 import {
   buildSessionOptions,
   extractPoseFromViewer,
@@ -25,11 +23,6 @@ import {
   getScene,
   getArWorldGroup,
   getCamera,
-  getArPose,
-  setScene,
-  setArWorldGroup,
-  setCamera,
-  setArPose,
   resetWebXRState,
   endARSession,
   applyAlignmentMatrix,
@@ -829,112 +822,6 @@ describe('module state accessors', () => {
 
     clearSessionDisposers();
   });
-
-  /**
-   * Why this test matters:
-   * Before initialization, getArPose should return null so modules
-   * that read it know the arpose node is not yet available.
-   */
-  it('getArPose returns null before initialization', () => {
-    expect(getArPose()).toBeNull();
-  });
-
-  /**
-   * Why this test matters:
-   * Replay mode sets the arpose node via setArPose() so that
-   * store subscribers can update it with recorded odom data.
-   */
-  it('setArPose makes getArPose return the provided object', () => {
-    const mockArPose = new Group();
-    setArPose(mockArPose);
-    expect(getArPose()).toBe(mockArPose);
-  });
-
-  /**
-   * Why this test matters:
-   * resetWebXRState must clear the arpose reference alongside scene,
-   * arWorldGroup, and camera.
-   */
-  it('resetWebXRState clears arpose', () => {
-    const mockArPose = new Group();
-    setArPose(mockArPose);
-    resetWebXRState();
-    expect(getArPose()).toBeNull();
-  });
-
-  /**
-   * Why this test matters:
-   * Replay mode needs to register its own scene with the module-global
-   * getters so that existing visualizers (GpsEventVisualizer,
-   * RefPointVisualizer) which call getScene() receive the replay scene.
-   * Without setScene(), replay mode cannot make visualizers work.
-   * @see docs/2026-02-19-replay-mode.md Risk R1
-   */
-  it('setScene makes getScene return the provided scene', () => {
-    const mockScene = new Scene();
-    setScene(mockScene);
-    expect(getScene()).toBe(mockScene);
-  });
-
-  /**
-   * Why this test matters:
-   * Replay mode needs to register its own arWorldGroup so that
-   * applyAlignmentMatrix() and visualizers that add content to the
-   * AR world group work correctly during replay.
-   * @see docs/2026-02-19-replay-mode.md Risk R1
-   */
-  it('setArWorldGroup makes getArWorldGroup return the provided group', () => {
-    const mockGroup = new Group();
-    setArWorldGroup(mockGroup);
-    expect(getArWorldGroup()).toBe(mockGroup);
-  });
-
-  /**
-   * Why this test matters:
-   * Replay mode needs to register its own camera so that getCamera()
-   * returns the replay camera for modules that read it.
-   * @see docs/2026-02-19-replay-mode.md Risk R1
-   */
-  it('setCamera makes getCamera return the provided camera', () => {
-    const mockCamera = new PerspectiveCamera();
-    setCamera(mockCamera);
-    expect(getCamera()).toBe(mockCamera);
-  });
-
-  /**
-   * Why this test matters:
-   * resetWebXRState must clear setter-provided values too, not just
-   * initAR()-provided values. This ensures no stale replay scene
-   * leaks into a subsequent AR session.
-   */
-  it('resetWebXRState clears values set via setters', () => {
-    const mockScene = new Scene();
-    const mockGroup = new Group();
-    const mockCamera = new PerspectiveCamera();
-    setScene(mockScene);
-    setArWorldGroup(mockGroup);
-    setCamera(mockCamera);
-
-    resetWebXRState();
-
-    expect(getScene()).toBeNull();
-    expect(getArWorldGroup()).toBeNull();
-    expect(getCamera()).toBeNull();
-  });
-
-  /**
-   * Why this test matters:
-   * setScene(null) must be a valid way to explicitly clear the scene,
-   * for cleanup paths that don't use the full resetWebXRState.
-   */
-  it('setScene accepts null to clear the scene', () => {
-    const mockScene = new Scene();
-    setScene(mockScene);
-    expect(getScene()).toBe(mockScene);
-
-    setScene(null);
-    expect(getScene()).toBeNull();
-  });
 });
 
 describe('applyAlignmentMatrix', () => {
@@ -969,90 +856,12 @@ describe('applyAlignmentMatrix', () => {
     expect(() => applyAlignmentMatrix([])).not.toThrow();
   });
 
-  /**
-   * Why this test matters:
-   * applyAlignmentMatrix now sets arWorldGroup.matrix to the alignment only
-   * (no WEBXR_TO_NUE composition). WEBXR_TO_NUE lives permanently in
-   * basisChangeNode. This confirms the simplified implementation.
-   */
-  it('sets arWorldGroup.matrix to alignment only (not composed with WEBXR_TO_NUE)', () => {
-    const { arWorldGroup } = createSceneHierarchy();
-    setArWorldGroup(arWorldGroup);
-
-    const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
-    applyAlignmentMatrix(identity);
-
-    // arWorldGroup.matrix must be exact identity — no WEBXR_TO_NUE folded in
-    const el = arWorldGroup.matrix.elements;
-    expect(el[0]).toBeCloseTo(1, 10); // diagonal
-    expect(el[5]).toBeCloseTo(1, 10);
-    expect(el[10]).toBeCloseTo(1, 10);
-    expect(el[15]).toBeCloseTo(1, 10);
-    expect(el[1]).toBeCloseTo(0, 10); // off-diagonal
-    expect(el[2]).toBeCloseTo(0, 10);
-    expect(el[4]).toBeCloseTo(0, 10);
-    expect(el[8]).toBeCloseTo(0, 10);
-  });
-
-  /**
-   * Why this test matters:
-   * The full chain arWorldGroup × basisChangeNode must still map a WebXR
-   * north position (z=-10) to NUE north (x=10). This verifies that moving
-   * WEBXR_TO_NUE into the scene graph preserves the correct camera mapping.
-   */
-  it('full chain (arWorldGroup × basisChangeNode) maps WebXR north to NUE north', () => {
-    const { arWorldGroup } = createSceneHierarchy();
-    setArWorldGroup(arWorldGroup);
-
-    const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
-    applyAlignmentMatrix(identity);
-
-    const basisChangeNode = arWorldGroup.getObjectByName(
-      SCENE_NODE.BASIS_CHANGE
-    )!;
-    const fullChain = new THREE.Matrix4().multiplyMatrices(
-      arWorldGroup.matrix,
-      basisChangeNode.matrix
-    );
-
-    // WebXR: x=0 (no east), y=0 (ground), z=-10 (north = -Z in WebXR)
-    const webxrPos = new THREE.Vector4(0, 0, -10, 1);
-    const result = webxrPos.applyMatrix4(fullChain);
-
-    // Expected NUE: x=10 (north), y=0, z=0 (no east)
-    expect(result.x).toBeCloseTo(10, 5);
-    expect(result.y).toBeCloseTo(0, 5);
-    expect(result.z).toBeCloseTo(0, 5);
-  });
-
-  /**
-   * Why this test matters:
-   * Walking east in WebXR (x increases) must still produce NUE Z increase
-   * (east) through the full chain, confirming end-to-end correctness.
-   */
-  it('full chain (arWorldGroup × basisChangeNode) maps WebXR east to NUE Z-east', () => {
-    const { arWorldGroup } = createSceneHierarchy();
-    setArWorldGroup(arWorldGroup);
-
-    const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
-    applyAlignmentMatrix(identity);
-
-    const basisChangeNode = arWorldGroup.getObjectByName(
-      SCENE_NODE.BASIS_CHANGE
-    )!;
-    const fullChain = new THREE.Matrix4().multiplyMatrices(
-      arWorldGroup.matrix,
-      basisChangeNode.matrix
-    );
-
-    const webxrPos = new THREE.Vector4(5, 0, 0, 1);
-    const result = webxrPos.applyMatrix4(fullChain);
-
-    // WebXR x=5 (east) → NUE z=5 (east)
-    expect(result.x).toBeCloseTo(0, 5);
-    expect(result.y).toBeCloseTo(0, 5);
-    expect(result.z).toBeCloseTo(5, 5);
-  });
+  // NOTE: the behavioural applyAlignmentMatrix tests (alignment written to
+  // the live arWorldGroup, full-chain WebXR→NUE mapping, replay composition
+  // with nuePositionToWebXR) live in webxr-session.alignment.test.ts — they
+  // seed the module arWorldGroup through the real initAR() path now that the
+  // replay-mode injection setters (setArWorldGroup et al.) are deleted
+  // (surface-reduction step 2).
 });
 
 describe('nuePositionToWebXR', () => {
@@ -1088,38 +897,10 @@ describe('nuePositionToWebXR', () => {
     expect(webxrRecovered[2]).toBeCloseTo(webxrOriginal[2], 10);
   });
 
-  /**
-   * Why this test matters:
-   * Verifies that applying the composed arWorldGroup matrix to a round-tripped
-   * WebXR position yields the same result as directly applying alignment to NUE.
-   */
-  it('composes correctly with applyAlignmentMatrix for replay', () => {
-    const { arWorldGroup } = createSceneHierarchy();
-    setArWorldGroup(arWorldGroup);
-
-    const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
-    applyAlignmentMatrix(identity);
-
-    // odomPosition in NUE: north=10, up=0, east=5
-    const odomNUE = [10, 0, 5];
-    // Convert to WebXR for arpose (arpose lives in WebXR space below basisChangeNode)
-    const webxrPos = nuePositionToWebXR(odomNUE);
-    // Apply the full chain: arWorldGroup (alignment) × basisChangeNode (WEBXR_TO_NUE)
-    const basisChangeNode = arWorldGroup.getObjectByName(
-      SCENE_NODE.BASIS_CHANGE
-    )!;
-    const fullChain = new THREE.Matrix4().multiplyMatrices(
-      arWorldGroup.matrix,
-      basisChangeNode.matrix
-    );
-    const v = new THREE.Vector4(webxrPos[0], webxrPos[1], webxrPos[2], 1);
-    v.applyMatrix4(fullChain);
-
-    // Should recover NUE position
-    expect(v.x).toBeCloseTo(odomNUE[0], 5);
-    expect(v.y).toBeCloseTo(odomNUE[1], 5);
-    expect(v.z).toBeCloseTo(odomNUE[2], 5);
-  });
+  // NOTE: the replay-composition test ("composes correctly with
+  // applyAlignmentMatrix for replay") moved to webxr-session.alignment.test.ts
+  // — it needs the module arWorldGroup, which is now only seeded by initAR()
+  // (surface-reduction step 2 deleted the injection setters).
 });
 
 describe('image capture functions', () => {
@@ -1514,29 +1295,12 @@ describe('DOM hardcoding audit regressions', () => {
     expect(endBlock).toContain('resetWebXRState()');
   });
 
-  /**
-   * Why this test matters:
-   * This is the behavioural proof of the leak the delegation fixes. Before
-   * delegating to resetWebXRState(), endARSession() left the scene-graph
-   * references (scene, camera, arWorldGroup, arPose) dangling, so a fresh
-   * session could observe stale objects via getScene()/getCamera()/etc.
-   * We seed those references through the public setters (the same surface
-   * replay mode uses) because initAR() cannot run under jsdom.
-   */
-  it('endARSession clears scene-graph references so they do not leak into the next session', async () => {
-    resetWebXRState();
-    setScene(new Scene());
-    setCamera(new PerspectiveCamera());
-    setArWorldGroup(new Group());
-    setArPose(new THREE.Object3D());
-
-    await endARSession();
-
-    expect(getScene()).toBeNull();
-    expect(getCamera()).toBeNull();
-    expect(getArWorldGroup()).toBeNull();
-    expect(getArPose()).toBeNull();
-  });
+  // NOTE: the behavioural leak proof ("endARSession clears scene-graph
+  // references") used to seed the module refs through the replay-mode
+  // injection setters, which were deleted (surface-reduction step 2). The
+  // same leak class is now pinned through the real initAR() path: the
+  // session-end tests (webxr-session.session-end.test.ts) assert
+  // getScene()/getCamera()/getArWorldGroup() are null after both end paths.
 
   /**
    * Why this test matters:

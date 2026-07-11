@@ -4,9 +4,9 @@
  * Why these tests matter:
  * The replay scene is the Three.js rendering surface for desktop replay mode.
  * It must set up the correct scene hierarchy with arpose between arWorldGroup
- * and camera, register the scene with module-global getters from
- * webxr-session.ts (Risk R1), and use a standard requestAnimationFrame
- * loop instead of WebXR.
+ * and camera, OWN its scene references (exposed via the init return value and
+ * getReplayState() — it must NOT leak into webxr-session's live-session
+ * getters), and use a standard requestAnimationFrame loop instead of WebXR.
  *
  * Tests are split across iterations 3a (core scene), 3b (OrbitControls),
  * and 3c (FPS toggle).
@@ -15,13 +15,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
-import {
-  getScene,
-  getArWorldGroup,
-  getCamera,
-  getArPose,
-  resetWebXRState,
-} from './webxr-session.js';
+import { getScene, getArWorldGroup, getCamera } from './webxr-session.js';
 import { SCENE_NODE } from './scene-node-names.js';
 
 // We must mock WebGLRenderer since jsdom has no WebGL context.
@@ -101,7 +95,6 @@ describe('replay-scene', () => {
   let container: HTMLDivElement;
 
   beforeEach(() => {
-    resetWebXRState();
     container = document.createElement('div');
     // Give the container dimensions so the renderer can size correctly
     Object.defineProperty(container, 'clientWidth', {
@@ -124,7 +117,6 @@ describe('replay-scene', () => {
   afterEach(() => {
     disposeReplayScene();
     document.body.removeChild(container);
-    resetWebXRState();
     vi.restoreAllMocks();
   });
 
@@ -151,31 +143,37 @@ describe('replay-scene', () => {
     });
 
     /**
-     * Why this test matters (Risk R1):
-     * Existing visualizers (GpsEventVisualizer, RefPointVisualizer) call
-     * getScene()/getArWorldGroup()/getCamera() from webxr-session.ts.
-     * initReplayScene must register its scene objects via the setters
-     * so visualizers work without modification.
+     * Why this test matters (surface-reduction step 2):
+     * The replay scene OWNS its references — initReplayScene must NOT write
+     * them into webxr-session's live-session getters (the deleted Risk R1
+     * injection). getScene()/getArWorldGroup()/getCamera() stay null during
+     * replay; consumers read the init return value / getReplayState().
      */
-    it('registers scene objects with webxr-session module getters', () => {
+    it('does not leak scene objects into webxr-session live getters', () => {
       const result = initReplayScene(container);
 
-      expect(getScene()).toBe(result.scene);
-      expect(getArWorldGroup()).toBe(result.arWorldGroup);
-      expect(getCamera()).toBe(result.camera);
+      expect(getScene()).toBeNull();
+      expect(getArWorldGroup()).toBeNull();
+      expect(getCamera()).toBeNull();
+      // The refs live in this module's own state instead.
+      const st = getReplayState()!;
+      expect(st.scene).toBe(result.scene);
+      expect(st.arWorldGroup).toBe(result.arWorldGroup);
+      expect(st.camera).toBe(result.camera);
     });
 
     /**
-     * Why this test matters (6.3):
-     * initReplayScene must register the arpose Object3D via setArPose()
-     * so store subscribers can update it with recorded odom data.
+     * Why this test matters (6.3, surface-reduction step 2):
+     * initReplayScene must expose the arpose Object3D through its own
+     * return value / state so store subscribers (replay-mode's
+     * onNewOdomPose) can update it with recorded odom data.
      */
-    it('registers arpose with webxr-session module getter', () => {
-      initReplayScene(container);
+    it('exposes arpose through the init return value and replay state', () => {
+      const result = initReplayScene(container);
 
-      const arpose = getArPose();
-      expect(arpose).not.toBeNull();
-      expect(arpose!.name).toBe('ar-pose');
+      expect(result.arpose).toBeDefined();
+      expect(result.arpose.name).toBe('ar-pose');
+      expect(getReplayState()!.arpose).toBe(result.arpose);
     });
 
     /**
@@ -282,13 +280,13 @@ describe('replay-scene', () => {
 
     /**
      * Why this test matters:
-     * Disposal must clear module-global scene references so that
-     * getScene()/getArWorldGroup()/getCamera() return null, preventing
-     * stale references from leaking into subsequent sessions.
+     * webxr-session's live getters must stay null across the whole replay
+     * lifecycle — neither init nor dispose may touch the live-session
+     * singleton (surface-reduction step 2 removed that injection).
      */
-    it('clears webxr-session module state', () => {
+    it('never touches webxr-session module state (init or dispose)', () => {
       initReplayScene(container);
-      expect(getScene()).not.toBeNull();
+      expect(getScene()).toBeNull();
 
       disposeReplayScene();
 
@@ -654,14 +652,14 @@ describe('replay-scene', () => {
      * orbit target to follow the trajectory.
      */
     it('arpose remains in hierarchy under basisChangeNode after camera reparent', () => {
-      initReplayScene(container);
-      const arpose = getArPose();
-      const arWorldGroup = getArWorldGroup();
+      const result = initReplayScene(container);
+      const arpose = result.arpose;
+      const arWorldGroup = result.arWorldGroup;
 
       expect(arpose).not.toBeNull();
-      expect(arpose!.name).toBe('ar-pose');
+      expect(arpose.name).toBe('ar-pose');
       // arpose.parent = basisChangeNode, basisChangeNode.parent = arWorldGroup
-      expect(arpose!.parent?.parent).toBe(arWorldGroup);
+      expect(arpose.parent?.parent).toBe(arWorldGroup);
     });
 
     /**
@@ -673,7 +671,7 @@ describe('replay-scene', () => {
      */
     it('camera world position is unaffected by arpose transform changes', () => {
       const result = initReplayScene(container);
-      const arpose = getArPose()!;
+      const arpose = result.arpose;
       const camera = result.camera;
 
       // Record camera world position

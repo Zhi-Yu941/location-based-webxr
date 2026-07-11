@@ -7,8 +7,15 @@
  * controls operate in a stable world-space frame, unaffected by the
  * alignment matrix on arWorldGroup or odom pose updates on arpose.
  *
- * Registers the scene objects with webxr-session.ts module-global getters
- * (Risk R1 fix) so existing visualizers work without modification.
+ * OWNS its scene objects: the replay scene/arWorldGroup/camera/arpose are
+ * exposed via initReplayScene()'s return value and getReplayState(), and are
+ * NEVER injected into webxr-session.ts (the historical Risk R1
+ * setScene/setArWorldGroup/setCamera/setArPose hack was removed by the
+ * 2026-07-11 webxr-session surface-reduction plan, step 2). The live-session
+ * getters (getScene() etc.) stay null during replay; replay consumers read
+ * this module's accessors instead, and scene-reading visualizers (e.g.
+ * gpsEventVisualizer.setSceneSource) are pointed at these references by the
+ * replay orchestrator.
  *
  * Camera modes:
  *   - orbit (default): OrbitControls — click-drag orbit + scroll zoom
@@ -21,13 +28,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import {
-  createSceneHierarchy,
-  setScene,
-  setArWorldGroup,
-  setCamera,
-  setArPose,
-} from './webxr-session.js';
+import { createSceneHierarchy } from './webxr-session.js';
 import { createLogger } from '../utils/logger.js';
 import {
   createCameraFollower,
@@ -54,6 +55,11 @@ export type CameraMode = 'orbit' | 'fps';
 export interface ReplaySceneState {
   scene: THREE.Scene;
   arWorldGroup: THREE.Group;
+  /**
+   * The arpose node (between basisChangeNode and the detached camera slot).
+   * Store subscribers write recorded odom poses here during replay.
+   */
+  arpose: THREE.Object3D;
   camera: THREE.PerspectiveCamera;
   renderer: THREE.WebGLRenderer;
   orbitControls: OrbitControls;
@@ -153,7 +159,8 @@ function updateFpsMovement(dt: number): void {
  * - Creates the scene hierarchy via createSceneHierarchy()
  * - Reparents camera from arWorldGroup to scene root (Risk R5)
  * - Creates a WebGLRenderer WITHOUT WebXR
- * - Registers scene with module-global getters (Risk R1)
+ * - Keeps its own scene/arWorldGroup/arpose/camera references (returned
+ *   here and via getReplayState()) — nothing is written into webxr-session
  * - Inserts canvas into the provided container
  * - Starts a requestAnimationFrame render loop
  * - Sets up OrbitControls as default camera mode
@@ -165,6 +172,7 @@ function updateFpsMovement(dt: number): void {
 export function initReplayScene(container: HTMLElement): {
   scene: THREE.Scene;
   arWorldGroup: THREE.Group;
+  arpose: THREE.Object3D;
   camera: THREE.PerspectiveCamera;
   renderer: THREE.WebGLRenderer;
 } {
@@ -207,12 +215,6 @@ export function initReplayScene(container: HTMLElement): {
   // Create CSS3D renderer overlay for DOM-based 3D objects (Approach E)
   const css3dManager = createCss3dRendererManager(container, width, height);
 
-  // Register with module-global getters (Risk R1 fix)
-  setScene(scene);
-  setArWorldGroup(arWorldGroup);
-  setArPose(arpose);
-  setCamera(camera);
-
   // Set up OrbitControls as default camera mode
   const orbitControls = new OrbitControls(camera, renderer.domElement);
   orbitControls.enableDamping = true;
@@ -239,6 +241,7 @@ export function initReplayScene(container: HTMLElement): {
   state = {
     scene,
     arWorldGroup,
+    arpose,
     camera,
     renderer,
     orbitControls,
@@ -252,7 +255,7 @@ export function initReplayScene(container: HTMLElement): {
 
   log.info('Replay scene initialized');
 
-  return { scene, arWorldGroup, camera, renderer };
+  return { scene, arWorldGroup, arpose, camera, renderer };
 }
 
 /**
@@ -262,7 +265,7 @@ export function initReplayScene(container: HTMLElement): {
  * - Disposes renderer (frees GPU resources)
  * - Disposes camera controls
  * - Removes canvas from DOM
- * - Clears module-global scene references
+ * - Clears this module's state (getReplayState() returns null afterwards)
  *
  * Safe to call multiple times (idempotent).
  */
@@ -303,12 +306,6 @@ export function disposeReplayScene(): void {
 
   // Dispose renderer (free GPU resources)
   state.renderer.dispose();
-
-  // Clear module-global state (Risk R1 cleanup)
-  setScene(null);
-  setArWorldGroup(null);
-  setArPose(null);
-  setCamera(null);
 
   state = null;
 

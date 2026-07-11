@@ -47,6 +47,100 @@ describe('GpsEventVisualizer', () => {
     });
   });
 
+  describe('setSceneSource (replay / offline scene ownership)', () => {
+    /**
+     * Why this test matters (surface-reduction step 2):
+     * Replay mode used to inject its scene into the webxr-session singleton
+     * (`setScene`/`setArWorldGroup` — the deleted Risk R1 setters) so this
+     * visualizer would find it via the live getters. Now replay points the
+     * visualizer at its OWN scene via setSceneSource; markers must land in
+     * that scene even though the live getters return null (no AR session).
+     */
+    it('parents markers into the override scene, not the live getters', () => {
+      vi.mocked(getScene).mockReturnValue(null);
+      vi.mocked(getArWorldGroup).mockReturnValue(null);
+
+      const replayScene = new THREE.Scene();
+      const replayGroup = new THREE.Group();
+      replayScene.add(replayGroup);
+      visualizer.setSceneSource({
+        getScene: () => replayScene,
+        getArWorldGroup: () => replayGroup,
+      });
+      visualizer.setZeroRef({ lat: 48.8566, lon: 2.3522 });
+
+      visualizer.addGpsEvent([10, 5, 20], [1, 2, 3]);
+
+      expect(visualizer.getCounts()).toEqual({
+        raw: 1,
+        fused: 1,
+        snapshots: 0,
+      });
+      expect(
+        replayScene.children.some((c) => c.name.startsWith('raw-gps-'))
+      ).toBe(true);
+      expect(
+        replayGroup.children.some((c) => c.name.startsWith('fused-'))
+      ).toBe(true);
+    });
+
+    /**
+     * Why this test matters:
+     * setSceneSource(null) must restore the live-session default so a live AR
+     * session started after a replay parents markers into the live scene
+     * again — the override must not leak across scene lifetimes.
+     */
+    it('setSceneSource(null) restores the live-session default', () => {
+      const replayScene = new THREE.Scene();
+      const replayGroup = new THREE.Group();
+      replayScene.add(replayGroup);
+      visualizer.setSceneSource({
+        getScene: () => replayScene,
+        getArWorldGroup: () => replayGroup,
+      });
+
+      visualizer.setSceneSource(null);
+      visualizer.setZeroRef({ lat: 48.8566, lon: 2.3522 });
+      visualizer.addGpsEvent([10, 5, 20], [1, 2, 3]);
+
+      // Markers landed in the (mocked) LIVE scene, not the replay scene.
+      expect(
+        mockScene.children.some((c) => c.name.startsWith('raw-gps-'))
+      ).toBe(true);
+      expect(replayScene.children).toHaveLength(1); // only replayGroup
+      expect(replayGroup.children).toHaveLength(0);
+    });
+
+    /**
+     * Why this test matters:
+     * clearAll() must remove markers from the scene the source currently
+     * points at (replay dispose clears before restoring the default).
+     */
+    it('clearAll removes markers from the override scene', () => {
+      const replayScene = new THREE.Scene();
+      const replayGroup = new THREE.Group();
+      replayScene.add(replayGroup);
+      visualizer.setSceneSource({
+        getScene: () => replayScene,
+        getArWorldGroup: () => replayGroup,
+      });
+      visualizer.setZeroRef({ lat: 48.8566, lon: 2.3522 });
+      visualizer.addGpsEvent([10, 5, 20], [1, 2, 3]);
+
+      visualizer.clearAll();
+
+      expect(visualizer.getCounts()).toEqual({
+        raw: 0,
+        fused: 0,
+        snapshots: 0,
+      });
+      expect(
+        replayScene.children.some((c) => c.name.startsWith('raw-gps-'))
+      ).toBe(false);
+      expect(replayGroup.children).toHaveLength(0);
+    });
+  });
+
   describe('addGpsEvent', () => {
     it('does not create markers if zero ref not set', () => {
       const gpsCoords: Vector3 = [10, 5, 20]; // meters from zero

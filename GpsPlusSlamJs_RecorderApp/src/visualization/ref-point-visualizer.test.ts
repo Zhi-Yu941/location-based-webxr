@@ -42,6 +42,47 @@ describe('RefPointVisualizer', () => {
     });
   });
 
+  describe('setSceneSource (replay scene ownership)', () => {
+    /**
+     * Why this test matters (surface-reduction step 2): replay mode no longer
+     * injects its scene into the webxr-session singleton; instead it points
+     * this visualizer at the replay scene. Meshes must land in that scene
+     * even though the live getScene() returns null (no AR session).
+     */
+    it('parents meshes into the override scene when live getScene is null', () => {
+      vi.mocked(getScene).mockReturnValue(null);
+      const replayScene = new THREE.Scene();
+      visualizer.setSceneSource(() => replayScene);
+      visualizer.setZeroRef({ lat: 48.8566, lon: 2.3522 });
+
+      visualizer.syncRefPoints([
+        createMockReferencePoint('rp1', 48.8567, 2.3523),
+      ]);
+
+      expect(visualizer.getRefPointCount()).toBe(1);
+      expect(replayScene.children).toHaveLength(1);
+    });
+
+    /**
+     * Why this test matters: setSceneSource(null) must restore the
+     * live-session default so a later live AR session renders ref points in
+     * the live scene again (replay-mode's dispose relies on this).
+     */
+    it('setSceneSource(null) restores the live-session default', () => {
+      const replayScene = new THREE.Scene();
+      visualizer.setSceneSource(() => replayScene);
+
+      visualizer.setSceneSource(null);
+      visualizer.setZeroRef({ lat: 48.8566, lon: 2.3522 });
+      visualizer.syncRefPoints([
+        createMockReferencePoint('rp1', 48.8567, 2.3523),
+      ]);
+
+      expect(mockScene.children).toHaveLength(1);
+      expect(replayScene.children).toHaveLength(0);
+    });
+  });
+
   describe('clearAll', () => {
     // Why this test matters: clearAll is the session-reset hook — leftover
     // meshes or a stale zeroRef would leak markers into the next session.

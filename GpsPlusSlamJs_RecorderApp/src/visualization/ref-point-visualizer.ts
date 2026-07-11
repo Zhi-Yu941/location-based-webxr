@@ -98,6 +98,13 @@ function refPointEntryToItem(entry: RefPointEntry): GpsAnchoredItem {
 
 export class RefPointVisualizer {
   private zeroRef: LatLong | null = null;
+  /**
+   * Scene the ref-point meshes are parented into. Defaults to the LIVE AR
+   * session's scene (`webxr-session.getScene`); replay-mode overrides it with
+   * the replay scene via {@link setSceneSource} (surface-reduction step 2 —
+   * replay no longer injects its scene into the webxr-session singleton).
+   */
+  private sceneSource: () => THREE.Scene | null = getScene;
   /** Handles for the `syncRefPoints` pipeline (one mesh per ref-point id). */
   private refPointHandles = new Map<string, THREE.Mesh>();
   /**
@@ -109,6 +116,15 @@ export class RefPointVisualizer {
    * self-healing.
    */
   private lastRefPoints: readonly RefPointEntry[] = [];
+
+  /**
+   * Point the visualizer at a non-live scene (desktop replay). Pass `null`
+   * to restore the live-session default. The overriding owner (replay-mode's
+   * dispose) is responsible for restoring the default when its scene dies.
+   */
+  setSceneSource(source: (() => THREE.Scene | null) | null): void {
+    this.sceneSource = source ?? getScene;
+  }
 
   setZeroRef(zero: LatLong): void {
     this.zeroRef = zero;
@@ -149,7 +165,7 @@ export class RefPointVisualizer {
     // below because the zero reference or scene is not available yet.
     this.lastRefPoints = refPoints;
     if (!this.zeroRef) return;
-    const scene = getScene();
+    const scene = this.sceneSource();
     if (!scene) return;
     const items = refPoints.map(refPointEntryToItem);
     const prev = this.refPointHandles;
@@ -166,7 +182,7 @@ export class RefPointVisualizer {
   }
 
   clearAll(): void {
-    const scene = getScene();
+    const scene = this.sceneSource();
     if (scene) {
       this.refPointHandles = syncGpsAnchoredMeshes(
         scene,

@@ -39,10 +39,21 @@ import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
 import { gpsEventVisualizer } from 'gps-plus-slam-app-framework/visualization/gps-event-markers';
 import {
   getScene,
-  setScene,
   getArWorldGroup,
-  setArWorldGroup,
 } from 'gps-plus-slam-app-framework/ar/webxr-session';
+
+/**
+ * Offline scene fixture for `addGpsEventForTest` (§3c). Playwright specs call
+ * that hook without an active WebXR session, so the visualizer needs SOME
+ * scene graph to parent markers into. The fixture used to inject a scene into
+ * the webxr-session singleton (`setScene`/`setArWorldGroup` — deleted by
+ * surface-reduction step 2); now it keeps its own module-level scene and
+ * points `gpsEventVisualizer` at it via `setSceneSource`, preferring the live
+ * scene whenever one exists. Module-level + lazily created = idempotent
+ * across calls, exactly like the old `if (!getScene())` guard.
+ */
+let offlineScene: THREE.Scene | null = null;
+let offlineArWorldGroup: THREE.Group | null = null;
 
 /** A fixture tour: a named GPS path Playwright hands in as plain JSON. */
 interface FixtureTour {
@@ -111,22 +122,28 @@ export function installE2eTestHooks(deps: E2eHookDeps): void {
     /**
      * §3c — Add a GPS event with optional accuracy directly to the
      * visualizer. Ensures an offline `THREE.Scene` + `arWorldGroup` exist
-     * (Playwright tests don't have an active WebXR session). Idempotent —
-     * subsequent calls reuse the same offline scene.
+     * (Playwright tests don't have an active WebXR session) and points the
+     * visualizer at them via `setSceneSource` — the live scene still wins
+     * when a real AR session is active. Idempotent — subsequent calls reuse
+     * the same offline scene.
      */
     addGpsEventForTest: (
       gpsCoords: [number, number, number],
       odomPosition: [number, number, number],
       accuracy?: { horizontal?: number; vertical?: number }
     ) => {
-      if (!getScene()) {
-        setScene(new THREE.Scene());
+      if (!offlineScene) {
+        offlineScene = new THREE.Scene();
+        offlineArWorldGroup = new THREE.Group();
+        offlineScene.add(offlineArWorldGroup);
       }
-      if (!getArWorldGroup()) {
-        const grp = new THREE.Group();
-        getScene()?.add(grp);
-        setArWorldGroup(grp);
-      }
+      // Re-assert the source on every call: a replay session may have
+      // overridden it and restored the live default on dispose, which would
+      // otherwise strand later fixture events without a scene.
+      gpsEventVisualizer.setSceneSource({
+        getScene: () => getScene() ?? offlineScene,
+        getArWorldGroup: () => getArWorldGroup() ?? offlineArWorldGroup,
+      });
       gpsEventVisualizer.addGpsEvent(gpsCoords, odomPosition, accuracy);
     },
     getRawGpsMarkerWorldSizes: () =>

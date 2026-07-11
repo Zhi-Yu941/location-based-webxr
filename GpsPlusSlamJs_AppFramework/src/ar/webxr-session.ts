@@ -204,7 +204,6 @@ export function resetWebXRState(): void {
   camera = null;
   xrSession = null;
   arWorldGroup = null;
-  arPoseNode = null;
   latestArPose = null;
   lastFrameTime = 0;
   clearFrameUpdates();
@@ -270,12 +269,12 @@ export function resetWebXRState(): void {
  */
 let arWorldGroup: THREE.Group | null = null;
 
-/**
- * The arpose Object3D — intermediate node between arWorldGroup and camera.
- * During recording it stays at identity; during replay it receives recorded
- * odomPosition/odomRotation from the store subscriber.
- */
-let arPoseNode: THREE.Object3D | null = null;
+// NOTE: the live session keeps NO module reference to the arpose node (the
+// intermediate Object3D between basisChangeNode and the camera). It stays at
+// identity during recording and lives purely in the scene graph built by
+// createSceneHierarchy(); its only reader was the replay-injection getter
+// getArPose(), deleted by surface-reduction step 2 — replay now uses its own
+// arpose from replay-scene's getReplayState().
 
 /**
  * Stores the latest raw AR pose from WebXR (updated every frame).
@@ -1064,11 +1063,11 @@ export async function initAR(
     );
   }
 
-  // Create scene with proper hierarchy
+  // Create scene with proper hierarchy. The arpose node stays in the graph
+  // only (no module ref) — see the NOTE next to the module state above.
   const hierarchy = createSceneHierarchy();
   scene = hierarchy.scene;
   arWorldGroup = hierarchy.arWorldGroup;
-  arPoseNode = hierarchy.arpose;
   camera = hierarchy.camera;
 
   // Request AR session with validated options
@@ -1464,6 +1463,19 @@ export function getDepthInfoFromFrame(
   }
 }
 
+// ---------------------------------------------------------------------------
+// Live-session scene getters
+//
+// These return the LIVE AR session's scene graph (set internally by initAR,
+// cleared by resetWebXRState) and are null at any other time — including
+// during desktop replay. The historical replay-mode "Risk R1" injection
+// exports (setScene/setArWorldGroup/setCamera/setArPose/getArPose — see
+// docs/2026-02-19-replay-mode.md, now superseded on this point) were deleted
+// by the 2026-07-11 webxr-session surface-reduction plan, step 2: replay owns
+// its scene in replay-scene.ts and exposes it via getReplayState(); replay
+// consumers read those references instead of this module.
+// ---------------------------------------------------------------------------
+
 /**
  * Get the current Three.js scene (for adding objects like map)
  */
@@ -1484,53 +1496,6 @@ export function getArWorldGroup(): THREE.Group | null {
  */
 export function getCamera(): THREE.PerspectiveCamera | null {
   return camera;
-}
-
-/**
- * Set the scene externally (for replay mode).
- * Allows non-WebXR code paths to register a scene so that modules
- * calling getScene() receive it.
- * @see docs/2026-02-19-replay-mode.md Risk R1
- */
-export function setScene(s: THREE.Scene | null): void {
-  scene = s;
-}
-
-/**
- * Set the AR world group externally (for replay mode).
- * Allows non-WebXR code paths to register an arWorldGroup so that
- * applyAlignmentMatrix() and visualizers work correctly.
- * @see docs/2026-02-19-replay-mode.md Risk R1
- */
-export function setArWorldGroup(g: THREE.Group | null): void {
-  arWorldGroup = g;
-}
-
-/**
- * Set the camera externally (for replay mode).
- * Allows non-WebXR code paths to register a camera so that modules
- * calling getCamera() receive it.
- * @see docs/2026-02-19-replay-mode.md Risk R1
- */
-export function setCamera(c: THREE.PerspectiveCamera | null): void {
-  camera = c;
-}
-
-/**
- * Get the arpose Object3D (intermediate node between arWorldGroup and camera).
- * Returns null before scene initialization.
- */
-export function getArPose(): THREE.Object3D | null {
-  return arPoseNode;
-}
-
-/**
- * Set the arpose Object3D externally (for replay mode).
- * Allows non-WebXR code paths to register an arpose so that
- * store subscribers can update it with recorded odom data.
- */
-export function setArPose(a: THREE.Object3D | null): void {
-  arPoseNode = a;
 }
 
 /**

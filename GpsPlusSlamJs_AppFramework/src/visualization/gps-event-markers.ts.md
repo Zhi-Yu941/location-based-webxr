@@ -14,6 +14,7 @@ Visualizes GPS events as 3D markers during recording and replay. Shows three typ
 
 - `GpsEventVisualizer` — class that manages GPS event marker visualization.
 - `GpsEventAccuracy` — optional `{ horizontal?: number; vertical?: number }` hint used by `addGpsEvent` to render the raw-GPS marker as a non-uniform-scaled ellipsoid (replay mode).
+- `GpsMarkerSceneSource` — `{ getScene: () => THREE.Scene | null; getArWorldGroup: () => THREE.Group | null }`: where the visualizer resolves its scene graph from (see `setSceneSource`).
 
 ### GpsEventVisualizer Class
 
@@ -29,6 +30,7 @@ Visualizes GPS events as 3D markers during recording and replay. Shows three typ
 - `setVisible(visible: boolean): void` — show/hide **all** debug markers (raw + fused + snapshot) and remember the state so markers added later inherit it. Backs the recorder's `visualization.gpsAlignmentMarkers` opt-out (Finding B), read once at Enter-AR (live only — replay keeps markers visible). Affects rendering only: capture, GPS-event recording, counts, and snapshot positions are unchanged. Default visible; `clearAll()` resets it to visible so a live opt-out never leaks into a subsequent replay on the shared singleton.
 - `clearAll(): void` — remove all markers (including snapshots), reset counters/zero-ref, and restore visibility to the default (visible).
 - `getCounts(): { raw, fused, snapshots }` — get marker counts including alignment snapshots.
+- `setSceneSource(source: GpsMarkerSceneSource | null): void` — point the visualizer at a non-live scene graph (desktop replay, offline e2e fixture); `null` restores the live-session default (`webxr-session`'s `getScene`/`getArWorldGroup`). Introduced by the 2026-07-11 webxr-session surface-reduction plan, step 2 — replay used to inject its scene into the webxr-session singleton (the deleted Risk R1 `setScene`/`setArWorldGroup` exports) so this visualizer would find it; now the replay orchestrator points the visualizer at the replay scene explicitly and restores the default on dispose. Not reset by `clearAll()` — the overriding owner restores it.
 - `getRawMarkerWorldSizes(): Array<{ x, y, z }>` — diagnostic accessor returning the world-space bounding-box size (`THREE.Box3.setFromObject`) of each raw-GPS marker in insertion order. Used by the §3c Playwright spec to verify accuracy-ellipsoid scaling.
 
 ### Exported Singleton
@@ -40,8 +42,8 @@ export const gpsEventVisualizer: GpsEventVisualizer;
 ## Invariants & Assumptions
 
 1. **Zero reference must be set** before adding GPS events — but purely as a readiness gate (see `setZeroRef` above); marker positions come from the pre-computed `gpsCoords`, not from this field.
-2. **Scene must be available** (from `getScene()`) for raw GPS markers to be created
-3. **arWorldGroup must be available** (from `getArWorldGroup()`) for fused markers; if unavailable, only raw GPS marker is created
+2. **Scene must be available** (from the current scene source — the live `getScene()` by default) for raw GPS markers to be created
+3. **arWorldGroup must be available** (from the current scene source — the live `getArWorldGroup()` by default) for fused markers; if unavailable, only raw GPS marker is created
 4. **Raw GPS markers are immutable** — they never move after creation (scene root)
 5. **Fused markers move automatically** when `applyAlignmentMatrix()` updates `arWorldGroup.matrix` — no manual repositioning needed
 6. **No gl-matrix dependency** — alignment is handled entirely by Three.js scene-graph propagation
@@ -105,6 +107,7 @@ unsubscribeStore = wireStoreSubscribers(store, {
 Unit tests in `gps-event-markers.test.ts`:
 
 - `setZeroRef / getZeroRef` — verify zero reference storage.
+- `setSceneSource` — markers land in the override scene while the live getters are null (replay), `null` restores the live default, `clearAll` removes from the override scene.
 - `addGpsEvent` — marker creation, colors, placement, guard checks.
 - `addGpsEvent accuracy-aware ellipsoid (§3)` — non-uniform scale on the raw marker, defensive fallback on missing/non-positive accuracy, lowered opacity, `renderOrder = -1`, cyan/red unaffected. See [`2026-05-19-investigate-rec31-altitude-drop.md`](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-19-investigate-rec31-altitude-drop.md) §3 for the motivation.
 - `scene-graph propagation` — world position via `arWorldGroup.matrix`.

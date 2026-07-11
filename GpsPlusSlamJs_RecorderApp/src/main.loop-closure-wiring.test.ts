@@ -106,8 +106,6 @@ vi.mock('gps-plus-slam-app-framework/ar/webxr-session', () => ({
   getScene: vi.fn().mockReturnValue({ name: 'scene' }),
   getCamera: vi.fn().mockReturnValue({ name: 'camera' }),
   getArWorldGroup: vi.fn().mockReturnValue({ name: 'ar-world' }),
-  setScene: vi.fn(),
-  setArWorldGroup: vi.fn(),
   getDepthInfoFromFrame: vi.fn(),
   getImageCaptureFrameCount: vi.fn().mockReturnValue(0),
   getDepthSampleCount: vi.fn().mockReturnValue(0),

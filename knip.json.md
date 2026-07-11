@@ -27,10 +27,9 @@ entirely after confirming they were only transitively pulled in.
 - `dependencies`, `files`, `unlisted`, `duplicates`, `binaries`,
   `unresolved`, `enumMembers`, `classMembers`: knip default (`error`).
   These are CI gates.
-- `exports`, `types`: `warn`. These surface in the report but do not
-  fail CI today. Pre-existing findings are tracked in
-  [GpsPlusSlamJs_Docs/docs/2026-04-28-knip-unused-exports-followup.md](../GpsPlusSlamJs_Docs/docs/2026-04-28-knip-unused-exports-followup.md).
-  Once that follow-up lands, flip these back to `error`.
+- `exports`, `types`: `error` — unused exported symbols and types fail the
+  gate (flipped from the interim `warn` after the 2026-04-28 unused-exports
+  follow-up landed).
 
 ## Per-workspace configuration notes
 

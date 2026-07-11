@@ -324,11 +324,21 @@ vi.mock('./state/recorder-store', () => ({
     // handleImageCaptured persists the frame blob through store.writeFrame
     writeFrame: vi.fn().mockResolvedValue(undefined),
   }),
-  startSession: vi.fn(),
-  endSession: vi.fn(),
-  add2dImage: vi.fn(),
-  recordDepthSample: vi.fn(),
 }));
+// Spy on the action creators main.ts dispatches for captured images / depth
+// samples, at their true sources (post-barrel-removal import paths). Spread
+// the actual modules so every other symbol stays real.
+vi.mock('gps-plus-slam-app-framework/state', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  add2dImage: vi.fn(),
+}));
+vi.mock(
+  'gps-plus-slam-app-framework/state/recording-slice',
+  async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    recordDepthSample: vi.fn(),
+  })
+);
 vi.mock('gps-plus-slam-app-framework/state/store-subscribers', () => ({
   wireStoreSubscribers: vi.fn().mockReturnValue(() => {}),
 }));
@@ -500,11 +510,9 @@ import {
   initAR,
   type CapturedImage,
 } from 'gps-plus-slam-app-framework/ar/webxr-session';
-import {
-  add2dImage,
-  recordDepthSample,
-  type DepthSample,
-} from './state/recorder-store';
+import { add2dImage } from 'gps-plus-slam-app-framework/state';
+import { recordDepthSample } from 'gps-plus-slam-app-framework/state/recording-slice';
+import type { DepthSample } from 'gps-plus-slam-app-framework/types/ar-types';
 
 describe('Occupancy-grid cube wiring in live AR', () => {
   beforeEach(() => {

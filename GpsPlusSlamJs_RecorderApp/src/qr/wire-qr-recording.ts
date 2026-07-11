@@ -53,7 +53,7 @@ import {
   getCurrentArPose,
 } from 'gps-plus-slam-app-framework/ar/webxr-session';
 import type { QrCaptureOptions } from '../state/recording-options';
-import { recordQrDetection } from '../state/recorder-store';
+import { recordQrDetection } from 'gps-plus-slam-app-framework/state';
 import type { RecorderStore } from '../state/recorder-store';
 import type { StoreRef } from '../state/store-ref';
 import { followStore } from '../state/store-ref';

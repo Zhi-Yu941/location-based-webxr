@@ -27,7 +27,8 @@ import {
 } from 'gps-plus-slam-app-framework/state/gps-event-coordinator';
 import { showError, updateStatus } from '../ui/hud';
 import { showToast, TOAST_DURATION_ERROR } from '../ui/toast';
-import type { GpsPoint, RawGpsPoint } from '../state/recorder-store';
+import type { GpsPoint } from 'gps-plus-slam-app-framework/core';
+import type { RawGpsPoint } from 'gps-plus-slam-app-framework/state';
 import {
   addRefPointEntry,
   resetRefPoints,

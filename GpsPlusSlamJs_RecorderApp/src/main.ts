@@ -101,11 +101,9 @@ import {
   replaceScreenState,
   getCurrentScreen,
 } from './ui/navigation';
-import {
-  createRecorderStore,
-  add2dImage,
-  recordDepthSample,
-} from './state/recorder-store';
+import { createRecorderStore } from './state/recorder-store';
+import { add2dImage } from 'gps-plus-slam-app-framework/state';
+import { recordDepthSample } from 'gps-plus-slam-app-framework/state/recording-slice';
 import {
   startGpsWatch,
   stopGpsWatch,

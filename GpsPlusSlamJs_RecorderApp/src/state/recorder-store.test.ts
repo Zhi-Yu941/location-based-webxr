@@ -13,17 +13,18 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createRecorderStore, type RecorderStore } from './recorder-store';
 import {
-  createRecorderStore,
   startSession,
   endSession,
+  recordWriteFailure,
+} from 'gps-plus-slam-app-framework/state/recording-slice';
+import {
   setZeroPos,
   recordGpsEvent,
-  recordWriteFailure,
-  setCurrentScenarioName,
-  type RecorderStore,
   type RawGpsPoint,
-} from './recorder-store';
+} from 'gps-plus-slam-app-framework/state';
+import { setCurrentScenarioName } from './scenario-slice';
 import { addRefPointEntry, type RefPointEntry } from './ref-points-slice';
 import { navigateTo } from './routing-slice';
 import { NullStorageBackend } from 'gps-plus-slam-app-framework/storage/null-storage-backend';

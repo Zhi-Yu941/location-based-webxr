@@ -150,22 +150,8 @@ vi.mock('./state/recorder-store', async () => {
     './state/recorder-store'
   );
   return {
+    ...actual,
     createRecorderStore: () => mockStore,
-    store: mockStore,
-    startSession: vi.fn((payload: unknown) => ({
-      type: 'recording/startSession',
-      payload,
-    })),
-    endSession: vi.fn(() => ({ type: 'recording/endSession' })),
-    add2dImage: vi.fn((payload: unknown) => ({
-      type: 'recording/add2dImage',
-      payload,
-    })),
-    recordDepthSample: vi.fn((payload: unknown) => ({
-      type: 'recording/recordDepthSample',
-      payload,
-    })),
-    setCurrentScenarioName: actual.setCurrentScenarioName,
   };
 });
 

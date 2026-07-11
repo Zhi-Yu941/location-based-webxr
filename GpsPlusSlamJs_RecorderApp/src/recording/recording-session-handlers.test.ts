@@ -250,10 +250,16 @@ vi.mock('gps-plus-slam-app-framework/state/store-subscribers', () => ({
 // wirers moved to the AR-scoped ui/ref-point-view-wiring.ts (round-3
 // feedback 2026-07-05), covered by its own tests.
 
-vi.mock('../state/recorder-store', () => ({
-  startSession: mockStartSession,
-  endSession: mockEndSession,
-}));
+// Spy on the recording actions at their true source (post-barrel-removal
+// import path). Spread the actual module so every other symbol stays real.
+vi.mock(
+  'gps-plus-slam-app-framework/state/recording-slice',
+  async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    startSession: mockStartSession,
+    endSession: mockEndSession,
+  })
+);
 
 vi.mock('../storage/write-failure-tracker', () => ({
   createWriteFailureTracker: mockCreateWriteFailureTracker,

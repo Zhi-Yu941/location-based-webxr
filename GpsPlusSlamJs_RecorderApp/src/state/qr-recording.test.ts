@@ -17,13 +17,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { RecordedAction } from 'gps-plus-slam-app-framework/storage/zip-reader';
 import {
   createRecorderStore,
-  startSession,
-  recordQrDetection,
-  selectLatestQrDetection,
   RECORDER_QR_MAX_HISTORY,
   type RecorderStore,
-  type QrDetectionEntry,
 } from './recorder-store';
+import { startSession } from 'gps-plus-slam-app-framework/state/recording-slice';
+import {
+  recordQrDetection,
+  selectLatestQrDetection,
+  type QrDetectionEntry,
+} from 'gps-plus-slam-app-framework/state';
 
 const writtenActions: unknown[] = [];
 let pendingWrites: Promise<void>[] = [];

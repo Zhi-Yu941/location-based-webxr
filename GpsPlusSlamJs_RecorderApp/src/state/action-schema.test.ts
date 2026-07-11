@@ -16,17 +16,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { LatLong } from 'gps-plus-slam-app-framework/core';
 import type { RecordedAction } from 'gps-plus-slam-app-framework/storage/zip-reader';
+import { createRecorderStore, type RecorderStore } from './recorder-store';
 import {
-  createRecorderStore,
   startSession,
+  recordDepthSample,
+  type SessionMetadata,
+} from 'gps-plus-slam-app-framework/state/recording-slice';
+import {
   setZeroPos,
   recordGpsEvent,
-  recordDepthSample,
   type RecordGpsEventPayload,
-  type SessionMetadata,
-  type RecorderStore,
-  type DepthSample,
-} from './recorder-store';
+} from 'gps-plus-slam-app-framework/state';
+import type { DepthSample } from 'gps-plus-slam-app-framework/types/ar-types';
 
 // Mock opfs-storage's writeAction to capture what would be written
 // (ScenarioWrappingStorageBackend → opfs-storage; partial mock keeps the rest real).

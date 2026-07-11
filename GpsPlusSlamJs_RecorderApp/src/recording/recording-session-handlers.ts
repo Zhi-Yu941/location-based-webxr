@@ -16,7 +16,10 @@ import {
   createGpsPositionHandler,
   updateDeviceOrientation,
 } from 'gps-plus-slam-app-framework/state/gps-event-coordinator';
-import { startSession, endSession } from '../state/recorder-store';
+import {
+  startSession,
+  endSession,
+} from 'gps-plus-slam-app-framework/state/recording-slice';
 import type { RecorderStore } from '../state/recorder-store';
 import { wireStoreSubscribers } from 'gps-plus-slam-app-framework/state/store-subscribers';
 import { refPointEntriesToMarkerData } from '../ui/ref-point-map-markers';

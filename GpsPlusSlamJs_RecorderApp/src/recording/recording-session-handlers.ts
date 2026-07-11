@@ -22,8 +22,8 @@ import {
 } from 'gps-plus-slam-app-framework/state/recording-slice';
 import type { RecorderStore } from '../state/recorder-store';
 import { wireStoreSubscribers } from 'gps-plus-slam-app-framework/state/store-subscribers';
-import { refPointEntriesToMarkerData } from '../ui/ref-point-map-markers';
 import { selectRefPointEntries } from '../state/ref-points-slice';
+import { buildSessionSummary } from './build-session-summary';
 import type { RecordingOptions } from '../state/recording-options';
 import { formatTimestamp } from 'gps-plus-slam-app-framework/storage/file-system-utils';
 import {
@@ -93,10 +93,7 @@ import {
   setAbsCompassStatus,
   hideAbsCompass,
 } from '../ui/hud';
-import {
-  showSessionSummary,
-  type SessionSummaryData,
-} from '../ui/session-summary';
+import { showSessionSummary } from '../ui/session-summary';
 import { showConfirmDialog } from '../ui/confirm-dialog';
 import {
   enableBeforeUnloadWarning,
@@ -106,17 +103,13 @@ import {
 } from '../ui/navigation';
 import { gpsEventVisualizer } from 'gps-plus-slam-app-framework/visualization/gps-event-markers';
 import { refPointVisualizer } from '../visualization/ref-point-visualizer';
-import { computeFusedPath } from 'gps-plus-slam-app-framework/utils/fused-path';
 import {
   gpsPathToCoverageCells,
   H3_RESOLUTION,
 } from 'gps-plus-slam-app-framework/geo';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
 import type { LatLong, Matrix4 } from 'gps-plus-slam-app-framework/core';
-import {
-  calcGpsCoords,
-  magneticHeadingFromEnuQuat,
-} from 'gps-plus-slam-app-framework/core';
+import { magneticHeadingFromEnuQuat } from 'gps-plus-slam-app-framework/core';
 import type { LeafletMapOverlay } from 'gps-plus-slam-app-framework/visualization/leaflet-map-overlay';
 import type { MapData } from 'gps-plus-slam-app-framework/visualization/map-data';
 import { getBuildInfo } from '../utils/build-info';
@@ -806,72 +799,25 @@ export function createRecordingSessionHandlers(
     // Dispatch session end
     store.dispatch(endSession());
 
-    // Build summary data
-    const firstGps = gpsPositions.length > 0 ? gpsPositions[0] : null;
-    const lastGps =
-      gpsPositions.length > 0 ? gpsPositions[gpsPositions.length - 1] : null;
-
-    const odomPositions = gpsEvents?.odometryPositions ?? [];
-    let totalDistanceMeters = 0;
-    for (let i = 1; i < odomPositions.length; i++) {
-      const prev = odomPositions[i - 1]!;
-      const curr = odomPositions[i]!;
-      const dx = curr[0] - prev[0];
-      const dy = curr[1] - prev[1];
-      const dz = curr[2] - prev[2];
-      totalDistanceMeters += Math.sqrt(dx * dx + dy * dy + dz * dz);
-    }
-
-    // Convert alignment snapshot NUE positions to GPS coordinates (Issue #1)
-    const snapshotZeroRef = firstGps?.zeroRef ?? null;
-    const alignmentSnapshotPath = snapshotZeroRef
-      ? gpsEventVisualizer.getAlignmentSnapshotPositions().map((nuePos) => {
-          const gps = calcGpsCoords(snapshotZeroRef, nuePos);
-          return { lat: gps.lat, lng: gps.lon };
-        })
-      : [];
-
-    const summaryData: SessionSummaryData = {
-      duration: {
-        startTime: sessionMetadata?.startTime ?? endTime,
-        endTime,
-      },
-      gpsEventCount: gpsPositions.length,
-      refPointCount: refPoints.length,
+    // Build summary data (pure derivation — see build-session-summary.ts)
+    const summaryData = buildSessionSummary({
+      endTime,
+      startTime: sessionMetadata?.startTime,
       imageCount,
       depthSampleCount,
       errors,
-      firstGps: firstGps
-        ? { lat: firstGps.latitude, lng: firstGps.longitude }
-        : null,
-      lastGps: lastGps
-        ? { lat: lastGps.latitude, lng: lastGps.longitude }
-        : null,
-      totalDistanceMeters,
       failedWriteCount: state.recording.failedWriteCount,
-      rawGpsPath: gpsPositions.map((p) => ({
-        lat: p.latitude,
-        lng: p.longitude,
-        ...(typeof p.latLongAccuracy === 'number' && p.latLongAccuracy > 0
-          ? { accuracy: p.latLongAccuracy }
-          : {}),
-      })),
-      fusedPath: computeFusedPath({
-        odometryPositions: odomPositions,
-        alignmentMatrix: gpsEvents?.alignmentMatrix ?? null,
-        zeroRef: firstGps?.zeroRef ?? null,
-      }),
-      // Shared mapping with the live minimap wirer — both maps must plot
-      // identical coordinates/labels (2026-07-05 live-map feedback).
-      referencePointsForMap: refPointEntriesToMarkerData(refPoints),
-      zipSizeBytes: lastSyncResult?.blob?.size,
-      zipFileCount: lastSyncResult?.fileCount,
-      zipBlob: lastSyncResult?.blob,
+      gpsPositions,
+      odometryPositions: gpsEvents?.odometryPositions ?? [],
+      alignmentMatrix: gpsEvents?.alignmentMatrix ?? null,
+      alignmentSnapshotNuePositions:
+        gpsEventVisualizer.getAlignmentSnapshotPositions(),
+      refPoints,
+      syncResult: lastSyncResult,
       zipFilename: lastSyncResult
         ? (getSaveFileName() ?? generateSessionFilename())
         : undefined,
-      alignmentSnapshotPath,
-    };
+    });
 
     // Clean up sync result reference
     lastSyncResult = null;

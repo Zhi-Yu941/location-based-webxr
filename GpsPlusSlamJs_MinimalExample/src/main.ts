@@ -56,6 +56,7 @@ import { ANCHOR_MODE, coSpawnAtWorldPose } from './co-spawn.js';
 import { createConnectorLine } from './connector-line.js';
 import { decideTapPlacement } from './placement.js';
 import { formatStatus } from './status.js';
+import { createStatusPanel } from './status-panel.js';
 
 function getElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -213,31 +214,20 @@ function main(): void {
   let gpsFixCount = 0;
   let lastGps: LatLong | LatLongAlt | null = null;
 
-  // Skip the DOM write when the rendered text is unchanged (quality-review
-  // F-12) — the subscriber fires per store action.
-  let lastStatusText = '';
-  function refreshStatus(): void {
-    const text = formatStatus({
-      isRecording: store.getState().recording.isRecording,
-      actionCount: store.getState().recording.actionCount,
-      gpsPositionCount: gpsFixCount,
-      failedWriteCount: store.getState().recording.failedWriteCount,
-    });
-    if (text === lastStatusText) return;
-    lastStatusText = text;
-    statusEl.textContent = text;
-  }
-
-  // Flash a transient hint when the user taps before the first GPS fix, then
-  // restore the normal status panel (honours the async/feedback UX rule).
-  let hintTimer: ReturnType<typeof setTimeout> | undefined;
-  function showHint(message: string): void {
-    statusEl.textContent = message;
-    if (hintTimer !== undefined) {
-      clearTimeout(hintTimer);
-    }
-    hintTimer = setTimeout(refreshStatus, 1500);
-  }
+  // Status panel: skips redundant DOM writes and flashes transient hints
+  // (e.g. when the user taps before the first GPS fix, honouring the
+  // async/feedback UX rule). Extracted to status-panel.ts (PR #177 review)
+  // so the cache/hint interaction is unit-tested.
+  const { refreshStatus, showHint } = createStatusPanel({
+    statusEl,
+    getStatusText: () =>
+      formatStatus({
+        isRecording: store.getState().recording.isRecording,
+        actionCount: store.getState().recording.actionCount,
+        gpsPositionCount: gpsFixCount,
+        failedWriteCount: store.getState().recording.failedWriteCount,
+      }),
+  });
 
   // GPS → store. The coordinator only records while a session is active and an
   // AR pose is available, so it is created once and driven from onGpsPosition.

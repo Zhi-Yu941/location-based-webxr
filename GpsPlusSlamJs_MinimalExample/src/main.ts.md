@@ -72,6 +72,8 @@ integration over `createEnableGpsArController` + `registerXrFrameUpdate`.
 This module is WebXR glue and is verified manually via `pnpm dev` on an
 AR-capable device. The pure pieces it depends on are unit-tested: the
 reticle view-model in the framework's
-[hit-test-reticle.test.ts](../../GpsPlusSlamJs_AppFramework/src/visualization/hit-test-reticle.test.ts)
-and the status formatter in [status.test.ts](status.test.ts). The store boot
-is covered by [boot.test.ts](boot.test.ts).
+[hit-test-reticle.test.ts](../../GpsPlusSlamJs_AppFramework/src/visualization/hit-test-reticle.test.ts),
+the status formatter in [status.test.ts](status.test.ts), and the status
+panel (write-skipping cache + transient hints) in
+[status-panel.test.ts](status-panel.test.ts). The store boot is covered by
+[boot.test.ts](boot.test.ts).

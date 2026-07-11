@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "odomCoordVersion": 5,
+  "startedAt": "2026-07-09T15:47:54.235Z",
+  "endedAt": "2026-07-09T15:48:48.277Z",
+  "contextTag": "Default Scenario",
+  "actionCount": 57,
+  "frameCount": 18,
+  "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Mobile Safari/537.36",
+  "build": {
+    "commitHash": "f930f20",
+    "appVersion": "0.1.0",
+    "libraryVersion": "1.8.0",
+    "frameworkVersion": "1.8.0",
+    "buildTime": "2026-07-04T22:02:48.934Z"
+  },
+  "pageUrl": "https://gps.csutil.com/recorder/",
+  "h3Cells": [
+    "8b1fa0a069b0fff",
+    "8b1fa0a069b3fff"
+  ],
+  "h3Resolution": 11
+}

@@ -1,0 +1,37 @@
+{
+  "type": "gpsData/recordGpsEvent",
+  "payload": {
+    "odomPosition": [
+      -2.365417242050171,
+      1.4806776642799377,
+      2.5603861808776855
+    ],
+    "odomRotation": [
+      -0.24217321021600924,
+      -0.2936916527905981,
+      -0.03465166968819319,
+      0.9240652634541675
+    ],
+    "rawGpsPoint": {
+      "id": "gps-38",
+      "latitude": 50.7701362,
+      "longitude": 6.0724825,
+      "altitude": 233.40000915527344,
+      "latLongAccuracy": 5.815999984741211,
+      "heading": 53.34519958496094,
+      "speed": 0.40896642208099365,
+      "timestamp": 1783612109975
+    },
+    "rawAbsoluteOrientation": {
+      "quaternion": [
+        0.506451302371495,
+        0.06039066157406426,
+        0.1491458904385219,
+        0.8471219213821372
+      ],
+      "referenceFrame": "device",
+      "screenAngleDeg": 0,
+      "sampleTimestamp": 1783612109989
+    }
+  }
+}

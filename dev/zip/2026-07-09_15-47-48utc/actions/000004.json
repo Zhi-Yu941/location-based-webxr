@@ -1,0 +1,7 @@
+{
+  "type": "gpsData/setZeroPos",
+  "payload": {
+    "lat": 50.7703239,
+    "lon": 6.0720863
+  }
+}

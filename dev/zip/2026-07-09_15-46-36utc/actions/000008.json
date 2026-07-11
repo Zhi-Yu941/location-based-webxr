@@ -1,0 +1,397 @@
+{
+  "type": "refPoints/setImportedRefPointEntries",
+  "payload": [
+    {
+      "id": "8b1fa1da1d64fff",
+      "timestamp": 0,
+      "name": "Lärm Schild",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1d64fff",
+        "latitude": 50.74946016153309,
+        "longitude": 6.479268030173108,
+        "altitude": 218.39590454101562,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1d60fff",
+      "timestamp": 0,
+      "name": "Bank",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1d60fff",
+        "latitude": 50.74901773935011,
+        "longitude": 6.479421015410848,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1d5dfff",
+      "timestamp": 0,
+      "name": "500m Schild",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1d5dfff",
+        "latitude": 50.74745169930416,
+        "longitude": 6.481116980039328,
+        "altitude": 208.72498067220053,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1d4afff",
+      "timestamp": 0,
+      "name": "500m Schild",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1d4afff",
+        "latitude": 50.74743672012661,
+        "longitude": 6.481158309718171,
+        "altitude": 205.86896260579428,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1d40fff",
+      "timestamp": 0,
+      "name": "Naturschutz Schild Höhe",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1d40fff",
+        "latitude": 50.74810078379608,
+        "longitude": 6.47995327134285,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1ce6fff",
+      "timestamp": 0,
+      "name": "Naturschutz Schild",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1ce6fff",
+        "latitude": 50.744142475782276,
+        "longitude": 6.479862734044467,
+        "altitude": 207.16400146484375,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1cd6fff",
+      "timestamp": 0,
+      "name": "Haustüre",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1cd6fff",
+        "latitude": 50.742293926208305,
+        "longitude": 6.478729064459394,
+        "altitude": 206.77397918701172,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1cd5fff",
+      "timestamp": 0,
+      "name": "Strom aus Wasser",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1cd5fff",
+        "latitude": 50.742783006821156,
+        "longitude": 6.480044893818089,
+        "altitude": 196.9706604003906,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1ccbfff",
+      "timestamp": 0,
+      "name": "Schild",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1ccbfff",
+        "latitude": 50.74264525854715,
+        "longitude": 6.483236849193403,
+        "altitude": 198.44943237304688,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1cc0fff",
+      "timestamp": 0,
+      "name": "Geländer Rewe",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1cc0fff",
+        "latitude": 50.74298141893483,
+        "longitude": 6.480808179633141,
+        "altitude": 196.8367919921875,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1c9dfff",
+      "timestamp": 0,
+      "name": "Bank",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1c9dfff",
+        "latitude": 50.74203340752245,
+        "longitude": 6.477096691518049,
+        "altitude": 241.65341186523438,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1c8cfff",
+      "timestamp": 0,
+      "name": "Unser Garten Tor",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1c8cfff",
+        "latitude": 50.742696282210716,
+        "longitude": 6.477406811401362,
+        "altitude": 239.6780242919922,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1c89fff",
+      "timestamp": 0,
+      "name": "Haustüre",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1c89fff",
+        "latitude": 50.74230795126672,
+        "longitude": 6.478703019584001,
+        "altitude": 207.31409708658853,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1c70fff",
+      "timestamp": 0,
+      "name": "Brücke",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1c70fff",
+        "latitude": 50.74617048775002,
+        "longitude": 6.481113415279705,
+        "altitude": 210.6154759724935,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1c2afff",
+      "timestamp": 0,
+      "name": "Waldpfad oben",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1c2afff",
+        "latitude": 50.745590794890475,
+        "longitude": 6.47889150250792,
+        "altitude": 242.40513610839844,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1c29fff",
+      "timestamp": 0,
+      "name": "Bank Höhe",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1c29fff",
+        "latitude": 50.74621134933175,
+        "longitude": 6.479801008073277,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1c09fff",
+      "timestamp": 0,
+      "name": "Waldpfad",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1c09fff",
+        "latitude": 50.745117189190296,
+        "longitude": 6.480411841687012,
+        "altitude": 209.68051452636718,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1c01fff",
+      "timestamp": 0,
+      "name": "Waldpfad oben",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1c01fff",
+        "latitude": 50.745533895048744,
+        "longitude": 6.478872507269243,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da15adfff",
+      "timestamp": 0,
+      "name": "Parkplatz",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da15adfff",
+        "latitude": 50.738985587997554,
+        "longitude": 6.478339591515381,
+        "altitude": 201.031489780971,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1593fff",
+      "timestamp": 0,
+      "name": "Bank",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1593fff",
+        "latitude": 50.73643356330996,
+        "longitude": 6.476340609919131,
+        "altitude": 234.64002227783203,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da158efff",
+      "timestamp": 0,
+      "name": "Fußgänger Schild",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da158efff",
+        "latitude": 50.73723206873799,
+        "longitude": 6.478203357610585,
+        "altitude": 200.73401896158853,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da158afff",
+      "timestamp": 0,
+      "name": "Fußgänger Schild",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da158afff",
+        "latitude": 50.73722816354421,
+        "longitude": 6.478209411002673,
+        "altitude": 200.41088104248047,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1582fff",
+      "timestamp": 0,
+      "name": "Grünen Schild",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1582fff",
+        "latitude": 50.737318615457355,
+        "longitude": 6.476846642501745,
+        "altitude": 240.0073038736979,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1534fff",
+      "timestamp": 0,
+      "name": "Geheimweg",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1534fff",
+        "latitude": 50.74100027143536,
+        "longitude": 6.476741705236006,
+        "altitude": 237.59410095214844,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1520fff",
+      "timestamp": 0,
+      "name": "Geheimweg",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1520fff",
+        "latitude": 50.74129583929128,
+        "longitude": 6.478578966061016,
+        "altitude": 204.43737574986048,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1511fff",
+      "timestamp": 0,
+      "name": "Fußgänger Schild",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1511fff",
+        "latitude": 50.739682378761806,
+        "longitude": 6.478509094720843,
+        "altitude": 202.13837432861328,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da14b4fff",
+      "timestamp": 0,
+      "name": "Blaues Schild",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da14b4fff",
+        "latitude": 50.736112806563675,
+        "longitude": 6.477578922192938,
+        "altitude": 202.8023223876953,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da1495fff",
+      "timestamp": 0,
+      "name": "Pizza",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da1495fff",
+        "latitude": 50.7350641990848,
+        "longitude": 6.478807693895352,
+        "altitude": 199.2720184326172,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa1da026bfff",
+      "timestamp": 0,
+      "name": "Bienen",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa1da026bfff",
+        "latitude": 50.740485995991236,
+        "longitude": 6.475902240793225,
+        "altitude": 237.82577514648438,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa0a316d4fff",
+      "timestamp": 0,
+      "name": "Bit stars",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa0a316d4fff",
+        "latitude": 50.769216037006885,
+        "longitude": 6.0677507002350906,
+        "altitude": 242.87908935546875,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa0a316d0fff",
+      "timestamp": 0,
+      "name": "Mülleimer",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa0a316d0fff",
+        "latitude": 50.76875201948733,
+        "longitude": 6.067835352613496,
+        "altitude": 241.5485076904297,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa0a31689fff",
+      "timestamp": 0,
+      "name": "Kästen",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa0a31689fff",
+        "latitude": 50.76901710387398,
+        "longitude": 6.0668937398697995,
+        "altitude": 243.7731170654297,
+        "timestamp": 0
+      }
+    },
+    {
+      "id": "8b1fa0a31681fff",
+      "timestamp": 0,
+      "name": "Geländer",
+      "rawGpsPoint": {
+        "id": "imported-8b1fa0a31681fff",
+        "latitude": 50.76902813370652,
+        "longitude": 6.065530916513349,
+        "altitude": 249.9553680419922,
+        "timestamp": 0
+      }
+    }
+  ]
+}

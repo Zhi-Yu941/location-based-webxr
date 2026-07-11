@@ -120,6 +120,61 @@ export async function setStorageReady(page, { validate = true } = {}) {
 }
 
 /**
+ * The full `window.testHooks` surface the app exposes — the single source of
+ * truth shared by `waitForTestHooks` and the coverage-guard spec in
+ * `test-hooks-verification.spec.js`.
+ *
+ * Why one list: the previous duplicated lists (an inline `&&` chain here plus
+ * an `expectedHooks` copy in the guard spec) let quality-review D-3 remove the
+ * `setFolderSelected` hook from the app while both stale lists kept requiring
+ * it — hanging 88 of 204 specs 30 s each in `beforeEach` (2026-07-11). Keep
+ * this list exactly in sync with the `window.testHooks` literal in
+ * `src/main.ts`; the guard spec fails with a precise message when it drifts
+ * in either direction.
+ */
+export const REQUIRED_TEST_HOOKS = [
+  'populateScenarios',
+  'showRecordingControls',
+  'hideRecordingControls',
+  'showSessionSummary',
+  'updateGpsInfo',
+  'updateArInfo',
+  'validateEnterButton',
+  'updatePermissionStatus',
+  'setPermissionsReady',
+  // Log panel hooks (Issue #5)
+  'showLogPanel',
+  'hideLogPanel',
+  'toggleLogPanel',
+  'logInfo',
+  'logWarn',
+  'logError',
+  // GPS event visualizer hooks
+  'getGpsEventVisualizerCounts',
+  'setGpsEventVisualizerZeroRef',
+  'clearGpsEventVisualizer',
+  // GPS accuracy ellipsoid hooks (§3c)
+  'addGpsEventForTest',
+  'getRawGpsMarkerWorldSizes',
+  // Tracking quality indicator hook (F1)
+  'updateTrackingQuality',
+  // Mandatory storage selection hook (Task 1a-fix; the optional-folder
+  // twin setFolderSelected was removed end-to-end in quality-review D-3)
+  'setSaveLocationSelected',
+  // Optional folder-import collapse hook (D5)
+  'setFolderImportExpanded',
+  // Folder-import indexing progress bar (D2, 2026-07-05)
+  'setFolderImportProgress',
+  // Map-centric recording browser (Step 4B)
+  'mountMapBrowser',
+  // Progressive map-browser streaming (Slice A)
+  'mountMapBrowserEmpty',
+  'streamMapBrowserRecording',
+  // Coverage backfill CTA (Slice B / B1)
+  'mountMapBrowserBackfill',
+];
+
+/**
  * Wait for core testHooks to be available.
  * Use this in beforeEach when tests depend on testHooks being ready.
  *
@@ -127,46 +182,10 @@ export async function setStorageReady(page, { validate = true } = {}) {
  */
 export async function waitForTestHooks(page) {
   await page.waitForFunction(
-    () =>
-      window.testHooks?.populateScenarios &&
-      window.testHooks?.showRecordingControls &&
-      window.testHooks?.hideRecordingControls &&
-      window.testHooks?.showSessionSummary &&
-      window.testHooks?.updateGpsInfo &&
-      window.testHooks?.updateArInfo &&
-      window.testHooks?.validateEnterButton &&
-      window.testHooks?.updatePermissionStatus &&
-      window.testHooks?.setPermissionsReady &&
-      // Log panel hooks (Issue #5)
-      window.testHooks?.showLogPanel &&
-      window.testHooks?.hideLogPanel &&
-      window.testHooks?.toggleLogPanel &&
-      window.testHooks?.logInfo &&
-      window.testHooks?.logWarn &&
-      window.testHooks?.logError &&
-      // GPS event visualizer hooks
-      window.testHooks?.getGpsEventVisualizerCounts &&
-      window.testHooks?.setGpsEventVisualizerZeroRef &&
-      window.testHooks?.clearGpsEventVisualizer &&
-      // GPS accuracy ellipsoid hooks (§3c)
-      window.testHooks?.addGpsEventForTest &&
-      window.testHooks?.getRawGpsMarkerWorldSizes &&
-      // Tracking quality indicator hook (F1)
-      window.testHooks?.updateTrackingQuality &&
-      // Mandatory storage selection hook (Task 1a-fix; the optional-folder
-      // twin setFolderSelected was removed end-to-end in quality-review D-3)
-      window.testHooks?.setSaveLocationSelected &&
-      // Optional folder-import collapse hook (D5)
-      window.testHooks?.setFolderImportExpanded &&
-      // Folder-import indexing progress bar (D2, 2026-07-05)
-      window.testHooks?.setFolderImportProgress &&
-      // Map-centric recording browser (Step 4B)
-      window.testHooks?.mountMapBrowser &&
-      // Progressive map-browser streaming (Slice A)
-      window.testHooks?.mountMapBrowserEmpty &&
-      window.testHooks?.streamMapBrowserRecording &&
-      // Coverage backfill CTA (Slice B / B1)
-      window.testHooks?.mountMapBrowserBackfill,
+    (names) =>
+      !!window.testHooks &&
+      names.every((n) => typeof window.testHooks[n] === 'function'),
+    REQUIRED_TEST_HOOKS,
     { timeout: TEST_HOOKS_TIMEOUT_MS }
   );
 }

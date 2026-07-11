@@ -1461,6 +1461,34 @@ describe('settings-modal', () => {
       expect(valueDisplay?.textContent).toBe('250 ms');
     });
 
+    it('shows quarter-second image intervals ≥1s with exact decimals', () => {
+      // Why this test matters: IMAGE_CONSTRAINTS.intervalMs.step is 250 ms,
+      // so 1250/1750 are reachable slider values — `toFixed(1)` would render
+      // them as a misleading "1.3s"/"1.8s" (PR #178 review). Quarter-second
+      // values must show two decimals while half-second multiples keep the
+      // clean one-decimal form.
+      const slider = document.getElementById(
+        'images-interval'
+      ) as HTMLInputElement;
+      const valueDisplay = document.getElementById('images-interval-value');
+
+      slider.value = '1250';
+      slider.dispatchEvent(new Event('input'));
+      expect(valueDisplay?.textContent).toBe('1.25s');
+
+      slider.value = '1750';
+      slider.dispatchEvent(new Event('input'));
+      expect(valueDisplay?.textContent).toBe('1.75s');
+
+      slider.value = '1500';
+      slider.dispatchEvent(new Event('input'));
+      expect(valueDisplay?.textContent).toBe('1.5s');
+
+      slider.value = '1000';
+      slider.dispatchEvent(new Event('input'));
+      expect(valueDisplay?.textContent).toBe('1.0s');
+    });
+
     it('updates images quality value display', () => {
       const slider = document.getElementById(
         'images-quality'

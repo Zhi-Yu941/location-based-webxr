@@ -27,14 +27,10 @@ import {
   showError,
   updateStatus,
   updateArInfo,
-  updateGpsInfo,
   updateFrameCount,
   populateScenarios,
-  showRecordingControls,
-  hideRecordingControls,
   validateEnterButton,
   updatePermissionStatus,
-  setPermissionsReady,
   setSaveLocationSelected,
   setFolderImportExpanded,
   setFolderImportProgress,
@@ -48,20 +44,10 @@ import {
   updateTrackingQuality,
   showUnsupportedPlatformNotice,
 } from './ui/hud';
-import {
-  initSessionSummary,
-  showSessionSummary,
-  hideSessionSummary,
-} from './ui/session-summary';
-import {
-  initLogPanel,
-  showLogPanel,
-  hideLogPanel,
-  toggleLogPanel,
-} from './ui/log-panel';
+import { initSessionSummary, hideSessionSummary } from './ui/session-summary';
+import { initLogPanel, showLogPanel } from './ui/log-panel';
 import { initToast, showToast, TOAST_DURATION_ERROR } from './ui/toast';
 import { destroyConfirmDialog } from './ui/confirm-dialog';
-import * as THREE from 'three';
 import {
   initAR,
   endARSession,
@@ -78,8 +64,6 @@ import {
   getScene,
   getCamera,
   getArWorldGroup,
-  setScene,
-  setArWorldGroup,
   getDepthInfoFromFrame,
   type CapturedImage,
   type DepthSample,
@@ -194,15 +178,11 @@ import {
 } from './ui/session-browser';
 import type { SessionEntry } from './ui/session-browser';
 import { createMapBrowser, type MapBrowserInstance } from './ui/map-browser';
-import {
-  streamRecordingIndex,
-  type RecordingCoverage,
-} from './ui/recording-index';
+import { streamRecordingIndex } from './ui/recording-index';
 import {
   backfillCoverageIntoZips,
   type BackfillCandidate,
 } from './storage/coverage-backfill';
-import { gpsPathToCoverageCells } from 'gps-plus-slam-app-framework/geo';
 import { createReplayHandlers } from './replay/replay-handlers';
 import { createRefPointHandlers } from './ref-points/ref-point-handlers';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
@@ -517,32 +497,6 @@ function ensureMapBrowserRoot(): HTMLElement {
     document.body.appendChild(container);
   }
   return container;
-}
-
-/**
- * Reduce a fixture tour (GPS path of `{lat,lng}`) to a `RecordingCoverage` so
- * Playwright can mount/stream the browser without a real recordings folder.
- */
-function fixtureToRecordingCoverage(
-  f: {
-    filename: string;
-    scenario: string;
-    path: Array<{ lat: number; lng: number }>;
-  },
-  index: number
-): RecordingCoverage {
-  const cells = gpsPathToCoverageCells(f.path);
-  return {
-    entry: {
-      filename: f.filename,
-      fileHandle: {} as FileSystemFileHandle,
-      date: new Date(Date.UTC(2026, 0, 1 + index)),
-      h3Cells: cells,
-    },
-    scenario: f.scenario,
-    cells,
-    backfilled: false,
-  };
 }
 
 const folderManager = createFolderManager({
@@ -1949,198 +1903,19 @@ export function handleBackDuringRecordingForTesting(): Promise<void> {
   return recordingSessionHandlers.handleBackDuringRecording();
 }
 
-// Expose test hooks on window for e2e testing (dev mode only, not in unit tests)
-// This allows Playwright tests to call real functions instead of simulating DOM changes
-// Guard against unit test environment where window.testHooks setup can cause issues
+// Expose test hooks on window for e2e testing (dev mode only, never in unit
+// tests or production bundles). The hooks live in test-utils/e2e-hooks.ts;
+// the dynamic import keeps them out of the production chunk graph, and
+// Playwright's waitForTestHooks polls until the object appears, so the async
+// install is invisible to the specs.
 if (
   import.meta.env.DEV &&
   typeof window !== 'undefined' &&
   !import.meta.env.VITEST
 ) {
-  window.testHooks = {
-    populateScenarios,
-    validateEnterButton,
-    showRecordingControls,
-    hideRecordingControls,
-    showSessionSummary,
-    updateGpsInfo,
-    updateArInfo,
-    updatePermissionStatus,
-    setPermissionsReady,
-    // Log panel hooks (Issue #5)
-    showLogPanel,
-    hideLogPanel,
-    toggleLogPanel,
-    logInfo: (tag: string, message: string) => createLogger(tag).info(message),
-    logWarn: (tag: string, message: string) => createLogger(tag).warn(message),
-    logError: (tag: string, message: string) =>
-      createLogger(tag).error(message),
-    // GPS event visualization hooks
-    getGpsEventVisualizerCounts: () => gpsEventVisualizer.getCounts(),
-    setGpsEventVisualizerZeroRef: (lat: number, lon: number) =>
-      gpsEventVisualizer.setZeroRef({ lat, lon }),
-    clearGpsEventVisualizer: () => gpsEventVisualizer.clearAll(),
-    /**
-     * §3c — Add a GPS event with optional accuracy directly to the
-     * visualizer. Ensures an offline `THREE.Scene` + `arWorldGroup` exist
-     * (Playwright tests don't have an active WebXR session). Idempotent —
-     * subsequent calls reuse the same offline scene.
-     */
-    addGpsEventForTest: (
-      gpsCoords: [number, number, number],
-      odomPosition: [number, number, number],
-      accuracy?: { horizontal?: number; vertical?: number }
-    ) => {
-      if (!getScene()) {
-        setScene(new THREE.Scene());
-      }
-      if (!getArWorldGroup()) {
-        const grp = new THREE.Group();
-        getScene()?.add(grp);
-        setArWorldGroup(grp);
-      }
-      gpsEventVisualizer.addGpsEvent(gpsCoords, odomPosition, accuracy);
-    },
-    getRawGpsMarkerWorldSizes: () =>
-      gpsEventVisualizer.getRawMarkerWorldSizes(),
-    // Tracking quality indicator hook
-    updateTrackingQuality,
-    // Mandatory storage selection hooks (Task 1a-fix)
-    setSaveLocationSelected,
-    setFolderImportExpanded,
-    // Folder-import indexing progress bar (D2, 2026-07-05)
-    setFolderImportProgress,
-    /**
-     * Map-centric recording browser (Step 4B). Mounts the full-bleed browser
-     * with fixture tours (GPS paths → H3 coverage), so Playwright can exercise
-     * the layout, tiles, name search, and single-tour playback without a real
-     * recordings folder. `onPlayTour` records the picked filename to
-     * `window.__mapBrowserPlayed`; the instance is exposed for tile-selection
-     * assertions on `window.__mapBrowserInstance`.
-     */
-    mountMapBrowser: (
-      fixture: Array<{
-        filename: string;
-        scenario: string;
-        path: Array<{ lat: number; lng: number }>;
-      }>
-    ) => {
-      const container = ensureMapBrowserRoot();
-      const recordings: RecordingCoverage[] = fixture.map((f, i) =>
-        fixtureToRecordingCoverage(f, i)
-      );
-      window.__mapBrowserPlayed = [];
-      const instance = createMapBrowser(container, {
-        recordings,
-        onPlayTour: (r) => window.__mapBrowserPlayed?.push(r.entry.filename),
-        onClose: () => {
-          instance?.destroy();
-          container.remove();
-          window.__mapBrowserInstance = undefined;
-        },
-      });
-      window.__mapBrowserInstance = instance ?? undefined;
-      return instance !== null;
-    },
-    /**
-     * Slice A — mount the browser EMPTY and prime the progress pill to
-     * `0 / total`, so the e2e test can then stream recordings in via
-     * {@link streamMapBrowserRecording} and assert progressive behaviour
-     * (map interactive before indexing, pill counts up then hides).
-     */
-    mountMapBrowserEmpty: (total: number) => {
-      const container = ensureMapBrowserRoot();
-      window.__mapBrowserPlayed = [];
-      const instance = createMapBrowser(container, {
-        onPlayTour: (r) => window.__mapBrowserPlayed?.push(r.entry.filename),
-        onClose: () => {
-          instance?.destroy();
-          container.remove();
-          window.__mapBrowserInstance = undefined;
-        },
-      });
-      instance?.setIndexingProgress(0, total);
-      window.__mapBrowserInstance = instance ?? undefined;
-      return instance !== null;
-    },
-    /**
-     * Slice A — stream one fixture recording into the already-mounted browser
-     * and advance the progress pill to `done / total`. Mirrors what the real
-     * `streamRecordingIndex` → `addRecording`/`setIndexingProgress` wiring does.
-     */
-    streamMapBrowserRecording: (
-      item: {
-        filename: string;
-        scenario: string;
-        path: Array<{ lat: number; lng: number }>;
-      },
-      done: number,
-      total: number
-    ) => {
-      const instance = window.__mapBrowserInstance;
-      if (!instance) {
-        return false;
-      }
-      instance.addRecording(fixtureToRecordingCoverage(item, done));
-      instance.setIndexingProgress(done, total);
-      return true;
-    },
-    /**
-     * Slice B (B1) — mount the browser with backfillable (legacy) recordings and
-     * a **deferred** `onBackfill` so Playwright can observe the transitional
-     * "Embedding…" state, then release the promise with `outcome` to assert the
-     * final state. Marks indexing complete so the CTA appears immediately.
-     * `window.__mapBrowserBackfillCalls` counts invocations;
-     * `window.__releaseBackfill()` resolves the in-flight backfill.
-     */
-    mountMapBrowserBackfill: (
-      fixture: Array<{
-        filename: string;
-        scenario: string;
-        path: Array<{ lat: number; lng: number }>;
-      }>,
-      outcome: {
-        embedded: number;
-        skipped: number;
-        failed: number;
-        permissionDenied: boolean;
-      }
-    ) => {
-      const container = ensureMapBrowserRoot();
-      window.__mapBrowserPlayed = [];
-      window.__mapBrowserBackfillCalls = 0;
-      let release: (() => void) | undefined;
-      window.__releaseBackfill = () => release?.();
-      const instance = createMapBrowser(container, {
-        onPlayTour: (r) => window.__mapBrowserPlayed?.push(r.entry.filename),
-        onClose: () => {
-          instance?.destroy();
-          container.remove();
-          window.__mapBrowserInstance = undefined;
-        },
-        onBackfill: () => {
-          window.__mapBrowserBackfillCalls =
-            (window.__mapBrowserBackfillCalls ?? 0) + 1;
-          return new Promise((resolve) => {
-            release = () => resolve(outcome);
-          });
-        },
-      });
-      window.__mapBrowserInstance = instance ?? undefined;
-      if (instance) {
-        fixture.forEach((f, i) => {
-          // Mark as legacy/backfilled so it counts toward the CTA.
-          instance.addRecording({
-            ...fixtureToRecordingCoverage(f, i),
-            backfilled: true,
-          });
-        });
-        // Mark indexing complete so the CTA appears.
-        instance.setIndexingProgress(fixture.length, fixture.length);
-      }
-      return instance !== null;
-    },
-  };
+  void import('./test-utils/e2e-hooks').then(({ installE2eTestHooks }) =>
+    installE2eTestHooks({ ensureMapBrowserRoot })
+  );
 }
 
 // Bootstrap

@@ -93,6 +93,13 @@ This module is the entry point that runs on page load. It also exports the follo
     `onGridSize` telemetry (one `[OccupancyGrid] <n> cells` log per ~30 s) so a
     log export correlates grid growth with the fps trend.
 
+- **Playwright hooks live in [test-utils/e2e-hooks.ts](test-utils/e2e-hooks.md)**:
+  main.ts only triggers `installE2eTestHooks` through a dynamic import guarded
+  by `import.meta.env.DEV && !VITEST`, so the fixture scaffolding never
+  reaches production bundles or the unit-test module graph. The
+  `window.testHooks` key set is pinned against `REQUIRED_TEST_HOOKS` in
+  `playwright-tests/test-helpers.js`.
+
 ## Examples
 
 The module self-executes:

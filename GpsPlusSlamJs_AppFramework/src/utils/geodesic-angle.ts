@@ -3,7 +3,7 @@
  * rotation angle between two unit quaternions.
  *
  * This used to be hand-rolled in (at least) two places:
- * - `geodesicAngleRad` (private) in `ar/qr-pose-aggregation.ts`, and
+ * - `geodesicAngleRad` (private) in `ar/qr/qr-pose-aggregation.ts`, and
  * - `quat.getAngle(...)` + a NaN guard inside `state/tracking-quality.ts`'s
  *   `matrixDelta`.
  *

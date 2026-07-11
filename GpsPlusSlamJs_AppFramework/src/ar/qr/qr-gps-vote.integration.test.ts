@@ -21,8 +21,8 @@ import {
   getAlignmentMatrix,
   setZeroPos,
 } from 'gps-plus-slam-js';
-import { createSlamAppStore } from '../state/create-slam-app-store';
-import { NullStorageBackend } from '../storage/null-storage-backend';
+import { createSlamAppStore } from '../../state/create-slam-app-store';
+import { NullStorageBackend } from '../../storage/null-storage-backend';
 import { buildQrGpsVotes, type QrGeoPose } from './qr-gps-vote';
 import type { Pose } from './qr-pose';
 

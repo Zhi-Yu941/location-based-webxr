@@ -41,7 +41,7 @@ two apps cannot drift apart in how a detected QR is visualized.
 ## Examples
 
 ```ts
-import { createQrDebugView } from 'gps-plus-slam-app-framework/ar/qr-debug-view';
+import { createQrDebugView } from 'gps-plus-slam-app-framework/ar/qr/qr-debug-view';
 
 const view = createQrDebugView(arWorldGroup);
 view.update({ position: [1, 2, -3], rotation: [0, 0, 0, 1] }, 0.2); // axis + 20 cm cube
@@ -50,7 +50,7 @@ view.clear(); // hide, keep attached (no flicker)
 view.dispose(); // detach + free GPU resources
 ```
 
-Import via the deep subpath (`…/ar/qr-debug-view`), NOT the `…/ar` barrel — the
+Import via the deep subpath (`…/ar/qr/qr-debug-view`), NOT the `…/ar` barrel — the
 barrel eagerly evaluates heavy transitive deps; this module needs only the
 constant `WEBXR_TO_NUE` matrix (three-only). Both the Recorder and the demo
 import it this way.

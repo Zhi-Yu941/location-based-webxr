@@ -19,7 +19,7 @@
  */
 
 import type { Vector3 } from 'gps-plus-slam-js';
-import type { GridCell } from './bresenham3d.js';
+import type { GridCell } from '../bresenham3d.js';
 
 /**
  * The slice of `OccupancyGrid` this check needs. Declared structurally so the

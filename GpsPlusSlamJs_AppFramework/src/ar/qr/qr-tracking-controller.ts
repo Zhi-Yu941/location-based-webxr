@@ -48,7 +48,7 @@ export interface QrSolvePoseInput {
  * Emitted on every lock, INDEPENDENTLY of the GPS vote (Note 3). The app maps
  * this onto `recordQrDetection` of the `qrDetected` slice. Kept structural (no
  * import of the state slice) so the `ar` layer never depends on `state` — that
- * would close a cycle (`state/qr-detected-slice` already imports `ar/qr-pose`).
+ * would close a cycle (`state/qr-detected-slice` already imports `ar/qr/qr-pose`).
  */
 export interface QrDetectionEvent {
   /** Decoded payload (text/URL) — the marker key. */

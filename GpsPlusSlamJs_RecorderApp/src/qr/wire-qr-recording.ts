@@ -30,7 +30,7 @@
  * delivered frame.
  *
  * @see qr-debug-controller.ts / qr-depth-resolver.ts — the consumer + as-of join.
- * @see gps-plus-slam-app-framework/ar/qr-detection-controller — the thin producer.
+ * @see gps-plus-slam-app-framework/ar/qr/qr-detection-controller — the thin producer.
  */
 
 import type { Object3D } from 'three';
@@ -41,12 +41,12 @@ import type { Object3D } from 'three';
 import {
   createQrDetectionController,
   type QrDetectionController,
-} from 'gps-plus-slam-app-framework/ar/qr-detection-controller';
+} from 'gps-plus-slam-app-framework/ar/qr/qr-detection-controller';
 import {
   createBarcodeDetectorFrontEnd,
   type RgbaImage,
-} from 'gps-plus-slam-app-framework/ar/qr-frontend';
-import type { Pose } from 'gps-plus-slam-app-framework/ar/qr-pose';
+} from 'gps-plus-slam-app-framework/ar/qr/qr-frontend';
+import type { Pose } from 'gps-plus-slam-app-framework/ar/qr/qr-pose';
 import {
   startCameraFrameCapture,
   stopCameraFrameCapture,

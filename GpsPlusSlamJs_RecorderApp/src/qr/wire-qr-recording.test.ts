@@ -61,10 +61,10 @@ const { mockDebugController, mockCreateQrDebugController } = vi.hoisted(() => {
   };
 });
 
-vi.mock('gps-plus-slam-app-framework/ar/qr-detection-controller', () => ({
+vi.mock('gps-plus-slam-app-framework/ar/qr/qr-detection-controller', () => ({
   createQrDetectionController: mockCreateQrDetectionController,
 }));
-vi.mock('gps-plus-slam-app-framework/ar/qr-frontend', () => ({
+vi.mock('gps-plus-slam-app-framework/ar/qr/qr-frontend', () => ({
   createBarcodeDetectorFrontEnd: mockCreateBarcodeDetectorFrontEnd,
 }));
 vi.mock('gps-plus-slam-app-framework/ar/webxr-session', () => ({

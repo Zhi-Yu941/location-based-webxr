@@ -13,7 +13,7 @@
  * consumer composes whatever extra it needs on top (the demo adds `cameraPose` +
  * `projectionMatrix` for the PnP intrinsics).
  *
- * Deep-imported via `…/ar/qr-size-depth-context` (NOT the `…/ar` barrel) so the
+ * Deep-imported via `…/ar/qr/qr-size-depth-context` (NOT the `…/ar` barrel) so the
  * Recorder's partially-mocked wiring tests don't pull heavy transitive deps —
  * same rationale as `qr-depth-resolver` / `qr-debug-view`.
  *
@@ -21,10 +21,10 @@
  * @see depth-unprojection.ts / depth-grid-lookup.ts — the pieces this composes.
  */
 
-import { createDepthUnprojector } from './depth-unprojection.js';
-import { createDepthGridLookup } from './depth-grid-lookup.js';
+import { createDepthUnprojector } from '../depth-unprojection.js';
+import { createDepthGridLookup } from '../depth-grid-lookup.js';
 import type { QrSizeDepthContext } from './qr-size-measurer.js';
-import type { DepthSample } from '../types/ar-types.js';
+import type { DepthSample } from '../../types/ar-types.js';
 
 // Re-exported so a consumer can get the value + its type from one subpath.
 export type { QrSizeDepthContext };

@@ -85,7 +85,7 @@ the follow-up `2026-06-17-followup-qr-size-thin-demo-next-steps.md` (D-X).
 
 ## Related
 
-- The PnP backend: [planar-pnp.ts.md](../../GpsPlusSlamJs_AppFramework/src/ar/planar-pnp.ts.md)
-  and the seam [qr-pose.ts.md](../../GpsPlusSlamJs_AppFramework/src/ar/qr-pose.ts.md)
+- The PnP backend: [planar-pnp.ts.md](../../GpsPlusSlamJs_AppFramework/src/ar/qr/planar-pnp.ts.md)
+  and the seam [qr-pose.ts.md](../../GpsPlusSlamJs_AppFramework/src/ar/qr/qr-pose.ts.md)
   (`solveQrPose`).
-- The size stage: [qr-size-measurer.ts.md](../../GpsPlusSlamJs_AppFramework/src/ar/qr-size-measurer.ts.md).
+- The size stage: [qr-size-measurer.ts.md](../../GpsPlusSlamJs_AppFramework/src/ar/qr/qr-size-measurer.ts.md).

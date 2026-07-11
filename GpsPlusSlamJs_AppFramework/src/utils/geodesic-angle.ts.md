@@ -20,7 +20,7 @@
     the near-identical `NaN` case into `0`.
 
 - **Consumers (do not re-derive `acos` elsewhere):**
-  - `ar/qr-pose-aggregation.ts` — inlier/spread angles.
+  - `ar/qr/qr-pose-aggregation.ts` — inlier/spread angles.
   - `state/tracking-quality.ts` `matrixDelta` — rotation delta term (was a raw
     `quat.getAngle` + explicit NaN guard).
   - `ar/pose-motion.ts` — capture motion-gate angular velocity.

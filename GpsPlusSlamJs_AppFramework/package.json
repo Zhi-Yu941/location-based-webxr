@@ -9,6 +9,7 @@
   "exports": {
     ".": "./dist/index.js",
     "./ar": "./dist/ar/index.js",
+    "./ar/qr": "./dist/ar/qr/index.js",
     "./ar/*": "./dist/ar/*.js",
     "./core": "./dist/core/index.js",
     "./sensors": "./dist/sensors/index.js",

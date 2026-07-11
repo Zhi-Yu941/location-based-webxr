@@ -49,18 +49,6 @@ const entryFiles = [
   // recorder's image-quality.worker.ts (NOT via the `/ar` barrel). The `./ar/*`
   // exports wildcard advertises this subpath, so it must be built per-file.
   'src/ar/image-quality.ts',
-  // QR detection + derive-on-read + debug viz — deep-imported by the recorder's
-  // live-QR modules (NOT via the `/ar` barrel, which eagerly pulls
-  // permission-checker into partially-mocked wiring tests). The `./ar/*` exports
-  // wildcard already advertises these subpaths, so they must be built per-file.
-  'src/ar/planar-pnp.ts',
-  'src/ar/qr-debug-view.ts',
-  'src/ar/qr-derived-pose.ts',
-  'src/ar/qr-detection-controller.ts',
-  'src/ar/qr-frontend.ts',
-  'src/ar/qr-pose.ts',
-  'src/ar/qr-size-depth-context.ts',
-  'src/ar/qr-size-measurer.ts',
   'src/ar/replay-scene.ts',
   'src/ar/scene-node-names.ts',
   'src/ar/webxr-nue-basis.ts',
@@ -68,6 +56,22 @@ const entryFiles = [
   'src/ar/xr-camera-texture.ts',
   'src/ar/xr-error-handler.ts',
   'src/ar/xr-frame-loop.ts',
+
+  // ar/qr/ (QR cluster — sub-barrel + per-file entries)
+  'src/ar/qr/index.ts',
+  // QR detection + derive-on-read + debug viz — deep-imported by the recorder's
+  // live-QR modules (NOT via the `/ar` barrel, which eagerly pulls
+  // permission-checker into partially-mocked wiring tests). The `./ar/*` exports
+  // wildcard matches multi-segment subpaths, so `./ar/qr/<file>` is already
+  // advertised and each must be built per-file.
+  'src/ar/qr/planar-pnp.ts',
+  'src/ar/qr/qr-debug-view.ts',
+  'src/ar/qr/qr-derived-pose.ts',
+  'src/ar/qr/qr-detection-controller.ts',
+  'src/ar/qr/qr-frontend.ts',
+  'src/ar/qr/qr-pose.ts',
+  'src/ar/qr/qr-size-depth-context.ts',
+  'src/ar/qr/qr-size-measurer.ts',
 
   // core/ (curated re-export of gps-plus-slam-js for app consumers)
   'src/core/index.ts',

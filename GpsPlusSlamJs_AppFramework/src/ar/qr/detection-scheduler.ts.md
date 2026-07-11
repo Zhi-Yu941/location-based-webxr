@@ -2,9 +2,9 @@
 
 **Purpose:** A **generic** throttle + coalesce + N-consecutive-lock state machine
 over any async detector — Phase 2 / §9 + research2 runtime stability of the
-[QR-code detection & tracking plan](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-qr-code-detection-tracking-plan.md),
+[QR-code detection & tracking plan](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-qr-code-detection-tracking-plan.md),
 generalized per **Note 1** of the
-[follow-up plan](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-followup-qr-tracking-generalization-overlay-and-north.md)
+[follow-up plan](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-followup-qr-tracking-generalization-overlay-and-north.md)
 so a future object detector (YOLO) reuses it unchanged. It gates nothing on QR.
 
 ## Public API

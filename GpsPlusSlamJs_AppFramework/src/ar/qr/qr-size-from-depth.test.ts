@@ -11,8 +11,8 @@
 import { describe, it, expect } from 'vitest';
 import { mat4, vec4 } from 'gl-matrix';
 import type { Matrix4, Quaternion, Vector3 } from 'gps-plus-slam-js';
-import type { DepthPoint } from '../types/ar-types';
-import { createDepthUnprojector } from './depth-unprojection';
+import type { DepthPoint } from '../../types/ar-types';
+import { createDepthUnprojector } from '../depth-unprojection';
 import {
   estimateQrSizeFromDepth,
   estimateQrSizeFromDepthDense,

@@ -26,7 +26,7 @@ the two apps measure different QR sizes).
 - Pure composition of `createDepthUnprojector` + `createDepthGridLookup`; it adds
   no state. Callers that need more (e.g. the demo's `cameraPose` +
   `projectionMatrix` for PnP intrinsics) compose it on top: `{ ...base, … }`.
-- Import via the deep subpath `…/ar/qr-size-depth-context`, NOT the `…/ar` barrel —
+- Import via the deep subpath `…/ar/qr/qr-size-depth-context`, NOT the `…/ar` barrel —
   the barrel eagerly pulls heavy transitive deps into the Recorder's
   partially-mocked wiring tests (same rationale as `qr-depth-resolver` /
   `qr-debug-view`).
@@ -34,7 +34,7 @@ the two apps measure different QR sizes).
 ## Examples
 
 ```ts
-import { createQrSizeDepthContext } from 'gps-plus-slam-app-framework/ar/qr-size-depth-context';
+import { createQrSizeDepthContext } from 'gps-plus-slam-app-framework/ar/qr/qr-size-depth-context';
 
 // Recorder (as-of resolver): time-address, then build the context.
 const ctx = createQrSizeDepthContext(asOfSample); // QrSizeDepthContext | null

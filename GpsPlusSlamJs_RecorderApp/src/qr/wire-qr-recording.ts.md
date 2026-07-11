@@ -51,4 +51,4 @@ the WS-5 **consumer** (debug axis+cube). `main.ts` calls it once in `handleEnter
 ## Related
 
 - [qr-debug-controller.ts.md](qr-debug-controller.ts.md), [qr-depth-resolver.ts.md](qr-depth-resolver.ts.md).
-- `gps-plus-slam-app-framework/ar/qr-detection-controller` — the thin producer.
+- `gps-plus-slam-app-framework/ar/qr/qr-detection-controller` — the thin producer.

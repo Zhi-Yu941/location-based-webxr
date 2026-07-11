@@ -20,7 +20,7 @@ import {
 } from './qr-size-measurer';
 import type { Point2 } from './qr-pose';
 import type { Vector3 } from 'gps-plus-slam-js';
-import type { DepthPoint } from '../types/ar-types';
+import type { DepthPoint } from '../../types/ar-types';
 
 const IMAGE = { width: 100, height: 100 };
 

@@ -1,7 +1,7 @@
 /**
  * As-of depth resolver for the recorder live-QR debug viz (WS-5).
  *
- * The derive-on-read size join (`ar/qr-derived-pose.ts`) needs, for each QR
+ * The derive-on-read size join (`ar/qr/qr-derived-pose.ts`) needs, for each QR
  * detection, the depth-sampling context that was active **at that detection's
  * timestamp**. The recorder records depth in its own stream (`recordDepthSample`),
  * but the store only keeps the LATEST sample — so this module keeps a small,
@@ -24,7 +24,7 @@
  * plan open topic A). The lookup is a pure numeric `≤` over those stamps; if the QR
  * producer used relative `performance.now()` instead, every join would silently miss.
  *
- * @see gps-plus-slam-app-framework/ar/qr-derived-pose — the consumer of `resolveDepthAt`.
+ * @see gps-plus-slam-app-framework/ar/qr/qr-derived-pose — the consumer of `resolveDepthAt`.
  * @see qr-debug-controller.ts — drives `append` + renders the derived placement.
  */
 
@@ -35,7 +35,7 @@
 import {
   createQrSizeDepthContext,
   type QrSizeDepthContext,
-} from 'gps-plus-slam-app-framework/ar/qr-size-depth-context';
+} from 'gps-plus-slam-app-framework/ar/qr/qr-size-depth-context';
 import type { DepthSample } from 'gps-plus-slam-app-framework/types/ar-types';
 
 /** Default cap on retained depth samples — matches the recorder QR history (100). */

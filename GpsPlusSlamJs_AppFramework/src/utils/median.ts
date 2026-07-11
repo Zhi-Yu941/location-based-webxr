@@ -2,9 +2,9 @@
  * Shared median helpers (2026-07-10 quality-review A-2).
  *
  * Six private copies with two silently different semantics used to live in
- * `ar/qr-size-from-depth.ts`, `state/tracking-quality.ts`,
+ * `ar/qr/qr-size-from-depth.ts`, `state/tracking-quality.ts`,
  * `visualization/gps-anchor.ts` (interpolating) and `ar/image-quality.ts`,
- * `ar/qr-pose-aggregation.ts`, `state/qr-detected-slice.ts` (lower-middle).
+ * `ar/qr/qr-pose-aggregation.ts`, `state/qr-detected-slice.ts` (lower-middle).
  * The two variants are deliberately separate named exports — picking the
  * wrong one is exactly the drift this consolidation prevents.
  */

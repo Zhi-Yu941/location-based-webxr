@@ -69,7 +69,7 @@ import {
   computeAspectFitSize,
 } from './camera-blit-capture';
 import { CameraFrameSource } from './camera-frame-source';
-import type { RgbaImage } from './qr-frontend';
+import type { RgbaImage } from './qr/qr-frontend';
 import { createRgbLookup, type RgbLookup } from './depth-rgb-lookup';
 import { acquireCameraTexture } from './xr-camera-texture';
 import { clearFrameUpdates, runFrameUpdates } from './frame-loop';

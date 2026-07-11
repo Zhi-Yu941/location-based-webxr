@@ -2,7 +2,7 @@
 
 **Purpose:** Turn a solved QR pose into synthetic high-weight GPS observation(s)
 for the existing weighted alignment + outlier-rejection fusion — Phase 5 / §6 of the
-[QR-code detection & tracking plan](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-qr-code-detection-tracking-plan.md).
+[QR-code detection & tracking plan](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-qr-code-detection-tracking-plan.md).
 A QR does **not** rigidly re-anchor the scene; it votes (heavily) via the normal
 `recordGpsEvent` path, so a bad detection is still rejectable as an outlier.
 
@@ -86,4 +86,4 @@ for (const v of votes) store.dispatch(recordGpsEvent(v));
 
 - Consumes `qrPoseWorld` from [qr-pose.ts.md](qr-pose.ts.md).
 - Mirrors the normal GPS path in
-  [gps-event-coordinator.ts.md](../state/gps-event-coordinator.ts.md).
+  [gps-event-coordinator.ts.md](../../state/gps-event-coordinator.ts.md).

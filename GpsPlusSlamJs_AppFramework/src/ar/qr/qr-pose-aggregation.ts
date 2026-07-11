@@ -38,8 +38,8 @@
 import { quat } from 'gl-matrix';
 import type { Pose } from './qr-pose.js';
 import type { Quaternion, Vector3 } from 'gps-plus-slam-js';
-import { geodesicAngleRad } from '../utils/geodesic-angle.js';
-import { lowerMedian } from '../utils/median.js';
+import { geodesicAngleRad } from '../../utils/geodesic-angle.js';
+import { lowerMedian } from '../../utils/median.js';
 
 const RAD2DEG = 180 / Math.PI;
 const DEG2RAD = Math.PI / 180;

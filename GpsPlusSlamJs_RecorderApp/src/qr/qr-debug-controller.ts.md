@@ -4,7 +4,7 @@
 
 The WS-5 store-driven consumer: turns recorded RAW QR detections into the live +
 replay debug axis+cube. Called on every store change, it renders — per marker —
-the shared [`createQrDebugView`](../../../GpsPlusSlamJs_AppFramework/src/ar/qr-debug-view.ts)
+the shared [`createQrDebugView`](../../../GpsPlusSlamJs_AppFramework/src/ar/qr/qr-debug-view.ts)
 under `arWorldGroup` at the **derived** best-effort pose+size
 (`selectDerivedQrPlacement`), and owns the as-of [depth resolver](qr-depth-resolver.ts).
 

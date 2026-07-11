@@ -14,7 +14,7 @@
  *
  * Pure, unit-tested logic lives in the sibling modules (`capability`,
  * `hud-view`, `demo-store`, `demo-controller`); the axis+cube overlay is the
- * shared framework `ar/qr-debug-view` (same view the Recorder renders). This
+ * shared framework `ar/qr/qr-debug-view` (same view the Recorder renders). This
  * file is verified manually via `pnpm dev` on an AR
  * device (the §5 on-device gate) and through the faked Playwright e2e.
  */
@@ -35,7 +35,7 @@ import { createQrDemoStore, type QrDemoStore } from "./demo-store.js";
 import {
   createQrDebugView,
   type QrDebugView,
-} from "gps-plus-slam-app-framework/ar/qr-debug-view";
+} from "gps-plus-slam-app-framework/ar/qr/qr-debug-view";
 import { createQrDemoController } from "./demo-controller.js";
 import { toHudView, type DemoStatus } from "./hud-view.js";
 import { isDemoSupported, capabilityMessage } from "./capability.js";

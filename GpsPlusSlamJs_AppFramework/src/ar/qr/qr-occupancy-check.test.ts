@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from 'vitest';
 import type { Vector3 } from 'gps-plus-slam-js';
-import type { GridCell } from './bresenham3d';
+import type { GridCell } from '../bresenham3d';
 import {
   checkQrPlausibility,
   type OccupancySurface,

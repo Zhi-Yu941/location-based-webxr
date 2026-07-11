@@ -6,7 +6,7 @@ OpenCV-free implementation of `qr-pose.ts`'s injected `SolvePnpSquare` for a
 centered planar square (the `SOLVEPNP_IPPE_SQUARE` case). Synchronous, no WASM,
 no worker, no async load — the OpenCV-free `SolvePnpSquare` (it replaced the
 removed `opencv-pnp.ts`). See the
-plan: [`../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-16-planar-pnp-homography-no-opencv-plan.md`](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-16-planar-pnp-homography-no-opencv-plan.md).
+plan: [`../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-16-planar-pnp-homography-no-opencv-plan.md`](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-16-planar-pnp-homography-no-opencv-plan.md).
 
 ## Public API
 

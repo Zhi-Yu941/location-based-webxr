@@ -28,7 +28,7 @@
  * rendering, or PnP numerics (those are covered by the framework tests).
  *
  * @see qr-depth-resolver.ts — the as-of depth join this drives.
- * @see gps-plus-slam-app-framework/ar/qr-debug-view — the rendered axis+cube.
+ * @see gps-plus-slam-app-framework/ar/qr/qr-debug-view — the rendered axis+cube.
  */
 
 import type { Object3D } from 'three';
@@ -38,15 +38,15 @@ import type { Object3D } from 'three';
 import {
   createQrDebugView,
   type QrDebugView,
-} from 'gps-plus-slam-app-framework/ar/qr-debug-view';
-import { PlanarPnpSquare } from 'gps-plus-slam-app-framework/ar/planar-pnp';
+} from 'gps-plus-slam-app-framework/ar/qr/qr-debug-view';
+import { PlanarPnpSquare } from 'gps-plus-slam-app-framework/ar/qr/planar-pnp';
 import {
   createIncrementalQrPlacement,
   type DeriveQrPoseDeps,
   type IncrementalQrPlacement,
   type RawQrObservation,
-} from 'gps-plus-slam-app-framework/ar/qr-derived-pose';
-import type { SolvePnpSquare } from 'gps-plus-slam-app-framework/ar/qr-pose';
+} from 'gps-plus-slam-app-framework/ar/qr/qr-derived-pose';
+import type { SolvePnpSquare } from 'gps-plus-slam-app-framework/ar/qr/qr-pose';
 import {
   selectQrRawObservations,
   type QrDetectedState,

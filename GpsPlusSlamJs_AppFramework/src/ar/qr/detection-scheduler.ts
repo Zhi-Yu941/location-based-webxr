@@ -2,9 +2,9 @@
  * Detection scheduler — a generic throttle + coalesce + N-consecutive-lock
  * state machine over ANY async detector. Phase 2 / §9 + research2 runtime
  * stability of the
- * [QR-code detection & tracking plan](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-qr-code-detection-tracking-plan.md);
+ * [QR-code detection & tracking plan](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-qr-code-detection-tracking-plan.md);
  * generalized per Note 1 of the
- * [follow-up plan](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-followup-qr-tracking-generalization-overlay-and-north.md)
+ * [follow-up plan](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-followup-qr-tracking-generalization-overlay-and-north.md)
  * so a future detector (object detection / YOLO) reuses it unchanged.
  *
  * It turns the per-render-frame `offerFrame` firehose into a THROTTLED,
@@ -28,7 +28,7 @@
 
 import type { QrPoseSolution } from './qr-pose.js';
 import type { RgbaImage } from './qr-frontend.js';
-import { createLogger } from '../utils/logger.js';
+import { createLogger } from '../../utils/logger.js';
 
 const log = createLogger('DetectionScheduler');
 

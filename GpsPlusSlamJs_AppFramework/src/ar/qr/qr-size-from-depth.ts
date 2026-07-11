@@ -31,9 +31,9 @@
 
 import { vec3 } from 'gl-matrix';
 import type { Vector3 } from 'gps-plus-slam-js';
-import type { DepthPoint } from '../types/ar-types.js';
-import type { DepthUnprojector } from './depth-unprojection.js';
-import { interpolatingMedian } from '../utils/median.js';
+import type { DepthPoint } from '../../types/ar-types.js';
+import type { DepthUnprojector } from '../depth-unprojection.js';
+import { interpolatingMedian } from '../../utils/median.js';
 
 /** Where the size lifecycle currently sits for one marker (Note 3 / Note 4). */
 export type QrSizeStatus =

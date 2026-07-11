@@ -38,7 +38,7 @@
  * @see webxr-session.ts — owns the camera-frame blit and wires this in the frame loop.
  */
 
-import type { RgbaImage } from './qr-frontend.js';
+import type { RgbaImage } from './qr/qr-frontend.js';
 
 /** Tuning for the camera frame source. */
 export interface CameraFrameSourceConfig {

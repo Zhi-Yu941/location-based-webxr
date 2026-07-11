@@ -3,7 +3,7 @@
 ## Purpose
 
 Measure a QR's **printed physical size directly from the depth map** (Note 4 of
-the [follow-up plan](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-followup-qr-tracking-generalization-overlay-and-north.md)),
+the [follow-up plan](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-followup-qr-tracking-generalization-overlay-and-north.md)),
 so the QR content/size are irrelevant and `qr.physicalSizeM` need not be hand-
 authored. This is the **measuring stage** of the Note 3 size lifecycle.
 
@@ -93,7 +93,7 @@ if (est.status === 'estimated') buildCube(est.estimateM!);
 
 ## Related
 
-- Composes [depth-unprojection.ts.md](depth-unprojection.ts.md). Feeds the size
-  lifecycle in [../state/qr-detected-slice.ts.md](../state/qr-detected-slice.ts.md)
+- Composes [depth-unprojection.ts.md](../depth-unprojection.ts.md). Feeds the size
+  lifecycle in [../../state/qr-detected-slice.ts.md](../../state/qr-detected-slice.ts.md)
   and the `resolveSizeM` seam of
   [qr-tracking-controller.ts.md](qr-tracking-controller.ts.md).

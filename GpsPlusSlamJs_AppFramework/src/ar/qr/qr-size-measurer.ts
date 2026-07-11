@@ -23,8 +23,8 @@
  */
 
 import type { Point2 } from './qr-pose.js';
-import type { DepthPoint } from '../types/ar-types.js';
-import type { DepthUnprojector } from './depth-unprojection.js';
+import type { DepthPoint } from '../../types/ar-types.js';
+import type { DepthUnprojector } from '../depth-unprojection.js';
 import {
   estimateQrSizeFromDepth,
   estimateQrSizeFromDepthDense,

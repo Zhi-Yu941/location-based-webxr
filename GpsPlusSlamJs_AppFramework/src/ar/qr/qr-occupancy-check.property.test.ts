@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from 'vitest';
 import * as fc from 'fast-check';
-import type { GridCell } from './bresenham3d';
+import type { GridCell } from '../bresenham3d';
 import {
   checkQrPlausibility,
   type OccupancySurface,

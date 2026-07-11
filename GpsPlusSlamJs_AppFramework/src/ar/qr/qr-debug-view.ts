@@ -33,7 +33,7 @@
 import { AxesHelper, BoxGeometry, Group, Mesh, MeshBasicMaterial } from 'three';
 import type { Object3D } from 'three';
 import type { Pose } from './qr-pose.js';
-import { WEBXR_TO_NUE } from './webxr-nue-basis.js';
+import { WEBXR_TO_NUE } from '../webxr-nue-basis.js';
 
 /** A thin slab so the cube's front face sits on the printed code (1 cm deep). */
 const CUBE_DEPTH_M = 0.01;

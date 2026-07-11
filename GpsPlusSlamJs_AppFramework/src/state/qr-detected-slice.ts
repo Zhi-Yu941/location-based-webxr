@@ -26,38 +26,41 @@
  * { qrDetected: qrDetectedReducer } })`. It is not a built-in of the store
  * factory, so framework consumers that never detect anything pay nothing.
  *
- * @see ../ar/qr-tracking-controller.ts — the producer (dispatches `recordQrDetection`).
- * @see ../ar/qr-pose.ts — `Pose` / `QrPoseSolution` (the per-detection geometry).
+ * @see ../ar/qr/qr-tracking-controller.ts — the producer (dispatches `recordQrDetection`).
+ * @see ../ar/qr/qr-pose.ts — `Pose` / `QrPoseSolution` (the per-detection geometry).
  */
 
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { Matrix4, Vector3 } from 'gps-plus-slam-js';
-import type { Point2, Pose } from '../ar/qr-pose.js';
-import type { QrSizeEstimate } from '../ar/qr-size-from-depth.js';
+import type { Point2, Pose } from '../ar/qr/qr-pose.js';
+import type { QrSizeEstimate } from '../ar/qr/qr-size-from-depth.js';
 import {
   evaluateQrPoseStability,
   type QrPoseStability,
   type QrPoseStabilityOptions,
-} from '../ar/qr-pose-aggregation.js';
+} from '../ar/qr/qr-pose-aggregation.js';
 import {
   deriveSolvedQrPose,
   deriveQrPlacement,
   type DeriveQrPoseDeps,
   type DerivedQrPlacement,
   type RawQrObservation,
-} from '../ar/qr-derived-pose.js';
+} from '../ar/qr/qr-derived-pose.js';
 import { lowerMedian } from '../utils/median.js';
 
 // Re-exported so consumers of the slice keep importing the size lifecycle types
-// from one place. They are DEFINED in `ar/qr-size-from-depth.ts` (where size is
+// from one place. They are DEFINED in `ar/qr/qr-size-from-depth.ts` (where size is
 // measured) so this slice can use them without `ar` ever importing `state`.
-export type { QrSizeStatus, QrSizeEstimate } from '../ar/qr-size-from-depth.js';
-// Same pattern for the pose-stability lifecycle (defined in `ar/qr-pose-aggregation.ts`).
+export type {
+  QrSizeStatus,
+  QrSizeEstimate,
+} from '../ar/qr/qr-size-from-depth.js';
+// Same pattern for the pose-stability lifecycle (defined in `ar/qr/qr-pose-aggregation.ts`).
 export type {
   QrPoseStabilityStatus,
   QrPoseStability,
   QrPoseStabilityOptions,
-} from '../ar/qr-pose-aggregation.js';
+} from '../ar/qr/qr-pose-aggregation.js';
 
 /**
  * Default ring-buffer cap per marker. Bounded so an overlay that never prunes
@@ -81,7 +84,7 @@ export interface QrDetectionEntry {
    * this MUST be **EPOCH ms** (`Date.now()`), because the depth stream it joins
    * against is epoch (`DepthSample.timestamp = performance.timeOrigin + frameTs`,
    * `ar/depth-sampler.ts`) and the size as-of join pairs this with the depth
-   * sample whose timestamp is `≤` this one (`ar/qr-derived-pose`). A relative
+   * sample whose timestamp is `≤` this one (`ar/qr/qr-derived-pose`). A relative
    * `performance.now()` stamp (~1e5) never satisfies that join, so the size — and
    * the debug cube — never resolve. See the recorder live-QR plan open topic A.
    */
@@ -89,7 +92,7 @@ export interface QrDetectionEntry {
 
   // --- RAW detector output (decision D-A, recorder live-QR plan) -----------
   // The authoritative, algorithm-agnostic shape: size + solved pose are DERIVED
-  // from these on read (see `selectSolvedQrPose` → `ar/qr-derived-pose.ts`). A
+  // from these on read (see `selectSolvedQrPose` → `ar/qr/qr-derived-pose.ts`). A
   // RAW producer (the Recorder) records ONLY these — the recording stays
   // algorithm-agnostic / re-testable. OPTIONAL because the legacy geo/demo
   // producer still records the solved pose below instead. See plan §3 / D-A.
@@ -356,7 +359,7 @@ export function medianQrPosition(
  * buffer (NOT stored separately — the detections are the source of truth, unlike
  * the depth-measured size which is accumulated outside the buffer). Mirrors the
  * size lifecycle's `unknown → measuring → stable` shape so the HUD can show
- * "converging…" vs "stable". See `ar/qr-pose-aggregation.ts`.
+ * "converging…" vs "stable". See `ar/qr/qr-pose-aggregation.ts`.
  */
 export function selectQrPoseStability(
   state: RootWithQrDetected,
@@ -430,7 +433,7 @@ function toRawObservation(entry: QrDetectionEntry): RawQrObservation | null {
  * `null` when the marker is unknown, has no raw observations, cannot be sized
  * yet, or PnP rejects the latest quad — the re-test-friendly replacement for the
  * once-stored solved pose. Runs identically live and on replay (only
- * `deps.resolveDepthAt` differs). See `ar/qr-derived-pose.ts`.
+ * `deps.resolveDepthAt` differs). See `ar/qr/qr-derived-pose.ts`.
  */
 export function selectSolvedQrPose(
   state: RootWithQrDetected,

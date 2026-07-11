@@ -38,7 +38,7 @@ render it off the derived pose, live and on replay.
 ## Examples
 
 ```ts
-import { createQrDebugView } from 'gps-plus-slam-app-framework/ar/qr-debug-view';
+import { createQrDebugView } from 'gps-plus-slam-app-framework/ar/qr/qr-debug-view';
 const view = createQrDebugView(arWorldGroup);
 // per store change, for a marker:
 const pose = selectSolvedQrPose(state, text, deps); // null when not sizeable yet
@@ -55,5 +55,5 @@ if (pose) view.update(pose, deriveQrSizeM(...));
 ## Related
 
 - [qr-derived-pose.ts.md](qr-derived-pose.ts.md) — derives the `Pose` rendered here.
-- [webxr-nue-basis.ts](webxr-nue-basis.ts) — the `WEBXR_TO_NUE` basis the objects ride.
+- [webxr-nue-basis.ts](../webxr-nue-basis.ts) — the `WEBXR_TO_NUE` basis the objects ride.
 - Recorder WS-5 subscriber: `GpsPlusSlamJs_RecorderApp/src/visualization/qr-debug-controller.ts`.

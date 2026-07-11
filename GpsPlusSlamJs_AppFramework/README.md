@@ -391,6 +391,7 @@ pnpm run build     # build with tsdown
 ```
 src/
 ├── ar/             # WebXR session, capture, replay scene
+│   └── qr/         # QR detection, pose (planar PnP), size-from-depth, GPS vote
 ├── sensors/        # GPS, orientation, permissions
 ├── state/          # createSlamAppStore, recording, replay, persistence middleware
 ├── storage/        # OPFS, ZIP export/import, StorageBackend

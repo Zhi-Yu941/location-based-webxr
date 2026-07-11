@@ -14,8 +14,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { Matrix4, Quaternion, Vector3 } from '../core/index.js';
-import type { DepthPoint, DepthSample } from '../types/ar-types.js';
+import type { Matrix4, Quaternion, Vector3 } from '../../core/index.js';
+import type { DepthPoint, DepthSample } from '../../types/ar-types.js';
 import { createQrSizeDepthContext } from './qr-size-depth-context.js';
 
 /** An invertible projection so `createDepthUnprojector` yields a real unprojector. */

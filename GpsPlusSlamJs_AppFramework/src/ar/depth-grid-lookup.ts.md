@@ -44,6 +44,6 @@ const d = lut.depthAt(0.42, 0.55); // smooth depth, not a nearest-node snap
 ## Related
 
 - Reads the grid from [depth-sampler.ts.md](depth-sampler.ts.md); the primary
-  consumer is [qr-size-measurer.ts.md](qr-size-measurer.ts.md) (the dense-fit
+  consumer is [qr-size-measurer.ts.md](qr/qr-size-measurer.ts.md) (the dense-fit
   lattice). Unprojection of the resulting points is
   [depth-unprojection.ts.md](depth-unprojection.ts.md).

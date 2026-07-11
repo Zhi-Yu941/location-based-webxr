@@ -2,7 +2,7 @@
 
 **Purpose:** Pure geometry self-check that uses the depth-built occupancy grid as
 a "physical sanity oracle" for a solved QR pose — Phase 4 / §7 of the
-[QR-code detection & tracking plan](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-qr-code-detection-tracking-plan.md).
+[QR-code detection & tracking plan](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-qr-code-detection-tracking-plan.md).
 Because the encoded QR size scales `tvec` linearly (see
 [qr-pose.ts.md](qr-pose.ts.md)), a wrong size puts the solved center off the real
 surface; this check catches that.
@@ -60,7 +60,7 @@ if (!verdict.ok) lowerVoteWeightOrReject(verdict); // "QR size may be wrong"
 
 ## Related
 
-- Consumes [occupancy-grid.ts.md](occupancy-grid.ts.md) (`getOccupiedCells`,
+- Consumes [occupancy-grid.ts.md](../occupancy-grid.ts.md) (`getOccupiedCells`,
   `getCellCenter`, `cellSizeM`).
 - Guards the depth DOF that the 4-corner GPS-vote injection (Phase 5) leaves
   least-constrained — see the plan §6 coplanarity caveat.

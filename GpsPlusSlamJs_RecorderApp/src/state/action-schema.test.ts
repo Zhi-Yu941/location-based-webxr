@@ -6,7 +6,9 @@
  * for integration testing and parameter optimization.
  *
  * ARCHITECTURE NOTE: See docs/architecture-ar-gps-pose-separation.md
- * and docs/issue-library-integration.md
+ * and docs/issue-library-integration.md. Action formats must stay
+ * coordinated with gps-plus-slam/GpsPlusSlamJs/src/utils/replayLoader.ts
+ * (the library-side replay reader in the sibling repo).
  *
  * The recordGpsEvent action uses the LIBRARY's format with:
  * - odomPosition/odomRotation (AR pose as tuples)

@@ -96,6 +96,20 @@ export function createRefPointHandlers(
 
   // --- Internal helpers ---
 
+  /**
+   * Mirror of the framework persistence middleware's `readIsRecording`
+   * (persistence-middleware.ts): the gate the `addRefPointEntry` dispatch
+   * below is subject to. Missing slice ⇒ false, exactly like the gate, so
+   * this predicts precisely whether a dispatched action would reach the
+   * recording's `actions/`.
+   */
+  function isRecordingActive(): boolean {
+    const state = deps.getStore().getState() as unknown as {
+      recording?: { isRecording?: boolean };
+    };
+    return state.recording?.isRecording ?? false;
+  }
+
   function validateRefPointPrerequisites(): {
     arPose: NonNullable<ReturnType<typeof getCurrentArPose>>;
     lastGpsPoint: GpsPoint;
@@ -342,16 +356,30 @@ export function createRefPointHandlers(
         };
       }
 
-      // Dispatch action to library
-      dispatchRefPointAction(
-        refPointId,
-        refPointName,
-        odomPosition,
-        odomRotation,
-        lastGpsPoint,
-        timestamp,
-        fusedGpsPoint
-      );
+      // The recording can end while this flow awaits (the new-point picker
+      // can stay open across Stop or a system session end) — root cause of
+      // the 2026-07-11 zip-1 lost "A3" action (indoor-loop enablement,
+      // implementation summary §3.5): the persistence middleware drops
+      // post-stop dispatches, so the action can never reach the recording,
+      // while the OPFS write below still succeeds and the toast claimed
+      // plain success. Skip the dead dispatch, keep the durable
+      // scenario-level observation, and tell the truth in the toast.
+      const recordingActive = isRecordingActive();
+      if (recordingActive) {
+        dispatchRefPointAction(
+          refPointId,
+          refPointName,
+          odomPosition,
+          odomRotation,
+          lastGpsPoint,
+          timestamp,
+          fusedGpsPoint
+        );
+      } else {
+        log.warn(
+          `Ref point "${refPointName}" (${refPointId}) marked after the recording ended — action not persisted, scenario observation only`
+        );
+      }
 
       const isNewPoint = !nearbyMatch;
 
@@ -391,7 +419,14 @@ export function createRefPointHandlers(
       // (Finding 3, 2026-04-29).
       if (isNewPoint) {
         if (persistOk) {
-          showToast(`Marked "${refPointName}"`, { severity: 'info' });
+          // The stop-window variant must not claim plain success: the mark
+          // is durable in the scenario but absent from the (ended) recording.
+          showToast(
+            recordingActive
+              ? `Marked "${refPointName}"`
+              : `Marked "${refPointName}" — recording already ended, saved to scenario only`,
+            { severity: recordingActive ? 'info' : 'warning' }
+          );
         } else {
           // Revert the in-progress "Saving…" state with an explicit failure
           // toast (persistRefPointObservation also drives the HUD error
@@ -403,7 +438,12 @@ export function createRefPointHandlers(
           });
         }
       } else if (persistOk) {
-        showToast(`Re-observed "${refPointName}"`, { severity: 'info' });
+        showToast(
+          recordingActive
+            ? `Re-observed "${refPointName}"`
+            : `Re-observed "${refPointName}" — recording already ended, saved to scenario only`,
+          { severity: recordingActive ? 'info' : 'warning' }
+        );
       }
 
       // Record re-observation timestamp for cooldown (Aachen audit Issue 3)

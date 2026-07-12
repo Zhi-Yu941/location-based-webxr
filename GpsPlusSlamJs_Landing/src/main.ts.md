@@ -36,6 +36,9 @@ Not applicable — loaded once via `<script type="module" src="/src/main.ts">`.
 ## Tests
 
 No unit tests (thin impure glue; all logic lives in the imported tested
-modules). Verified manually per the plan's verification section: desktop
-Chrome/Firefox, Android phone, reduced-motion enabled, both themes,
-no-WebGL (WebGL disabled via browser flag).
+modules). The Playwright smoke suite (`playwright-tests/scroll-story.spec.js`)
+exercises this wiring end-to-end in a real browser: boot + chapter
+activation without console errors, canvas-or-floor, theme persistence,
+demo links, reduced motion. The remaining coverage is the manual pass per
+the plan's verification section: desktop Chrome/Firefox, Android phone,
+both themes, no-WebGL (WebGL disabled via browser flag).

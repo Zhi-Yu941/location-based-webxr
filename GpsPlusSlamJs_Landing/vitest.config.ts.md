@@ -2,10 +2,11 @@
 
 - **Purpose:** Restricts Vitest to the colocated `src/**/*.test.ts` unit
   tests (including `*.property.test.ts`).
-- **Why it exists:** keeps the include explicit and mirrors the sibling
-  apps' configs; the landing has no e2e runner in v1, so no spec files
-  need excluding — but the explicit `include` keeps that true if one is
-  added later.
+- **Why it exists:** the Playwright e2e specs in
+  `playwright-tests/*.spec.js` import `@playwright/test`, which throws if
+  Vitest tries to collect them. Scoping `include` to `src` keeps the two
+  runners separated: unit logic via Vitest (`pnpm run test:unit`),
+  browser smoke via Playwright (`pnpm run test:e2e`).
 - **Invariants:** all unit tests live under `src/` next to the code they
   cover; tests run in the default node environment — modules that touch
   browser APIs take them as injected seams instead of globals (see

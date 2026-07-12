@@ -53,7 +53,12 @@ build is `vite build` at base `/` orchestrated by `scripts/build-site.mjs`.
 
 - `lint:css` (stylelint + csstree) covers the inline CSS.
 - The chapter-id contract is covered by `src/chapters.test.ts` +
-  `main.ts`'s runtime warning; the demo-link presence is asserted by the
-  build-site guard after `pnpm run build:site`.
-- Visual behavior (scroll story, themes, reduced motion, no-WebGL) is the
-  manual pass defined in the plan's verification section.
+  `main.ts`'s runtime warning; the demo-link presence is asserted both by
+  the Playwright smoke suite and by the build-site guard after
+  `pnpm run build:site`.
+- `playwright-tests/scroll-story.spec.js` smoke-tests the rendered page:
+  boot + chapter activation without console errors, canvas (or the
+  no-WebGL floor), theme toggle persistence, reduced motion.
+- Fine-grained visual quality (composition per chapter, both themes on
+  real displays) remains the manual pass defined in the plan's
+  verification section.

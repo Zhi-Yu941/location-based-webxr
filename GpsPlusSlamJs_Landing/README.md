@@ -11,12 +11,14 @@ Requirements, story beats, and all product decisions live in the plan doc:
 ## Development
 
 ```bash
-pnpm install   # from the repo root
-pnpm dev       # from this directory — serves on http://localhost:5182
-pnpm test      # format + lint + lint:css + check:all + typecheck(+tests) + unit tests
+pnpm install        # from the repo root
+pnpm dev            # from this directory — serves on http://localhost:5182
+pnpm test           # test:core (format/lint/lint:css/check:all/typecheck/unit) + e2e
+pnpm run test:e2e   # Playwright smoke suite only
 ```
 
-Single test file: `pnpm run test:unit src/scroll-story.test.ts`.
+Single test file: `pnpm run test:unit src/scroll-story.test.ts`. Never call
+`vitest` or `playwright` directly.
 
 ## Architecture
 

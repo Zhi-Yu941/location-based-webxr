@@ -160,6 +160,8 @@ export default defineConfig(
       "dist/**",
       "coverage/**",
       "node_modules/**",
+      "test-results/**",
+      "playwright-report/**",
       "vite.config.ts",
       "vitest.config.ts",
     ],

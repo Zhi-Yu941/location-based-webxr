@@ -93,21 +93,24 @@ const LIGHT: ScenePalette = {
   },
 };
 
+// Brightened after round-1 feedback ("dark theme too dark, needs a tick
+// more contrast"): lifted surface tones + stronger lights against the
+// near-black background, glow accents unchanged.
 const DARK: ScenePalette = {
   background: 0x0b0b0d,
   fog: { color: 0x0b0b0d, near: 40, far: 90 },
-  hemisphere: { sky: 0x3a3f55, ground: 0x14141a, intensity: 0.9 },
-  directional: { color: 0xbfd0ff, intensity: 0.8 },
+  hemisphere: { sky: 0x565f80, ground: 0x23232c, intensity: 1.15 },
+  directional: { color: 0xbfd0ff, intensity: 1.1 },
   roles: {
-    ground: { color: 0x17171c },
-    path: { color: 0x24242c },
-    hill: { color: 0x1c1c23 },
-    foliage: { color: 0x1f3a2d },
-    trunk: { color: 0x3a3028 },
-    rock: { color: 0x2a2a31 },
-    sign: { color: 0x3a3028 },
+    ground: { color: 0x23232b },
+    path: { color: 0x3a3a46 },
+    hill: { color: 0x2a2a33 },
+    foliage: { color: 0x2e5240 },
+    trunk: { color: 0x4d4136 },
+    rock: { color: 0x3c3c45 },
+    sign: { color: 0x4d4136 },
     signPanel: { color: 0xd9d9e0, emissiveIntensity: 0.25 },
-    statue: { color: 0x3b3b44 },
+    statue: { color: 0x50505c },
     person: { color: 0xe7e7ea, emissiveIntensity: 0.35 },
     markerRaw: { color: 0xfacc15, emissiveIntensity: 0.6 },
     markerFused: { color: ACCENT, emissiveIntensity: 0.9 },

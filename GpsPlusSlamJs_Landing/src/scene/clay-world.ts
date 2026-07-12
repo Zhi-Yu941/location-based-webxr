@@ -330,15 +330,18 @@ function buildArContent(): Group {
   const arContent = namedGroup(WORLD_NODE.arContent);
   const curve = createPathCurve();
   for (let i = 0; i < 4; i++) {
-    const t = 0.56 + i * 0.08; // ahead of the dive position (walk t = 0.5)
+    const t = 0.6 + i * 0.08; // ahead of the dive position (walk t = 0.5)
     const point = curve.getPointAt(t);
     const tangent = curve.getTangentAt(t);
     const arrow = clayMesh(new ConeGeometry(0.26, 0.75, 6), "arrow");
-    arrow.position.set(point.x, 0.6, point.z);
+    arrow.position.set(point.x, 0.45, point.z);
     // Cone +Y axis onto the tangent: pitch flat first (X), then yaw (Y);
-    // Euler order YXZ applies X before Y. Pinned by the alignment test.
+    // Euler order YXZ applies X before Y. The extra ~14° of pitch tips
+    // the nose slightly down so the cone reads as an arrow (not a flat
+    // hexagon) when seen from behind at eye level. Pinned by the
+    // alignment test (cos 0.25 ≈ 0.97 keeps the tangent dot above 0.95).
     arrow.rotation.order = "YXZ";
-    arrow.rotation.x = Math.PI / 2;
+    arrow.rotation.x = Math.PI / 2 + 0.25;
     arrow.rotation.y = Math.atan2(tangent.x, tangent.z);
     arrow.userData.pathT = t;
     arrow.castShadow = false;

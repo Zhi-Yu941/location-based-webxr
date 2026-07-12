@@ -124,16 +124,80 @@ export function syncStage(stage: StoryStage): void {
  * `syncStage`). `onUpdate` fires on every applied scrub — the render loop
  * uses it as its dirty flag.
  */
+/** Per-property `{from, to}` params for a Vector3-shaped target. */
+function vec3Tween(from: Vector3, to: Vector3) {
+  return {
+    x: { from: from.x, to: to.x },
+    y: { from: from.y, to: to.y },
+    z: { from: from.z, to: to.z },
+  };
+}
+
+interface ChainSegment {
+  readonly to: number;
+  readonly duration: number;
+  readonly ease?: string;
+}
+
+/**
+ * Add a wiggle/jitter sequence as INDIVIDUAL `{from, to}` tweens.
+ *
+ * Never use anime keyframe ARRAYS in these timelines: they do not restore
+ * their pre-tween value when the timeline is seeked back before them
+ * (probe-verified — the value sticks at an intermediate keyframe), which
+ * breaks scrub-path independence. Explicit chained segments restore
+ * perfectly in both directions.
+ */
+function addValueChain(
+  timeline: Timeline,
+  target: object,
+  property: string,
+  from: number,
+  segments: readonly ChainSegment[],
+  startAt: number,
+): void {
+  let value = from;
+  let at = startAt;
+  for (const segment of segments) {
+    timeline.add(
+      target,
+      {
+        [property]: { from: value, to: segment.to },
+        duration: segment.duration,
+        ...(segment.ease ? { ease: segment.ease } : {}),
+      },
+      at,
+    );
+    value = segment.to;
+    at += segment.duration;
+  }
+}
+
+/** One chapter's target composition (camera + look + walk progress). */
+interface ChapterFraming {
+  readonly at: number;
+  readonly camera: Vector3;
+  readonly look: Vector3;
+  readonly walkT: number;
+  readonly cameraEase?: string;
+  readonly walkDuration?: number;
+}
+
 export function buildStoryTimeline(
   stage: StoryStage,
   onUpdate: () => void,
 ): Timeline {
   const timeline = createTimeline({
     autoplay: false,
-    // composition 'none' is load-bearing: with the default 'replace', the
-    // intro timeline (created later, touching the same camera properties)
-    // silently CANCELS these tweens. Both timelines are seek-driven, so
-    // last-seeked-wins is exactly the semantics we want.
+    // composition 'none' is load-bearing TWICE over:
+    // 1. With the default 'replace', the intro timeline (created later,
+    //    touching the same camera properties) silently CANCELS these tweens.
+    // 2. BUT 'none' also disables anime's from-value chaining: every tween
+    //    captures `from` at BUILD time (the hero pose), so any property
+    //    animated by more than one tween MUST declare explicit {from, to} —
+    //    otherwise each chapter starts by teleporting back to the build
+    //    pose (the round-1 feedback's "harter Sprung", pinned by the
+    //    continuity tests). The framing chain below guarantees this.
     // Camera/reveal tweens run in the FIRST ~55% of each chapter window:
     // the scroll mapping centers a chapter's copy at ~mid-window, and the
     // composition must be settled by then (not still mid-flight). The walk
@@ -150,82 +214,7 @@ export function buildStoryTimeline(
   const { camera, lookTarget, walk, world, markers, phone } = stage;
   const rawBase = markers.raw.position.clone();
 
-  // ── Chapter 0: hero — slow push-in on the miniature world.
-  timeline.add(camera, { x: 16.5, y: 15, z: 16.5 }, 0);
-  timeline.add(lookTarget, { y: 1.5 }, 0);
-
-  // ── Chapter 1: QR = door + instant anchor.
-  timeline.add(camera, { x: -3.5, y: 4.5, z: 15.5 }, 1000);
-  timeline.add(
-    lookTarget,
-    { x: WORLD_ANCHORS.sign.x, y: 1.6, z: WORLD_ANCHORS.sign.z, duration: 500 },
-    1000,
-  );
-  timeline.add(walk, { t: 0.14, duration: CHAPTER_DURATION_MS }, 1000);
-  // The world "snaps into alignment": a settling wiggle with decaying
-  // amplitude, ending perfectly at rest.
-  timeline.add(
-    world,
-    {
-      x: [
-        { to: 0.28, duration: 150 },
-        { to: -0.18, duration: 150 },
-        { to: 0.08, duration: 150 },
-        { to: 0, duration: 150 },
-      ],
-    },
-    1200,
-  );
-  const snapRing = world.getObjectByName(WORLD_NODE.snapRing);
-  if (snapRing) {
-    timeline.add(
-      snapRing,
-      {
-        scale: [
-          { to: 2.2, duration: 300, ease: "outCubic" },
-          { to: 0.001, duration: 100 },
-        ],
-      },
-      1450,
-    );
-  }
-
-  // ── Chapter 2: wobbly GPS vs. fused anchor.
-  timeline.add(camera, { x: 6, y: 5, z: 14 }, 2000);
-  timeline.add(
-    lookTarget,
-    {
-      x: WORLD_ANCHORS.markerPair.x,
-      y: 1.2,
-      z: WORLD_ANCHORS.markerPair.z,
-      duration: 500,
-    },
-    2000,
-  );
-  timeline.add(walk, { t: 0.45, duration: CHAPTER_DURATION_MS }, 2000);
-  // Raw GPS jitter: meters of wander. The fused marker is deliberately
-  // NEVER animated — its stillness is the message.
-  timeline.add(
-    markers.raw,
-    {
-      x: [
-        { to: rawBase.x + 0.9, duration: 180 },
-        { to: rawBase.x - 0.5, duration: 180 },
-        { to: rawBase.x + 0.6, duration: 180 },
-        { to: rawBase.x - 0.3, duration: 180 },
-        { to: rawBase.x, duration: 160 },
-      ],
-      z: [
-        { to: rawBase.z - 0.6, duration: 220 },
-        { to: rawBase.z + 0.5, duration: 220 },
-        { to: rawBase.z - 0.4, duration: 220 },
-        { to: rawBase.z, duration: 220 },
-      ],
-    },
-    2100,
-  );
-
-  // ── Chapter 3: the dive — into the dot-person's held phone.
+  // ── Chapter 3 geometry (computed up front; used in the framing chain).
   const eyeT = 0.5;
   const eyePoint = stage.curve.getPointAt(eyeT);
   const eyeTangent = stage.curve.getTangentAt(eyeT);
@@ -236,48 +225,198 @@ export function buildStoryTimeline(
   const diveLook = stage.curve
     .getPointAt(Math.min(1, eyeT + 0.12))
     .add(new Vector3(0, 1.3, 0));
-  timeline.add(
-    camera,
-    { x: divePos.x, y: divePos.y, z: divePos.z, ease: "inOutQuad" },
-    3000,
-  );
-  timeline.add(
-    lookTarget,
-    { x: diveLook.x, y: diveLook.y, z: diveLook.z, duration: 550 },
-    3000,
-  );
-  timeline.add(walk, { t: eyeT, duration: 500 }, 3000);
-  timeline.add(phone, { scale: 1, duration: 300, ease: "outBack" }, 3320);
 
-  // ── Chapter 4: works anywhere — pull back, reveal the unmapped park.
-  timeline.add(phone, { scale: 0.001, duration: 150 }, 4000);
-  timeline.add(camera, { x: 0, y: 44, z: 27 }, 4000);
-  timeline.add(lookTarget, { x: 0, y: 0, z: 0, duration: 500 }, 4000);
-  timeline.add(walk, { t: 0.6, duration: CHAPTER_DURATION_MS }, 4000);
+  // The camera path as an explicit framing CHAIN: each move tweens from the
+  // previous framing to its own, so scrubbing is continuous by construction
+  // (no dependence on anime's from-capture).
+  const start: ChapterFraming = {
+    at: 0,
+    camera: HERO_CAMERA.clone(),
+    look: new Vector3(0, 2, 0),
+    walkT: 0.02,
+  };
+  const framings: readonly ChapterFraming[] = [
+    // hero push-in
+    {
+      at: 0,
+      camera: new Vector3(16.5, 15, 16.5),
+      look: new Vector3(0, 1.5, 0),
+      walkT: 0.02,
+    },
+    // qr
+    {
+      at: 1000,
+      camera: new Vector3(-3.5, 4.5, 15.5),
+      look: new Vector3(WORLD_ANCHORS.sign.x, 1.6, WORLD_ANCHORS.sign.z),
+      walkT: 0.14,
+    },
+    // fusion
+    {
+      at: 2000,
+      camera: new Vector3(6, 5, 14),
+      look: new Vector3(
+        WORLD_ANCHORS.markerPair.x,
+        1.2,
+        WORLD_ANCHORS.markerPair.z,
+      ),
+      walkT: 0.45,
+    },
+    // dive
+    {
+      at: 3000,
+      camera: divePos,
+      look: diveLook,
+      walkT: eyeT,
+      cameraEase: "inOutQuad",
+      walkDuration: 500,
+    },
+    // anywhere
+    {
+      at: 4000,
+      camera: new Vector3(0, 44, 27),
+      look: new Vector3(0, 0, 0),
+      walkT: 0.6,
+    },
+    // gallery
+    {
+      at: 5000,
+      camera: new Vector3(-8, 11, -12),
+      look: new Vector3(4, 1, -3),
+      walkT: 0.78,
+    },
+    // cta
+    {
+      at: 6000,
+      camera: new Vector3(15, 17, 21),
+      look: new Vector3(0, 1, 0),
+      walkT: 0.92,
+    },
+  ];
+  let previous = start;
+  for (const framing of framings) {
+    timeline.add(
+      camera,
+      {
+        ...vec3Tween(previous.camera, framing.camera),
+        ...(framing.cameraEase ? { ease: framing.cameraEase } : {}),
+      },
+      framing.at,
+    );
+    timeline.add(
+      lookTarget,
+      { ...vec3Tween(previous.look, framing.look), duration: 500 },
+      framing.at,
+    );
+    if (framing.walkT !== previous.walkT) {
+      timeline.add(
+        walk,
+        {
+          t: { from: previous.walkT, to: framing.walkT },
+          duration: framing.walkDuration ?? CHAPTER_DURATION_MS,
+        },
+        framing.at,
+      );
+    }
+    previous = framing;
+  }
+  // ── Prop beats. All wiggle/jitter sequences go through addValueChain
+  // (explicit {from, to} per segment) — see its doc comment for why anime
+  // keyframe arrays are banned here.
+
+  // QR chapter: the world "snaps into alignment" — a settling wiggle with
+  // decaying amplitude, ending perfectly at rest.
+  addValueChain(
+    timeline,
+    world,
+    "x",
+    0,
+    [
+      { to: 0.28, duration: 150 },
+      { to: -0.18, duration: 150 },
+      { to: 0.08, duration: 150 },
+      { to: 0, duration: 150 },
+    ],
+    1200,
+  );
+  const snapRing = world.getObjectByName(WORLD_NODE.snapRing);
+  if (snapRing) {
+    addValueChain(
+      timeline,
+      snapRing,
+      "scale",
+      0.001,
+      [
+        { to: 2.2, duration: 300, ease: "outCubic" },
+        { to: 0.001, duration: 100 },
+      ],
+      1450,
+    );
+  }
+
+  // Fusion chapter: raw GPS jitter — meters of wander. The fused marker is
+  // deliberately NEVER animated; its stillness is the message.
+  addValueChain(
+    timeline,
+    markers.raw,
+    "x",
+    rawBase.x,
+    [
+      { to: rawBase.x + 0.9, duration: 180 },
+      { to: rawBase.x - 0.5, duration: 180 },
+      { to: rawBase.x + 0.6, duration: 180 },
+      { to: rawBase.x - 0.3, duration: 180 },
+      { to: rawBase.x, duration: 160 },
+    ],
+    2100,
+  );
+  addValueChain(
+    timeline,
+    markers.raw,
+    "z",
+    rawBase.z,
+    [
+      { to: rawBase.z - 0.6, duration: 220 },
+      { to: rawBase.z + 0.5, duration: 220 },
+      { to: rawBase.z - 0.4, duration: 220 },
+      { to: rawBase.z, duration: 220 },
+    ],
+    2100,
+  );
+
+  // Dive chapter: the phone rises in front of the lens...
+  timeline.add(
+    phone,
+    { scale: { from: 0.001, to: 1 }, duration: 300, ease: "outBack" },
+    3320,
+  );
+  // ...and drops away again on the pull-back.
+  timeline.add(phone, { scale: { from: 1, to: 0.001 }, duration: 150 }, 4000);
+
+  // Anywhere chapter: the unmapped-park ring rises into place.
   const outer = world.getObjectByName(WORLD_NODE.outer);
   if (outer) {
-    timeline.add(outer, { y: 0, duration: 500, ease: "outCubic" }, 4100);
+    timeline.add(
+      outer,
+      { y: { from: -6, to: 0 }, duration: 500, ease: "outCubic" },
+      4100,
+    );
   }
 
-  // ── Chapter 5: use-case gallery pops in.
-  timeline.add(camera, { x: -8, y: 11, z: -12 }, 5000);
-  timeline.add(lookTarget, { x: 4, y: 1, z: -3, duration: 500 }, 5000);
-  timeline.add(walk, { t: 0.78, duration: CHAPTER_DURATION_MS }, 5000);
+  // Gallery chapter: the use-case props pop in.
   const gallery = world.getObjectByName(WORLD_NODE.gallery);
   if (gallery) {
-    timeline.add(gallery, { scale: 1, duration: 450, ease: "outBack" }, 5150);
+    timeline.add(
+      gallery,
+      { scale: { from: 0.001, to: 1 }, duration: 450, ease: "outBack" },
+      5150,
+    );
   }
-
-  // ── Chapter 6: CTA — settle into a calm wide framing.
-  timeline.add(camera, { x: 15, y: 17, z: 21 }, 6000);
-  timeline.add(lookTarget, { x: 0, y: 1, z: 0, duration: 500 }, 6000);
-  timeline.add(walk, { t: 0.92, duration: CHAPTER_DURATION_MS }, 6000);
 
   // Materialize the full duration even if a chapter ends with a short
   // tween (keeps duration === CHAPTER_COUNT * CHAPTER_DURATION_MS).
   timeline.add(
     walk,
-    { t: 0.92, duration: 0 },
+    { t: { from: 0.92, to: 0.92 }, duration: 0 },
     CHAPTER_COUNT * CHAPTER_DURATION_MS,
   );
 
@@ -301,19 +440,21 @@ export function buildIntroTimeline(
     defaults: { ease: "outCubic", composition: "none" },
     onUpdate,
   });
+  const introFar = new Vector3(32, 30, 32);
   timeline.add(stage.camera, { x: 32, y: 30, z: 32, duration: 0 }, 0);
-  timeline.add(stage.world, { y: [{ from: -1.2, to: 0 }], duration: 900 }, 0);
+  timeline.add(stage.world, { y: { from: -1.2, to: 0 }, duration: 900 }, 0);
   timeline.add(
     stage.person,
-    { scale: [{ from: 0.001, to: 1 }], duration: 700, ease: "outBack" },
+    { scale: { from: 0.001, to: 1 }, duration: 700, ease: "outBack" },
     600,
   );
+  // Explicit {from, to}: composition 'none' would otherwise capture the
+  // build-time camera (already at HERO) as the start — turning the flight
+  // into a hard snap at t=300 (the round-1 "buggy pause then nudge").
   timeline.add(
     stage.camera,
     {
-      x: HERO_CAMERA.x,
-      y: HERO_CAMERA.y,
-      z: HERO_CAMERA.z,
+      ...vec3Tween(introFar, HERO_CAMERA),
       duration: 1800,
       ease: "outCubic",
     },

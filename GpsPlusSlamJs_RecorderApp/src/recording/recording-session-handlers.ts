@@ -671,6 +671,18 @@ export function createRecordingSessionHandlers(
 
     // Get state before dispatch
     const store = deps.getStore();
+
+    // Drain the persistence middleware's async WriteQueue BEFORE anything
+    // reads this session's `actions/` (the final external sync and the OPFS
+    // zip export below) — an action dispatched moments before Stop could
+    // otherwise land after the export enumerated the directory and silently
+    // miss the zip (indoor-loop enablement follow-up §3.6b, 2026-07-12).
+    try {
+      await store.flushPendingActionWrites();
+    } catch (err) {
+      log.error('Failed to flush pending action writes:', err);
+    }
+
     const state = store.getState();
     const sessionMetadata = state.recording.sessionMetadata;
     const gpsEvents = state.gpsData?.gpsEvents;

@@ -687,3 +687,125 @@ describe('persistence re-entrancy tripwire', () => {
     errSpy.mockRestore();
   });
 });
+
+/**
+ * flushPendingWrites — the stop-flow drain hook (2026-07-12).
+ *
+ * Why these tests matter: the WriteQueue is fire-and-forget with a
+ * concurrency cap, so a mark dispatched moments before Stop can still be
+ * in flight (or queued) when the recorder's stop flow reads `actions/`
+ * for the final sync / ZIP export — the trailing write would land after
+ * the export enumerated the directory and silently miss the zip. The
+ * flush API is what the stop flow awaits to close that race; these tests
+ * pin its contract: resolves immediately when idle, resolves only after
+ * EVERY queued write settled (beyond the concurrency cap), and never
+ * hangs on failed writes.
+ */
+describe('flushPendingWrites', () => {
+  const recSlice = createSlice({
+    name: 'recording',
+    initialState: { isRecording: false, failedWriteCount: 0 },
+    reducers: {
+      startSession(state) {
+        state.isRecording = true;
+      },
+      recordWriteFailure(state) {
+        state.failedWriteCount += 1;
+      },
+    },
+  });
+  const gpsSlice = createSlice({
+    name: 'gpsData',
+    initialState: null as { zero: { lat: number; lon: number } } | null,
+    reducers: {
+      setZeroPos(_s, action: PayloadAction<{ lat: number; lon: number }>) {
+        return { zero: action.payload };
+      },
+    },
+  });
+
+  function backendWith(writeAction: ReturnType<typeof vi.fn>) {
+    return {
+      createSession: vi.fn().mockResolvedValue({ sessionName: 't' }),
+      listSessions: vi.fn().mockResolvedValue([]),
+      writeAction,
+      writeFrame: vi.fn().mockResolvedValue(undefined),
+      writeSessionMetadata: vi.fn().mockResolvedValue(undefined),
+    } as unknown as StorageBackend;
+  }
+
+  function storeWithMiddleware(writeAction: ReturnType<typeof vi.fn>) {
+    const middleware = createPersistenceMiddleware({
+      storageBackend: backendWith(writeAction),
+      persistedPrefixes: ['gpsData', 'recording'],
+    });
+    const store = configureStore({
+      reducer: { recording: recSlice.reducer, gpsData: gpsSlice.reducer },
+      middleware: (getDefault) =>
+        getDefault({ serializableCheck: false, immutableCheck: false }).concat(
+          middleware
+        ),
+    });
+    return { store, middleware };
+  }
+
+  it('resolves immediately when nothing is queued', async () => {
+    const { middleware } = storeWithMiddleware(
+      vi.fn().mockResolvedValue(undefined)
+    );
+    await expect(middleware.flushPendingWrites()).resolves.toBeUndefined();
+  });
+
+  it('resolves only after EVERY queued write settled (past the concurrency cap)', async () => {
+    // Manually-released writes: all five persisted actions stay in flight
+    // until the test resolves them, and only 3 may run concurrently.
+    const releases: Array<() => void> = [];
+    const writeAction = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          releases.push(resolve);
+        })
+    );
+    const { store, middleware } = storeWithMiddleware(writeAction);
+
+    store.dispatch(recSlice.actions.startSession());
+    for (let i = 0; i < 4; i++) {
+      store.dispatch(gpsSlice.actions.setZeroPos({ lat: i, lon: i }));
+    }
+
+    let flushed = false;
+    const flushPromise = middleware.flushPendingWrites().then(() => {
+      flushed = true;
+    });
+
+    // Concurrency cap: only 3 of the 5 writes may have started.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(writeAction).toHaveBeenCalledTimes(3);
+    expect(flushed).toBe(false);
+
+    // Release progressively; flush must not resolve until the LAST settles.
+    while (releases.length > 0) {
+      releases.shift()!();
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    while (writeAction.mock.calls.length < 5 || releases.length > 0) {
+      if (releases.length > 0) releases.shift()!();
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    await flushPromise;
+    expect(flushed).toBe(true);
+    expect(writeAction).toHaveBeenCalledTimes(5);
+  });
+
+  it('does not hang when writes fail (rejections still count as settled)', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const writeAction = vi.fn().mockRejectedValue(new Error('disk full'));
+    const { store, middleware } = storeWithMiddleware(writeAction);
+
+    store.dispatch(recSlice.actions.startSession());
+    store.dispatch(gpsSlice.actions.setZeroPos({ lat: 1, lon: 2 }));
+
+    await expect(middleware.flushPendingWrites()).resolves.toBeUndefined();
+    errSpy.mockRestore();
+  });
+});

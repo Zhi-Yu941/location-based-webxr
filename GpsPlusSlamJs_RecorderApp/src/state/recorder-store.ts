@@ -88,6 +88,12 @@ export interface RecorderStore {
   subscribe: (listener: () => void) => () => void;
   writeFrame: (blob: Blob, index: number) => Promise<void>;
   writeSessionMetadata: (metadata: OpfsSessionMetadata) => Promise<void>;
+  /**
+   * Drains the persistence middleware's async WriteQueue. The stop flow
+   * awaits this before anything reads the session's `actions/` (final
+   * sync, ZIP export) — see recording-session-handlers `performStop`.
+   */
+  flushPendingActionWrites: () => Promise<void>;
 }
 
 export interface RecorderStoreOptions {
@@ -161,6 +167,7 @@ export function createRecorderStore(
     subscribe: store.subscribe,
     writeFrame: store.writeFrame,
     writeSessionMetadata: store.writeSessionMetadata,
+    flushPendingActionWrites: store.flushPendingActionWrites,
   };
 }
 

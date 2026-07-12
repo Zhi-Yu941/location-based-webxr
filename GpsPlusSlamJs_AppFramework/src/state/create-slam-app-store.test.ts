@@ -326,6 +326,49 @@ describe('createSlamAppStore', () => {
       });
       expect(writeSessionMetadata).toHaveBeenCalled();
     });
+
+    // Why: the stop flow must be able to await every queued action write
+    // before it reads `actions/` for the final sync / ZIP export (the
+    // persistence WriteQueue is async — a mark dispatched moments before
+    // Stop could otherwise miss the zip). This pins that the store exposes
+    // the middleware's drain hook and that it actually waits for the
+    // backend write to settle.
+    it('flushPendingActionWrites resolves only after queued action writes settled', async () => {
+      let releaseWrite!: () => void;
+      const writeAction = vi.fn().mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            releaseWrite = resolve;
+          })
+      );
+      const spy: StorageBackend = {
+        createSession: vi.fn().mockResolvedValue({ sessionName: 's' }),
+        listSessions: vi.fn().mockResolvedValue([]),
+        writeAction,
+        writeFrame: vi.fn().mockResolvedValue(undefined),
+        writeSessionMetadata: vi.fn().mockResolvedValue(undefined),
+      };
+      const store = createSlamAppStore({ storageBackend: spy });
+      store.dispatch(
+        startSession({
+          scenarioName: 'Test',
+          sessionName: 'flush-session',
+          startTime: Date.now(),
+        })
+      );
+
+      let flushed = false;
+      const flushPromise = store.flushPendingActionWrites().then(() => {
+        flushed = true;
+      });
+      await new Promise((r) => setTimeout(r, 0));
+      expect(writeAction).toHaveBeenCalled();
+      expect(flushed).toBe(false);
+
+      releaseWrite();
+      await flushPromise;
+      expect(flushed).toBe(true);
+    });
   });
 
   describe('license validation', () => {

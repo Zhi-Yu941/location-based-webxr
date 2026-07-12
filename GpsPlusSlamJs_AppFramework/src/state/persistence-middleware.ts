@@ -37,10 +37,31 @@ const MAX_CONCURRENT_WRITES = 3;
 class WriteQueue {
   private pendingCount = 0;
   private queue: Array<() => Promise<void>> = [];
+  private flushWaiters: Array<() => void> = [];
 
   enqueue(writeFn: () => Promise<void>): void {
     this.queue.push(writeFn);
     this.drain();
+  }
+
+  /**
+   * Resolves once the queue is fully idle — every enqueued write (including
+   * ones still waiting behind the concurrency cap) has settled. Rejected
+   * writes count as settled (the enqueue wrappers handle their errors), so
+   * flush never hangs on a failing backend. Writes enqueued AFTER the queue
+   * went idle again are not waited for.
+   */
+  flush(): Promise<void> {
+    if (this.isIdle()) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      this.flushWaiters.push(resolve);
+    });
+  }
+
+  private isIdle(): boolean {
+    return this.pendingCount === 0 && this.queue.length === 0;
   }
 
   private drain(): void {
@@ -51,6 +72,13 @@ class WriteQueue {
         this.pendingCount--;
         this.drain();
       });
+    }
+    if (this.isIdle() && this.flushWaiters.length > 0) {
+      const waiters = this.flushWaiters;
+      this.flushWaiters = [];
+      for (const resolve of waiters) {
+        resolve();
+      }
     }
   }
 }
@@ -150,9 +178,20 @@ function isInPersistableSession(
  * - Uses 1-based indexing for action files (000001.json, 000002.json, …).
  * - Each middleware instance maintains its own action index (Bug 10 fix).
  */
+/**
+ * The persistence middleware plus its drain hook: `flushPendingWrites`
+ * resolves once every queued action write has settled. The stop flow MUST
+ * await it before anything reads the session's `actions/` (final sync, ZIP
+ * export) — the queue is async, so a write enqueued moments before Stop
+ * could otherwise land after the export enumerated the directory.
+ */
+export type PersistenceMiddleware = Middleware & {
+  flushPendingWrites: () => Promise<void>;
+};
+
 export function createPersistenceMiddleware(
   options: PersistenceMiddlewareOptions
-): Middleware {
+): PersistenceMiddleware {
   const { storageBackend, onWriteFailure, persistedPrefixes } = options;
 
   // Normalize each whitelisted slice name to its `name/` form once, so the
@@ -275,5 +314,7 @@ export function createPersistenceMiddleware(
     }
   };
 
-  return middleware;
+  return Object.assign(middleware, {
+    flushPendingWrites: () => writeQueue.flush(),
+  });
 }

@@ -407,6 +407,7 @@ function createMockStore(): RecorderStore {
     replaceReducer: vi.fn(),
     writeFrame: vi.fn().mockResolvedValue(undefined),
     writeSessionMetadata: vi.fn().mockResolvedValue(undefined),
+    flushPendingActionWrites: vi.fn().mockResolvedValue(undefined),
   } as unknown as RecorderStore;
 }
 
@@ -1296,6 +1297,46 @@ describe('handleStopRecording', () => {
     mockGetSaveFileHandle.mockReturnValue(null);
     await handlers.handleStopRecording();
     expect(mockExportSessionAsZip).toHaveBeenCalled();
+  });
+
+  // ── WriteQueue drain before actions/ readers (indoor-loop enablement
+  // follow-up §3.6b, 2026-07-12): the persistence middleware's WriteQueue is
+  // async, so an action dispatched moments before Stop can still be queued
+  // when the stop flow reads `actions/`. performStop must await the store's
+  // drain hook BEFORE the final sync and BEFORE the OPFS zip export, or a
+  // trailing mark silently misses the zip. ────────────────────────────────
+
+  it('flushes pending action writes BEFORE the OPFS zip export', async () => {
+    mockGetSaveFileHandle.mockReturnValue(null);
+
+    await handlers.handleStopRecording();
+
+    const flushMock = mockStore.flushPendingActionWrites as ReturnType<
+      typeof vi.fn
+    >;
+    expect(flushMock).toHaveBeenCalled();
+    expect(mockExportSessionAsZip).toHaveBeenCalled();
+    expect(flushMock.mock.invocationCallOrder[0]!).toBeLessThan(
+      mockExportSessionAsZip.mock.invocationCallOrder[0]!
+    );
+  });
+
+  it('flushes pending action writes BEFORE the final external sync', async () => {
+    mockGetSaveFileHandle.mockReturnValue({});
+    await handlers.handleStartRecording();
+    vi.clearAllMocks();
+
+    await handlers.handleStopRecording();
+
+    const flushMock = mockStore.flushPendingActionWrites as ReturnType<
+      typeof vi.fn
+    >;
+    expect(flushMock).toHaveBeenCalled();
+    expect(mockSyncManagerInstance.syncNow).toHaveBeenCalled();
+    expect(flushMock.mock.invocationCallOrder[0]!).toBeLessThan(
+      (mockSyncManagerInstance.syncNow as ReturnType<typeof vi.fn>).mock
+        .invocationCallOrder[0]!
+    );
   });
 
   // ── Re-entrancy & concurrent teardown (Sentry issue 7319627943) ──────────

@@ -1,29 +1,30 @@
-# `scene/phone-frame.ts` — simulated AR view for the dive chapter
+# `scene/phone-frame.ts` — the phone window for the dive chapter
 
 ## Purpose
 
-Builds the phone silhouette whose screen frames the clay world at eye
-level during the signature dive moment, with stylized AR overlays (trail
-arrows + a label) floating inside the screen area. Communicates "this is
-what your users see" without pretending to be real footage (the plan's
-explicit decision against blended real capture).
+Builds the phone frame whose glass-translucent screen is a pure WINDOW
+into the clay world at eye level during the signature dive moment. The AR
+content itself (trail arrows, POI pin, hinted label) lives in the world
+(`clay-world`'s `ar-content` group) and is seen through the window —
+round-1 feedback removed the earlier screen-plane overlays, which pointed
+nowhere and confused the message.
 
 ## Public API
 
 - `buildPhoneFrame() → Group` — named `PHONE_NODE.root`
   (`"phone-frame"`), starts `visible = false`.
-- `PHONE_NODE` — `root`, `screen` (`"phone-screen"`), `overlays`
-  (`"phone-ar-overlays"`) — the nodes the dive timeline animates.
+- `PHONE_NODE` — `root`, `screen` (`"phone-screen"`).
 
 ## Invariants & assumptions
 
 - **Starts hidden** (test-pinned): the dive timeline raises it in front of
   the camera and hides it again when scrolling past.
-- The screen plane sits just in front of the body, overlays just in front
-  of the screen — z-offsets are local, so the whole group can be parented
-  to the camera or posed freely.
-- Roles: `phone` (body), `screen`, `arrow`/`label` (overlays) — the dark
-  theme makes screen + overlays glow.
+- The body is a FRAME of four edge bars (never a solid slab — that would
+  block the window) and the screen material is transparent (opacity
+  ≈ 0.16) so the world shows through. **No overlay meshes on the screen
+  plane** (test-pinned: zero `arrow`-role meshes in the subtree).
+- Roles: `phone` (frame bars), `screen` — the dark theme makes the screen
+  glow slightly.
 
 ## Examples
 

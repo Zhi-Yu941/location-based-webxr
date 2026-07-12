@@ -14,7 +14,8 @@ export const MARKER_NODE = {
   fused: "marker-fused",
 } as const;
 
-function buildPin(name: string, role: PaletteRole): Group {
+/** Classic map pin, tip on the ground — also used for the AR POI marker. */
+export function buildPin(name: string, role: PaletteRole): Group {
   const marker = namedGroup(name);
   // Classic map pin: inverted cone with a sphere head, tip on the ground.
   const tip = clayMesh(new ConeGeometry(0.32, 1.1, 10), role);

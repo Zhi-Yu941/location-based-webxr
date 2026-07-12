@@ -63,11 +63,21 @@ describe("buildMarkerPair", () => {
 });
 
 describe("buildPhoneFrame", () => {
-  it("starts hidden and contains the screen + AR overlay nodes the dive animates", () => {
+  it("starts hidden and is a pure window: frame + translucent screen, NO screen-plane overlays", () => {
+    // Round-1 feedback: overlays painted on the screen plane pointed
+    // nowhere and confused the message — the AR content lives in the
+    // WORLD (clay-world's ar-content group) and is seen THROUGH the
+    // window instead.
     const phone = buildPhoneFrame();
     expect(phone.name).toBe(PHONE_NODE.root);
     expect(phone.visible).toBe(false);
     expect(phone.getObjectByName(PHONE_NODE.screen)).toBeDefined();
-    expect(phone.getObjectByName(PHONE_NODE.overlays)).toBeDefined();
+    let arrowCount = 0;
+    phone.traverse((obj) => {
+      if (obj.userData.paletteRole === "arrow") {
+        arrowCount++;
+      }
+    });
+    expect(arrowCount).toBe(0);
   });
 });

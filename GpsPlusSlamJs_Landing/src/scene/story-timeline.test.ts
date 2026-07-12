@@ -89,12 +89,16 @@ describe("buildStoryTimeline", () => {
     expect(stage.person.position.y).toBeCloseTo(0, 3);
   });
 
-  it("reveals the phone during the dive and the gallery in its chapter", () => {
+  it("reveals the AR content + phone during the dive and the gallery in its chapter", () => {
     const timeline = buildStoryTimeline(stage, () => {});
     timeline.seek(50);
     const phoneScaleBefore = stage.phone.scale.x;
     timeline.seek(chapterEndTime(3)); // end of dive
     expect(stage.phone.scale.x).toBeGreaterThan(phoneScaleBefore);
+    // The AR content must be fully in place while looking through the
+    // phone window (round-1 feedback: overlays live in the WORLD now).
+    const arContent = stage.world.getObjectByName(WORLD_NODE.arContent);
+    expect(arContent?.scale.x ?? 0).toBeGreaterThan(0.9);
 
     const gallery = stage.world.getObjectByName(WORLD_NODE.gallery);
     timeline.seek(chapterEndTime(5)); // end of gallery chapter

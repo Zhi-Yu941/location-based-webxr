@@ -90,6 +90,11 @@ export function createStoryStage(parts: StageParts): StoryStage {
     gallery.visible = true;
     gallery.scale.setScalar(0.001);
   }
+  const arContent = parts.world.getObjectByName(WORLD_NODE.arContent);
+  if (arContent) {
+    arContent.visible = true;
+    arContent.scale.setScalar(0.001);
+  }
   const snapRing = parts.world.getObjectByName(WORLD_NODE.snapRing);
   if (snapRing) {
     snapRing.visible = true;
@@ -383,7 +388,17 @@ export function buildStoryTimeline(
     2100,
   );
 
-  // Dive chapter: the phone rises in front of the lens...
+  // Dive chapter: the AR content (trail arrows, POI pin, hinted label)
+  // appears in the world just before the phone window rises...
+  const arContent = world.getObjectByName(WORLD_NODE.arContent);
+  if (arContent) {
+    timeline.add(
+      arContent,
+      { scale: { from: 0.001, to: 1 }, duration: 350, ease: "outBack" },
+      3150,
+    );
+  }
+  // ...then the phone rises in front of the lens...
   timeline.add(
     phone,
     { scale: { from: 0.001, to: 1 }, duration: 300, ease: "outBack" },

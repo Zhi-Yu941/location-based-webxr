@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Mesh, Vector3 } from "three";
+import { Vector3, type Mesh } from "three";
 import { PALETTE_ROLES } from "./palette";
 import {
   buildClayWorld,
@@ -82,10 +82,42 @@ describe("buildClayWorld", () => {
     }
   });
 
-  it("hides the reveal groups (outer terrain, gallery) until their chapters", () => {
+  it("hides the reveal groups (outer terrain, gallery, AR content) until their chapters", () => {
     const world = buildClayWorld("high");
     expect(world.getObjectByName(WORLD_NODE.outer)?.visible).toBe(false);
     expect(world.getObjectByName(WORLD_NODE.gallery)?.visible).toBe(false);
+    expect(world.getObjectByName(WORLD_NODE.arContent)?.visible).toBe(false);
+  });
+
+  it("points every AR trail arrow forward along the path tangent", () => {
+    // Round-1 feedback: the dive's arrows pointed in a wrong direction.
+    // The cone's +Y axis must map onto the walk direction at the arrow's
+    // own path position — this pins the Euler-order composition.
+    const world = buildClayWorld("high");
+    const arContent = world.getObjectByName(WORLD_NODE.arContent);
+    const curve = createPathCurve();
+    let checked = 0;
+    arContent?.traverse((obj) => {
+      const t = obj.userData.pathT as number | undefined;
+      if (t === undefined) {
+        return;
+      }
+      const direction = new Vector3(0, 1, 0).applyQuaternion(obj.quaternion);
+      const tangent = curve.getTangentAt(t);
+      expect(
+        direction.dot(tangent),
+        `arrow at t=${t} misaligned`,
+      ).toBeGreaterThan(0.95);
+      checked++;
+    });
+    expect(checked).toBeGreaterThanOrEqual(3);
+  });
+
+  it("marks the statue with a red POI pin and a hinted text label (dive AR content)", () => {
+    const world = buildClayWorld("high");
+    const arContent = world.getObjectByName(WORLD_NODE.arContent);
+    expect(arContent?.getObjectByName("ar-poi-pin")).toBeDefined();
+    expect(arContent?.getObjectByName("ar-poi-label")).toBeDefined();
   });
 });
 

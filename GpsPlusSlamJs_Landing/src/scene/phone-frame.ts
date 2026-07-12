@@ -1,6 +1,5 @@
 import {
   BoxGeometry,
-  ConeGeometry,
   PlaneGeometry,
   type Group,
   type MeshStandardMaterial,
@@ -8,11 +7,12 @@ import {
 import { clayMesh, namedGroup } from "./palette";
 
 /**
- * The simulated AR view of the dive chapter: a phone silhouette whose
- * "screen" frames the clay world at eye level, with stylized AR overlays
- * (arrows + a label) floating inside the screen area. It communicates
- * "this is what your users see" without pretending to be real footage —
- * the plan's signature-moment decision.
+ * The simulated AR view of the dive chapter: a phone frame whose
+ * glass-translucent "screen" is a pure WINDOW into the clay world at eye
+ * level. The AR content itself (trail arrows, POI pin, hinted label)
+ * lives in the world (`clay-world`'s ar-content group) and is seen
+ * through the window — round-1 feedback killed the earlier screen-plane
+ * overlays, which pointed nowhere and confused the message.
  *
  * Starts hidden; the story timeline raises and reveals it in front of the
  * camera during the dive and hides it again afterwards.
@@ -21,7 +21,6 @@ import { clayMesh, namedGroup } from "./palette";
 export const PHONE_NODE = {
   root: "phone-frame",
   screen: "phone-screen",
-  overlays: "phone-ar-overlays",
 } as const;
 
 export function buildPhoneFrame(): Group {
@@ -55,21 +54,7 @@ export function buildPhoneFrame(): Group {
   screenMaterial.transparent = true;
   screenMaterial.opacity = 0.16;
 
-  const overlays = namedGroup(PHONE_NODE.overlays);
-  overlays.position.z = 0.09;
-  for (let i = 0; i < 3; i++) {
-    const arrow = clayMesh(new ConeGeometry(0.06, 0.18, 6), "arrow");
-    arrow.position.set(-0.15 + i * 0.15, -0.45 + i * 0.12, 0);
-    arrow.rotation.z = -Math.PI / 2;
-    arrow.castShadow = false;
-    overlays.add(arrow);
-  }
-  const label = clayMesh(new PlaneGeometry(0.5, 0.16), "label");
-  label.position.set(0.1, 0.35, 0);
-  label.castShadow = false;
-  overlays.add(label);
-
-  phone.add(body, screen, overlays);
+  phone.add(body, screen);
   phone.visible = false;
   return phone;
 }

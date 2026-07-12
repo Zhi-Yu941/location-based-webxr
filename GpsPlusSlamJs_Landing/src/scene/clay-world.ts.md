@@ -17,7 +17,11 @@ via a seeded LCG.
   `low` builds fewer decoration meshes and path segments.
 - `WORLD_NODE` — the names of every addressable node (`root`, `ground`,
   `path`, `hills`, `trees`, `rocks`, `sign`, `statue`, `snapRing`,
-  `outer`, `gallery`). The story timeline looks these up by name.
+  `outer`, `gallery`, `arContent`). The story timeline looks these up by
+  name. `arContent` holds the dive's in-world AR overlays: path-forward
+  trail arrows (each carrying `userData.pathT`, orientation test-pinned
+  to the path tangent), the red `ar-poi-pin` over the statue, and the
+  `ar-poi-label` hinted-text board.
 - `createPathCurve() → CatmullRomCurve3` — the ground-level walk path the
   dot-person follows (same curve the path slabs are laid along).
 - `WORLD_ANCHORS` — story hot-spots (`sign`, `markerPair`, `statue`)

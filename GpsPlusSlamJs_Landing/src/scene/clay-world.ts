@@ -5,12 +5,12 @@ import {
   CylinderGeometry,
   Group,
   IcosahedronGeometry,
-  PlaneGeometry,
   SphereGeometry,
   TorusGeometry,
   Vector3,
 } from "three";
 import { clayMesh, namedGroup } from "./palette";
+import { buildPin } from "./markers";
 
 /**
  * Procedural low-poly "clay world": the miniature landscape every chapter
@@ -35,6 +35,7 @@ export const WORLD_NODE = {
   snapRing: "world-snap-ring",
   outer: "world-outer",
   gallery: "world-gallery",
+  arContent: "world-ar-content",
 } as const;
 
 const WORLD_RADIUS = 30;
@@ -319,28 +320,62 @@ function buildOuter(counts: DetailCounts, rng: () => number): Group {
   return outer;
 }
 
-/** Use-case gallery props: trail arrows, statue labels, treasures. */
-function buildGallery(rng: () => number): Group {
-  const gallery = namedGroup(WORLD_NODE.gallery);
+/**
+ * The AR content seen "through the phone" from the dive on (round-1
+ * feedback shaped this): trail arrows hovering over the path pointing
+ * FORWARD along the walk direction, a red POI pin over the statue, and a
+ * hinted text label (board with bars suggesting text) beside it.
+ */
+function buildArContent(): Group {
+  const arContent = namedGroup(WORLD_NODE.arContent);
   const curve = createPathCurve();
-  for (let i = 0; i < 5; i++) {
-    const t = 0.15 + i * 0.15;
+  for (let i = 0; i < 4; i++) {
+    const t = 0.56 + i * 0.08; // ahead of the dive position (walk t = 0.5)
     const point = curve.getPointAt(t);
     const tangent = curve.getTangentAt(t);
-    const arrow = clayMesh(new ConeGeometry(0.28, 0.8, 6), "arrow");
-    arrow.position.set(point.x, 1.4, point.z);
-    arrow.rotation.set(
-      Math.PI / 2,
-      0,
-      -Math.atan2(tangent.x, tangent.z),
-      "YXZ",
-    );
-    gallery.add(arrow);
+    const arrow = clayMesh(new ConeGeometry(0.26, 0.75, 6), "arrow");
+    arrow.position.set(point.x, 0.6, point.z);
+    // Cone +Y axis onto the tangent: pitch flat first (X), then yaw (Y);
+    // Euler order YXZ applies X before Y. Pinned by the alignment test.
+    arrow.rotation.order = "YXZ";
+    arrow.rotation.x = Math.PI / 2;
+    arrow.rotation.y = Math.atan2(tangent.x, tangent.z);
+    arrow.userData.pathT = t;
+    arrow.castShadow = false;
+    arContent.add(arrow);
   }
-  const label = clayMesh(new PlaneGeometry(1.8, 0.6), "label");
-  label.position.set(WORLD_ANCHORS.statue.x, 3.2, WORLD_ANCHORS.statue.z);
-  label.castShadow = false;
-  gallery.add(label);
+
+  const poi = buildPin("ar-poi-pin", "poi");
+  poi.position.set(WORLD_ANCHORS.statue.x, 3.0, WORLD_ANCHORS.statue.z);
+  arContent.add(poi);
+
+  const label = namedGroup("ar-poi-label");
+  const board = clayMesh(new BoxGeometry(1.7, 0.62, 0.04), "signPanel");
+  board.castShadow = false;
+  label.add(board);
+  const barWidths = [1.3, 1.0, 1.2];
+  barWidths.forEach((width, index) => {
+    const bar = clayMesh(new BoxGeometry(width, 0.09, 0.05), "label");
+    bar.position.set((width - 1.4) / 2, 0.17 - index * 0.17, 0.02);
+    bar.castShadow = false;
+    label.add(bar);
+  });
+  label.position.set(
+    WORLD_ANCHORS.statue.x + 1.9,
+    2.4,
+    WORLD_ANCHORS.statue.z + 0.4,
+  );
+  // Face the dive/gallery viewing directions (path side of the statue).
+  label.lookAt(new Vector3(2, 2.2, 8));
+  arContent.add(label);
+
+  arContent.visible = false;
+  return arContent;
+}
+
+/** Use-case gallery props (chapter 5): scattered treasures to find. */
+function buildGallery(rng: () => number): Group {
+  const gallery = namedGroup(WORLD_NODE.gallery);
   for (let i = 0; i < 4; i++) {
     const treasure = clayMesh(new IcosahedronGeometry(0.3, 0), "treasure");
     const angle = rng() * Math.PI * 2;
@@ -370,6 +405,7 @@ export function buildClayWorld(detail: "high" | "low"): Group {
     buildStatue(),
     buildSnapRing(),
     buildOuter(counts, rng),
+    buildArContent(),
     buildGallery(rng),
   );
   return world;

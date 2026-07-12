@@ -2,25 +2,29 @@
  * Recorder Store — composable store for the recorder app.
  *
  * Wraps the framework's `createSlamAppStore` factory and supplies the
- * recorder-specific extras (routing, refPoints — until refPoints moves
- * out in Iter 3, scenario in Iter 1D). The framework no longer ships a
- * `createRecorderStore`; that wrapper now lives in the consuming app.
+ * recorder-specific slices (refPoints, routing, scenario) plus the
+ * framework `qrDetected` slice, and narrows the state type to
+ * `CombinedRootState` for recorder consumers. The framework does not
+ * ship a `createRecorderStore`; that wrapper lives here in the app.
  *
- * Re-exports everything the recorder app previously imported from
- * `gps-plus-slam-app-framework/state/store` so consumer call sites only
- * need a path swap, not a per-symbol audit.
+ * Historical note: during Iter 1–3 of the
+ * [AppFramework / RecorderApp boundary migration](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-03-appframework-vs-recorderapp-boundary-analysis.md)
+ * this module also re-exported the framework/state surface so consumers
+ * only needed a path swap. That re-export layer is gone — consumers now
+ * import each symbol from its true source (e.g. recording actions from
+ * `gps-plus-slam-app-framework/state/recording-slice`, GPS/QR actions and
+ * raw sensor types from `gps-plus-slam-app-framework/state`, scenario
+ * actions from `./scenario-slice`).
  *
- * Iter 1 of the [AppFramework / RecorderApp boundary migration](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-03-appframework-vs-recorderapp-boundary-analysis.md).
- *
- * NOTE: This module routes every core-library symbol through
- * `gps-plus-slam-app-framework/state` (which itself re-exports the
- * curated public surface of `gps-plus-slam-js`). The recorder app no
- * longer takes a direct dependency on `gps-plus-slam-js` — see
+ * NOTE: The recorder app takes no direct dependency on `gps-plus-slam-js`;
+ * core-library symbols are consumed via the framework's curated re-export
+ * surface — see
  * [2026-05-05-recorder-app-drop-direct-core-dep-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-05-recorder-app-drop-direct-core-dep-plan.md).
- * The `RawDeviceOrientation` re-export deliberately uses the `state`
- * subpath rather than the framework root barrel because the root
- * barrel exposes a structurally different (nullable) sensor variant
- * from `sensors/gps.ts`. See §2.2.1 of that plan.
+ * Raw sensor types (`RawDeviceOrientation` & friends) must come from the
+ * `gps-plus-slam-app-framework/state` subpath, not the framework root
+ * barrel — the root barrel exposes a structurally different (nullable)
+ * sensor variant from `sensors/gps.ts`. See §2.2.1 of that plan and
+ * `recorder-store-types.test.ts`.
  */
 
 import { type LibraryRootState } from 'gps-plus-slam-app-framework/core';
@@ -48,71 +52,6 @@ import { ScenarioWrappingStorageBackend } from '../storage/scenario-storage';
 import type { SessionMetadata as OpfsSessionMetadata } from 'gps-plus-slam-app-framework/storage/opfs-storage';
 import { routingReducer, type RoutingState } from './routing-slice';
 import { scenarioReducer, type ScenarioState } from './scenario-slice';
-
-// --- Re-exports for backwards compatibility with consumers that previously
-// imported these from `gps-plus-slam-app-framework/state/store`. The framework
-// still owns the underlying definitions; this module just makes the recorder
-// import surface stable while pieces migrate. ---
-
-export {
-  type RecordingState,
-  type SessionMetadata,
-  startSession,
-  endSession,
-  recordDepthSample,
-  recordWriteFailure,
-} from 'gps-plus-slam-app-framework/state/recording-slice';
-
-export {
-  setCurrentScenarioName,
-  resetCurrentScenarioName,
-  type ScenarioState,
-} from './scenario-slice';
-
-// The `qrDetected` slice surface the recorder app (live-QR wiring + tests) needs.
-// Re-exported here so consumers import the QR slice from the same store module as
-// every other recorder action. The slice itself lives in the framework.
-export {
-  recordQrDetection,
-  setQrMaxHistory,
-  selectSolvedQrPose,
-  selectLatestQrDetection,
-  clearQrMarker,
-  clearAllQrMarkers,
-  type QrDetectionEntry,
-  type QrDetectedState,
-} from 'gps-plus-slam-app-framework/state';
-export type {
-  RawQrObservation,
-  DeriveQrPoseDeps,
-} from 'gps-plus-slam-app-framework/ar';
-
-export {
-  setZeroPos,
-  recordGpsEvent,
-  add2dImage,
-  calcRelativeCoordsInMeters,
-} from 'gps-plus-slam-app-framework/state';
-
-export type {
-  LatLong,
-  GpsPoint,
-  RawGpsPoint,
-  RawDeviceOrientation,
-  RecordGpsEventPayload,
-} from 'gps-plus-slam-app-framework/state';
-
-export { type RefPointMark } from '../storage/ref-point-loader';
-export type {
-  DepthPoint,
-  DepthSample,
-} from 'gps-plus-slam-app-framework/types/ar-types';
-
-export type { RefPointsState } from './ref-points-slice';
-
-export type { RecordingOptions } from 'gps-plus-slam-app-framework/state/recording-options';
-export type { StorageBackend } from 'gps-plus-slam-app-framework/storage/storage-backend';
-export type { SessionMetadata as OpfsSessionMetadata } from 'gps-plus-slam-app-framework/storage/opfs-storage';
 
 // --- Recorder-owned types ---
 
@@ -149,6 +88,12 @@ export interface RecorderStore {
   subscribe: (listener: () => void) => () => void;
   writeFrame: (blob: Blob, index: number) => Promise<void>;
   writeSessionMetadata: (metadata: OpfsSessionMetadata) => Promise<void>;
+  /**
+   * Drains the persistence middleware's async WriteQueue. The stop flow
+   * awaits this before anything reads the session's `actions/` (final
+   * sync, ZIP export) — see recording-session-handlers `performStop`.
+   */
+  flushPendingActionWrites: () => Promise<void>;
 }
 
 export interface RecorderStoreOptions {
@@ -222,6 +167,7 @@ export function createRecorderStore(
     subscribe: store.subscribe,
     writeFrame: store.writeFrame,
     writeSessionMetadata: store.writeSessionMetadata,
+    flushPendingActionWrites: store.flushPendingActionWrites,
   };
 }
 

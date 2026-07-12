@@ -37,7 +37,7 @@ import {
   h3CellsMatch,
 } from 'gps-plus-slam-app-framework/geo/h3-proximity';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
-import { setCurrentScenarioName } from '../state/recorder-store';
+import { setCurrentScenarioName } from '../state/scenario-slice';
 import { setImportedRefPointEntries } from '../state/ref-points-slice';
 import type { RecorderStore } from '../state/recorder-store';
 

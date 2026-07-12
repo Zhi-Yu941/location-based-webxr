@@ -10,12 +10,12 @@
  * fixed contract:
  *  - BOTH end paths (system gesture and app-initiated endARSession()) run the
  *    full resetWebXRState() teardown,
- *  - the host callback registered via setSessionEndCallback() fires exactly
- *    once per session end with the correct `requestedByApp` discriminator
+ *  - the host callback passed via initAR's `callbacks.onSessionEnd` fires
+ *    exactly once per session end with the correct `requestedByApp` discriminator
  *    (endARSession()'s own session.end() fires the same 'end' event — the
  *    module must not double-fire),
  *  - a throwing callback never breaks the teardown.
- * See docs/2026-07-04-ar-clipping-planes-and-lifecycle-plan.md (F3) and
+ * See docs/2026-07-04-1626-ar-clipping-planes-and-lifecycle-plan.md (F3) and
  * docs/2026-02-15-lifecycle-orphans.md §1.
  *
  * This file is isolated from webxr-session.test.ts because it mocks
@@ -56,8 +56,9 @@ import {
   initAR,
   endARSession,
   resetWebXRState,
-  setSessionEndCallback,
   getScene,
+  getCamera,
+  getArWorldGroup,
   type SessionEndInfo,
 } from './webxr-session.js';
 
@@ -103,7 +104,6 @@ describe('session-end hook (F3)', () => {
   });
 
   afterEach(() => {
-    setSessionEndCallback(null);
     resetWebXRState();
     vi.unstubAllGlobals();
     container.remove();
@@ -111,9 +111,13 @@ describe('session-end hook (F3)', () => {
 
   it('system-initiated end runs full teardown and fires the callback with requestedByApp=false', async () => {
     const events: SessionEndInfo[] = [];
-    setSessionEndCallback((info) => events.push(info));
 
-    await initAR(container, MINIMAL_ISOLATION);
+    await initAR(
+      container,
+      MINIMAL_ISOLATION,
+      {},
+      { onSessionEnd: (info) => events.push(info) }
+    );
     expect(container.querySelectorAll('canvas')).toHaveLength(1);
 
     // Simulate the Android back gesture: the browser ends the session and
@@ -129,25 +133,40 @@ describe('session-end hook (F3)', () => {
 
   it('app-initiated endARSession() fires the callback exactly once with requestedByApp=true', async () => {
     const events: SessionEndInfo[] = [];
-    setSessionEndCallback((info) => events.push(info));
 
-    await initAR(container, MINIMAL_ISOLATION);
+    await initAR(
+      container,
+      MINIMAL_ISOLATION,
+      {},
+      { onSessionEnd: (info) => events.push(info) }
+    );
     await endARSession();
 
     // The mock end() fired the 'end' event (like a real browser) and
     // endARSession() also runs its own finally-teardown — the callback must
     // still fire exactly once.
     expect(events).toEqual([{ requestedByApp: true }]);
+    // Full scene-graph leak proof (moved here from webxr-session.test.ts when
+    // the replay injection setters it seeded through were deleted —
+    // surface-reduction step 2): no stale refs may survive into the next
+    // session via getScene()/getCamera()/getArWorldGroup().
     expect(getScene()).toBeNull();
+    expect(getCamera()).toBeNull();
+    expect(getArWorldGroup()).toBeNull();
     expect(container.querySelectorAll('canvas')).toHaveLength(0);
   });
 
   it('a throwing callback does not break the teardown', async () => {
-    setSessionEndCallback(() => {
-      throw new Error('host callback exploded');
-    });
-
-    await initAR(container, MINIMAL_ISOLATION);
+    await initAR(
+      container,
+      MINIMAL_ISOLATION,
+      {},
+      {
+        onSessionEnd: () => {
+          throw new Error('host callback exploded');
+        },
+      }
+    );
 
     expect(() => capturedEndListener?.()).not.toThrow();
     expect(getScene()).toBeNull();
@@ -159,16 +178,51 @@ describe('session-end hook (F3)', () => {
     // callback) so a stale host handler can never fire for a session it was
     // not registered for.
     const events: SessionEndInfo[] = [];
-    setSessionEndCallback((info) => events.push(info));
 
-    await initAR(container, MINIMAL_ISOLATION);
+    await initAR(
+      container,
+      MINIMAL_ISOLATION,
+      {},
+      { onSessionEnd: (info) => events.push(info) }
+    );
     capturedEndListener?.(); // system end — fires + tears down + clears
     expect(events).toHaveLength(1);
 
-    await initAR(container, MINIMAL_ISOLATION); // host did NOT re-register
+    // Host did NOT re-pass the callback for the second session.
+    await initAR(container, MINIMAL_ISOLATION);
     capturedEndListener?.();
 
     expect(events).toHaveLength(1);
+  });
+
+  /**
+   * Why this test matters:
+   * The CSS3D overlay (Leaflet minimap host, Approach E) is a DOM element the
+   * manager appends next to the WebGL canvas; leaking it across sessions
+   * leaves a stale absolutely-positioned layer over the next session's view.
+   * The old getLiveCss3dManager tests (deleted with the getter in
+   * surface-reduction step 3) only ever saw the getter's null default — this
+   * pins the actual lifecycle observably: initAR creates the overlay when
+   * `enableCss3dRenderer` is on, and the session-end teardown
+   * (resetWebXRState → css3dManager.dispose()) removes it from the DOM.
+   */
+  it('creates the CSS3D overlay on init and removes it on session end', async () => {
+    await initAR(container, {
+      ...MINIMAL_ISOLATION,
+      enableCss3dRenderer: true,
+    });
+
+    // The overlay is a non-canvas element the manager appended to the
+    // container (the canvas itself is the WebGL renderer's).
+    const overlay = Array.from(container.children).find(
+      (el) => el.tagName !== 'CANVAS'
+    );
+    expect(overlay).toBeDefined();
+
+    capturedEndListener?.(); // system-initiated end — full teardown
+
+    expect(Array.from(container.children)).not.toContain(overlay);
+    expect(container.children).toHaveLength(0);
   });
 
   it('requestedByApp does not stay latched after an app-initiated end', async () => {
@@ -177,10 +231,14 @@ describe('session-end hook (F3)', () => {
     const events: SessionEndInfo[] = [];
 
     await initAR(container, MINIMAL_ISOLATION);
-    await endARSession(); // no callback registered yet — nothing fires
+    await endARSession(); // no callback registered — nothing fires
 
-    setSessionEndCallback((info) => events.push(info));
-    await initAR(container, MINIMAL_ISOLATION);
+    await initAR(
+      container,
+      MINIMAL_ISOLATION,
+      {},
+      { onSessionEnd: (info) => events.push(info) }
+    );
     capturedEndListener?.(); // system end of the SECOND session
 
     expect(events).toEqual([{ requestedByApp: false }]);

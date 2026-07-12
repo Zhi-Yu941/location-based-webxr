@@ -15,7 +15,7 @@ import { NullStorageBackend } from 'gps-plus-slam-app-framework/storage';
 // future framework refactor breaks the public store/storage entry points this
 // fails in CI without any AR hardware.
 //
-// See: GpsPlusSlamJs_Docs/docs/2026-06-03-threejs-arbutton-minimal-ar-example-user-feedback.md §5 Step 0.
+// See: GpsPlusSlamJs_Docs/docs/2026-06-03-0553-threejs-arbutton-minimal-ar-example-user-feedback.md §5 Step 0.
 
 describe('minimal example boot (headless smoke test)', () => {
   it('creates a slam app store with the NullStorageBackend', () => {

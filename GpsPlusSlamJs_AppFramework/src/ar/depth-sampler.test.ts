@@ -61,7 +61,7 @@ describe('DepthSampler', () => {
     /**
      * Why this test matters:
      * The default density feeds the AR-space occupancy grid
-     * (2026-06-11-depth-occupancy-grid-port-plan.md §1): 16×16 = 256 pts/s
+     * (2026-06-11-2134-depth-occupancy-grid-port-plan.md §1): 16×16 = 256 pts/s
      * is the minimum useful density for judging grid correctness on-device.
      */
     it('uses default grid size of 16', () => {
@@ -719,7 +719,7 @@ describe('wrapXRDepthInfo', () => {
 
   /**
    * Why these tests matter (live depth occluder, Iter 1 —
-   * 2026-06-14-webxr-depth-occlusion-plan.md §2/§8):
+   * 2026-06-14-0009-webxr-depth-occlusion-plan.md §2/§8):
    * The live occluder is a SECOND consumer of the same per-frame
    * XRCPUDepthInformation. It needs three fields the sparse sampler never read:
    * the raw `data` buffer, `rawValueToMeters`, and the `normDepthBufferFromNormView`

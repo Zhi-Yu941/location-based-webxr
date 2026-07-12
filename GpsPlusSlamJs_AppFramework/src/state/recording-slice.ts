@@ -11,7 +11,6 @@
 
 import type { Draft, PayloadAction } from '@reduxjs/toolkit';
 import { createSlice } from '@reduxjs/toolkit';
-import { type RecordingOptions } from './recording-options';
 import type { DepthSample } from '../types/ar-types';
 
 // --- Recording-specific Types ---
@@ -30,8 +29,13 @@ export interface SessionMetadata {
   startTime: number;
   deviceInfo?: string;
   notes?: string;
-  /** Recording options used for this session (for replay context) */
-  recordingOptions?: RecordingOptions;
+  /**
+   * Recording options used for this session (for replay context). Stored
+   * OPAQUELY: the recorder owns the concrete `RecordingOptions` type (its
+   * settings catalog, `GpsPlusSlamJs_RecorderApp/src/state/recording-options.ts`
+   * since the 2026-07-11 G-1 move) and narrows this on read.
+   */
+  recordingOptions?: Record<string, unknown>;
 }
 
 /**

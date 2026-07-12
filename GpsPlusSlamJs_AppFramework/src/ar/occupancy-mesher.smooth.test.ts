@@ -142,7 +142,7 @@ describe("occupancy mesher — 'smooth' surface-nets (dual contouring)", () => {
     // triangle COUNT but ZERO total area, i.e. they were invisible to the
     // (default-on) occluder. Count-only assertions can never catch that, so
     // this area assertion is the permanent regression gate (see
-    // 2026-07-01-followup-smooth-mesher-single-corner-degeneracy.md).
+    // 2026-07-01-1455-smooth-mesher-single-corner-degeneracy-followup.md).
     // Guaranteed: non-zero total area (the n === 1 end/corner vertices spread
     // apart). NOT guaranteed, by design: interior shaft segments of a 1×1×N
     // feature stay degenerate — their n === 2 rings are locally

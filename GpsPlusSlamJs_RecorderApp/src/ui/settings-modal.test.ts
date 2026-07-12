@@ -26,7 +26,7 @@ import {
 import {
   loadRecordingOptions,
   DEFAULT_RECORDING_OPTIONS,
-} from 'gps-plus-slam-app-framework/state/recording-options';
+} from '../state/recording-options';
 
 const { mockGetBuildInfo } = vi.hoisted(() => ({
   mockGetBuildInfo: vi.fn(() => ({
@@ -923,7 +923,7 @@ describe('settings-modal', () => {
       expect(linear).not.toBeNull();
       // Defaults from DEFAULT_MOTION_FILTER (0.6 rad/s, 2.5 m/s — the linear
       // threshold was raised 0.5 → 2.5 on 2026-07-02 to stop deferring walking;
-      // see 2026-07-02-image-capture-rate-motion-gate-finding.md).
+      // see 2026-07-02-0117-image-capture-rate-motion-gate-finding.md).
       expect(parseFloat(angular!.value)).toBeCloseTo(0.6, 6);
       expect(parseFloat(linear!.value)).toBeCloseTo(2.5, 6);
     });
@@ -1095,6 +1095,66 @@ describe('settings-modal', () => {
       imagesEnabled.dispatchEvent(new Event('change'));
       expect(blur.disabled).toBe(true);
       expect(luma.disabled).toBe(true);
+    });
+
+    // Why these tests matter: the blur-metric select (2026-07-12 toggle plan)
+    // is the only UI to A/B the FFT metric on device; it must round-trip
+    // through persisted options and follow the same disabled rules as the
+    // other quality-gate controls, or a dead/mislabeled control would fake a
+    // field test that never ran.
+    it('exposes the blur-metric select with both metrics, default first', () => {
+      const select = document.getElementById(
+        'images-blur-metric'
+      ) as HTMLSelectElement | null;
+      expect(select).not.toBeNull();
+      expect(select!.value).toBe('variance-of-laplacian');
+      expect([...select!.options].map((o) => o.value)).toEqual([
+        'variance-of-laplacian',
+        'high-frequency-energy-ratio',
+      ]);
+    });
+
+    it('persists an edited blur metric through save/load (gate on)', () => {
+      const qualityFilter = document.getElementById(
+        'images-quality-filter'
+      ) as HTMLInputElement;
+      const select = document.getElementById(
+        'images-blur-metric'
+      ) as HTMLSelectElement;
+
+      qualityFilter.checked = true;
+      qualityFilter.dispatchEvent(new Event('change'));
+      select.value = 'high-frequency-energy-ratio';
+      select.dispatchEvent(new Event('change'));
+
+      document.getElementById('btn-settings-save')?.click();
+
+      const saved = loadRecordingOptions().images.qualityFilter;
+      expect(saved.enabled).toBe(true);
+      expect(saved.blurMetric).toBe('high-frequency-energy-ratio');
+    });
+
+    it('disables the blur-metric select when the gate (or capture) is off', () => {
+      const imagesEnabled = document.getElementById(
+        'images-enabled'
+      ) as HTMLInputElement;
+      const qualityFilter = document.getElementById(
+        'images-quality-filter'
+      ) as HTMLInputElement;
+      const select = document.getElementById(
+        'images-blur-metric'
+      ) as HTMLSelectElement;
+
+      // Gate off (the default) → select disabled.
+      expect(select.disabled).toBe(true);
+
+      qualityFilter.checked = true;
+      qualityFilter.dispatchEvent(new Event('change'));
+      expect(select.disabled).toBe(false);
+
+      imagesEnabled.checked = false;
+      imagesEnabled.dispatchEvent(new Event('change'));
+      expect(select.disabled).toBe(true);
     });
   });
 

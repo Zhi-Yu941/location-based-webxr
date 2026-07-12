@@ -9,12 +9,12 @@
  *   1. Zoom-clustering MUST use h3-js `cellToParent`, NEVER hex-string
  *      truncation (resolution lives in the high bits; slicing yields INVALID
  *      cells, not parents). This is the D1 gotcha from
- *      docs/2026-06-14-map-centric-recording-browser-and-h3-index-user-feedback.md.
+ *      docs/2026-06-14-1048-map-centric-recording-browser-and-h3-index-user-feedback.md.
  *   2. `cellToParent` only coarsens — asking for a finer res than the stored
  *      cell throws — so the clustering helper must clamp `targetRes` to
  *      [0, H3_RESOLUTION].
  *
- * @see GpsPlusSlamJs_Docs/docs/2026-06-14-map-centric-recording-browser-and-h3-index-user-feedback.md (D1)
+ * @see GpsPlusSlamJs_Docs/docs/2026-06-14-1048-map-centric-recording-browser-and-h3-index-user-feedback.md (D1)
  */
 
 import { describe, it, expect } from 'vitest';

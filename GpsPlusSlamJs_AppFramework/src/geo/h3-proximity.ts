@@ -81,7 +81,7 @@ export function gpsPathToCoverageCells(path: readonly LatLngLike[]): string[] {
  * truncate the hex-string id: resolution is encoded in the high bits with
  * trailing `f` padding, so slicing yields INVALID cells, not parents (verified;
  * see the D1 gotcha in
- * docs/2026-06-14-map-centric-recording-browser-and-h3-index-user-feedback.md).
+ * docs/2026-06-14-1048-map-centric-recording-browser-and-h3-index-user-feedback.md).
  *
  * `targetRes` is clamped to `[0, H3_RESOLUTION]` because `cellToParent` throws
  * when asked for a FINER resolution than the cell, and res 11 is the finest

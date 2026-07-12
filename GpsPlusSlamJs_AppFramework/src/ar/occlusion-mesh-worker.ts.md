@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The **pure, transfer-friendly halves** of the occluder Web Worker offload (Phase 1 of `2026-07-01-occluder-worker-and-chunked-remesh-plan.md`). Moving `meshOccupiedCells` off the main thread keeps the render smooth when a large-grid re-mesh takes 100s of ms. Framework-owned so any consumer needs only a ~10-line worker shell.
+The **pure, transfer-friendly halves** of the occluder Web Worker offload (Phase 1 of `2026-07-01-0733-occluder-worker-and-chunked-remesh-plan.md`). Moving `meshOccupiedCells` off the main thread keeps the render smooth when a large-grid re-mesh takes 100s of ms. Framework-owned so any consumer needs only a ~10-line worker shell.
 
 ## Public API
 

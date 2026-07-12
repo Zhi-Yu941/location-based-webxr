@@ -3,7 +3,7 @@
  *
  * Why this test matters:
  * `meshOccupiedCells` is the pure core of the persistent occlusion mesh and the
- * physics-collider export (2026-06-13-occupancy-mesh-options-plan.md, option
+ * physics-collider export (2026-06-13-0004-occupancy-mesh-options-plan.md, option
  * B). These cases pin the exact, oracle-able invariants of face culling — an
  * isolated voxel is a closed cube (6 faces / 12 tris), a shared face between
  * adjacent voxels is dropped, fully-enclosed voxels contribute nothing, and the

@@ -475,7 +475,7 @@ describe('OcclusionMesh', () => {
       // original constants (fade 1.5 → 10 m) made depth-shaded visually
       // identical to matcap in a normal room — fade was still at 94%
       // brightness at 3 m, so the whole room sat in the "near" band (see
-      // 2026-07-02-occluder-debug-viz-styles-followups.md §F1). These pins are
+      // 2026-07-02-0800-occluder-debug-viz-styles-followups.md §F1). These pins are
       // the executable form of "must be visibly darker across a room": the
       // fade must engage within arm's reach, bottom out by ~5 m so indoor
       // scenes span the full near→far gradient, and a wall ~3 m away must

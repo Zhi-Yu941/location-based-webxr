@@ -270,7 +270,7 @@ export function createGpsAnchor(options: GpsAnchorOptions): GpsAnchor {
    * on-screen snap. The one exception is the first placement of a `skipBootstrap`
    * anchor (see `firstCommitPending`), which must escape the origin even while
    * on-screen. See
-   * `gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-06-anchor-starter-cachehit-jump-investigation.md`.
+   * `gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-06-1210-anchor-starter-cachehit-jump-investigation.md`.
    *
    * Frame note: `arWorldGroup.matrix` IS the alignment matrix, which maps
    * **AR-odometry NUE → GPS-world NUE**. `object3D.position` is a *local*

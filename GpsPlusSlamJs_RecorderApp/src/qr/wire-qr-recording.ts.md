@@ -14,7 +14,7 @@ the WS-5 **consumer** (debug axis+cube). `main.ts` calls it once in `handleEnter
   - `options.getArWorldGroup()` — parent for the debug objects.
   - `options.qr` — `{ enabled, intervalMs, captureSize }` (caller gates on `enabled`).
   - `options.setProducer(producer | null)` — receives the producer so the
-    pre-`initAR` `setCameraFrameCallback` can forward frames to it.
+    initAR `callbacks.cameraFrame.onFrame` (wired at Enter-AR) can forward frames to it.
   - returns a `dispose()` that stops capture, resets/clears the producer, detaches
     the debug subscriber + swap listener, and disposes the viz.
 
@@ -51,4 +51,4 @@ the WS-5 **consumer** (debug axis+cube). `main.ts` calls it once in `handleEnter
 ## Related
 
 - [qr-debug-controller.ts.md](qr-debug-controller.ts.md), [qr-depth-resolver.ts.md](qr-depth-resolver.ts.md).
-- `gps-plus-slam-app-framework/ar/qr-detection-controller` — the thin producer.
+- `gps-plus-slam-app-framework/ar/qr/qr-detection-controller` — the thin producer.

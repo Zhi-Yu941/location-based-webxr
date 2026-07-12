@@ -5,7 +5,7 @@
  * (button → AR session → hit-test reticle → tap-to-place), adapted for a
  * GPS-aligned framework. See ../README.md for the "ladder" narrative and the
  * plan doc
- * GpsPlusSlamJs_Docs/docs/2026-06-03-threejs-arbutton-minimal-ar-example-user-feedback.md.
+ * GpsPlusSlamJs_Docs/docs/2026-06-03-0553-threejs-arbutton-minimal-ar-example-user-feedback.md.
  *
  * What is testable vs. glue:
  * - The reticle view-model (the framework's `hit-test-reticle.ts`) and status

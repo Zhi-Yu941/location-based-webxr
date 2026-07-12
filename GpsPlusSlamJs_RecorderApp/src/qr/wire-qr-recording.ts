@@ -30,7 +30,7 @@
  * delivered frame.
  *
  * @see qr-debug-controller.ts / qr-depth-resolver.ts — the consumer + as-of join.
- * @see gps-plus-slam-app-framework/ar/qr-detection-controller — the thin producer.
+ * @see gps-plus-slam-app-framework/ar/qr/qr-detection-controller — the thin producer.
  */
 
 import type { Object3D } from 'three';
@@ -41,19 +41,19 @@ import type { Object3D } from 'three';
 import {
   createQrDetectionController,
   type QrDetectionController,
-} from 'gps-plus-slam-app-framework/ar/qr-detection-controller';
+} from 'gps-plus-slam-app-framework/ar/qr/qr-detection-controller';
 import {
   createBarcodeDetectorFrontEnd,
   type RgbaImage,
-} from 'gps-plus-slam-app-framework/ar/qr-frontend';
-import type { Pose } from 'gps-plus-slam-app-framework/ar/qr-pose';
+} from 'gps-plus-slam-app-framework/ar/qr/qr-frontend';
+import type { Pose } from 'gps-plus-slam-app-framework/ar/qr/qr-pose';
 import {
   startCameraFrameCapture,
   stopCameraFrameCapture,
   getCurrentArPose,
 } from 'gps-plus-slam-app-framework/ar/webxr-session';
-import type { QrCaptureOptions } from 'gps-plus-slam-app-framework/state/recording-options';
-import { recordQrDetection } from '../state/recorder-store';
+import type { QrCaptureOptions } from '../state/recording-options';
+import { recordQrDetection } from 'gps-plus-slam-app-framework/state';
 import type { RecorderStore } from '../state/recorder-store';
 import type { StoreRef } from '../state/store-ref';
 import { followStore } from '../state/store-ref';
@@ -67,8 +67,8 @@ export interface WireQrRecordingOptions {
   /** QR capture settings (`enabled` is assumed true by the caller's gate). */
   qr: QrCaptureOptions;
   /**
-   * Receives the created producer so the pre-`initAR` camera-frame callback
-   * (`setCameraFrameCallback`, which must be registered before the source is
+   * Receives the created producer so the camera-frame callback passed to
+   * `initAR` (`callbacks.cameraFrame.onFrame`, wired before the source is
    * built) can forward frames to it. Called with `null` on dispose.
    */
   setProducer: (producer: QrDetectionController | null) => void;

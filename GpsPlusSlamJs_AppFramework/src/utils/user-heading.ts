@@ -4,7 +4,7 @@
  * Turns the latest AR camera rotation into an absolute compass bearing (degrees
  * clockwise from geographic North) so the live/replay map overlay can draw a
  * thin view-direction line from the user-position dot. See Finding 2 of
- * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-28-map-rings-transparency-and-view-direction-user-feedback.md.
+ * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-28-1822-map-rings-transparency-and-view-direction-user-feedback.md.
  *
  * Why this lives in the app-framework (NOT the library's `orientation-heading.ts`):
  * that library module is the MAGNETIC path — its bearings come from the

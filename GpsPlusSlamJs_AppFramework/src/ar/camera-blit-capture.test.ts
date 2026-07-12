@@ -786,7 +786,7 @@ describe('camera-blit-capture', () => {
     describe('getWidth / getHeight', () => {
       /**
        * Why this test matters (frame-tile aspect-ratio fix, D1 of
-       * 2026-06-13-frame-tile-rendering-bugs-user-feedback.md):
+       * 2026-06-13-1311-frame-tile-rendering-bugs-user-feedback.md):
        * the render-target size equals the encoded JPEG's pixel size, so
        * webxr-session reads these getters to persist each captured frame's
        * true width/height for aspect-correct rendering. They must report the

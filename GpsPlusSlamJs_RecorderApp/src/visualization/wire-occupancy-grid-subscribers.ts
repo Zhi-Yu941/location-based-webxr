@@ -19,7 +19,7 @@
  * via `onError`).
  */
 
-import type { DepthSample } from '../state/recorder-store';
+import type { DepthSample } from 'gps-plus-slam-app-framework/types/ar-types';
 import type { RecorderStore } from '../state/recorder-store';
 import type { StoreRef } from '../state/store-ref';
 import { followStore } from '../state/store-ref';

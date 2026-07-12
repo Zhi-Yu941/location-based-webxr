@@ -22,8 +22,8 @@ import fc from 'fast-check';
 import * as THREE from 'three';
 import type { GridCell } from '../ar/bresenham3d';
 import { meshOccupiedCells } from '../ar/occupancy-mesher';
-import type { OccluderDebugStyle } from '../state/recording-options';
 import {
+  type OccluderDebugStyle,
   OcclusionMesh,
   OCCLUDER_DEPTH_SHADE,
   occluderDepthFade,

@@ -33,6 +33,10 @@ production had used only `setZeroRef` + `syncRefPoints`.)
     the animation was scheduled.
   - `getRefPointCount(): number` — number of meshes managed by
     `syncRefPoints`.
+  - `setSceneSource(source: (() => THREE.Scene | null) | null)` — point the
+    visualizer at a non-live scene (replay-mode passes the replay scene);
+    `null` restores the live-session default (`getScene`). Replay-mode's
+    `dispose()` restores the default.
   - `clearAll()` — clears the `syncRefPoints` handles, resets the zero
     ref, and drops the cached `lastRefPoints` so a later `setZeroRef`
     does not replay stale entries.
@@ -70,16 +74,19 @@ production had used only `setZeroRef` + `syncRefPoints`.)
 - Shared geometry/material lifecycle is owned by the module-level cache
   inside `syncGpsAnchoredMeshes`; the visualizer never disposes GPU
   resources directly.
-- Scene access goes through `getScene()` from
-  `gps-plus-slam-app-framework/ar/webxr-session`; the scene is then
-  injected explicitly into the reconciler (P3 rule 1).
+- Scene access goes through an overridable scene source (default: the LIVE
+  session's `getScene()` from `gps-plus-slam-app-framework/ar/webxr-session`);
+  the resolved scene is then injected explicitly into the reconciler (P3
+  rule 1). During replay the live getters stay null (surface-reduction step 2
+  removed the webxr-session injection), so replay-mode overrides the source
+  via `setSceneSource`.
 - Frame-loop access goes through `registerFrameUpdate` from
   `gps-plus-slam-app-framework/ar/frame-loop`; the returned unregister
   is invoked when the animation completes so the registry stays bounded.
 
 ## Tests
 
-- See [ref-point-visualizer.test.ts](ref-point-visualizer.test.ts) — setZeroRef/getZeroRef, clearAll (session reset), and the syncRefPoints pipeline (radius pin, insert animation, cached replay, shared-id last-write-wins). The legacy prior/current suites were removed with the API (quality-review D-1).
+- See [ref-point-visualizer.test.ts](ref-point-visualizer.test.ts) — setZeroRef/getZeroRef, setSceneSource (override scene wins while live getScene is null; `null` restores the live default), clearAll (session reset), and the syncRefPoints pipeline (radius pin, insert animation, cached replay, shared-id last-write-wins). The legacy prior/current suites were removed with the API (quality-review D-1).
 
 ## Related docs
 

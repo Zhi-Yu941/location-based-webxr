@@ -117,7 +117,7 @@ export class OccupancyGrid {
    * an already-settled cell (count `> MAX_RELEVANT_COUNT`) does NOT bump it, so a
    * consumer can cheaply skip a full re-derive (cube refresh / occluder re-mesh)
    * when the revision is unchanged — the dominant idle-time saving over a long
-   * session (see `2026-06-30-occluder-tuning-followups.md`).
+   * session (see `2026-06-30-0829-occluder-tuning-followups.md`).
    */
   private revision = 0;
   /**

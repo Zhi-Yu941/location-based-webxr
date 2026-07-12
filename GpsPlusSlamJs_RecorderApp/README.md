@@ -283,7 +283,7 @@ Permissions are requested in the **SETUP** state before entering AR:
 
 When `isWebXRSupported()` returns `false` (desktop browsers **and iOS**, where browsers do not provide `immersive-ar` at all), the app automatically switches to a **Replay Mode** — no dead-end. The setup modal is replaced with a replay-focused UX for loading and replaying previously recorded sessions in an interactive 3D visualization. This enables desktop-based debugging, UX verification, and parameter tuning without an AR device.
 
-To avoid leaving mobile users confused about why recording is unavailable, a prominent **unsupported-platform notice** (`#unsupported-platform-notice`, revealed by `showUnsupportedPlatformNotice()`) explains the cause (the browser lacks the AR camera tracking the recorder needs — notably iOS) and the fix (open the app in **Chrome on Android** with ARCore), while making clear that replay still works on the current device (D1, [docs/2026-06-16-user-feedback-team1.md](../GpsPlusSlamJs_Docs/docs/2026-06-16-user-feedback-team1.md)). **Recording is supported only on Chromium-based browsers on Android with WebXR `immersive-ar` (ARCore).**
+To avoid leaving mobile users confused about why recording is unavailable, a prominent **unsupported-platform notice** (`#unsupported-platform-notice`, revealed by `showUnsupportedPlatformNotice()`) explains the cause (the browser lacks the AR camera tracking the recorder needs — notably iOS) and the fix (open the app in **Chrome on Android** with ARCore), while making clear that replay still works on the current device (D1, [docs/2026-06-16-2053-team1-user-feedback.md](../GpsPlusSlamJs_Docs/docs/2026-06-16-2053-team1-user-feedback.md)). **Recording is supported only on Chromium-based browsers on Android with WebXR `immersive-ar` (ARCore).**
 
 For the full design investigation, code analysis, and alternatives considered, see [docs/2026-02-19-replay-mode.md](../GpsPlusSlamJs_Docs/docs/2026-02-19-replay-mode.md).
 
@@ -518,20 +518,24 @@ function eulerToQuaternion(
 When AR tracking is lost and resumes, the system automatically handles alignment correction:
 
 ```typescript
-// Wire tracking callbacks before initAR():
-setTrackingLostCallback(() => {
-  updateArInfo('⚠️ LOST');
-  showError('AR tracking lost. Try moving to a well-lit area...');
-});
-
-setTrackingCallbacks((payload) => {
-  store.dispatch(odometryTrackingRestarted(payload));
-  log.info('AR tracking restarted — alignment correction dispatched');
-});
-
-setTrackingRecoveredCallback(() => {
-  updateArInfo('');
-  log.info('AR tracking recovered (same coordinate frame)');
+// Tracking store + callbacks ride into initAR as ONE callbacks group
+// (the framework's pre-init setters were folded into initAR):
+await initAR(container, isolationOptions, sessionFeatures, {
+  tracking: {
+    store,
+    onLost: () => {
+      updateArInfo('⚠️ LOST');
+      showError('AR tracking lost. Try moving to a well-lit area...');
+    },
+    onRestarted: (payload) => {
+      store.dispatch(odometryTrackingRestarted(payload));
+      log.info('AR tracking restarted — alignment correction dispatched');
+    },
+    onRecovered: () => {
+      updateArInfo('');
+      log.info('AR tracking recovered (same coordinate frame)');
+    },
+  },
 });
 ```
 

@@ -7,7 +7,7 @@ Install deterministic fakes over the app's DEV-only test seam
 (`window.__anchorStarterTest`) so Playwright can drive the full application
 flow (boot → guidance → soft-gated placement → `?show=` round-trip →
 copy-link) without real WebXR or GPS. See the plan
-[`2026-06-01-anchor-starter-e2e-test-plan.md`](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-01-anchor-starter-e2e-test-plan.md)
+[`2026-06-01-0447-anchor-starter-e2e-test-plan.md`](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-01-0447-anchor-starter-e2e-test-plan.md)
 §5–§6 and the seam itself in [`../src/seams.ts`](../src/seams.ts) /
 [`../src/seams.ts.md`](../src/seams.ts.md).
 
@@ -38,10 +38,11 @@ copy-link) without real WebXR or GPS. See the plan
   remove it again on any failure; specs assert this stays empty after a failed
   placement (no orphaned mesh left to overlap a retry).
 - `trackingReport` — mutable; mutate to change the onboarding phase mid-test.
-- `trackingStoreWired` / `trackingCallbacksWired` — booleans flipped by the
-  faked `setTrackingStore` / `setTrackingCallbacks`. A spec asserts both became
-  `true` during boot: the framework forwards per-frame poses only when both are
-  wired before `initAR`, so dropping either silently pins the onboarding
+- `trackingStoreWired` / `trackingCallbacksWired` — booleans set by the faked
+  `initAR` from the `callbacks.tracking` group it receives (store present /
+  `onRestarted` is a function). A spec asserts both became `true` during boot:
+  since the framework's setter fold the store + restart callback arrive
+  TOGETHER in that group, and dropping it silently pins the onboarding
   guidance to "AR tracking lost" (regression guard).
 - `failCreateAnchor` — set true to make the faked `createGpsAnchor` throw
   (placement-failure revert path).

@@ -3,7 +3,7 @@
  *
  * Why this matters: this is the policy that decides whether a due frame is calm
  * enough to capture or must be deferred. The cases pin the four behaviours the
- * plan (2026-06-23-blurry-frame-motion-gating-plan.md §4.2-4.4) requires:
+ * plan (2026-06-23-2105-blurry-frame-motion-gating-plan.md §4.2-4.4) requires:
  *  - calm frame captures, fast frame defers,
  *  - the never-calm safety fallback eventually captures (no silent gap),
  *  - a tracking-glitch spike is rejected (does not pollute the window, so it

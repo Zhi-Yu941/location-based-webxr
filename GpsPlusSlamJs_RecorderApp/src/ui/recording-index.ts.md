@@ -4,7 +4,7 @@
 
 Builds the **in-memory recording-coverage index** that backs the map-centric recording browser: for every recording in a folder, the deduplicated res-11 H3 cells its GPS path crossed. The map view clusters these per zoom level (via `clusterCellsByZoom`) to draw tiles and answer "which tours cross this tile?".
 
-See the plan: `GpsPlusSlamJs_Docs/docs/2026-06-14-map-centric-recording-browser-and-h3-index-user-feedback.md` (D2 — in-memory only, no disk cache).
+See the plan: `GpsPlusSlamJs_Docs/docs/2026-06-14-1048-map-centric-recording-browser-and-h3-index-user-feedback.md` (D2 — in-memory only, no disk cache).
 
 ## Public API
 

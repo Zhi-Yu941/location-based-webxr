@@ -207,7 +207,7 @@ describe('meshOccupiedCells — properties', () => {
  * ship in the default occluder mode — these properties pin, over arbitrary
  * connected occupied sets, that (1) the mesh always has non-zero area, and
  * that the nudge did not break (2) the measured-offset invariant or (3) vertex
- * welding. See 2026-07-01-followup-smooth-mesher-single-corner-degeneracy.md.
+ * welding. See 2026-07-01-1455-smooth-mesher-single-corner-degeneracy-followup.md.
  */
 describe("meshOccupiedCells — 'smooth' mode properties (nudge active)", () => {
   const STEP_DIRS: readonly GridCell[] = [

@@ -13,7 +13,7 @@ by name:
 - **"Recorder"** → `/recorder/` (the `GpsPlusSlamJs_RecorderApp`).
 
 It is the third surface of the multi-app subpath deployment described in
-[2026-06-01-multi-app-subpath-deployment-plan.md](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-01-multi-app-subpath-deployment-plan.md)
+[2026-06-01-0424-multi-app-subpath-deployment-plan.md](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-01-0424-multi-app-subpath-deployment-plan.md)
 (Step 4).
 
 ## Public API

@@ -48,17 +48,8 @@ const {
   };
 });
 
-const {
-  mockGetCurrentArPose,
-  mockSetTrackingLostCallback,
-  mockSetTrackingCallbacks,
-  mockSetTrackingRecoveredCallback,
-  mockRecordingOptions,
-} = vi.hoisted(() => ({
+const { mockGetCurrentArPose, mockRecordingOptions } = vi.hoisted(() => ({
   mockGetCurrentArPose: vi.fn().mockReturnValue(null),
-  mockSetTrackingLostCallback: vi.fn(),
-  mockSetTrackingCallbacks: vi.fn(),
-  mockSetTrackingRecoveredCallback: vi.fn(),
   // Shared mutable options object — main.ts keeps the returned reference, so
   // tests flip `loopClosureDebug.detectorEnabled` between enter-AR calls.
   mockRecordingOptions: {
@@ -106,25 +97,15 @@ vi.mock('gps-plus-slam-app-framework/ar/webxr-session', () => ({
   isWebXRSupported: vi.fn().mockResolvedValue(true),
   getCurrentArPose: mockGetCurrentArPose,
   applyAlignmentMatrix: vi.fn(),
-  setImageCaptureCallback: vi.fn(),
   startImageCapture: vi.fn(),
   stopImageCapture: vi.fn(),
-  setDepthCaptureCallback: vi.fn(),
   startDepthCapture: vi.fn(),
   stopDepthCapture: vi.fn(),
-  setFrameCallback: vi.fn(),
-  setCameraFrameCallback: vi.fn(),
-  setTrackingLostCallback: mockSetTrackingLostCallback,
-  setTrackingCallbacks: mockSetTrackingCallbacks,
-  setTrackingRecoveredCallback: mockSetTrackingRecoveredCallback,
-  setTrackingStore: vi.fn(),
-  setSessionEndCallback: vi.fn(),
+  rebindTrackingStore: vi.fn(),
   endARSession: vi.fn(),
   getScene: vi.fn().mockReturnValue({ name: 'scene' }),
   getCamera: vi.fn().mockReturnValue({ name: 'camera' }),
   getArWorldGroup: vi.fn().mockReturnValue({ name: 'ar-world' }),
-  setScene: vi.fn(),
-  setArWorldGroup: vi.fn(),
   getDepthInfoFromFrame: vi.fn(),
   getImageCaptureFrameCount: vi.fn().mockReturnValue(0),
   getDepthSampleCount: vi.fn().mockReturnValue(0),
@@ -308,7 +289,7 @@ vi.mock('gps-plus-slam-app-framework/state/gps-event-coordinator', () => ({
   extractOdomPosition: vi.fn().mockReturnValue([0, 0, 0]),
   extractOdomRotation: vi.fn().mockReturnValue([0, 0, 0, 1]),
 }));
-vi.mock('gps-plus-slam-app-framework/state/recording-options', () => ({
+vi.mock('./state/recording-options', () => ({
   loadRecordingOptions: vi.fn(() => mockRecordingOptions),
 }));
 vi.mock('gps-plus-slam-app-framework/sensors/gps', () => ({
@@ -345,16 +326,6 @@ vi.mock('gps-plus-slam-app-framework/visualization/reference-points', () => ({
 }));
 vi.mock('gps-plus-slam-app-framework/visualization/gps-event-markers', () => ({
   gpsEventVisualizer: { setVisible: vi.fn(), clearAll: vi.fn() },
-}));
-vi.mock('gps-plus-slam-app-framework/visualization/map-overlay', () => ({
-  MapOverlay: vi.fn().mockImplementation(() => ({
-    isVisible: vi.fn().mockReturnValue(false),
-    toggle: vi.fn(),
-    updatePosition: vi.fn(),
-    setGpsPosition: vi.fn(),
-    getGpsPosition: vi.fn().mockReturnValue(null),
-    dispose: vi.fn(),
-  })),
 }));
 vi.mock(
   'gps-plus-slam-app-framework/visualization/leaflet-map-overlay',
@@ -425,6 +396,14 @@ vi.mock('./storage/folder-manager', () => ({
 
 // Import after all mocks are set up
 import { handleEnterARForTesting, resetMainState } from './main';
+import { initAR } from 'gps-plus-slam-app-framework/ar/webxr-session';
+
+/** The tracking group main.ts passed to the mocked initAR (setter fold). */
+function getTrackingCallbacks() {
+  const callbacks = vi.mocked(initAR).mock.calls[0]?.[3];
+  expect(callbacks?.tracking).toBeDefined();
+  return callbacks!.tracking!;
+}
 
 const setupDom = () => {
   document.body.innerHTML = `
@@ -508,15 +487,13 @@ describe('loop-closure capture wiring (opt-in)', () => {
     lastFrameCallback()({});
 
     // Simulate the framework firing the tracking callbacks.
-    const lostCb = mockSetTrackingLostCallback.mock.calls[0]![0] as () => void;
-    lostCb();
+    const tracking = getTrackingCallbacks();
+    tracking.onLost!();
     expect(mockLoopClosureHandler.setTrackingActive).toHaveBeenCalledWith(
       false
     );
 
-    const recoveredCb = mockSetTrackingRecoveredCallback.mock
-      .calls[0]![0] as () => void;
-    recoveredCb();
+    tracking.onRecovered!();
     expect(mockLoopClosureHandler.setTrackingActive).toHaveBeenLastCalledWith(
       true
     );
@@ -536,7 +513,7 @@ describe('loop-closure capture wiring (opt-in)', () => {
     lastFrameCallback()({});
     mockLoopClosureHandler.setTrackingActive.mockClear();
 
-    const restartCb = mockSetTrackingCallbacks.mock.calls[0]![0] as (
+    const restartCb = getTrackingCallbacks().onRestarted! as (
       payload: unknown
     ) => void;
     restartCb({});

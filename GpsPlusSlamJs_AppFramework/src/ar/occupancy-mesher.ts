@@ -16,7 +16,7 @@
  * `THREE.BufferGeometry` (and the output is transferable to a Web Worker).
  * Greedy quad/box merging is a separate follow-on optimisation.
  *
- * Design notes (see 2026-06-13-occupancy-mesh-options-plan.md, option B):
+ * Design notes (see 2026-06-13-0004-occupancy-mesh-options-plan.md, option B):
  * - Vertices are NOT shared between faces (4 verts/face). Simpler and keeps
  *   per-face winding trivially correct; the occluder/collider don't need a
  *   welded vertex buffer. A closed voxel surface is still watertight (every
@@ -426,7 +426,7 @@ function buildCulled(
  * (locally indistinguishable from a thin floor's intentionally-flat edges).
  * 0.25 was rejected as too close to imperceptibly-non-zero; 1.0 discards the
  * measured centroid exactly where data is sparsest. See
- * 2026-07-01-followup-smooth-mesher-single-corner-degeneracy.md.
+ * 2026-07-01-1455-smooth-mesher-single-corner-degeneracy-followup.md.
  */
 const SINGLE_CORNER_NUDGE_K = 0.5;
 

@@ -14,7 +14,7 @@
  * call so no app can forget it.
  *
  * See
- * `gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-05-gps-anchor-frame-architecture-bug-and-plan.md`
+ * `gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-05-0650-gps-anchor-frame-architecture-bug-and-plan.md`
  * (Slice 2 / Bug A) and the colocated sidecar.
  */
 import type * as THREE from 'three';
@@ -57,7 +57,7 @@ export interface ArWorldGroupAlignmentHandle {
  * handle is still returned for callers that want to stop alignment mid-session,
  * and is idempotent + self-deregistering so a manual `dispose()` and the
  * teardown flush never double-run. See
- * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-08-arworldgroup-alignment-session-scoped-disposal.md.
+ * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-08-2149-arworldgroup-alignment-session-scoped-disposal.md.
  *
  * Double-drive is still the caller's concern: the recorder owns its own lerper
  * and must NOT also call this (it would double-lerp the same group). It does not

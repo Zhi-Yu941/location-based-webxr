@@ -38,7 +38,6 @@ import type { Map as LeafletMap } from 'leaflet';
 import { gpsEventVisualizer } from 'gps-plus-slam-app-framework/visualization/gps-event-markers';
 import { refPointVisualizer } from '../visualization/ref-point-visualizer';
 import {
-  getArPose,
   nuePositionToWebXR,
   nueQuaternionToWebXR,
 } from 'gps-plus-slam-app-framework/ar/webxr-session';
@@ -49,7 +48,7 @@ import { FrameTileVisualizer } from '../visualization/frame-tile-visualizer';
 import { decodeFrameTexture } from '../visualization/frame-texture-decoder';
 import { wireFrameTileSubscribers } from '../visualization/wire-frame-tile-subscribers';
 import { OccupancyGrid } from 'gps-plus-slam-app-framework/ar/occupancy-grid';
-import { loadRecordingOptions } from 'gps-plus-slam-app-framework/state/recording-options';
+import { loadRecordingOptions } from '../state/recording-options';
 import { OccupancyCubesVisualizer } from '../visualization/occupancy-cubes-visualizer';
 import {
   createOccluderSink,
@@ -165,6 +164,17 @@ export async function startReplayMode(
   // Initialize Three.js replay scene (no WebXR)
   const replaySceneState = initReplayScene(config.container);
   log.info('Replay scene initialized');
+
+  // The replay scene OWNS its scene graph (surface-reduction step 2 — the
+  // old webxr-session setScene/setArWorldGroup injection is gone), so the
+  // scene-reading singleton visualizers wired below must be pointed at the
+  // replay references explicitly. dispose() restores the live-session
+  // defaults so a later AR session parents markers correctly again.
+  gpsEventVisualizer.setSceneSource({
+    getScene: () => replaySceneState.scene,
+    getArWorldGroup: () => replaySceneState.arWorldGroup,
+  });
+  refPointVisualizer.setSceneSource(() => replaySceneState.scene);
 
   // F3.5 — wire frame-tile visualization for add2dImage actions so the
   // 2D camera frames recorded during the original session reappear as
@@ -333,25 +343,22 @@ export async function startReplayMode(
     // 6.2: Update arpose Object3D with recorded odom pose during replay.
     // The arpose node sits between arWorldGroup and camera; writing the
     // recorded pose here makes the camera follow the recorded trajectory
-    // while user controls only affect the camera's local offset.
-    onNewOdomPose: (() => {
-      return (
-        odomPosition: readonly number[],
-        odomRotation: readonly number[]
-      ) => {
-        const arpose = getArPose();
-        if (!arpose) {
-          return;
-        }
-        // Convert NUE→WebXR so (alignment × W2N) × WebXR_pos = alignment × NUE_pos
-        const webxrPos = nuePositionToWebXR(odomPosition);
-        arpose.position.fromArray(webxrPos);
-        // Rotation is now NUE in state — convert back to WebXR for arpose
-        // (arpose sits below basisChangeNode in WebXR-local space)
-        const webxrRot = nueQuaternionToWebXR(odomRotation);
-        arpose.quaternion.fromArray(webxrRot);
-      };
-    })(),
+    // while user controls only affect the camera's local offset. The node is
+    // the replay scene's OWN arpose (initReplayScene return) — webxr-session's
+    // getArPose was deleted with the rest of the replay injection surface.
+    onNewOdomPose: (
+      odomPosition: readonly number[],
+      odomRotation: readonly number[]
+    ) => {
+      const arpose = replaySceneState.arpose;
+      // Convert NUE→WebXR so (alignment × W2N) × WebXR_pos = alignment × NUE_pos
+      const webxrPos = nuePositionToWebXR(odomPosition);
+      arpose.position.fromArray(webxrPos);
+      // Rotation is now NUE in state — convert back to WebXR for arpose
+      // (arpose sits below basisChangeNode in WebXR-local space)
+      const webxrRot = nueQuaternionToWebXR(odomRotation);
+      arpose.quaternion.fromArray(webxrRot);
+    },
     // Issue #3: Update orbit target when alignment snapshots are created.
     // The snapshot NUE position is in scene-root space (A_k × p_k), so it
     // can be passed directly to updateOrbitTarget.
@@ -453,6 +460,11 @@ export async function startReplayMode(
         statsRafId = null;
       }
       statsOverlay?.dispose();
+      // Restore the live-session scene sources BEFORE the replay scene is
+      // torn down so no visualizer can parent a marker into a disposed scene,
+      // and a later live AR session gets the default wiring back.
+      gpsEventVisualizer.setSceneSource(null);
+      refPointVisualizer.setSceneSource(null);
       disposeReplayScene();
       log.info('Replay mode disposed');
     },

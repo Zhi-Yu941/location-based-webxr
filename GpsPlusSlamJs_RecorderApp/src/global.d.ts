@@ -53,9 +53,10 @@ declare global {
       clearGpsEventVisualizer: () => void;
       /**
        * §3c — Replay-mode diagnostic. Adds a GPS event with optional 1σ
-       * accuracy to the visualizer. Creates an offline scene + arWorldGroup
-       * via `setSceneForTesting` so the visualizer can run without an
-       * active WebXR session.
+       * accuracy to the visualizer. Creates a module-local offline scene +
+       * arWorldGroup in e2e-hooks and points the visualizer at it via
+       * `gpsEventVisualizer.setSceneSource` (live scene wins when present),
+       * so the visualizer can run without an active WebXR session.
        */
       addGpsEventForTest: (
         gpsCoords: [number, number, number],

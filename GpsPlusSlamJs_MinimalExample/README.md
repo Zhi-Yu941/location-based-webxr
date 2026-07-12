@@ -9,7 +9,7 @@ and a reticle tracks real-world surfaces under the screen centre.
 It is a structural port of the stock three.js `webxr_ar_hittest` example
 (button → AR session → reticle → tap-to-place), adapted for the GPS-aligned
 framework. The full design rationale lives in the plan doc
-[2026-06-03-threejs-arbutton-minimal-ar-example-user-feedback.md](../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-03-threejs-arbutton-minimal-ar-example-user-feedback.md).
+[2026-06-03-0553-threejs-arbutton-minimal-ar-example-user-feedback.md](../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-03-0553-threejs-arbutton-minimal-ar-example-user-feedback.md).
 
 ## The two framework deltas (what a porting developer must not get wrong)
 

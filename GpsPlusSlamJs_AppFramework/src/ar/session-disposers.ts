@@ -17,7 +17,7 @@
  * `arWorldGroup`). Because `initAR()` throws if a prior session is still live,
  * every restart must pass through `resetWebXRState()`, making it the single
  * chokepoint where flushing these disposers is guaranteed. See
- * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-08-arworldgroup-alignment-session-scoped-disposal.md.
+ * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-08-2149-arworldgroup-alignment-session-scoped-disposal.md.
  */
 
 import { createLogger } from '../utils/logger';

@@ -102,7 +102,10 @@ export function createStoryStage(parts: StageParts): StoryStage {
   }
 
   parts.camera.position.copy(HERO_CAMERA);
-  const lookTarget = new Vector3(0, 2, 0);
+  // Aimed left of the world center so the marker pair and path sit in the
+  // right half of the hero frame, clear of the copy panel on the left
+  // (round-1 feedback: the red marker hid behind the text box).
+  const lookTarget = new Vector3(-4, 2, 0);
   parts.camera.lookAt(lookTarget);
 
   return { ...parts, lookTarget, walk, curve };
@@ -237,7 +240,7 @@ export function buildStoryTimeline(
   const start: ChapterFraming = {
     at: 0,
     camera: HERO_CAMERA.clone(),
-    look: new Vector3(0, 2, 0),
+    look: new Vector3(-4, 2, 0), // must match createStoryStage's lookTarget
     walkT: 0.02,
   };
   const framings: readonly ChapterFraming[] = [
@@ -245,7 +248,7 @@ export function buildStoryTimeline(
     {
       at: 0,
       camera: new Vector3(16.5, 15, 16.5),
-      look: new Vector3(0, 1.5, 0),
+      look: new Vector3(-3.5, 1.5, 0.5),
       walkT: 0.02,
     },
     // qr

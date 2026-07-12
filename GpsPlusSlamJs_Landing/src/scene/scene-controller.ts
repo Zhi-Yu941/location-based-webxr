@@ -5,6 +5,7 @@ import {
   HemisphereLight,
   PerspectiveCamera,
   Scene,
+  Vector3,
   WebGLRenderer,
 } from "three";
 import type { QualityTier } from "../capability";
@@ -177,11 +178,16 @@ export function createSceneController(
   let displayedProgress = 0;
   let lastTickMs: number | null = null;
   let introStartedAt: number | null = null;
+  // The camera pose the timelines produced, BEFORE the ambient hero drift
+  // is layered on top (the drift is an additive offset, never baked in).
+  const scrubbedCameraPos = stage.camera.position.clone();
+  let ambientRampStartMs: number | null = null;
 
   function seekStory(progress: number): void {
     displayedProgress = progress;
     story.seek(progress * story.duration);
     syncStage(stage);
+    scrubbedCameraPos.copy(stage.camera.position);
     dirty = true;
   }
 
@@ -192,10 +198,50 @@ export function createSceneController(
     const elapsed = nowMs - introStartedAt;
     intro.seek(Math.min(elapsed, intro.duration));
     syncStage(stage);
+    scrubbedCameraPos.copy(stage.camera.position);
     dirty = true;
     if (elapsed >= intro.duration) {
       introStartedAt = null;
     }
+  }
+
+  /**
+   * Gentle time-based camera sway while the visitor rests at the hero
+   * (round-1 feedback: a frozen hero reads as buggy). Additive on top of
+   * the scrubbed pose, faded out by scroll progress AND ramped in over a
+   * second so the intro/scrub handover never pops. Scroll mode only —
+   * reduced motion must stay still.
+   */
+  function applyAmbientDrift(nowMs: number): void {
+    // Restore the pure scrubbed pose first (also cleans up the last
+    // ambient offset after scrolling away from the hero).
+    if (!stage.camera.position.equals(scrubbedCameraPos)) {
+      stage.camera.position.copy(scrubbedCameraPos);
+      dirty = true;
+    }
+    if (tier.mode !== "scroll" || introStartedAt !== null) {
+      ambientRampStartMs = null;
+      return;
+    }
+    const weight = Math.max(0, 1 - displayedProgress * 12);
+    if (weight <= 0.001) {
+      ambientRampStartMs = null;
+      return;
+    }
+    if (ambientRampStartMs === null) {
+      ambientRampStartMs = nowMs;
+    }
+    const ramp = Math.min(1, (nowMs - ambientRampStartMs) / 1200);
+    const s = nowMs * 0.001;
+    stage.camera.position.addScaledVector(
+      new Vector3(
+        Math.sin(s * 0.33) * 0.9,
+        Math.sin(s * 0.21) * 0.35,
+        Math.cos(s * 0.26) * 0.9,
+      ),
+      weight * ramp,
+    );
+    dirty = true;
   }
 
   function advanceScrub(dtMs: number): void {
@@ -234,6 +280,7 @@ export function createSceneController(
       if (introStartedAt !== null) {
         intro.seek(intro.duration);
         syncStage(stage);
+        scrubbedCameraPos.copy(stage.camera.position);
         introStartedAt = null;
         dirty = true;
       }
@@ -257,6 +304,7 @@ export function createSceneController(
       } else {
         advanceScrub(dt);
       }
+      applyAmbientDrift(nowMs);
       if (dirty) {
         camera.lookAt(stage.lookTarget);
         renderer.render(scene, camera);

@@ -63,16 +63,47 @@ describe("createSceneController", () => {
     expect(controller).toBeNull();
   });
 
-  it("renders once for the initial frame, then only when something changed", () => {
+  it("renders on demand only once away from the hero (battery)", () => {
+    // The hero has an ambient drift (below), so render-on-demand is
+    // asserted at a mid-story progress where the scene is truly idle.
     const { controller, renderer } = makeController();
     expect(controller).not.toBeNull();
-    controller?.tick(16);
-    const initialRenders = renderer.renders;
-    expect(initialRenders).toBeGreaterThan(0);
-    // Nothing changed: further ticks must not re-render (battery).
-    controller?.tick(32);
-    controller?.tick(48);
-    expect(renderer.renders).toBe(initialRenders);
+    controller?.setTargetProgress(0.5);
+    for (let i = 1; i <= 400; i++) {
+      controller?.tick(i * 16);
+    }
+    const settledRenders = renderer.renders;
+    expect(settledRenders).toBeGreaterThan(0);
+    // Converged and away from the hero: further ticks must not re-render.
+    controller?.tick(401 * 16);
+    controller?.tick(402 * 16);
+    expect(renderer.renders).toBe(settledRenders);
+  });
+
+  it("drifts the camera gently at the hero while idle (background life)", () => {
+    // Round-1 feedback: a frozen hero reads as buggy — something should
+    // move in the background until the visitor scrolls.
+    const { controller } = makeController();
+    const camera = controller?.stage.camera as PerspectiveCamera;
+    controller?.tick(0);
+    const posA = camera.position.clone();
+    for (let t = 100; t <= 4000; t += 100) {
+      controller?.tick(t);
+    }
+    const drift = camera.position.distanceTo(posA);
+    expect(drift).toBeGreaterThan(0.01);
+    expect(drift).toBeLessThan(3); // gentle sway, not a fly-away
+  });
+
+  it("suppresses the ambient drift under reduced motion", () => {
+    const { controller } = makeController({ ...TIER, mode: "reduced-motion" });
+    const camera = controller?.stage.camera as PerspectiveCamera;
+    controller?.tick(0);
+    const posA = camera.position.clone();
+    for (let t = 100; t <= 4000; t += 100) {
+      controller?.tick(t);
+    }
+    expect(camera.position.distanceTo(posA)).toBeLessThan(1e-6);
   });
 
   it("scroll progress smoothing converges on the target and moves the camera", () => {
@@ -125,11 +156,17 @@ describe("createSceneController", () => {
     controller?.playIntro();
     controller?.tick(100); // intro started: camera pulled far away
     expect(camera.position.distanceTo(heroPos)).toBeGreaterThan(5);
-    for (let t = 200; t <= 4000; t += 100) {
+    for (let t = 200; t <= 2300; t += 100) {
       controller?.tick(t);
     }
-    // Intro over: back exactly on the hero framing, ready for scroll.
+    // Intro over: on the hero framing (the ambient drift ramps in from
+    // zero, so right after completion the offset is still ~0 — seamless).
     expect(camera.position.distanceTo(heroPos)).toBeLessThan(0.5);
+    // Later the gentle sway plays, but stays bounded around the framing.
+    for (let t = 2400; t <= 6000; t += 100) {
+      controller?.tick(t);
+    }
+    expect(camera.position.distanceTo(heroPos)).toBeLessThan(2);
   });
 
   it("skipIntro jumps straight to the hero framing (first scroll during intro)", () => {

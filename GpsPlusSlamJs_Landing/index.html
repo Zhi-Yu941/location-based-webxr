@@ -150,10 +150,14 @@
         padding: 26px 28px;
         backdrop-filter: blur(10px);
         margin-left: 6vw;
-        opacity: 0.98;
+        opacity: 0.55;
+        transition: opacity 0.35s ease;
       }
       body.no-webgl .copy {
         backdrop-filter: none;
+        opacity: 1;
+      }
+      .chapter.active .copy {
         opacity: 1;
       }
       .chapter:nth-of-type(even) .copy {

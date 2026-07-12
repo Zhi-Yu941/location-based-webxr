@@ -1,0 +1,61 @@
+# `scene/story-timeline.ts` — the scroll-scrubbed story + load intro
+
+## Purpose
+
+Builds the two anime.js timelines: the master story timeline (one segment
+per chapter, scrubbed by scroll — never auto-played) and the one-shot load
+intro. Also composes the "stage" (prop placement + reveal-group priming)
+and keeps derived state (dot-person on the path) in sync.
+
+## Public API
+
+- `CHAPTER_DURATION_MS` (1000) and `chapterEndTime(index)` — the timeline
+  time bases; total duration = `CHAPTER_COUNT × CHAPTER_DURATION_MS`.
+- `createStoryStage(parts: StageParts) → StoryStage` — positions person /
+  markers, parents the phone to the camera (held "in front of the lens"),
+  primes reveal groups (visible but scaled/lowered away), sets the hero
+  camera framing. Mutates the passed objects; call once at boot.
+- `buildStoryTimeline(stage, onUpdate) → Timeline` — paused timeline;
+  scrub with `seek(progress × duration)`.
+- `buildIntroTimeline(stage, onUpdate) → Timeline` — ~2.1 s intro that
+  ends EXACTLY on the story's hero framing (seamless scroll hand-over).
+- `syncStage(stage)` — re-derives person path placement from `walk.t`.
+  **Must be called after every `seek`** (see invariants).
+- `StoryStage`, `StageParts` types.
+
+## Invariants & assumptions
+
+- **Seek-driven only:** both timelines are created `autoplay: false` and
+  are driven by `seek()` from the scene controller's tick loop — the anime
+  engine loop is never relied upon (deterministic, node-testable).
+- **`composition: 'none'` is load-bearing:** with anime's default
+  `'replace'` composition, the intro timeline (created later, animating
+  the same camera/world properties) silently CANCELS the story timeline's
+  tweens. Seek-driven usage wants last-seeked-wins.
+- **`onUpdate` fires BEFORE child tween values apply** (anime behavior),
+  so it is only a dirty-flag hook; derived state must be pulled via
+  `syncStage` AFTER the seek returns.
+- The fused marker is deliberately never animated — its stillness vs. the
+  raw marker's jitter IS the product message (test-pinned).
+- The camera look direction is decoupled: tweens move `stage.lookTarget`
+  (a bare Vector3); the render loop calls `camera.lookAt(...)`.
+- Chapter staging summary: hero push-in → QR settle-wiggle + snap-ring
+  pulse → marker jitter vs. stillness → dive to eye level + phone raise →
+  pull-back + outer-terrain rise → gallery pop-in → calm CTA framing.
+
+## Examples
+
+```ts
+const stage = createStoryStage({ world, person, markers, phone, camera });
+const story = buildStoryTimeline(stage, markDirty);
+story.seek(progress * story.duration);
+syncStage(stage);
+camera.lookAt(stage.lookTarget);
+```
+
+## Tests
+
+`story-timeline.test.ts` — duration coverage, camera movement per chapter,
+raw-jitters/fused-still, path walking (via the syncStage contract), phone +
+gallery reveals, dirty-notify on scrub, scrub-back restoration, intro
+hand-over framing, stage placement.

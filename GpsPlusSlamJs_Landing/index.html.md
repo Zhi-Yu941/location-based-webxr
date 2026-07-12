@@ -1,51 +1,59 @@
-# `GpsPlusSlamJs_Landing/index.html` — root landing page
+# `GpsPlusSlamJs_Landing/index.html` — root landing page (3D scroll story)
 
 ## Purpose
 
-The static landing page served at the **root** (`/`) of `gps.csutil.com`. It
-gives a one-paragraph pitch of the GPS+SLAM location-based-WebXR framework and
-routes visitors to the deployed apps that share the origin, each labelled
-by name:
+The entry document of the landing app served at the **root** (`/`) of
+`gps.csutil.com`. It carries the entire chapter copy as **real DOM text**
+(SEO, accessibility, and the no-WebGL floor — the plan's "Content in DOM"
+decision), the dual-theme CSS, and the mount points for the 3D scroll
+story that `src/main.ts` boots behind the copy.
 
-- **"Anchor Starter Demo"** → `/starter/` (the `GpsPlusSlamJs_AnchorStarter` app).
-- **"Minimal Example"** → `/minimal/` (the `GpsPlusSlamJs_MinimalExample` app).
-- **"QR-Tracking Demo"** → `/qr-demo/` (the `GpsPlusSlamJs_QrTrackingDemo` app).
-- **"Recorder"** → `/recorder/` (the `GpsPlusSlamJs_RecorderApp`).
+## Structure
 
-It is the third surface of the multi-app subpath deployment described in
-[2026-06-01-0424-multi-app-subpath-deployment-plan.md](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-01-0424-multi-app-subpath-deployment-plan.md)
-(Step 4).
-
-## Public API
-
-None — it is a single self-contained HTML document. All CSS is inlined; there
-is **no build step, no JavaScript, and no dependencies**. The build-site
-orchestration (`scripts/build-site.mjs`, Step 5) copies this file verbatim to
-`dist-site/index.html`.
+- `#scene-root` — fixed full-viewport layer the WebGL canvas is appended
+  into (`aria-hidden`, z-index 0; hidden entirely under `body.no-webgl`).
+- `.top-bar` — brand + `#theme-toggle` button (aria-pressed reflects the
+  light theme).
+- `<main id="story">` — seven `<section class="chapter" id="chapter-<id>">`
+  in the order defined by `src/chapters.ts` (hero, qr, fusion, dive,
+  anywhere, gallery, cta). Each carries a `.copy` glass panel with the
+  punchy-marketing copy (round-2 interview decision). The active section
+  gets `.active` (full opacity) from `main.ts`.
+- The CTA section holds the primary "Fork & start building" button, the
+  demos hub (four `.demo-card`s with inline-SVG vignettes keeping the
+  proven one-line descriptions), the external links, and the license
+  footer.
 
 ## Invariants & assumptions
 
-- **Absolute subpath links.** The buttons link to `/starter/`, `/minimal/`,
-  `/qr-demo/`, and `/recorder/` (root-absolute, with trailing slash). These are
-  deployment URLs on the shared origin, not Vite-processed paths, so they are
-  written literally and are **not** rewritten by any base-path logic.
-- **Zero dependencies / no bundler.** Keeping the page pure static HTML+CSS is a
-  deliberate decision (plan Q3) so the framework pitch is trivial to keep up to
-  date and loads instantly.
-- **Trailing slashes matter.** Linking to `/starter/` (not `/starter`) makes the
-  static-asset server serve the nested `index.html` directly without relying on
-  a redirect (see plan Step 5/Q2).
+- **FOUC guard:** the inline `<script>` in `<head>` applies the persisted
+  (or OS-preferred) theme to `<html data-theme>` before first paint. Its
+  resolution rule MUST stay in sync with `src/theme.ts`
+  (`resolveInitialTheme`) — same storage key `gps-landing-theme`, same
+  valid values, same fallback.
+- **Theming:** all chrome colors go through CSS custom properties defined
+  per `html[data-theme='dark'|'light']`; the accent `#ef4444` matches the
+  3D palette's fused-anchor color.
+- **Demo links** are root-absolute with trailing slashes (`/starter/`,
+  `/minimal/`, `/qr-demo/`, `/recorder/`) — deployment URLs on the shared
+  origin, asserted by `scripts/build-site.mjs` after the production build.
+- **Chapter sections** must exist for every id in `src/chapters.ts` (same
+  order); `main.ts` warns on missing ones. Sections are min-height 130vh
+  (hero 100vh) to give the scroll story room.
+- `csstree/validator` disable comments on `clamp()` lines are false-
+  positive suppressions (the bundled css-tree grammar rejects math
+  functions), same as in the sibling apps.
 
 ## Examples
 
-Open the file directly in a browser to preview; the buttons will 404 locally
-unless the sibling apps are also served under `/starter/`, `/minimal/`, and
-`/recorder/`.
-End-to-end it is exercised by serving the combined `dist-site/` output and
-clicking through landing → starter → recorder (plan Step 5 verification).
+`pnpm dev` in this package serves the page on port 5182. The production
+build is `vite build` at base `/` orchestrated by `scripts/build-site.mjs`.
 
 ## Tests
 
-No unit test — it is static markup with no logic. Its links are covered by the
-build-site tree assertion (the `index.html` file must exist at the `dist-site`
-root) and by the manual click-through smoke check in plan Steps 5 and 7.
+- `lint:css` (stylelint + csstree) covers the inline CSS.
+- The chapter-id contract is covered by `src/chapters.test.ts` +
+  `main.ts`'s runtime warning; the demo-link presence is asserted by the
+  build-site guard after `pnpm run build:site`.
+- Visual behavior (scroll story, themes, reduced motion, no-WebGL) is the
+  manual pass defined in the plan's verification section.

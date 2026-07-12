@@ -379,6 +379,79 @@ describe('Recorder Store', () => {
       );
     });
 
+    /**
+     * Why this test matters (indoor-loop enablement follow-up, 2026-07-12):
+     * the field protocol for loop recordings is "re-mark every corner on
+     * every pass WITHIN one recording" — multiple `addRefPointEntry`
+     * dispatches of the SAME id in one session. Every prior test dispatched
+     * a single mark, so a middleware regression that dedupes, drops, or
+     * mis-indexes repeated same-id actions would pass unnoticed and starve
+     * the investigation ground truth exactly like the 2026-07-11 session.
+     * This wires the REAL slice + REAL middleware and pins that all three
+     * re-marks persist, each with its own incrementing index and its own
+     * payload (none merged away).
+     */
+    it('persists EVERY re-observation of the same ref-point id with incrementing indices', async () => {
+      const { writeAction } =
+        await import('gps-plus-slam-app-framework/storage/opfs-storage');
+
+      store.dispatch(
+        startSession({
+          scenarioName: 'Test',
+          sessionName: 'recording-loop-session',
+          startTime: Date.now(),
+        })
+      );
+      vi.mocked(writeAction).mockClear();
+
+      const baseTs = 1_700_000_000_000;
+      const markOf = (timestamp: number): RefPointEntry => ({
+        id: '8b1fa0a4970afff', // one physical corner, re-marked per loop pass
+        timestamp,
+        rawGpsPoint: {
+          id: `gps-${timestamp}`,
+          latitude: 50.123,
+          longitude: 6.789,
+          timestamp,
+        },
+      });
+
+      // Three marks of the same corner, ≥10 s apart (past the UI cooldown).
+      store.dispatch(addRefPointEntry(markOf(baseTs)));
+      store.dispatch(addRefPointEntry(markOf(baseTs + 15_000)));
+      store.dispatch(addRefPointEntry(markOf(baseTs + 30_000)));
+
+      // Writes flow through the middleware's async WriteQueue — rapid
+      // successive dispatches are queued, not written synchronously, so the
+      // assertion must wait for the queue to drain (this is also why the
+      // single-mark tests above never noticed: their one write starts on
+      // the first microtask).
+      const getMarkWrites = () =>
+        vi
+          .mocked(writeAction)
+          .mock.calls.filter(
+            ([action]) =>
+              (action as { type?: string }).type ===
+              'refPoints/addRefPointEntry'
+          );
+      await vi.waitFor(() => expect(getMarkWrites()).toHaveLength(3));
+      const markWrites = getMarkWrites();
+      // Each write keeps its own payload — nothing deduped or overwritten.
+      expect(
+        markWrites.map(
+          ([action]) =>
+            (action as { payload: { timestamp: number } }).payload.timestamp
+        )
+      ).toEqual([baseTs, baseTs + 15_000, baseTs + 30_000]);
+      // Indices increment strictly (distinct actions/NNNNNN.json files).
+      const indices = markWrites.map(([, index]) => index);
+      expect(indices[1]).toBe(indices[0]! + 1);
+      expect(indices[2]).toBe(indices[1]! + 1);
+
+      // The REAL slice appends all three (pure append, no dedupe).
+      expect(store.getState().refPoints.entries).toHaveLength(3);
+    });
+
     it('should NOT persist actions when not recording', async () => {
       const { writeAction } =
         await import('gps-plus-slam-app-framework/storage/opfs-storage');

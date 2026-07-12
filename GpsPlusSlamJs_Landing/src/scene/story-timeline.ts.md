@@ -28,10 +28,23 @@ and keeps derived state (dot-person on the path) in sync.
 - **Seek-driven only:** both timelines are created `autoplay: false` and
   are driven by `seek()` from the scene controller's tick loop — the anime
   engine loop is never relied upon (deterministic, node-testable).
-- **`composition: 'none'` is load-bearing:** with anime's default
-  `'replace'` composition, the intro timeline (created later, animating
-  the same camera/world properties) silently CANCELS the story timeline's
-  tweens. Seek-driven usage wants last-seeked-wins.
+- **`composition: 'none'` is load-bearing TWICE over:** (1) with anime's
+  default `'replace'`, the intro timeline (created later, animating the
+  same camera/world properties) silently CANCELS the story timeline's
+  tweens; (2) `'none'` also disables from-value chaining, so every
+  property touched by more than one tween MUST declare explicit
+  `{from, to}` — the chapter moves are generated from an explicit framing
+  CHAIN for exactly this reason (round-1 "harter Sprung" bug, pinned by
+  the continuity tests).
+- **anime keyframe ARRAYS are banned** in these timelines: they do not
+  restore their pre-tween value when seeked back past them
+  (probe-verified), breaking scrub-path independence. Wiggle/jitter beats
+  go through `addValueChain` (explicit `{from, to}` per segment) instead.
+- **Continuity guarantees (test-pinned):** fine-step forward AND backward
+  sweeps bound the camera's per-step displacement and accel; a fast-check
+  property pins that scene state at time t is independent of the scrub
+  history (`story-timeline.continuity.test.ts`,
+  `story-timeline.property.test.ts`).
 - **`onUpdate` fires BEFORE child tween values apply** (anime behavior),
   so it is only a dirty-flag hook; derived state must be pulled via
   `syncStage` AFTER the seek returns.

@@ -25,15 +25,24 @@ renders on demand.
 ## Invariants & assumptions
 
 - **Render on demand:** a frame renders only when something changed
-  (scrub, intro, theme, resize). Idle ticks render nothing (test-pinned) —
-  battery matters on the phones this page targets.
+  (scrub, intro, theme, resize, ambient hero drift). Idle ticks away from
+  the hero render nothing (test-pinned) — battery matters on the phones
+  this page targets.
 - **One driver:** `tick(nowMs)` advances everything by seeking; the anime
   engine's own loop is never used. `start()` merely wraps `tick` in rAF.
 - **Smoothing:** scroll sets a target; displayed progress converges
-  exponentially (τ = 120 ms) with an epsilon snap, so wheel steps glide
-  instead of jump-cutting.
+  exponentially (τ = 240 ms, raised from 120 after round-1 "hakelig"
+  feedback) with an epsilon snap, so wheel steps glide instead of
+  jump-cutting.
+- **Ambient hero drift:** while resting near the top (scroll mode only,
+  intro not active), a gentle time-based sway is layered ADDITIVELY over
+  the scrubbed camera pose (`scrubbedCameraPos` holds the pure pose) —
+  ramped in over 1.2 s, faded out by ~8 % progress, suppressed under
+  reduced motion (all test-pinned). This means the hero renders
+  continuously; render-on-demand applies away from the hero.
 - Intro playback wins over scrubbing while active; `skipIntro()` seeks it
-  to the end (used on the first scroll during the intro).
+  to the end AND updates the scrubbed camera base (it previously snapped
+  back to the stale intro pose).
 - `applyTheme` swaps palette colors, background, fog and light settings in
   place — no scene rebuild.
 - Tier application: `setPixelRatio(tier.dprCap)`, `shadowMap.enabled`,

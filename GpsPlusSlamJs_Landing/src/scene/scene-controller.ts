@@ -81,8 +81,13 @@ export interface SceneController {
   start(): void;
 }
 
-/** Exponential smoothing time constant for the scroll scrub (ms). */
-const SCRUB_TAU_MS = 120;
+/**
+ * Exponential smoothing time constant for the scroll scrub (ms).
+ * Raised from 120 after round-1 feedback ("hakelig"): at 120 ms discrete
+ * wheel steps were still readable as steps; 240 ms glides through them
+ * while staying responsive enough that the story doesn't feel laggy.
+ */
+const SCRUB_TAU_MS = 240;
 /** Snap threshold: below this progress delta we stop re-seeking. */
 const SCRUB_EPSILON = 0.0005;
 

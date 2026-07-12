@@ -35,6 +35,7 @@
     "dpdm": "^4.2.0",
     "eslint": "^10.3.0",
     "eslint-config-prettier": "^10.1.8",
+    "fast-check": "^4.8.0",
     "globals": "^17.6.0",
     "jscpd": "^4.1.1",
     "postcss-html": "^1.8.1",

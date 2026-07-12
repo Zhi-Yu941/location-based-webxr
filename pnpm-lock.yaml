@@ -204,6 +204,9 @@ importers:
       eslint-config-prettier:
         specifier: ^10.1.8
         version: 10.1.8(eslint@10.3.0(jiti@2.7.0))
+      fast-check:
+        specifier: ^4.8.0
+        version: 4.8.0
       globals:
         specifier: ^17.6.0
         version: 17.6.0

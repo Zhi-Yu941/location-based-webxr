@@ -50,10 +50,23 @@ function collectSections(): HTMLElement[] {
   return sections;
 }
 
-function measureSections(sections: readonly HTMLElement[]): SectionMetrics[] {
+/**
+ * Section metrics in SCROLLER coordinates. `<main id="story">` is the
+ * page's one and only scroller (the document never scrolls — that keeps
+ * the mobile URL bar stationary and the scroll→progress mapping free of
+ * URL-bar viewport-resize remaps).
+ */
+function measureSections(
+  scroller: HTMLElement,
+  sections: readonly HTMLElement[],
+): SectionMetrics[] {
+  const scrollerTop = scroller.getBoundingClientRect().top;
   return sections.map((el) => {
     const rect = el.getBoundingClientRect();
-    return { top: rect.top + window.scrollY, height: rect.height };
+    return {
+      top: rect.top - scrollerTop + scroller.scrollTop,
+      height: rect.height,
+    };
   });
 }
 
@@ -67,8 +80,14 @@ function markActiveChapter(
 }
 
 function boot(): void {
+  const scroller = document.getElementById("story");
+  if (!scroller) {
+    console.warn("landing: missing #story scroller; page stays static");
+    document.body.classList.add("no-webgl");
+    return;
+  }
   const sections = collectSections();
-  let metrics = measureSections(sections);
+  let metrics = measureSections(scroller, sections);
 
   const tier = decideQualityTier({
     webglSupported: probeWebgl(),
@@ -112,8 +131,8 @@ function boot(): void {
   let lastChapterIndex = -1;
   const onScrollChanged = (): void => {
     const state = computeScrollState(
-      window.scrollY,
-      window.innerHeight,
+      scroller.scrollTop,
+      scroller.clientHeight,
       metrics,
     );
     if (state.chapterIndex !== lastChapterIndex) {
@@ -131,7 +150,7 @@ function boot(): void {
 
   let introRunning = false;
   if (scene && tier.mode === "scroll") {
-    if (window.scrollY < 40) {
+    if (scroller.scrollTop < 40) {
       scene.playIntro();
       introRunning = true;
     }
@@ -140,10 +159,10 @@ function boot(): void {
     scene.start();
   }
 
-  window.addEventListener(
+  scroller.addEventListener(
     "scroll",
     () => {
-      if (introRunning && window.scrollY > 40) {
+      if (introRunning && scroller.scrollTop > 40) {
         scene?.skipIntro();
         introRunning = false;
       }
@@ -152,7 +171,7 @@ function boot(): void {
     { passive: true },
   );
   window.addEventListener("resize", () => {
-    metrics = measureSections(sections);
+    metrics = measureSections(scroller, sections);
     scene?.handleResize(window.innerWidth, window.innerHeight);
     onScrollChanged();
   });

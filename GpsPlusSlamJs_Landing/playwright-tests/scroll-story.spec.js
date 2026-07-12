@@ -49,6 +49,12 @@ test("boots and activates every chapter while scrolling, with zero errors", asyn
     await expect(page.locator(`#chapter-${id}.active`)).toBeAttached();
     await expect(page.locator(`#chapter-${id} .copy`)).toBeVisible();
   }
+  // The DOCUMENT must never scroll — #story is the page's only scroller
+  // (keeps the mobile URL bar stationary; round-1 feedback F1b).
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  expect(
+    await page.evaluate(() => document.getElementById("story")?.scrollTop ?? 0),
+  ).toBeGreaterThan(0);
   expect(errors).toEqual([]);
 });
 

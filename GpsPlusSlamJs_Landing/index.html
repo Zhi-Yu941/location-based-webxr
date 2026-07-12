@@ -71,6 +71,12 @@
       body {
         margin: 0;
         padding: 0;
+        height: 100%;
+        /* The DOCUMENT never scrolls — <main> is the scroller (below).
+           This keeps the mobile browser bar stationary and prevents the
+           URL-bar collapse/expand viewport resizes that would remap
+           scroll progress mid-gesture (round-1 feedback F1b/F3). */
+        overflow: hidden;
         background: var(--bg);
         color: var(--text);
         font-family:
@@ -130,7 +136,10 @@
       }
 
       main {
-        position: relative;
+        /* The page's one and only scroller (see html/body overflow note). */
+        position: fixed;
+        inset: 0;
+        overflow-y: auto;
         z-index: 1;
       }
       .chapter {

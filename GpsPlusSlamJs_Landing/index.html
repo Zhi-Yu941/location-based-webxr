@@ -1,24 +1,68 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GPS+SLAM — Location-Based WebXR Framework</title>
     <meta
       name="description"
-      content="Build location-based AR experiences on the web. An Apache-2.0 framework plus a reference recorder app, fusing GPS with WebXR odometry for sub-meter, install-free AR in the mobile browser."
+      content="Build location-based AR experiences on the web. An Apache-2.0 framework plus demo apps, fusing GPS with WebXR odometry for install-free AR in the mobile browser — one URL, no app."
     />
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='%23ef4444'/%3E%3Ccircle cx='50' cy='50' r='15' fill='%23fff'/%3E%3C/svg%3E"
       type="image/svg+xml"
     />
+    <script>
+      // FOUC guard: apply the persisted (or OS-preferred) theme before first
+      // paint. src/theme.ts re-derives the same value with the same rules and
+      // stays the source of truth after boot.
+      (function () {
+        try {
+          var stored = localStorage.getItem("gps-landing-theme");
+          var theme =
+            stored === "light" || stored === "dark"
+              ? stored
+              : window.matchMedia &&
+                  window.matchMedia("(prefers-color-scheme: light)").matches
+                ? "light"
+                : "dark";
+          document.documentElement.dataset.theme = theme;
+        } catch (_e) {
+          /* keep the html default */
+        }
+      })();
+    </script>
     <style>
       :root {
+        --accent: #ef4444;
+        --accent-hover: #dc2626;
+      }
+      html[data-theme="dark"] {
+        --bg: #0b0b0d;
+        --text: #e7e7ea;
+        --muted: #b6b6bd;
+        --panel: rgb(19 19 23 / 82%);
+        --panel-border: rgb(255 255 255 / 10%);
+        --card: #1b1b20;
+        --card-border: #34343c;
+        --card-hover: #24242b;
+        --link: #9db8ff;
+
         color-scheme: dark;
+      }
+      html[data-theme="light"] {
+        --bg: #f2f1ed;
+        --text: #1b1b20;
+        --muted: #5a5a63;
+        --panel: rgb(255 255 255 / 84%);
+        --panel-border: rgb(0 0 0 / 8%);
+        --card: #fff;
+        --card-border: #ddd9d2;
+        --card-hover: #f6f4f0;
+        --link: #2954cc;
+
+        color-scheme: light;
       }
       * {
         box-sizing: border-box;
@@ -27,101 +71,203 @@
       body {
         margin: 0;
         padding: 0;
-        background: #0b0b0d;
-        color: #e7e7ea;
+        background: var(--bg);
+        color: var(--text);
         font-family:
           system-ui,
           -apple-system,
-          Segoe UI,
+          "Segoe UI",
           Roboto,
           sans-serif;
         line-height: 1.55;
       }
+
+      /* Fixed 3D stage behind the scrolling copy. */
+      #scene-root {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+      }
+      #scene-root canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      body.no-webgl #scene-root {
+        display: none;
+      }
+
+      .top-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 2;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 18px;
+        pointer-events: none;
+      }
+      .brand {
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        font-size: 0.95rem;
+        color: var(--muted);
+      }
+      #theme-toggle {
+        pointer-events: auto;
+        border: 1px solid var(--card-border);
+        background: var(--panel);
+        color: var(--text);
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 0.85rem;
+        cursor: pointer;
+      }
+      #theme-toggle:hover {
+        background: var(--card-hover);
+      }
+
       main {
-        max-width: 760px;
-        margin: 0 auto;
-        padding: 48px 20px 64px;
+        position: relative;
+        z-index: 1;
       }
-      header {
-        text-align: center;
-        margin-bottom: 36px;
+      .chapter {
+        min-height: 130vh;
+        display: flex;
+        align-items: center;
+        padding: 8vh 20px;
       }
-      h1 {
-        font-size: clamp(1.9rem, 5vw, 2.6rem);
+      .chapter:first-of-type {
+        min-height: 100vh;
+      }
+      .copy {
+        max-width: 460px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 16px;
+        padding: 26px 28px;
+        backdrop-filter: blur(10px);
+        margin-left: 6vw;
+        opacity: 0.98;
+      }
+      body.no-webgl .copy {
+        backdrop-filter: none;
+        opacity: 1;
+      }
+      .chapter:nth-of-type(even) .copy {
+        margin-left: auto;
+        margin-right: 6vw;
+      }
+      .copy h1 {
+        /* stylelint-disable-next-line csstree/validator -- clamp() is valid CSS; the bundled css-tree grammar rejects math functions (false positive). */
+        font-size: clamp(2rem, 6vw, 3rem);
         margin: 0 0 12px;
         letter-spacing: -0.02em;
+        line-height: 1.15;
       }
-      .tagline {
-        font-size: 1.1rem;
-        color: #b6b6bd;
-        margin: 0 auto;
-        max-width: 620px;
+      .copy h2 {
+        /* stylelint-disable-next-line csstree/validator -- clamp() is valid CSS; the bundled css-tree grammar rejects math functions (false positive). */
+        font-size: clamp(1.4rem, 4vw, 1.9rem);
+        margin: 0 0 10px;
+        letter-spacing: -0.01em;
+        line-height: 1.2;
       }
-      .actions {
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-        margin: 36px 0;
-      }
-      .btn {
-        display: block;
-        text-decoration: none;
-        text-align: center;
-        padding: 16px 20px;
-        border-radius: 12px;
+      .copy p {
+        margin: 0;
+        color: var(--muted);
         font-size: 1.05rem;
+      }
+      .scroll-hint {
+        margin-top: 18px;
+        font-size: 0.9rem;
+        color: var(--accent);
         font-weight: 600;
-        border: 1px solid transparent;
-        transition:
-          background 0.15s ease,
-          border-color 0.15s ease;
+      }
+
+      /* CTA chapter: centered, no side panel offset. */
+      #chapter-cta {
+        display: block;
+        padding-top: 14vh;
+      }
+      #chapter-cta .copy {
+        margin: 0 auto;
+        max-width: 720px;
+        text-align: center;
       }
       .btn-primary {
-        background: #ef4444;
+        display: inline-block;
+        margin-top: 18px;
+        text-decoration: none;
+        background: var(--accent);
         color: #fff;
+        font-weight: 600;
+        font-size: 1.05rem;
+        padding: 14px 26px;
+        border-radius: 12px;
       }
       .btn-primary:hover {
-        background: #dc2626;
+        background: var(--accent-hover);
       }
-      .btn-secondary {
-        background: #1b1b20;
-        color: #e7e7ea;
-        border-color: #34343c;
+      .demos {
+        max-width: 720px;
+        margin: 26px auto 0;
       }
-      .btn-secondary:hover {
-        background: #24242b;
-        border-color: #44444e;
+      .demos h3 {
+        text-align: center;
+        font-size: 1rem;
+        color: var(--muted);
+        margin: 0 0 14px;
+        font-weight: 600;
       }
-      .btn small {
+      .demo-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      @media (width >= 720px) {
+        .demo-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      .demo-card {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        text-decoration: none;
+        background: var(--card);
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        padding: 14px 16px;
+        color: var(--text);
+      }
+      .demo-card:hover {
+        background: var(--card-hover);
+      }
+      .demo-card svg {
+        flex: 0 0 auto;
+        width: 34px;
+        height: 34px;
+        margin-top: 2px;
+      }
+      .demo-card strong {
         display: block;
-        font-weight: 400;
+        font-size: 1rem;
+        margin-bottom: 2px;
+      }
+      .demo-card small {
+        color: var(--muted);
         font-size: 0.85rem;
-        color: #cfcfd6;
-        margin-top: 4px;
+        line-height: 1.4;
       }
-      .btn-secondary small {
-        color: #9a9aa3;
-      }
-      section {
-        margin-top: 32px;
-      }
-      h2 {
-        font-size: 1.15rem;
-        margin: 0 0 10px;
-        color: #f2f2f5;
-      }
-      ul {
-        margin: 0;
-        padding-left: 1.2em;
-      }
-      li {
-        margin: 6px 0;
-        color: #c4c4cc;
-      }
+
       .links {
-        margin-top: 40px;
-        padding-top: 24px;
-        border-top: 1px solid #26262c;
+        max-width: 720px;
+        margin: 34px auto 0;
+        padding-top: 20px;
+        border-top: 1px solid var(--card-border);
         display: flex;
         flex-wrap: wrap;
         gap: 18px;
@@ -129,122 +275,221 @@
         font-size: 0.95rem;
       }
       .links a {
-        color: #9db8ff;
+        color: var(--link);
         text-decoration: none;
       }
       .links a:hover {
         text-decoration: underline;
       }
       footer {
-        margin-top: 40px;
+        margin: 30px auto 0;
+        max-width: 720px;
         text-align: center;
         font-size: 0.82rem;
-        color: #7a7a83;
+        color: var(--muted);
+        padding-bottom: 48px;
       }
-      code {
-        background: #1b1b20;
+      footer code {
+        background: var(--card);
         padding: 1px 6px;
         border-radius: 5px;
         font-size: 0.9em;
       }
+
+      @media (prefers-reduced-motion: reduce) {
+        .scroll-hint {
+          animation: none;
+        }
+      }
     </style>
   </head>
   <body>
-    <main>
-      <header>
-        <h1>GPS+SLAM — Location-Based WebXR</h1>
-        <p class="tagline">
-          Build location-based Augmented Reality experiences that run in the
-          mobile browser — no app install. An Apache-2.0 framework fuses GPS
-          with WebXR odometry so content can sit on a specific spot on a path,
-          a wall, or the ground, with accuracy beyond raw GPS.
-        </p>
-      </header>
+    <div id="scene-root" aria-hidden="true"></div>
 
-      <div class="actions">
-        <a class="btn btn-primary" href="/starter/">
-          Anchor Starter Demo
-          <small
-            >Place a GPS anchor, reload, and watch it re-localise at the exact
-            physical spot.</small
-          >
-        </a>
-        <a class="btn btn-secondary" href="/minimal/">
-          Minimal Example
-          <small
-            >The smallest three.js + GPS+AR starting point: tap to place a GPS
-            anchor next to a naive floater and watch the difference.</small
-          >
-        </a>
-        <a class="btn btn-secondary" href="/qr-demo/">
-          QR-Tracking Demo
-          <small
-            >Point at any printed QR code: it measures the code's real size from
-            the depth map and glues a 3D axis + cube to it — no GPS needed.</small
-          >
-        </a>
-        <a class="btn btn-secondary" href="/recorder/">
-          Recorder
-          <small
-            >The full app to evaluate tracking accuracy: capture AR + GPS
-            sessions on a phone, replay and inspect alignment on a
-            desktop.</small
-          >
-        </a>
-      </div>
+    <header class="top-bar">
+      <span class="brand">GPS+SLAM</span>
+      <button id="theme-toggle" type="button" aria-pressed="false">
+        ◐ Theme
+      </button>
+    </header>
 
-      <section>
-        <h2>Why GPS+SLAM?</h2>
-        <ul>
-          <li>
-            <strong>Accuracy beyond raw GPS:</strong> fuses GPS with the
-            device's AR odometry, so alignment gets more stable as the user
-            walks — visible drift drops well below raw GPS.
-          </li>
-          <li>
-            <strong>Just a URL, no app install:</strong> the whole experience
-            runs in the mobile browser through WebXR.
-          </li>
-          <li>
-            <strong>Fully offline alignment:</strong> localises from the
-            device's own GPS, camera tracking, and motion sensors — no VPS
-            provider or network scan of the place required.
-          </li>
-          <li>
-            <strong>Anchors for shareable content:</strong> tie objects to a
-            GPS coordinate for replay, persistence, and sharing.
-          </li>
-        </ul>
+    <main id="story">
+      <section class="chapter" id="chapter-hero" data-chapter="hero">
+        <div class="copy">
+          <h1>One URL. No app. Real&#8209;world AR.</h1>
+          <p>
+            GPS+SLAM turns the mobile browser into a window that pins digital
+            content to real places — streets, trails, squares — and keeps it
+            there.
+          </p>
+          <p class="scroll-hint">Scroll to walk in ↓</p>
+        </div>
       </section>
 
-      <section>
-        <h2>What you can build</h2>
-        <ul>
-          <li>Outdoor AR navigation with GPS-anchored arrows and waypoints.</li>
-          <li>Persistent 3D content dropped at lat/lon that stays put.</li>
-          <li>AR tour guides, museum trails, and location-based games.</li>
-          <li>Field-data capture tools for GPS, AR poses, frames, and depth.</li>
-        </ul>
+      <section class="chapter" id="chapter-qr" data-chapter="qr">
+        <div class="copy">
+          <h2>A printed code is the door — and the anchor.</h2>
+          <p>
+            Visitors scan a QR code on a sign. The experience opens instantly —
+            and it knows exactly where it stands from the very first second.
+          </p>
+        </div>
       </section>
 
-      <div class="links">
-        <a href="https://github.com/cs-util-com/location-based-webxr"
-          >GitHub repository</a
-        >
-        <a href="https://github.com/cs-util-com/location-based-webxr#readme"
-          >Documentation</a
-        >
-        <a href="https://www.npmjs.com/package/gps-plus-slam-app-framework"
-          >npm: gps-plus-slam-app-framework</a
-        >
-      </div>
+      <section class="chapter" id="chapter-fusion" data-chapter="fusion">
+        <div class="copy">
+          <h2>Raw GPS wobbles. Fusion holds still.</h2>
+          <p>
+            GPS alone jitters by meters. Fused with the phone's own motion
+            tracking, your content stays put — and gets steadier the longer
+            visitors walk.
+          </p>
+        </div>
+      </section>
 
-      <footer>
-        Open-source framework under Apache-2.0. The
-        <code>gps-plus-slam-js</code> alignment core is closed-source with a
-        free community license bundled in, so you can start building right
-        away.
-      </footer>
+      <section class="chapter" id="chapter-dive" data-chapter="dive">
+        <div class="copy">
+          <h2>This is what your visitors see.</h2>
+          <p>
+            Their own phone becomes the window. No headset, no download —
+            arrows, labels and stories laid over the real world.
+          </p>
+        </div>
+      </section>
+
+      <section class="chapter" id="chapter-anywhere" data-chapter="anywhere">
+        <div class="copy">
+          <h2>Works anywhere. Fully offline.</h2>
+          <p>
+            No cloud mapping, no scanning vans, no pre-scanned city centers.
+            Everything aligns on the device — on a plaza or in a random park.
+          </p>
+        </div>
+      </section>
+
+      <section class="chapter" id="chapter-gallery" data-chapter="gallery">
+        <div class="copy">
+          <h2>What will you build?</h2>
+          <p>
+            Guided trails. Talking statues. Treasure hunts. Anything you can pin
+            to a place.
+          </p>
+        </div>
+      </section>
+
+      <section class="chapter" id="chapter-cta" data-chapter="cta">
+        <div class="copy">
+          <h2>Free to start. No signup.</h2>
+          <p>
+            The framework is Apache-2.0, with a free community license for the
+            alignment core bundled in. No API key. No account.
+          </p>
+          <a
+            class="btn-primary"
+            href="https://github.com/cs-util-com/location-based-webxr"
+            >Fork &amp; start building</a
+          >
+        </div>
+
+        <div class="demos">
+          <h3>Or try the live demos</h3>
+          <div class="demo-grid">
+            <a class="demo-card" href="/starter/">
+              <svg viewBox="0 0 34 34" aria-hidden="true">
+                <path
+                  d="M17 3c-5 0-9 4-9 9 0 6.6 9 16 9 16s9-9.4 9-16c0-5-4-9-9-9z"
+                  fill="#ef4444"
+                />
+                <circle cx="17" cy="12" r="3.6" fill="#fff" />
+              </svg>
+              <span>
+                <strong>Anchor Starter Demo</strong>
+                <small
+                  >Place a GPS anchor, reload, and watch it re-localise at the
+                  exact physical spot.</small
+                >
+              </span>
+            </a>
+            <a class="demo-card" href="/minimal/">
+              <svg viewBox="0 0 34 34" aria-hidden="true">
+                <path d="M17 4l11 6v13l-11 6-11-6V10z" fill="#8b8b95" />
+                <path d="M17 4l11 6-11 6-11-6z" fill="#b9b9c2" />
+                <path d="M17 16v13l-11-6V10z" fill="#6e6e78" />
+              </svg>
+              <span>
+                <strong>Minimal Example</strong>
+                <small
+                  >The smallest three.js + GPS+AR starting point: tap to place a
+                  GPS anchor next to a naive floater and watch the
+                  difference.</small
+                >
+              </span>
+            </a>
+            <a class="demo-card" href="/qr-demo/">
+              <svg viewBox="0 0 34 34" aria-hidden="true">
+                <rect x="4" y="4" width="11" height="11" fill="#8b8b95" />
+                <rect x="7" y="7" width="5" height="5" fill="#fff" />
+                <rect x="19" y="4" width="11" height="11" fill="#8b8b95" />
+                <rect x="22" y="7" width="5" height="5" fill="#fff" />
+                <rect x="4" y="19" width="11" height="11" fill="#8b8b95" />
+                <rect x="7" y="22" width="5" height="5" fill="#fff" />
+                <rect x="19" y="19" width="5" height="5" fill="#ef4444" />
+                <rect x="25" y="25" width="5" height="5" fill="#ef4444" />
+              </svg>
+              <span>
+                <strong>QR-Tracking Demo</strong>
+                <small
+                  >Point at any printed QR code: it measures the code's real
+                  size from the depth map and glues a 3D axis + cube to it — no
+                  GPS needed.</small
+                >
+              </span>
+            </a>
+            <a class="demo-card" href="/recorder/">
+              <svg viewBox="0 0 34 34" aria-hidden="true">
+                <circle
+                  cx="17"
+                  cy="17"
+                  r="12"
+                  fill="none"
+                  stroke="#8b8b95"
+                  stroke-width="3"
+                />
+                <circle cx="17" cy="17" r="5.5" fill="#ef4444" />
+              </svg>
+              <span>
+                <strong>Recorder</strong>
+                <small
+                  >The full app to evaluate tracking accuracy: capture AR + GPS
+                  sessions on a phone, replay and inspect alignment on a
+                  desktop.</small
+                >
+              </span>
+            </a>
+          </div>
+        </div>
+
+        <div class="links">
+          <a href="https://github.com/cs-util-com/location-based-webxr"
+            >GitHub repository</a
+          >
+          <a href="https://github.com/cs-util-com/location-based-webxr#readme"
+            >Documentation</a
+          >
+          <a href="https://www.npmjs.com/package/gps-plus-slam-app-framework"
+            >npm: gps-plus-slam-app-framework</a
+          >
+        </div>
+
+        <footer>
+          Open-source framework under Apache-2.0. The
+          <code>gps-plus-slam-js</code> alignment core is closed-source with a
+          free community license bundled in, so you can start building right
+          away.
+        </footer>
+      </section>
     </main>
+
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

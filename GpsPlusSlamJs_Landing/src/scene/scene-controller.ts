@@ -64,6 +64,18 @@ export interface SceneControllerOptions {
   readonly createRenderer?: () => RendererLike;
   /** rAF seam for `start()`; defaults to window.requestAnimationFrame. */
   readonly requestFrame?: (callback: (nowMs: number) => void) => void;
+  /**
+   * Fired when the WebGL context is lost at runtime (mobile GPUs and
+   * loaded systems genuinely do this) — the caller should engage the
+   * static DOM floor, same as when creation fails.
+   */
+  readonly onContextLost?: () => void;
+  /**
+   * Fired when the browser restores the context (preventDefault on the
+   * lost event allows this; three.js re-uploads GPU resources itself) —
+   * the caller can lift the static floor again.
+   */
+  readonly onContextRestored?: () => void;
 }
 
 export interface SceneController {
@@ -172,6 +184,19 @@ export function createSceneController(
     Math.max(1, container.clientWidth) / Math.max(1, container.clientHeight);
   camera.updateProjectionMatrix();
   container.appendChild(renderer.domElement);
+  if (typeof renderer.domElement.addEventListener === "function") {
+    renderer.domElement.addEventListener("webglcontextlost", (event) => {
+      // preventDefault ALLOWS the browser to restore the context later
+      // (three.js re-uploads its GPU resources on restore). Until then
+      // the caller shows the static DOM floor.
+      event.preventDefault?.();
+      options.onContextLost?.();
+    });
+    renderer.domElement.addEventListener("webglcontextrestored", () => {
+      dirty = true;
+      options.onContextRestored?.();
+    });
+  }
   applyThemeInternal(initialTheme);
 
   let targetProgress = 0;

@@ -51,6 +51,37 @@ function makeController(tier: QualityTier = TIER) {
 }
 
 describe("createSceneController", () => {
+  it("reports a lost WebGL context so the caller can engage the static floor", () => {
+    // Mobile GPUs (and CI under pressure) genuinely lose contexts; the
+    // page must degrade to the DOM floor instead of freezing mid-story.
+    const listeners = new Map<string, (event: unknown) => void>();
+    const renderer = {
+      ...makeFakeRenderer(),
+      domElement: {
+        addEventListener: (type: string, handler: (event: unknown) => void) => {
+          listeners.set(type, handler);
+        },
+      } as unknown as HTMLCanvasElement,
+    };
+    const onContextLost = vi.fn();
+    const onContextRestored = vi.fn();
+    const controller = createSceneController({
+      container: { clientWidth: 800, clientHeight: 600, appendChild: () => {} },
+      tier: TIER,
+      initialTheme: "dark",
+      createRenderer: () => renderer,
+      onContextLost,
+      onContextRestored,
+    });
+    expect(controller).not.toBeNull();
+    listeners.get("webglcontextlost")?.({ preventDefault: () => {} });
+    expect(onContextLost).toHaveBeenCalledOnce();
+    // The browser may restore the context (preventDefault allows it, and
+    // three.js re-uploads its resources) — the floor lifts again.
+    listeners.get("webglcontextrestored")?.({});
+    expect(onContextRestored).toHaveBeenCalledOnce();
+  });
+
   it("returns null when renderer creation throws (static-dom floor)", () => {
     const controller = createSceneController({
       container: { clientWidth: 800, clientHeight: 600, appendChild: () => {} },

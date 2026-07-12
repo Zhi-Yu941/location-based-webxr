@@ -23,8 +23,12 @@ export default defineConfig({
   testDir: ".",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : 3,
+  retries: process.env.CI ? 2 : 1,
+  // ONE worker everywhere: every spec drives a full WebGL scene, and
+  // several parallel GL contexts under an already-loaded GPU lose their
+  // contexts (observed locally: CONTEXT_LOST_WEBGL + SharedImage
+  // failures with 3 workers while the recorder suite ran elsewhere).
+  workers: 1,
   reporter: process.env.CI
     ? [["github"], ["json", { outputFile: "../test-results/results.json" }]]
     : [["list"], ["html", { open: "never" }]],

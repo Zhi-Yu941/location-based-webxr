@@ -108,6 +108,14 @@ function boot(): void {
       // theme controller below re-applies it right after construction.
       initialTheme:
         document.documentElement.dataset.theme === "light" ? "light" : "dark",
+      onContextLost: () => {
+        // GPU gave up mid-visit: degrade to the static DOM floor rather
+        // than freezing the story on a dead canvas.
+        document.body.classList.add("no-webgl");
+      },
+      onContextRestored: () => {
+        document.body.classList.remove("no-webgl");
+      },
     });
   }
   if (!scene) {

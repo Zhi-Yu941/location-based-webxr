@@ -24,9 +24,16 @@ function collectErrors(page) {
   /** @type {string[]} */
   const errors = [];
   page.on("console", (msg) => {
-    if (msg.type() === "error") {
-      errors.push(msg.text());
+    if (msg.type() !== "error") {
+      return;
     }
+    // WebGL context loss is an ENVIRONMENT event (GPU pressure), not a
+    // page bug — the page handles it via the static-floor fallback, so
+    // it must not fail the zero-errors assertion.
+    if (/context lost|context_lost_webgl|context restored/i.test(msg.text())) {
+      return;
+    }
+    errors.push(msg.text());
   });
   page.on("pageerror", (err) => {
     errors.push(String(err));
@@ -62,21 +69,29 @@ test("renders the 3D canvas, or engages the static-DOM floor cleanly", async ({
   page,
 }) => {
   await page.goto("/");
-  const usesFloor = await page.evaluate(() =>
-    document.body.classList.contains("no-webgl"),
-  );
-  if (usesFloor) {
-    // No WebGL in this environment: the canvas layer must be hidden and
-    // the copy fully readable — that IS the correct behavior, not a bug.
-    await expect(page.locator("#scene-root")).toBeHidden();
-    await expect(page.locator("#chapter-hero .copy")).toBeVisible();
-  } else {
-    const canvas = page.locator("#scene-root canvas");
-    await expect(canvas).toBeVisible();
-    const box = await canvas.boundingBox();
-    expect(box?.width ?? 0).toBeGreaterThan(0);
-    expect(box?.height ?? 0).toBeGreaterThan(0);
-  }
+  // A GPU under pressure can lose the WebGL context at ANY moment and the
+  // page then flips to the static floor (and back on restore) — so assert
+  // that the page is in ONE of the two consistent states, re-evaluating
+  // the floor flag inside the retry loop instead of racing it once.
+  await expect(async () => {
+    const usesFloor = await page.evaluate(() =>
+      document.body.classList.contains("no-webgl"),
+    );
+    if (usesFloor) {
+      // No WebGL right now: canvas layer hidden, copy fully readable —
+      // that IS correct behavior, not a bug.
+      await expect(page.locator("#scene-root")).toBeHidden({ timeout: 500 });
+      await expect(page.locator("#chapter-hero .copy")).toBeVisible({
+        timeout: 500,
+      });
+    } else {
+      const canvas = page.locator("#scene-root canvas");
+      await expect(canvas).toBeVisible({ timeout: 500 });
+      const box = await canvas.boundingBox();
+      expect(box?.width ?? 0).toBeGreaterThan(0);
+      expect(box?.height ?? 0).toBeGreaterThan(0);
+    }
+  }).toPass({ timeout: 15000 });
 });
 
 test("theme toggle flips the page theme and persists across reload", async ({

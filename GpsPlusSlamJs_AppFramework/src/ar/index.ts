@@ -119,12 +119,16 @@ export {
 // --- image-quality (pure blur/blackness metrics + drop/retry verdict policy) ---
 export {
   type QualityFilterConfig,
+  type BlurMetricId,
+  BLUR_METRIC_IDS,
   DEFAULT_QUALITY_FILTER,
   DEFAULT_SHARPNESS_HISTORY_SIZE,
   DEFAULT_SHARPNESS_MIN_SAMPLES,
   type QualityRejectReason,
   type QualityVerdict,
   sharpnessScore,
+  highFrequencyEnergyRatio,
+  blurMetricScorer,
   rgbaToGrayscale,
   meanLuminance,
   ImageQualityGate,

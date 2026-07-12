@@ -61,11 +61,15 @@ function boolOr(value: unknown, fallback: boolean): boolean {
 
 /**
  * Validate and normalize AR crash isolation flags.
- * Missing or invalid values fall back to defaults.
+ * Missing or invalid values fall back to defaults. The container itself is as
+ * untrusted as its fields (persisted blobs may lack the key entirely or hold
+ * `null`), so a nullish container yields the full defaults instead of
+ * throwing.
  */
 export function validateArCrashIsolationOptions(
-  options: Partial<ArCrashIsolationOptions>
+  rawOptions?: Partial<ArCrashIsolationOptions> | null
 ): ArCrashIsolationOptions {
+  const options = rawOptions ?? {};
   const defaults = DEFAULT_AR_CRASH_ISOLATION;
   return {
     enableDomOverlay: boolOr(

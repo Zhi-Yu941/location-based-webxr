@@ -14,7 +14,7 @@ Diagnostic flags for isolating pre-recording AR startup crashes: type, defaults,
   - `enableCameraTextureAcquisition` — acquire the raw camera GL texture each frame.
   - `applyChromiumProjectionLayerWorkaround` — apply the Chromium WebXR camera-access tab-crash workaround at bootstrap (see `chromium-camera-access-workaround.ts`). Default `true`; opt-out exists because forcing `XRWebGLLayer` may break unaffected devices (e.g. Quest).
 - `DEFAULT_AR_CRASH_ISOLATION: ArCrashIsolationOptions` — all flags `true`.
-- `validateArCrashIsolationOptions(options: Partial<ArCrashIsolationOptions>): ArCrashIsolationOptions` — boolean-or-default per field; never throws.
+- `validateArCrashIsolationOptions(rawOptions?: Partial<ArCrashIsolationOptions> | null): ArCrashIsolationOptions` — boolean-or-default per field; never throws. The container itself is normalized too: a `null`/`undefined`/non-object container yields the full defaults (PR #185 review — a persisted blob may lack the key entirely).
 
 ## Invariants & Assumptions
 
@@ -37,5 +37,6 @@ const flags = validateArCrashIsolationOptions({ enableCss3dRenderer: false });
 
 ## Tests
 
+- `ar-crash-isolation.test.ts` — pins the validator's never-throws contract directly: nullish/non-object containers → full defaults; corrupt fields → per-field fallback.
 - `webxr-session.test.ts` — pins the isolation defaults/validator behavior through `initAR`'s session-feature negotiation.
 - `GpsPlusSlamJs_RecorderApp/src/state/recording-options.test.ts` — exercises the validator via the recorder catalog's `validateRecordingOptions` (schema evolution, corrupt persisted values, save/load round-trips).

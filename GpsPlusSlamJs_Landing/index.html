@@ -42,6 +42,8 @@
         --bg: #0b0b0d;
         --text: #e7e7ea;
         --muted: #b6b6bd;
+        --hl-raw: #facc15;
+        --hl-code: #fbbf24;
         --panel: rgb(19 19 23 / 82%);
         --panel-border: rgb(255 255 255 / 10%);
         --card: #1b1b20;
@@ -55,6 +57,8 @@
         --bg: #f2f1ed;
         --text: #1b1b20;
         --muted: #5a5a63;
+        --hl-raw: #a16207;
+        --hl-code: #b45309;
         --panel: rgb(255 255 255 / 84%);
         --panel-border: rgb(0 0 0 / 8%);
         --card: #fff;
@@ -199,6 +203,19 @@
         font-weight: 600;
       }
 
+      /* Copy highlights color-matched to the 3D elements they describe
+         (round-1 feedback): raw-GPS rings + QR modules = amber family,
+         fused anchor = brand red. */
+      .hl-raw {
+        color: var(--hl-raw);
+      }
+      .hl-code {
+        color: var(--hl-code);
+      }
+      .hl-fused {
+        color: var(--accent);
+      }
+
       /* CTA chapter: centered, no side panel offset. */
       #chapter-cta {
         display: block;
@@ -341,7 +358,10 @@
 
       <section class="chapter" id="chapter-qr" data-chapter="qr">
         <div class="copy">
-          <h2>A printed code is the door — and the anchor.</h2>
+          <h2>
+            A <span class="hl-code">printed code</span> is the door — and the
+            anchor.
+          </h2>
           <p>
             Visitors scan a QR code on a sign. The experience opens instantly —
             and it knows exactly where it stands from the very first second.
@@ -351,11 +371,16 @@
 
       <section class="chapter" id="chapter-fusion" data-chapter="fusion">
         <div class="copy">
-          <h2>Raw GPS wobbles. Fusion holds still.</h2>
+          <h2>
+            <span class="hl-raw">Raw GPS</span> wobbles.
+            <span class="hl-fused">Fusion</span> holds still.
+          </h2>
           <p>
-            GPS alone jitters by meters. Fused with the phone's own motion
-            tracking, your content stays put — and gets steadier the longer
-            visitors walk.
+            GPS alone jitters by meters — the
+            <span class="hl-raw">amber rings</span>. Fused with the phone's own
+            motion tracking, your content
+            <span class="hl-fused">stays put</span> — and gets steadier the
+            longer visitors walk.
           </p>
         </div>
       </section>

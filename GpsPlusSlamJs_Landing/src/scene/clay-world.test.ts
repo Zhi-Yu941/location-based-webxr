@@ -63,6 +63,25 @@ describe("buildClayWorld", () => {
     expect(positionsOf("high")).toEqual(positionsOf("high"));
   });
 
+  it("renders the sign's code as a dense QR-like grid with three finder patterns", () => {
+    // Round-1 feedback: the 5x5 blob was not recognizable as a QR code.
+    // A real-looking code needs the three corner finder squares plus a
+    // dense module field, all in the color the copy highlight echoes.
+    const world = buildClayWorld("high");
+    const qr = world.getObjectByName("world-sign-qr");
+    expect(qr).toBeDefined();
+    let modules = 0;
+    qr?.traverse((obj) => {
+      if ((obj as Mesh).isMesh && obj.userData.paletteRole === "qrModule") {
+        modules++;
+      }
+    });
+    expect(modules).toBeGreaterThanOrEqual(35);
+    for (const i of [0, 1, 2]) {
+      expect(qr?.getObjectByName(`qr-finder-${i}`)).toBeDefined();
+    }
+  });
+
   it("hides the reveal groups (outer terrain, gallery) until their chapters", () => {
     const world = buildClayWorld("high");
     expect(world.getObjectByName(WORLD_NODE.outer)?.visible).toBe(false);

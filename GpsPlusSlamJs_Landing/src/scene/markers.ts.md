@@ -1,27 +1,30 @@
-# `scene/markers.ts` — raw-GPS vs. fused-anchor proof markers
+# `scene/markers.ts` — raw-GPS uncertainty rings vs. fused-anchor pin
 
 ## Purpose
 
-Builds the twin map-pin markers of the fusion chapter: the raw-GPS pin
-that jitters meters around its spot and the fused anchor that sits
-rock-solid. The visual contrast between them IS the product message
-("GPS alone is wobbly → fusion fixes it").
+Builds the twin proof visuals of the fusion chapter: raw GPS as jittering
+amber **uncertainty rings** (round-1 feedback replaced the unreadable gray
+pin) and the fused anchor as a rock-solid red map pin. The contrast —
+wandering fuzz vs. still pin — IS the product message ("GPS alone is
+wobbly → fusion fixes it"); the chapter copy echoes both colors via
+`.hl-raw` / `.hl-fused` spans in `index.html`.
 
 ## Public API
 
-- `buildMarkerPair() → { raw: Group, fused: Group }` — pins named
-  `MARKER_NODE.raw` (`"marker-raw"`) / `MARKER_NODE.fused`
-  (`"marker-fused"`).
-- `MARKER_NODE` — the names the story timeline uses (jitter the raw pin,
-  keep the fused one still).
+- `buildMarkerPair() → { raw: Group, fused: Group }` — groups named
+  `MARKER_NODE.raw` (`"marker-raw"`, the ring stack) / `MARKER_NODE.fused`
+  (`"marker-fused"`, the pin).
+- `MARKER_NODE` — the names the story timeline uses (jitter the raw
+  group, keep the fused one still).
 
 ## Invariants & assumptions
 
-- Identical geometry, **disjoint palette roles** (`markerRaw` gray/dim vs
-  `markerFused` brand red, glowing in dark theme) — sharing a role would
-  blur the contrast; test-pinned.
-- Pins stand tip-on-ground: placing a marker means setting the group
-  position at ground level (y = 0).
+- **Disjoint palette roles** (`markerRaw` amber, glowing in dark theme vs
+  `markerFused` brand red) — sharing a role would blur the contrast;
+  test-pinned. Ring meshes are named `uncertainty-ring-<i>` (test-pinned).
+- Both groups sit tip/rings-on-ground: placing one means setting the
+  group position at ground level (y = 0); rings are height-staggered a
+  few cm to avoid z-fighting with the ground.
 
 ## Examples
 

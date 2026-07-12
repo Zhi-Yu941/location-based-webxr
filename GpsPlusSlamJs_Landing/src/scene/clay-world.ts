@@ -198,34 +198,72 @@ function scatter(
   return group;
 }
 
+/**
+ * A QR-like module grid (round-1 feedback: the old 5x5 blob did not read
+ * as a QR code): 9x9 cells with the three corner finder squares real QR
+ * codes have, plus a ~50% random module fill. Modules use the `qrModule`
+ * role so the copy highlight (`.hl-code`) can echo their color.
+ */
+function buildQrGrid(panelY: number): Group {
+  const qr = namedGroup("world-sign-qr");
+  const grid = 9;
+  const cell = 0.1;
+  const half = (grid - 1) / 2;
+  const rng = createRng(7);
+
+  const moduleAt = (col: number, row: number, parent: Group): void => {
+    const dot = clayMesh(
+      new BoxGeometry(cell * 0.85, cell * 0.85, 0.04),
+      "qrModule",
+    );
+    dot.position.set((col - half) * cell, panelY + (row - half) * cell, 0.06);
+    dot.castShadow = false;
+    parent.add(dot);
+  };
+
+  // Finder patterns: 3x3 corner squares (outer ring + center like a real
+  // QR finder, simplified to filled 3x3 blocks with a gap row around).
+  const finderOrigins: ReadonlyArray<readonly [number, number]> = [
+    [0, 0],
+    [grid - 3, 0],
+    [0, grid - 3],
+  ];
+  const inFinderZone = (col: number, row: number): boolean =>
+    finderOrigins.some(
+      ([c0, r0]) =>
+        col >= c0 - 1 && col <= c0 + 3 && row >= r0 - 1 && row <= r0 + 3,
+    );
+  finderOrigins.forEach(([c0, r0], index) => {
+    const finder = namedGroup(`qr-finder-${index}`);
+    for (let row = r0; row < r0 + 3; row++) {
+      for (let col = c0; col < c0 + 3; col++) {
+        if (row === r0 + 1 && col === c0 + 1) {
+          continue; // hollow center ring look
+        }
+        moduleAt(col, row, finder);
+      }
+    }
+    qr.add(finder);
+  });
+
+  for (let row = 0; row < grid; row++) {
+    for (let col = 0; col < grid; col++) {
+      if (inFinderZone(col, row) || rng() >= 0.5) {
+        continue;
+      }
+      moduleAt(col, row, qr);
+    }
+  }
+  return qr;
+}
+
 function buildSign(): Group {
   const sign = namedGroup(WORLD_NODE.sign);
   const post = clayMesh(new CylinderGeometry(0.08, 0.1, 1.6, 6), "sign");
   post.position.y = 0.8;
   const panel = clayMesh(new BoxGeometry(1.1, 1.1, 0.08), "signPanel");
   panel.position.y = 2.0;
-  // Stylized QR: a grid of small dark cubes on the panel front.
-  const qr = new Group();
-  qr.name = "world-sign-qr";
-  const cell = 0.16;
-  const rng = createRng(7);
-  for (let row = 0; row < 5; row++) {
-    for (let col = 0; col < 5; col++) {
-      const corner =
-        (row < 2 && col < 2) || (row < 2 && col > 2) || (row > 2 && col < 2);
-      if (!corner && rng() < 0.45) {
-        continue;
-      }
-      const dot = clayMesh(
-        new BoxGeometry(cell * 0.8, cell * 0.8, 0.04),
-        "phone",
-      );
-      dot.position.set((col - 2) * cell, 2.0 + (row - 2) * cell, 0.06);
-      dot.castShadow = false;
-      qr.add(dot);
-    }
-  }
-  sign.add(post, panel, qr);
+  sign.add(post, panel, buildQrGrid(2.0));
   sign.position.copy(WORLD_ANCHORS.sign);
   sign.rotation.y = Math.PI / 5;
   return sign;

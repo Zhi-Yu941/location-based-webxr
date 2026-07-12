@@ -24,6 +24,20 @@ describe("buildDotPerson", () => {
 });
 
 describe("buildMarkerPair", () => {
+  it("visualizes raw GPS as concentric uncertainty rings, not a pin", () => {
+    // Round-1 feedback: the gray raw-GPS pin was unreadable ("keine
+    // Ahnung, was der sein soll") — raw GPS is shown as jittering
+    // uncertainty rings instead, color-matched to the copy highlight.
+    const pair = buildMarkerPair();
+    const ringNames: string[] = [];
+    pair.raw.traverse((obj) => {
+      if (obj.name.startsWith("uncertainty-ring-")) {
+        ringNames.push(obj.name);
+      }
+    });
+    expect(ringNames.length).toBeGreaterThanOrEqual(2);
+  });
+
   it("returns a raw (wobbly) and a fused (stable) marker with distinct roles", () => {
     const pair = buildMarkerPair();
     expect(pair.raw.name).toBe(MARKER_NODE.raw);

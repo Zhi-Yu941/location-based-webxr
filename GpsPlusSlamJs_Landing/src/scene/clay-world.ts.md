@@ -3,11 +3,13 @@
 ## Purpose
 
 Builds the miniature clay world the whole scroll story plays in: ground
-disc, S-curve path, hills/trees/rocks, the QR sign, the statue, the QR
-"snap" ring, the hidden outer "unmapped park" ring (anywhere chapter) and
-the hidden use-case gallery props (arrows, label, treasures). Everything
-is generated — no asset downloads (plan's asset budget) — and
-deterministic via a seeded LCG.
+disc, S-curve path, hills/trees/rocks, the QR sign (9×9 QR-like module
+grid with the three corner finder squares, `qrModule` role — echoed by
+the copy's `.hl-code` highlight), the statue, the QR "snap" ring, the
+hidden outer "unmapped park" ring (anywhere chapter) and the hidden
+use-case gallery props (arrows, label, treasures). Everything is
+generated — no asset downloads (plan's asset budget) — and deterministic
+via a seeded LCG.
 
 ## Public API
 

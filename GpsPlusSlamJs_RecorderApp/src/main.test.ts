@@ -2068,7 +2068,7 @@ describe('resetForNewRecording (soft reset)', () => {
   // must end the session so the next Enter AR initializes cleanly. F3's
   // session-end callback fires with requestedByApp: true here, which the
   // system-session-end handler ignores — no double navigation or toast.
-  // See docs/2026-07-04-soft-reset-end-ar-session-plan.md (GpsPlusSlamJs_Docs).
+  // See docs/2026-07-04-2319-soft-reset-end-ar-session-plan.md (GpsPlusSlamJs_Docs).
   it('ends the AR session so the next Enter AR starts clean', async () => {
     const { endARSession } =
       await import('gps-plus-slam-app-framework/ar/webxr-session');

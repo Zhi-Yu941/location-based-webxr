@@ -39,4 +39,4 @@
 - **Related docs:** `image-quality-client.ts.md`, `image-quality-protocol.ts.md`,
   `../../../GpsPlusSlamJs_AppFramework/src/ar/image-quality.ts.md` (the pure
   metrics + gate it delegates to),
-  `GpsPlusSlamJs_Docs/docs/2026-06-24-image-quality-gate-plan.md`.
+  `GpsPlusSlamJs_Docs/docs/2026-06-24-1057-image-quality-gate-plan.md`.

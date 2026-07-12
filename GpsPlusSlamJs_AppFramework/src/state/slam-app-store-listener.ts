@@ -23,8 +23,8 @@
  * established {@link createTrackingQualityListenerMiddleware} precedent in the
  * same folder.
  *
- * @see GpsPlusSlamJs_Docs/docs/2026-06-28-subscriber-dispatch-persistence-ordering-plan.md
- * @see GpsPlusSlamJs_Docs/docs/2026-06-28-subscriber-dispatch-persistence-ordering-review.md
+ * @see GpsPlusSlamJs_Docs/docs/2026-06-28-0751-subscriber-dispatch-persistence-ordering-plan.md
+ * @see GpsPlusSlamJs_Docs/docs/2026-06-28-0751-subscriber-dispatch-persistence-ordering-review.md
  * @see ./tracking-quality.ts (createTrackingQualityListenerMiddleware)
  */
 import type { Middleware, UnknownAction } from '@reduxjs/toolkit';

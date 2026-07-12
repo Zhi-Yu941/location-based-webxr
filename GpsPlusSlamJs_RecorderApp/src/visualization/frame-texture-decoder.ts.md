@@ -49,7 +49,7 @@ report). We fix it at decode by requesting a pre-flipped bitmap —
 `texture.flipY = false` so three does not also try (and only warn). The
 geometry/basis path is proven flip-free (D2 elimination test in
 `frame-tile-visualizer.test.ts`), so this is the complete fix. See
-[frame-tile-rendering-bugs-user-feedback.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-frame-tile-rendering-bugs-user-feedback.md)
+[frame-tile-rendering-bugs-user-feedback.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-1311-frame-tile-rendering-bugs-user-feedback.md)
 Finding 2 / D2 and the lessons-learned texture-orientation entry.
 
 ## Three.js notes

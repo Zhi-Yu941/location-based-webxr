@@ -79,7 +79,7 @@ export interface DepthInfo {
    * the matrices: the per-frame buffer is too large to clone and the live
    * depth occluder uploads it synchronously). Absent when the source carries
    * no `data` (e.g. the sparse-only path). Plumbed for the live depth occluder
-   * (2026-06-14-webxr-depth-occlusion-plan.md §2); the sparse sampler ignores it.
+   * (2026-06-14-0009-webxr-depth-occlusion-plan.md §2); the sparse sampler ignores it.
    */
   data?: ArrayBuffer;
   /**

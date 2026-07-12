@@ -55,6 +55,6 @@
 - **Related:** `alignment-lerper.ts` (the smoothing primitive),
   `ar/session-disposers.ts` (the teardown registry this binds to),
   `gps-anchor.ts` (anchors ride this alignment), the plan at
-  `gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-05-gps-anchor-frame-architecture-bug-and-plan.md`
+  `gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-05-0650-gps-anchor-frame-architecture-bug-and-plan.md`
   (Slice 2 / Bug A), and the disposal plan at
-  `gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-08-arworldgroup-alignment-session-scoped-disposal.md`.
+  `gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-08-2149-arworldgroup-alignment-session-scoped-disposal.md`.

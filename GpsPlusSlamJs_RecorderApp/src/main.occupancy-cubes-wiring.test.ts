@@ -762,7 +762,7 @@ describe('Occupancy-grid cube wiring in live AR', () => {
   });
 
   /**
-   * Why this test matters (2026-06-12-payload-rebuild-field-drop-audit.md F1):
+   * Why this test matters (2026-06-12-1130-payload-rebuild-field-drop-audit.md F1):
    * handleDepthSampleCaptured used to re-create the recordDepthSample
    * payload field-by-field, silently dropping the optional
    * projectionMatrix — the camera intrinsics the occupancy grid needs to
@@ -792,7 +792,7 @@ describe('Occupancy-grid cube wiring in live AR', () => {
   });
 
   /**
-   * Why this test matters (2026-06-12-payload-rebuild-field-drop-audit.md F2):
+   * Why this test matters (2026-06-12-1130-payload-rebuild-field-drop-audit.md F2):
    * handleImageCaptured rebuilds the add2dImage payload field-by-field — the
    * same seam shape as the F1 depth bug above. When CapturedImage gains a
    * persistable field it can be silently dropped before persistence with no

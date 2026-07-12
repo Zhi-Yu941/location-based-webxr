@@ -805,7 +805,7 @@ describe('GpsEventVisualizer', () => {
 
   // ---------------------------------------------------------------------------
   // Visibility toggle (Finding B / Slice 3 of
-  // 2026-06-14-followup-frame-tile-legacy-aspect-and-live-toggle.md)
+  // 2026-06-14-0012-frame-tile-legacy-aspect-and-live-toggle-followup.md)
   // ---------------------------------------------------------------------------
   // Why these tests matter: the recorder's new `visualization.gpsAlignmentMarkers`
   // toggle must be able to hide ALL GPS+VIO debug spheres live — raw (yellow),

@@ -6,7 +6,7 @@ Pure, device-free, store-free robust aggregation of a **static** QR's pose over 
 short sliding window of detections, so the high-weight GPS vote and the debug
 overlay consume a _converged_ pose instead of a raw single-frame pose whose
 **rotation** can swing. Implements the sliding-window stabilization design in
-[`GpsPlusSlamJs_Docs/docs/2026-06-16-followup-qr-pose-stabilization-sliding-window.md`](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-16-followup-qr-pose-stabilization-sliding-window.md).
+[`GpsPlusSlamJs_Docs/docs/2026-06-16-0858-qr-pose-stabilization-sliding-window-followup.md`](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-16-0858-qr-pose-stabilization-sliding-window-followup.md).
 
 ## Public API
 

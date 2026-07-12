@@ -8,7 +8,7 @@ Generates every strategy the 2026-07-05 payload benchmark validated, costs
 each with the oracle-locked [qr-size-estimator](qr-size-estimator.ts.md),
 and returns the sparsest (fewest QR bits at the chosen EC level; ties go
 to the more human-readable form). Results doc:
-`gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-05-qr-payload-compression-benchmark-results.md`.
+`gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-05-2027-qr-payload-compression-benchmark-results.md`.
 
 ## Public API
 

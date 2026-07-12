@@ -1,13 +1,13 @@
 # qr-level.ts
 
 **Purpose:** Fetch + defensively validate the QR level file (§8) — Phase 6 of
-the [QR-code detection & tracking plan](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-qr-code-detection-tracking-plan.md).
+the [QR-code detection & tracking plan](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-0806-qr-code-detection-tracking-plan.md).
 The printed QR encodes only a URL; the level file carries `physicalSizeM`
 (drives the pose solve + size self-check), the absolute `geo` pose (drives the
 synthetic vote), and the AR `content`.
 
 Both `physicalSizeM` and `geo` are **optional** (Note 3 of the
-[follow-up plan](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-followup-qr-tracking-generalization-overlay-and-north.md):
+[follow-up plan](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-1219-qr-tracking-generalization-overlay-and-north-followup.md):
 flat optionals + capability model). Their **presence** gates capabilities and
 the use-cases combine: `geo` present → the GPS vote runs; `physicalSizeM`
 present → size is authored (else it must be **measured** first — the Note 4

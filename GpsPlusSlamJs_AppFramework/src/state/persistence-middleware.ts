@@ -217,7 +217,7 @@ export function createPersistenceMiddleware(
   // created the state it depends on and is dropped on replay — a silent,
   // replay-only failure. We warn ONCE (per instance) to turn that into a loud
   // dev-time signal even if the listener-middleware convention is bypassed.
-  // See GpsPlusSlamJs_Docs/docs/2026-06-28-subscriber-dispatch-persistence-ordering-review.md.
+  // See GpsPlusSlamJs_Docs/docs/2026-06-28-0751-subscriber-dispatch-persistence-ordering-review.md.
   let dispatchDepth = 0;
   let hasWarnedReentrant = false;
 
@@ -285,7 +285,7 @@ export function createPersistenceMiddleware(
             `(inside another dispatch's next()). Its recorded order can invert ` +
             `on replay — react to actions via a prepended listener middleware, ` +
             `not a synchronous store.subscribe dispatch. See ` +
-            `2026-06-28-subscriber-dispatch-persistence-ordering-review.md.`
+            `2026-06-28-0751-subscriber-dispatch-persistence-ordering-review.md.`
         );
       }
 

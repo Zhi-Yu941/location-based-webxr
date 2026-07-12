@@ -13,7 +13,7 @@
  * teardown is driven by its own UI (close button, tour pick, empty folder,
  * relaunch) — it is intentionally NOT registered in `arSessionScope`.
  *
- * @see GpsPlusSlamJs_Docs/docs/2026-06-14-map-centric-recording-browser-and-h3-index-user-feedback.md
+ * @see GpsPlusSlamJs_Docs/docs/2026-06-14-1048-map-centric-recording-browser-and-h3-index-user-feedback.md
  */
 
 import { createMapBrowser, type MapBrowserInstance } from './map-browser';

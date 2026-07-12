@@ -114,7 +114,7 @@ object as an `@internal` testing seam in lieu of pumping the global
   (instantly). A previous per-anchor lerp (`lerpCorrections` /
   `correctionLerpRate`, D1′) was removed once alignment was lerped at
   `arWorldGroup` — see
-  `gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-05-gps-anchor-frame-architecture-bug-and-plan.md`.
+  `gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-05-0650-gps-anchor-frame-architecture-bug-and-plan.md`.
 - **`snap-when-offscreen` corrections fire only off-screen — except the first
   placement**: a correction is suppressed while the object is inside the camera
   frustum, so the user never sees a jump. The lone exception is the **one-time
@@ -128,7 +128,7 @@ object as an `@internal` testing seam in lieu of pumping the global
   that the whole frame rides one lerped `arWorldGroup.matrix`, a large jump is
   absorbed smoothly for the entire view, so a per-anchor on-screen snap only
   manufactured the AnchorStarter cache-hit hard-jump — see
-  `gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-06-anchor-starter-cachehit-jump-investigation.md`.
+  `gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-06-1210-anchor-starter-cachehit-jump-investigation.md`.
 
 ## Examples
 

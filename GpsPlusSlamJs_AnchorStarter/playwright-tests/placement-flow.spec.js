@@ -9,7 +9,7 @@ import {
  * Tier 1 placement-flow e2e for the persistent-anchor starter.
  *
  * Why this suite matters (see
- * GpsPlusSlamJs_Docs/docs/2026-06-01-anchor-starter-e2e-test-plan.md §6 Tier 1):
+ * GpsPlusSlamJs_Docs/docs/2026-06-01-0447-anchor-starter-e2e-test-plan.md §6 Tier 1):
  * Tier 0 can only prove the desktop capability gate. With the DEV seam faked
  * (real WebXR/GPS are absent in Playwright Chromium), these tests cover the
  * actual application flow a real user walks through: boot → onboarding

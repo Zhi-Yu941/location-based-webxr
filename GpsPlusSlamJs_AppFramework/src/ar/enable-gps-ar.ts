@@ -8,7 +8,7 @@
  * inheriting a framework-owned button DOM (unlike three.js' `ARButton`).
  *
  * Why a seam and not a button: per the plan
- * (`2026-06-03-threejs-arbutton-minimal-ar-example-user-feedback.md` §4 / §6.5),
+ * (`2026-06-03-0553-threejs-arbutton-minimal-ar-example-user-feedback.md` §4 / §6.5),
  * the permission/enter-AR *sequence* is the reusable core; the button DOM, toast
  * surface and copy are app-specific UX and stay app-local.
  *

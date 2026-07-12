@@ -1,7 +1,7 @@
 # qr-pose.ts
 
 **Purpose:** Pure, device-free, OpenCV-free pose math for QR-code 3D tracking —
-Phase 1 of the [QR-code detection & tracking plan](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-qr-code-detection-tracking-plan.md).
+Phase 1 of the [QR-code detection & tracking plan](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-0806-qr-code-detection-tracking-plan.md).
 It turns the 4 detected QR corners (pixels) into the QR's rigid pose in
 raw-WebXR/"odom" space, so every later phase (the GPS-vote bridge, the
 occupancy self-check, the on-device verification gate) shares one set of

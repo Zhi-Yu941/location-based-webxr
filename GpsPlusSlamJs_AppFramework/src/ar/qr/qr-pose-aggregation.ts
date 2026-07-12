@@ -1,6 +1,6 @@
 /**
  * QR pose aggregation — sliding-window pose stabilization
- * (docs `2026-06-16-followup-qr-pose-stabilization-sliding-window.md`).
+ * (docs `2026-06-16-0858-qr-pose-stabilization-sliding-window-followup.md`).
  *
  * Pure, device-free, store-free robust aggregation of a STATIC fiducial's pose
  * across a short sliding window of detections. A QR is static in the world, so

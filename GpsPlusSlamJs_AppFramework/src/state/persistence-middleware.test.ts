@@ -543,7 +543,7 @@ describe('persistence re-entrancy tripwire', () => {
   // (b) stays silent for normal top-level dispatches; (c) is observational
   // only (does not drop/reorder the recorded writes); and (d) does not
   // false-positive on the middleware's own async `recordWriteFailure` dispatch.
-  // See 2026-06-28-subscriber-dispatch-persistence-ordering-review.md.
+  // See 2026-06-28-0751-subscriber-dispatch-persistence-ordering-review.md.
 
   const gpsSlice = createSlice({
     name: 'gpsData',

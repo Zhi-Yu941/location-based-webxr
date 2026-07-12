@@ -104,9 +104,9 @@
   mean-luminance bounds + brighten-monotonicity).
 
 - **Related docs:**
-  `GpsPlusSlamJs_Docs/docs/2026-07-12-blur-metric-toggle-plan.md` (the metric
+  `GpsPlusSlamJs_Docs/docs/2026-07-12-0823-blur-metric-toggle-plan.md` (the metric
   toggle: origin, semantics, recorder wiring),
-  `GpsPlusSlamJs_Docs/docs/2026-06-24-image-quality-gate-plan.md`,
+  `GpsPlusSlamJs_Docs/docs/2026-06-24-1057-image-quality-gate-plan.md`,
   `ar/capture-motion-gate.ts.md` (the motion gate this builds on),
   `ar/image-capture.ts.md` (the manager that consumes the verdict via the
   injected `analyzeFrame` callback).

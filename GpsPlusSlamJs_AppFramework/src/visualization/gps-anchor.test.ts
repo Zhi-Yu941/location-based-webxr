@@ -655,7 +655,7 @@ describe('createGpsAnchor — steady state (snap-every-tick)', () => {
  * lerped `arWorldGroup.matrix`, a large jump is absorbed smoothly for the entire
  * view, so a per-anchor on-screen snap only manufactured the AnchorStarter
  * cache-hit hard-jump. See
- * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-06-anchor-starter-cachehit-jump-investigation.md.
+ * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-06-1210-anchor-starter-cachehit-jump-investigation.md.
  *
  * Tests use a real `THREE.Mesh` (not `Object3D`) because the
  * frustum-visibility module's `isObjectInCameraFrustum` requires a
@@ -703,7 +703,7 @@ describe('createGpsAnchor — steady state (snap-when-offscreen)', () => {
     // bypass: once the one-time initial placement is consumed, every later
     // correction must wait until the object is off-screen — no matter how large
     // the alignment delta. See
-    // gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-06-anchor-starter-cachehit-jump-investigation.md.
+    // gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-06-1210-anchor-starter-cachehit-jump-investigation.md.
     const env = makeMeshAnchorEnv();
     // Step 1 — place the object OFF-SCREEN so the one-time placement bypass is
     // consumed without making the later on-screen assertion ambiguous. Camera

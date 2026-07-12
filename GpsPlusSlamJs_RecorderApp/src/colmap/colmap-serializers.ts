@@ -2,7 +2,7 @@
  * COLMAP `sparse/0/` Text Serializers
  *
  * Pure string builders for the three COLMAP model files (export plan Iter 2,
- * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-colmap-export-plan.md §5):
+ * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-1205-colmap-export-plan.md §5):
  *  - `cameras.txt` — one shared `PINHOLE` camera.
  *  - `images.txt`  — two lines per image: the world-to-camera pose, then an
  *    EMPTY keypoint line (we have no 2D feature detections — plan Q1/§2.2).

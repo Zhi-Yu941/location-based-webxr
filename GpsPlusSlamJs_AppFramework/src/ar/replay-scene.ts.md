@@ -109,6 +109,6 @@ disposeReplayScene();
 ## References
 
 - [docs/2026-02-19-replay-mode.md](../../../GpsPlusSlamJs_Docs/docs/2026-02-19-replay-mode.md) — Issue 4 (scene setup), Issue 5 (camera controls), Risk R1 (historical: the R1 setter injection described there was removed by the 2026-07-11 surface-reduction plan, step 2), R5
-- [docs/2026-07-11-webxr-session-surface-reduction-plan.md](../../../GpsPlusSlamJs_Docs/docs/2026-07-11-webxr-session-surface-reduction-plan.md) — step 2: replay owns its scene
+- [docs/2026-07-11-1641-webxr-session-surface-reduction-plan.md](../../../GpsPlusSlamJs_Docs/docs/2026-07-11-1641-webxr-session-surface-reduction-plan.md) — step 2: replay owns its scene
 - [webxr-session.ts](webxr-session.ts) — `createSceneHierarchy()` (the only remaining dependency)
 - [gps-event-markers.ts](../visualization/gps-event-markers.ts) — `setSceneSource()` (how scene-reading visualizers are pointed at the replay scene)

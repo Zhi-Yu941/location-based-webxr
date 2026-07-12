@@ -2,7 +2,7 @@
  * AbsoluteOrientationSensor capture (Generic Sensor API).
  *
  * Phase 1 of the AbsoluteOrientationSensor plan
- * (GpsPlusSlamJs_Docs/docs/2026-06-25-absolute-orientation-sensor-plan.md §5.1):
+ * (GpsPlusSlamJs_Docs/docs/2026-06-25-0543-absolute-orientation-sensor-plan.md §5.1):
  * passive instrumentation that fuses accelerometer + gyroscope + magnetometer
  * into an Earth-referenced (ENU) quaternion, captured per GPS event as an
  * independent north reference. No production behaviour change.

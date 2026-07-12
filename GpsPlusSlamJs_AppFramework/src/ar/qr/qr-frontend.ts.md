@@ -2,7 +2,7 @@
 
 **Purpose:** The detect+decode front-end behind a single `QrFrontEnd` —
 Phase 2 / §3 of the
-[QR-code detection & tracking plan](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-qr-code-detection-tracking-plan.md).
+[QR-code detection & tracking plan](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-0806-qr-code-detection-tracking-plan.md).
 Native `BarcodeDetector` only; the OpenCV `QRCodeDetector` fallback was removed
 (the framework is now OpenCV-free).
 
@@ -32,7 +32,7 @@ Native `BarcodeDetector` only; the OpenCV `QRCodeDetector` fallback was removed
 - **Interim posture is BarcodeDetector-only** (covers the Android-Chrome test
   devices). A pure-JS decoder fallback (zxing-wasm / jsQR / none) is its own
   dependency decision — see
-  [2026-06-17-followup-qr-decoder-fallback.md](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-17-followup-qr-decoder-fallback.md).
+  [2026-06-17-0020-qr-decoder-fallback-followup.md](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-17-0020-qr-decoder-fallback-followup.md).
 
 ## Tests
 

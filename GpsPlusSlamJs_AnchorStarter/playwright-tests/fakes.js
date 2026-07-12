@@ -4,7 +4,7 @@ import { expect } from "@playwright/test";
  * Tier 1 e2e fakes for the persistent-anchor starter.
  *
  * Why this file exists (see
- * GpsPlusSlamJs_Docs/docs/2026-06-01-anchor-starter-e2e-test-plan.md §5–§6):
+ * GpsPlusSlamJs_Docs/docs/2026-06-01-0447-anchor-starter-e2e-test-plan.md §5–§6):
  * Playwright Chromium has no WebXR and no real GPS, so the *application flow*
  * (boot → guidance → soft-gated placement → `?show=` round-trip → copy-link)
  * cannot be exercised against real sensors. Instead of mocking individual

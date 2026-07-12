@@ -15,7 +15,7 @@
  *      persistent cache (2-B) is the documented escape hatch only if real
  *      folders prove too slow to re-scan.
  *
- * @see GpsPlusSlamJs_Docs/docs/2026-06-14-map-centric-recording-browser-and-h3-index-user-feedback.md (D2)
+ * @see GpsPlusSlamJs_Docs/docs/2026-06-14-1048-map-centric-recording-browser-and-h3-index-user-feedback.md (D2)
  */
 
 import { loadGpsPathFromBlob } from 'gps-plus-slam-app-framework/storage/zip-reader';

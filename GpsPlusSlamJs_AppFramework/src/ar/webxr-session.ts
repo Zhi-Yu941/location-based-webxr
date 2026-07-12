@@ -540,7 +540,7 @@ let cameraFrameBlit: CameraBlitCapture | null = null;
  * so 1024 is the safe default. Raise per-consumer via
  * `startCameraFrameCapture({ captureSize })`.
  *
- * @see GpsPlusSlamJs_Docs/docs/2026-06-17-qr-size-accuracy-and-thin-demo-plan.md (WS-C)
+ * @see GpsPlusSlamJs_Docs/docs/2026-06-17-1020-qr-size-accuracy-and-thin-demo-plan.md (WS-C)
  */
 export const DEFAULT_CAMERA_FRAME_CAPTURE_SIZE = 1024;
 
@@ -696,7 +696,7 @@ export interface SessionFeatureOptions {
    * (no conflict, no throw): the grid sampler and the occluder are two consumers
    * of one depth read. Default `false`.
    *
-   * @see GpsPlusSlamJs_Docs/docs/2026-06-14-webxr-depth-occlusion-plan.md §6/§8
+   * @see GpsPlusSlamJs_Docs/docs/2026-06-14-0009-webxr-depth-occlusion-plan.md §6/§8
    */
   requestDepthOcclusion?: boolean;
 }
@@ -758,7 +758,7 @@ export function buildSessionOptions(
       // that CPU buffer and is therefore rejected — not (any longer) merely to
       // dodge the old three.js `getDepthInformation` null-deref (fixed in r184),
       // but because cpu-optimized is what every depth consumer here is built on.
-      // See 2026-06-14-webxr-depth-occlusion-plan.md §1.
+      // See 2026-06-14-0009-webxr-depth-occlusion-plan.md §1.
       depthSensing: {
         usagePreference: ['cpu-optimized'],
         dataFormatPreference: ['luminance-alpha', 'float32'],
@@ -1683,7 +1683,7 @@ export async function endARSession(): Promise<void> {
  *   image-options section (`intervalMs`, `quality`, `resolutionDivisor`; any
  *   extra keys such as `enabled` are ignored). Passing the section as one
  *   object means a newly-added option flows through without editing this seam
- *   — see `2026-06-12-payload-rebuild-field-drop-audit.md` (F3).
+ *   — see `2026-06-12-1130-payload-rebuild-field-drop-audit.md` (F3).
  */
 export function startImageCapture(config?: Partial<ImageCaptureConfig>): void {
   if (!renderer) {

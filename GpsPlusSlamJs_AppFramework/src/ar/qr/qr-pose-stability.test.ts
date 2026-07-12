@@ -9,7 +9,7 @@
  * are executable documentation of the two failure modes; they intentionally do
  * NOT fix anything. The fix ships once an on-device run disambiguates which
  * cause the tester actually saw — see
- * `GpsPlusSlamJs_Docs/docs/2026-06-20-qr-axis-jump-step0-findings-and-next.md`.
+ * `GpsPlusSlamJs_Docs/docs/2026-06-20-0030-qr-axis-jump-step0-findings-and-next.md`.
  *
  * Both are reproduced with no device: a known pose is forward-projected to
  * detector pixels and fed back through the production pipeline.

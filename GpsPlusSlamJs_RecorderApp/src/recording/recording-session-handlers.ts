@@ -497,7 +497,7 @@ export function createRecordingSessionHandlers(
     // single config object, so a newly-added tunable reaches the sampler
     // without editing this seam. Re-listing fields here is the field-drop
     // hazard that left `resolutionDivisor` bolted on and the depth knobs dead
-    // (see 2026-06-12-payload-rebuild-field-drop-audit.md F3).
+    // (see 2026-06-12-1130-payload-rebuild-field-drop-audit.md F3).
     if (recordingOptions.images.enabled) {
       const { enabled: _imagesEnabled, ...imageConfig } =
         recordingOptions.images;

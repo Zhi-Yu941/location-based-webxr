@@ -11,7 +11,7 @@
  *      known pose re-derives that same pose (live == replay by construction),
  *   4. graceful nulls when there is no history / no depth / size not yet known.
  *
- * @see docs 2026-06-17-recorder-live-qr-detection-recording-plan.md (WS-4, D-A).
+ * @see docs 2026-06-17-1914-recorder-live-qr-detection-recording-plan.md (WS-4, D-A).
  */
 
 import { describe, it, expect } from 'vitest';

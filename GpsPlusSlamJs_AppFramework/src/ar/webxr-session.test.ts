@@ -184,7 +184,7 @@ describe('buildSessionOptions', () => {
    * `hit-test` feature. It is opt-in (default off) so existing
    * recorder/anchor sessions are unaffected, and it is *optional* (not
    * required) so the session still starts on runtimes without hit-test. See
-   * `2026-06-03-threejs-arbutton-minimal-ar-example-user-feedback.md` §6.3.
+   * `2026-06-03-0553-threejs-arbutton-minimal-ar-example-user-feedback.md` §6.3.
    */
   it('does not request hit-test by default', () => {
     const mockElement = document.createElement('div');
@@ -227,7 +227,7 @@ describe('buildSessionOptions', () => {
 
   /**
    * Why these tests matter (live depth occluder, Iter 1 —
-   * 2026-06-14-webxr-depth-occlusion-plan.md §6/§8):
+   * 2026-06-14-0009-webxr-depth-occlusion-plan.md §6/§8):
    * The live CPU-depth occluder is a consumer of the SAME cpu-optimized depth
    * stream the grid uses, but consumer apps want occlusion WITHOUT the
    * recorder's depth-capture crash-isolation flag. So `requestDepthOcclusion`

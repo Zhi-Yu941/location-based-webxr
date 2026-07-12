@@ -42,5 +42,5 @@
   that re-pointing the two original call sites preserved behaviour.
 
 - **Related docs:**
-  `GpsPlusSlamJs_Docs/docs/2026-06-23-followup-consolidate-geodesic-angle-kernel.md`,
-  `GpsPlusSlamJs_Docs/docs/2026-06-23-blurry-frame-motion-gating-plan.md` (§4.1).
+  `GpsPlusSlamJs_Docs/docs/2026-06-23-2120-consolidate-geodesic-angle-kernel-followup.md`,
+  `GpsPlusSlamJs_Docs/docs/2026-06-23-2105-blurry-frame-motion-gating-plan.md` (§4.1).

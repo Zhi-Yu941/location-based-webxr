@@ -40,4 +40,4 @@ import.meta.url), { type:'module' })`) and wraps it. NOT unit-tested.
 
 - **Related docs:** `image-quality.worker.ts.md`, `image-quality-protocol.ts.md`,
   `recording-session-handlers.ts.md`,
-  `GpsPlusSlamJs_Docs/docs/2026-06-24-image-quality-gate-plan.md` (§3, §8).
+  `GpsPlusSlamJs_Docs/docs/2026-06-24-1057-image-quality-gate-plan.md` (§3, §8).

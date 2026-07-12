@@ -194,7 +194,7 @@ Unit tests in `webxr-session.test.ts` cover:
 - Null-safety regression test
 - DOM overlay root binding
 - `hit-test` is off by default and added as an _optional_ feature only when `requestHitTest: true`
-- `depth-sensing` (cpu-optimized) is requested when **either** `enableDepthSensingFeature` **or** `requestDepthOcclusion` is set — requested exactly once when both are, with no conflict/throw (grid sampler + live occluder are two consumers of one cpu-optimized stream). Live-occluder Iter 1, [2026-06-14-webxr-depth-occlusion-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-14-webxr-depth-occlusion-plan.md) §6/§8.
+- `depth-sensing` (cpu-optimized) is requested when **either** `enableDepthSensingFeature` **or** `requestDepthOcclusion` is set — requested exactly once when both are, with no conflict/throw (grid sampler + live occluder are two consumers of one cpu-optimized stream). Live-occluder Iter 1, [2026-06-14-0009-webxr-depth-occlusion-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-14-0009-webxr-depth-occlusion-plan.md) §6/§8.
 
 **`extractPoseFromViewer()`:**
 

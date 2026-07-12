@@ -50,7 +50,7 @@ intrinsics, cameraPose })`. Rotation no longer inherits per-corner depth noise.
   outlier-rejected pose), else the raw frame pose. `recordDetection` runs first,
   so the window already includes the current frame. The ring keeps the RAW poses —
   the filtered pose is never written back. See
-  [2026-06-16-followup-qr-pose-stabilization-sliding-window.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-16-followup-qr-pose-stabilization-sliding-window.md).
+  [2026-06-16-0858-qr-pose-stabilization-sliding-window-followup.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-16-0858-qr-pose-stabilization-sliding-window-followup.md).
 - Fully injected → unit-testable without WebXR / camera / depth.
 
 ## Tests
@@ -66,7 +66,7 @@ recording; `resolveStablePose` overrides the rendered pose; `reset` → idle.
 
 This controller deliberately parallels the framework's `createQrTrackingController`
 (both: detect → solve pose → emit → status machine → scheduler). The audit
-(`2026-06-17-qr-size-accuracy-and-thin-demo-plan.md`, WS-D) confirmed that **every
+(`2026-06-17-1020-qr-size-accuracy-and-thin-demo-plan.md`, WS-D) confirmed that **every
 non-trivial piece is already framework code** — `createDetectionScheduler`,
 `createQrSizeMeasurer`, `solveQrPose` + `PlanarPnpSquare`, `intrinsicsFromProjection`,
 `validateQuad`. What remains here is **pure wiring** plus one demo-specific policy:
@@ -81,7 +81,7 @@ D-X**: make the framework controller level-optional + add a size-from-depth hook
 then delete this file) is the right end state, but it is **deferred until the
 Recorder's live-QR path exists** — generalising shared, well-tested code for a
 single consumer is premature; the second consumer should drive the abstraction. See
-the follow-up `2026-06-17-followup-qr-size-thin-demo-next-steps.md` (D-X).
+the follow-up `2026-06-17-1204-qr-size-thin-demo-next-steps-followup.md` (D-X).
 
 ## Related
 

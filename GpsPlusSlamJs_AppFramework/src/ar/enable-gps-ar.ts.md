@@ -139,7 +139,7 @@ call, no-op when not running, re-entry after disable, resilience to
 
 ## Related
 
-- Plan: `GpsPlusSlamJs_Docs/docs/2026-06-03-threejs-arbutton-minimal-ar-example-user-feedback.md`
+- Plan: `GpsPlusSlamJs_Docs/docs/2026-06-03-0553-threejs-arbutton-minimal-ar-example-user-feedback.md`
   §5 Step 1, §6.1, §6.5.
 - [webxr-session.ts](./webxr-session.ts) — `initAR`, `endARSession`,
   `isWebXRSupported`, `SessionFeatureOptions`.

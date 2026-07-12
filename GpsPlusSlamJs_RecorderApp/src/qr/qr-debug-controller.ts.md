@@ -38,7 +38,7 @@ maintainer's re-test goal, visualised).
   persistent `createIncrementalQrPlacement` that folds only NEW observations per
   marker (O(1)/detection) and memoizes when nothing new arrived — NOT
   `selectDerivedQrPlacement` (O(history) per store action), which ramped the
-  recorder framerate down on device. See [open topic D](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-18-followup-recorder-live-qr-perf-degradation.md).
+  recorder framerate down on device. See [open topic D](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-18-0048-recorder-live-qr-perf-degradation-followup.md).
 - **No self-subscription:** the controller never subscribes; `main.ts` calls
   `update()` from its existing store subscription (live) and replay drives the
   same store, so one wiring covers both.

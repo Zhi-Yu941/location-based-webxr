@@ -1,6 +1,6 @@
 /**
  * QR size from depth — Note 4 of the QR-tracking follow-up plan
- * (docs `2026-06-15-followup-qr-tracking-generalization-overlay-and-north.md`).
+ * (docs `2026-06-15-1219-qr-tracking-generalization-overlay-and-north-followup.md`).
  *
  * MEASURE a QR's printed physical size directly from the depth map, so the
  * QR content + printed size are irrelevant and `qr.physicalSizeM` need not be
@@ -173,7 +173,7 @@ export function estimateQrSizeFromDepth(
 // read sits off the QR). The dense path instead fits the QR PLANE to many
 // interior depth reads and recovers the corners by intersecting their pixel
 // rays with that plane — decoupling "where depth exists" from "where the corners
-// are." See `2026-06-17-qr-size-accuracy-and-thin-demo-plan.md` WS-A.
+// are." See `2026-06-17-1020-qr-size-accuracy-and-thin-demo-plan.md` WS-A.
 
 /** A normalized screen position (top-left origin), depth-free. */
 export interface ScreenPoint {

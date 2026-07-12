@@ -17,7 +17,7 @@
  *
  * @see ./image-quality-protocol.ts
  * @see ./image-quality.worker.ts
- * @see GpsPlusSlamJs_Docs/docs/2026-06-24-image-quality-gate-plan.md §3, §8
+ * @see GpsPlusSlamJs_Docs/docs/2026-06-24-1057-image-quality-gate-plan.md §3, §8
  */
 
 import type {

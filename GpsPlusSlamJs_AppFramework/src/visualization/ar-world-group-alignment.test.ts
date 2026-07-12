@@ -4,7 +4,7 @@
  *
  * Why this test matters: this is the load-bearing fix for the GPS-anchor
  * frame-architecture bug
- * (gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-05-gps-anchor-frame-architecture-bug-and-plan.md
+ * (gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-05-0650-gps-anchor-frame-architecture-bug-and-plan.md
  * Slice 2 / Bug A). The two simpler apps (MinimalExample, AnchorStarter) never
  * applied alignment to `arWorldGroup`, leaving the camera pure-VIO and forcing
  * every GPS anchor to absorb the full alignment delta on each re-registration.

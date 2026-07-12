@@ -1,7 +1,7 @@
 # qr-tracking-controller.ts
 
 **Purpose:** The reusable orchestration "brain" of the QR demonstrator —
-Phase 6 of the [QR-code detection & tracking plan](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-qr-code-detection-tracking-plan.md).
+Phase 6 of the [QR-code detection & tracking plan](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-0806-qr-code-detection-tracking-plan.md).
 Wires front-end → level fetch → pose solve → GPS-vote bridge at a throttled,
 coalesced cadence and exposes an async-status state machine for the UI.
 
@@ -53,7 +53,7 @@ timestamp }`, emitted via `onDetection` on every lock. Structural (no import
   into the slice synchronously, so `resolveStablePose` reads a window that already
   includes the current frame. Without a resolver, the raw solve pose drives the
   vote (back-compat). See
-  [2026-06-16-followup-qr-pose-stabilization-sliding-window.md](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-16-followup-qr-pose-stabilization-sliding-window.md).
+  [2026-06-16-0858-qr-pose-stabilization-sliding-window-followup.md](../../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-16-0858-qr-pose-stabilization-sliding-window-followup.md).
 - **Fully injected** (front-end, solve, fetch, dispatch, camera/intrinsics
   accessors, clock) → no WASM, device, or store needed to test. Production wires
   `solvePose` to `solveQrPose({...input, solver: new PlanarPnpSquare()})`,

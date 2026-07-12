@@ -77,7 +77,7 @@ This module is the entry point that runs on page load. It also exports the follo
   [qr/wire-qr-recording.ts.md](qr/wire-qr-recording.ts.md). Disabled by default,
   so an existing recording is byte-for-byte unaffected.
 - **Live debug-overlay toggles** (`recording-options.visualization.*`, Finding B
-  of the [2026-06-14 follow-up](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-14-followup-frame-tile-legacy-aspect-and-live-toggle.md)):
+  of the [2026-06-14 follow-up](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-14-0012-frame-tile-legacy-aspect-and-live-toggle-followup.md)):
   `handleEnterAR` reads the four toggles ONCE at Enter-AR (toggling mid-session
   applies on the next Enter-AR; replay is never gated). Each uses the mechanism
   that fits its consumer:
@@ -96,7 +96,7 @@ This module is the entry point that runs on page load. It also exports the follo
     wirer gets a no-op visualizer sink so the grid still folds in every depth
     sample without allocating GPU geometry.
   - **statsOverlay** (default OFF — Step 0 of the
-    [2026-07-03 long-session fps plan](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-03-long-session-fps-and-voxel-grid-scaling-plan.md)) —
+    [2026-07-03 long-session fps plan](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-03-1344-long-session-fps-and-voxel-grid-scaling-plan.md)) —
     mounts the Stats.js FPS/ms/MB panel row
     ([ui/stats-overlay.ts](ui/stats-overlay.ts.md)) into the `#app` dom-overlay
     root and advances it from the initAR `callbacks.onFrame` tick. Teardown runs via

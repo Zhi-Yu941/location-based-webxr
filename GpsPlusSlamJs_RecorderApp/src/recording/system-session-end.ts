@@ -20,7 +20,7 @@
  *
  * Dependencies are injected so the module is unit-testable without the DOM
  * heavy main.ts wiring. See
- * docs/2026-07-04-ar-clipping-planes-and-lifecycle-plan.md (F3 app part).
+ * docs/2026-07-04-1626-ar-clipping-planes-and-lifecycle-plan.md (F3 app part).
  */
 
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';

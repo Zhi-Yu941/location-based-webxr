@@ -10,7 +10,7 @@
  * and covered by Playwright e2e.
  *
  * @see ./map-browser-index.ts
- * @see GpsPlusSlamJs_Docs/docs/2026-06-14-map-centric-recording-browser-and-h3-index-user-feedback.md (D3/D5)
+ * @see GpsPlusSlamJs_Docs/docs/2026-06-14-1048-map-centric-recording-browser-and-h3-index-user-feedback.md (D3/D5)
  */
 
 import { describe, it, expect } from 'vitest';

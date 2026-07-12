@@ -28,4 +28,4 @@
   builds/consumes these messages against a fake worker).
 
 - **Related docs:** `image-quality-client.ts.md`, `image-quality.worker.ts.md`,
-  `GpsPlusSlamJs_Docs/docs/2026-06-24-image-quality-gate-plan.md`.
+  `GpsPlusSlamJs_Docs/docs/2026-06-24-1057-image-quality-gate-plan.md`.

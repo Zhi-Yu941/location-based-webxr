@@ -4,7 +4,7 @@
 
 Owns the **app-lifetime lifecycle** of the map-centric recording browser (Step 4C): mounts the full-bleed root container, creates the [`map-browser`](map-browser.ts.md) instance, streams the recording coverage index onto it ([`recording-index`](recording-index.ts.md)), accumulates legacy backfill candidates (Slice B1) for [`coverage-backfill`](../storage/coverage-backfill.ts.md), and tears everything down. Extracted verbatim from `main.ts` (2026-07-11), which previously held the browser/abort pair as module-level `let`s.
 
-See the plan: `GpsPlusSlamJs_Docs/docs/2026-06-14-map-centric-recording-browser-and-h3-index-user-feedback.md` (D3/D3a, Slice A/B).
+See the plan: `GpsPlusSlamJs_Docs/docs/2026-06-14-1048-map-centric-recording-browser-and-h3-index-user-feedback.md` (D3/D3a, Slice A/B).
 
 ## Public API
 

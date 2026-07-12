@@ -52,7 +52,7 @@ renderers cannot diverge again.
   (camera near-vertical, or before the first alignment solve). Accuracy circles
   are stroke-only — see [accuracy-circles.ts.md](accuracy-circles.ts.md). Both
   belong to Finding 2 / Finding 1 of
-  [2026-06-28-map-rings-transparency-and-view-direction-user-feedback.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-28-map-rings-transparency-and-view-direction-user-feedback.md).
+  [2026-06-28-1822-map-rings-transparency-and-view-direction-user-feedback.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-28-1822-map-rings-transparency-and-view-direction-user-feedback.md).
 
 ## Examples
 

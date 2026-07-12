@@ -20,7 +20,7 @@
  *    black/empty frame; an absolute cutoff is safe because "black is black"
  *    regardless of scene texture (§5).
  *
- * @see GpsPlusSlamJs_Docs/docs/2026-06-24-image-quality-gate-plan.md
+ * @see GpsPlusSlamJs_Docs/docs/2026-06-24-1057-image-quality-gate-plan.md
  * @see ./capture-motion-gate.ts — the motion gate this builds on (same shape:
  *   a shared config type + a small stateful window + a pure decision).
  */
@@ -34,7 +34,7 @@ import { lowerMedian } from '../utils/median.js';
  * `blurRelativeThreshold` slider drives either. Benchmarked against the
  * hand-labeled recording 2026-07-11 (variance-of-Laplacian best at "clearly
  * blurry vs rest", the energy ratio best at "sharp vs degraded") — see
- * GpsPlusSlamJs_Docs/docs/2026-07-12-blur-metric-toggle-plan.md.
+ * GpsPlusSlamJs_Docs/docs/2026-07-12-0823-blur-metric-toggle-plan.md.
  */
 export type BlurMetricId =
   | 'variance-of-laplacian'

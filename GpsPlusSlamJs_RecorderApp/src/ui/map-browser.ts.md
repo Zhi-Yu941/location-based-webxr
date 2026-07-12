@@ -6,7 +6,7 @@ The map-centric recording browser: a **full-bleed Leaflet map with floating over
 
 This is the thin Leaflet/DOM layer over the pure, unit-tested `map-browser-index.ts`. It is covered by Playwright e2e (`playwright-tests/map-browser.spec.js`), per the repo convention that Leaflet views are e2e- not unit-tested.
 
-See the plan: `GpsPlusSlamJs_Docs/docs/2026-06-14-map-centric-recording-browser-and-h3-index-user-feedback.md` (D3 selection, D3a layout, D5 name search).
+See the plan: `GpsPlusSlamJs_Docs/docs/2026-06-14-1048-map-centric-recording-browser-and-h3-index-user-feedback.md` (D3 selection, D3a layout, D5 name search).
 
 ## Public API
 

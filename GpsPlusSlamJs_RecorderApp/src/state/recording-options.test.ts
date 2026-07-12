@@ -72,7 +72,7 @@ describe('recording-options', () => {
     // so the apps would silently share localStorage if their keys collided.
     // The starter uses `gps-plus-slam-anchor-starter:*`; the recorder MUST
     // keep its own `gps-plus-slam-recorder` prefix so the namespaces stay
-    // disjoint. See docs: 2026-06-01-multi-app-subpath-deployment-plan.md
+    // disjoint. See docs: 2026-06-01-0424-multi-app-subpath-deployment-plan.md
     // (Step 6).
     it('namespaces its localStorage key under the app-specific prefix', () => {
       expect(STORAGE_KEY).toMatch(/^gps-plus-slam-recorder/);
@@ -499,9 +499,9 @@ describe('recording-options', () => {
     });
 
     /**
-     * Why these matter (2026-06-13-occupancy-mesh-options-plan.md +
-     * 2026-06-29-occupancy-mesh-followups.md +
-     * 2026-07-01-occluder-worker-and-chunked-remesh-plan.md): both occluders
+     * Why these matter (2026-06-13-0004-occupancy-mesh-options-plan.md +
+     * 2026-06-29-1414-occupancy-mesh-followups.md +
+     * 2026-07-01-0733-occluder-worker-and-chunked-remesh-plan.md): both occluders
      * round-trip as booleans — a corrupted stored value must not silently switch
      * either on. Since 2026-07-01 the **persistent** mesh occluder ships ON by
      * default (Web-Worker offload removed the render stall; surface-nets mesher —
@@ -888,7 +888,7 @@ describe('recording-options', () => {
   describe('validateVisualizationOptions', () => {
     /**
      * Why these tests matter (Finding B / DB-1b of
-     * 2026-06-14-followup-frame-tile-legacy-aspect-and-live-toggle.md): the new
+     * 2026-06-14-0012-frame-tile-legacy-aspect-and-live-toggle-followup.md): the new
      * `visualization` group gates the four live debug overlays (frame tiles,
      * occupancy cubes, GPS+VIO alignment markers, compass cubes) plus the
      * heading-up minimap preference (2026-06-29). All MUST default ON so the
@@ -1521,7 +1521,7 @@ describe('recording-options', () => {
      * gridSize 32 (max points/sample ⇒ cells confirm fastest), minConfidence 3
      * (fastest noise floor that still suppresses phantoms — ~1.5s dwell),
      * cellSizeM 0.15 (detail). See
-     * GpsPlusSlamJs_Docs/docs/2026-06-30-occluder-tuning-followups.md (Round 6).
+     * GpsPlusSlamJs_Docs/docs/2026-06-30-0829-occluder-tuning-followups.md (Round 6).
      */
     it('uses the fast-reconstruction depth/occupancy defaults', () => {
       expect(DEFAULT_RECORDING_OPTIONS.depth.intervalMs).toBe(500);
@@ -1577,7 +1577,7 @@ describe('recording-options', () => {
 
     /**
      * Why this test matters: the 2026-07-10 splat-orbit finding
-     * (GpsPlusSlamJs_Docs/docs/2026-07-10-splat-orbit-capture-rate-finding.md)
+     * (GpsPlusSlamJs_Docs/docs/2026-07-10-0802-splat-orbit-capture-rate-finding.md)
      * showed the old 1000 ms minimum caps a slow object orbit at ~1 frame/s —
      * too sparse for Gaussian-splat reconstruction (50–150+ frames/object).
      * min/step were lowered 1000/500 → 250/250 so the slider reaches 4 Hz.

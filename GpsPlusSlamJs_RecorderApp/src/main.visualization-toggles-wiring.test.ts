@@ -2,7 +2,7 @@
 /**
  * Integration tests for the four live debug-overlay toggles in handleEnterAR
  * (main.ts) — Finding B / Slice 4 of
- * 2026-06-14-followup-frame-tile-legacy-aspect-and-live-toggle.md.
+ * 2026-06-14-0012-frame-tile-legacy-aspect-and-live-toggle-followup.md.
  *
  * Why these tests matter:
  * The `visualization` recording-options group must gate ONLY what is drawn live

@@ -4,7 +4,7 @@
   e2e suite inject AR/GPS fakes into the otherwise glue-only `main.ts`. It reads
   the framework/marker functions from an optional `window.__anchorStarterSeams`
   override, falling back to the real imports. See
-  [the e2e test plan §5/§8](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-01-anchor-starter-e2e-test-plan.md).
+  [the e2e test plan §5/§8](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-01-0447-anchor-starter-e2e-test-plan.md).
 - **Public API:**
   - `interface AnchorStarterSeams` — the set of framework/marker functions a fake
     may override (`checkWebXRSupport`, `checkGeolocationPermission`, `initAR`,

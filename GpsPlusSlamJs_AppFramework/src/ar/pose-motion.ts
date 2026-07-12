@@ -2,7 +2,7 @@
  * Pose-motion helpers — stateless angular/linear velocity from two AR poses.
  *
  * The capture motion gate (blurry-frame skipping, see
- * `GpsPlusSlamJs_Docs/docs/2026-06-23-blurry-frame-motion-gating-plan.md` §4.1)
+ * `GpsPlusSlamJs_Docs/docs/2026-06-23-2105-blurry-frame-motion-gating-plan.md` §4.1)
  * rejects frames whose device motion is too fast to yield a sharp image. Motion
  * is derived from consecutive WebXR poses — cheaper than any image-content
  * metric because it needs no GPU readback.

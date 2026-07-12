@@ -435,7 +435,7 @@ describe('loadRecording — within-recording re-marks survive the zip round trip
  * recording zips (2.4 GB total) and must not read whole archives into memory
  * just to check a few KB of JSON — that breached its 60 s regression budget
  * (gps-plus-slam repo:
- * GpsPlusSlamJs_Investigation/docs/2026-07-09-regression-gate-budget-breach-followup.md).
+ * GpsPlusSlamJs_Investigation/docs/2026-07-09-1944-regression-gate-budget-breach-followup.md).
  * loadRecording therefore accepts any zip.js Reader. This test proves the
  * full lazy chain (fd-backed ranged Reader → framework zip helpers →
  * loadRecording) yields a LoadedRecording identical to the Uint8Array path,

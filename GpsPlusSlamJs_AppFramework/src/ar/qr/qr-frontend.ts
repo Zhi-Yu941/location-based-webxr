@@ -10,7 +10,7 @@
  * OpenCV-free); the interim posture is **BarcodeDetector-only**. A pure-JS
  * decoder fallback for browsers without `BarcodeDetector` is a separate
  * dependency decision — see the follow-up
- * `GpsPlusSlamJs_Docs/docs/2026-06-17-followup-qr-decoder-fallback.md`.
+ * `GpsPlusSlamJs_Docs/docs/2026-06-17-0020-qr-decoder-fallback-followup.md`.
  *
  * Corners are emitted in **pixel** coordinates (top-left origin); corner-order
  * normalization / winding validation lives downstream in `qr-pose.ts`

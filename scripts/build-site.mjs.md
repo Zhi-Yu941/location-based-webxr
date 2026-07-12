@@ -11,7 +11,7 @@ output directory (`dist-site/`) that Cloudflare serves as static assets:
 
 Invoked via the root script `pnpm run build:site`. This is the command the
 Cloudflare Git integration runs (replacing the former `build:recorder`). See
-[2026-06-01-multi-app-subpath-deployment-plan.md](../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-01-multi-app-subpath-deployment-plan.md).
+[2026-06-01-0424-multi-app-subpath-deployment-plan.md](../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-01-0424-multi-app-subpath-deployment-plan.md).
 
 ## Public API
 

@@ -523,7 +523,7 @@ export function setCurrentScenarioName(name: string): void {
  * (>1 m between consecutive frames) dispatches `arLoopClosureDetected` into
  * the session store — and therefore into the recording. This is the corpus
  * producer the pair-refresh T5 verdict is blocked on; see
- * GpsPlusSlamJs_Docs/docs/2026-07-06-recorder-loop-closure-detector-wiring-plan.md.
+ * GpsPlusSlamJs_Docs/docs/2026-07-06-2228-recorder-loop-closure-detector-wiring-plan.md.
  *
  * Returns the teardown (unregister the frame feed + drop the handler), for
  * registration in `arSessionScope`.
@@ -678,7 +678,7 @@ export function getReplaySessionEntriesForTesting(): SessionEntry[] {
  * - AR/WebXR session (ended — the setup screen requires Enter AR again, and
  *   initAR() throws on a live session, so a preserved session would make the
  *   first Enter AR after the reset fail; see
- *   GpsPlusSlamJs_Docs docs/2026-07-04-soft-reset-end-ar-session-plan.md)
+ *   GpsPlusSlamJs_Docs docs/2026-07-04-2319-soft-reset-end-ar-session-plan.md)
  * - Store (fresh Redux store for new session)
  * - Session/scenario names
  * - Sync manager, trackers, map overlay
@@ -1297,7 +1297,7 @@ async function handleEnterAR(): Promise<void> {
       // Live debug-overlay visibility (recording-options `visualization`, read
       // ONCE here at Enter-AR — toggling mid-session applies on the next
       // Enter-AR, not retroactively; replay is never gated). Finding B / DB-2 of
-      // GpsPlusSlamJs_Docs/docs/2026-06-14-followup-frame-tile-legacy-aspect-and-live-toggle.md.
+      // GpsPlusSlamJs_Docs/docs/2026-06-14-0012-frame-tile-legacy-aspect-and-live-toggle-followup.md.
       const viz = recordingOptions.visualization;
 
       // Perf stats overlay (Step 0 of the 2026-07-03 long-session fps plan).
@@ -1664,7 +1664,7 @@ function handleImageCaptured(image: CapturedImage): void {
 function handleDepthSampleCaptured(sample: DepthSample): void {
   // Dispatch the sampler's payload AS-IS. Re-building it field-by-field
   // silently dropped the optional projectionMatrix when it was added (see
-  // 2026-06-12-payload-rebuild-field-drop-audit.md F1) — without it the
+  // 2026-06-12-1130-payload-rebuild-field-drop-audit.md F1) — without it the
   // occupancy grid cannot unproject the sample's points.
   store.dispatch(recordDepthSample(sample));
   log.info(`Recorded depth sample with ${sample.points.length} points`);

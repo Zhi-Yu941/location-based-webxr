@@ -6,8 +6,8 @@
  * `depthWrite = true`), drawn before virtual content (low `renderOrder`) so real
  * geometry the camera saw earlier hides virtual objects placed behind it —
  * including out-of-view surfaces a single-frame live depth occluder cannot
- * remember (2026-06-13-occupancy-mesh-options-plan.md §4; complements the live
- * occluder in 2026-06-14-webxr-depth-occlusion-plan.md).
+ * remember (2026-06-13-0004-occupancy-mesh-options-plan.md §4; complements the live
+ * occluder in 2026-06-14-0009-webxr-depth-occlusion-plan.md).
  *
  * Reusable across consumer apps (AnchorStarter / MinimalExample want occlusion
  * too); the recorder only owns the off-by-default toggle + scene wiring.

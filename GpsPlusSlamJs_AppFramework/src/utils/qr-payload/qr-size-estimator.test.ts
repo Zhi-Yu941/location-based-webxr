@@ -8,7 +8,7 @@ import {
 
 /**
  * P1 of the QR payload-compression benchmark plan
- * (gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-05-qr-payload-compression-benchmark-plan.md).
+ * (gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-05-0611-qr-payload-compression-benchmark-plan.md).
  *
  * The estimator is the benchmark's *metric* — every later phase (P2–P5)
  * ranks candidates by its output, so these tests pin it against hand-derived

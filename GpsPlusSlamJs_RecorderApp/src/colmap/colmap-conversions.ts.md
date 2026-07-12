@@ -7,7 +7,7 @@ COLMAP's `sparse/0/` text files expect. The single tested seam owning the
 axis/sign conventions for the COLMAP export (mirrors `depth-unprojection.ts`).
 
 Part of the COLMAP/3DGS export — see
-[2026-06-13-colmap-export-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-colmap-export-plan.md)
+[2026-06-13-1205-colmap-export-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-1205-colmap-export-plan.md)
 §2.3 (Iter 1).
 
 ## Public API

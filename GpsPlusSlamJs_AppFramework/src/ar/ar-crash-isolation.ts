@@ -2,7 +2,7 @@
  * AR crash isolation flags — diagnostic gates for XR session negotiation.
  *
  * Moved out of the recorder settings catalog (2026-07-11 G-1 move,
- * `2026-07-11-recording-options-altitude-move-plan.md`): the framework itself
+ * `2026-07-11-1445-recording-options-altitude-move-plan.md`): the framework itself
  * consumes these flags in `webxr-session.ts` (session feature requests, frame
  * loop) and on `enable-gps-ar.ts`'s public param, so the type + defaults +
  * validator live framework-side. The recorder embeds the group in its own

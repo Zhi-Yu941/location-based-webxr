@@ -1,6 +1,6 @@
 /**
  * Test seam (DEV-only) — see
- * GpsPlusSlamJs_Docs/docs/2026-06-01-anchor-starter-e2e-test-plan.md §5 (Option A).
+ * GpsPlusSlamJs_Docs/docs/2026-06-01-0447-anchor-starter-e2e-test-plan.md §5 (Option A).
  *
  * The starter is glue-only: `main.ts` imports the AR/GPS framework functions
  * and calls them inside `startAr()` / `main()`. In a desktop Playwright browser

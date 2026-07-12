@@ -66,9 +66,9 @@ await initAR(container, isolationOptions, sessionFeatures, {
   lying success toast, user not stranded).
 - On-device gate (physical Android): back gesture mid-recording → camera-app
   exit + summary + toast + recording present; tracked in
-  `GpsPlusSlamJs_Docs/docs/2026-07-04-ar-clipping-planes-and-lifecycle-plan.md`.
+  `GpsPlusSlamJs_Docs/docs/2026-07-04-1626-ar-clipping-planes-and-lifecycle-plan.md`.
 
 ## Related docs
 
-- [2026-07-04-ar-clipping-planes-and-lifecycle-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-04-ar-clipping-planes-and-lifecycle-plan.md) (F3)
+- [2026-07-04-1626-ar-clipping-planes-and-lifecycle-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-04-1626-ar-clipping-planes-and-lifecycle-plan.md) (F3)
 - [2026-02-15-lifecycle-orphans.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-02-15-lifecycle-orphans.md) §1

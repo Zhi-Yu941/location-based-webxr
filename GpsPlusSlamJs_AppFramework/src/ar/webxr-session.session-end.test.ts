@@ -15,7 +15,7 @@
  *    (endARSession()'s own session.end() fires the same 'end' event — the
  *    module must not double-fire),
  *  - a throwing callback never breaks the teardown.
- * See docs/2026-07-04-ar-clipping-planes-and-lifecycle-plan.md (F3) and
+ * See docs/2026-07-04-1626-ar-clipping-planes-and-lifecycle-plan.md (F3) and
  * docs/2026-02-15-lifecycle-orphans.md §1.
  *
  * This file is isolated from webxr-session.test.ts because it mocks

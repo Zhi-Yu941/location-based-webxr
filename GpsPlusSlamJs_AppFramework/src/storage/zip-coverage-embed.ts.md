@@ -4,7 +4,7 @@
 
 One-line: produce a copy of a recording zip whose `session.json` gains the H3 coverage fields (`h3Cells` + `h3Resolution`), leaving every other entry byte-for-byte unchanged.
 
-This is the **B3** primitive of the in-zip backfill (O3 — in-zip rewrite): it lets a one-time "upgrade" embed the derived coverage **inside the recording**, so legacy recordings index instantly on every future open in this app and any other reader. See the plan: `GpsPlusSlamJs_Docs/docs/2026-06-14-followup-progressive-map-browser-indexing-and-backfill.md`.
+This is the **B3** primitive of the in-zip backfill (O3 — in-zip rewrite): it lets a one-time "upgrade" embed the derived coverage **inside the recording**, so legacy recordings index instantly on every future open in this app and any other reader. See the plan: `GpsPlusSlamJs_Docs/docs/2026-06-14-1924-progressive-map-browser-indexing-and-backfill-followup.md`.
 
 ## Public API
 

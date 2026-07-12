@@ -1,6 +1,6 @@
 /**
  * `qrDetected` Redux slice — Note 3 of the QR-tracking follow-up plan
- * (docs `2026-06-15-followup-qr-tracking-generalization-overlay-and-north.md`).
+ * (docs `2026-06-15-1219-qr-tracking-generalization-overlay-and-north-followup.md`).
  *
  * A detection-agnostic, framework-level store of "what was detected, where, in
  * 3D" that overlay / trigger / anchor consumers subscribe to INDEPENDENTLY of

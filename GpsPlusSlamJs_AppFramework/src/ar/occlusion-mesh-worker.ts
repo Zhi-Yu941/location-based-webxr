@@ -3,7 +3,7 @@
  *
  * The persistent occluder full-rebuilds the whole grid mesh every refresh —
  * O(total cells), 100s of ms at hundreds of metres (see
- * `2026-07-01-occluder-worker-and-chunked-remesh-plan.md`). Moving
+ * `2026-07-01-0733-occluder-worker-and-chunked-remesh-plan.md`). Moving
  * {@link meshOccupiedCells} to a Web Worker keeps rendering smooth regardless of
  * mesh time. This module holds the **pure, transfer-friendly** halves so a
  * consumer only needs a trivial worker *shell* (any app can copy ~5 lines):

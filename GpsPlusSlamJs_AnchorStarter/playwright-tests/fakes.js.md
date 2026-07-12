@@ -7,7 +7,7 @@ Install deterministic fakes over the app's DEV-only test seam
 (`window.__anchorStarterTest`) so Playwright can drive the full application
 flow (boot → guidance → soft-gated placement → `?show=` round-trip →
 copy-link) without real WebXR or GPS. See the plan
-[`2026-06-01-anchor-starter-e2e-test-plan.md`](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-01-anchor-starter-e2e-test-plan.md)
+[`2026-06-01-0447-anchor-starter-e2e-test-plan.md`](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-01-0447-anchor-starter-e2e-test-plan.md)
 §5–§6 and the seam itself in [`../src/seams.ts`](../src/seams.ts) /
 [`../src/seams.ts.md`](../src/seams.ts.md).
 

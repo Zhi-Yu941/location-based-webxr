@@ -12,7 +12,7 @@
  * pitch at or above the design pitch θ* = 51°, all four plane corners stay
  * strictly in front of the viewer plane. This encodes the geometric proof
  * from the F1 spec (GpsPlusSlamJs_Docs/docs/
- * 2026-07-04-ar-clipping-planes-and-lifecycle-plan.md) as executable
+ * 2026-07-04-1626-ar-clipping-planes-and-lifecycle-plan.md) as executable
  * documentation — including the yaw dimensions the original (pre-review)
  * fix draft missed.
  *

@@ -38,5 +38,5 @@ startCameraFrameCapture(captureSize ? { captureSize } : undefined);
 ## Related
 
 - Wired in [seams.ts](seams.ts) (`startFrameSource`). Sweep method + decision in
-  `2026-06-17-followup-qr-size-thin-demo-next-steps.md`. The aspect-fit behaviour
+  `2026-06-17-1204-qr-size-thin-demo-next-steps-followup.md`. The aspect-fit behaviour
   of each candidate size is locked in the framework `camera-blit-capture.test.ts`.

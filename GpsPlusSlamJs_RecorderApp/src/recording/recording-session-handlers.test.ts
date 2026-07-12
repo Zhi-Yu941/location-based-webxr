@@ -1003,7 +1003,7 @@ describe('handleStartRecording', () => {
     // Why: Depth capture is controlled by user settings — and the user's
     // interval/grid/rgb values must actually reach the sampler. They were
     // dead knobs before startDepthCapture accepted a config (occupancy-grid
-    // port plan Iter 6; see 2026-06-12-payload-rebuild-field-drop-audit.md
+    // port plan Iter 6; see 2026-06-12-1130-payload-rebuild-field-drop-audit.md
     // F3), so this asserts the exact values, not just the call. The rgb
     // flag (Iter 8 voxel coloring) rides the same forward-the-whole-section
     // seam, so it reaches the sampler with no seam edit.

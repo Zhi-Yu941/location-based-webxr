@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The **live CPU-depth occluder** — hides virtual fragments behind the real surface the camera sees _this frame_. It is the sharp, registration-free, no-memory half of the occlusion feature; its companion is the persistent [`OcclusionMesh`](../visualization/occlusion-mesh.ts.md) (out-of-view memory, blocky, lagging). Both are depth-only under `arWorldGroup` and **compose** at render time (live wins where this frame has depth, the mesh fills out-of-view / depth holes — [2026-06-14-webxr-depth-occlusion-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-14-webxr-depth-occlusion-plan.md) §5).
+The **live CPU-depth occluder** — hides virtual fragments behind the real surface the camera sees _this frame_. It is the sharp, registration-free, no-memory half of the occlusion feature; its companion is the persistent [`OcclusionMesh`](../visualization/occlusion-mesh.ts.md) (out-of-view memory, blocky, lagging). Both are depth-only under `arWorldGroup` and **compose** at render time (live wins where this frame has depth, the mesh fills out-of-view / depth holes — [2026-06-14-0009-webxr-depth-occlusion-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-14-0009-webxr-depth-occlusion-plan.md) §5).
 
 It is a **second consumer** of the same per-frame `XRCPUDepthInformation` the sparse [`DepthSampler`](depth-sampler.ts.md) already reads for the occupancy grid — no extra depth read, no second session.
 
@@ -51,7 +51,7 @@ registerSessionDisposer(() => occ.dispose());
 
 - `depth-occluder.property.test.ts` — property tests for the four pure functions (bounds, monotonicity, round-trip, format selection, near/far endpoints).
 - `depth-occluder.test.ts` — `DepthOccluder` lifecycle + the by-reference shared uniform block + the full-screen shader source in jsdom.
-- **On-device (device-gated, not in CI):** does a real surface hide a virtual object behind it; the `gl_FragDepth` metric sanity check; the `dataFormatPreference` default (float32 vs luminance-alpha); per-frame perf; the §5 compose with the persistent mesh. See [2026-06-14-webxr-depth-occlusion-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-14-webxr-depth-occlusion-plan.md) §8.
+- **On-device (device-gated, not in CI):** does a real surface hide a virtual object behind it; the `gl_FragDepth` metric sanity check; the `dataFormatPreference` default (float32 vs luminance-alpha); per-frame perf; the §5 compose with the persistent mesh. See [2026-06-14-0009-webxr-depth-occlusion-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-14-0009-webxr-depth-occlusion-plan.md) §8.
 
 ## Related
 

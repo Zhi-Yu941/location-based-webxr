@@ -117,7 +117,7 @@ export {
 } from './gps-ar-pose-sampler.js';
 
 // --- recording-options — moved to the recorder app (2026-07-11 G-1 move,
-//     `2026-07-11-recording-options-altitude-move-plan.md`): the settings
+//     `2026-07-11-1445-recording-options-altitude-move-plan.md`): the settings
 //     catalog lives in `GpsPlusSlamJs_RecorderApp/src/state/recording-options.ts`.
 //     The framework keeps only the pieces it consumes itself:
 //     `ar/ar-crash-isolation.ts` and `visualization/occlusion-mesh.ts`

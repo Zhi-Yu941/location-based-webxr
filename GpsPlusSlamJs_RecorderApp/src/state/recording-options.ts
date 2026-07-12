@@ -8,7 +8,7 @@
  *
  * The RECORDER owns this catalog (moved out of the framework's `state/` layer
  * on 2026-07-11, G-1 move — see
- * `GpsPlusSlamJs_Docs/docs/2026-07-11-recording-options-altitude-move-plan.md`).
+ * `GpsPlusSlamJs_Docs/docs/2026-07-11-1445-recording-options-altitude-move-plan.md`).
  * Two group building blocks stay framework-owned and are consumed here:
  * - `arCrashIsolation` — type/defaults/validator from
  *   `gps-plus-slam-app-framework/ar/ar-crash-isolation` (the framework reads
@@ -82,7 +82,7 @@ export interface RecordingOptionsInput {
  * unaffected by the capture-time flag state. Turning the flags off during capture
  * only matters if you want the LIVE app to behave as the GPS-only baseline; it is
  * not required for clean §6a analysis data. See
- * `GpsPlusSlamJs_Docs/docs/2026-06-26-stage0-field-collection-and-enablement.md`
+ * `GpsPlusSlamJs_Docs/docs/2026-06-26-0701-stage0-field-collection-and-enablement.md`
  * (2026-07-01 update).
  */
 export interface CompassDebugOptions {
@@ -105,7 +105,7 @@ export interface CompassDebugOptions {
  * pair-refresh T5 verdict is blocked on such recordings). It also changes the
  * LIVE alignment (each closure Bézier-deforms the stored trajectory), which is
  * why it stays an operator opt-in. See
- * GpsPlusSlamJs_Docs/docs/2026-07-06-recorder-loop-closure-detector-wiring-plan.md.
+ * GpsPlusSlamJs_Docs/docs/2026-07-06-2228-recorder-loop-closure-detector-wiring-plan.md.
  */
 export interface LoopClosureDebugOptions {
   /** Wire the live loop-closure handler into the AR frame loop. Default OFF. */
@@ -153,7 +153,7 @@ export interface ImageCaptureOptions {
    * the capture manager consumes); the recorder destructures `images` and flows
    * the rest, including this group, through the capture seam. Default: enabled.
    * See `ar/capture-motion-gate.ts` and
-   * `GpsPlusSlamJs_Docs/docs/2026-06-23-blurry-frame-motion-gating-plan.md`.
+   * `GpsPlusSlamJs_Docs/docs/2026-06-23-2105-blurry-frame-motion-gating-plan.md`.
    */
   motionFilter: MotionFilterConfig;
   /**
@@ -163,7 +163,7 @@ export interface ImageCaptureOptions {
    * pending field tuning of the relative blur threshold (a mis-tuned gate
    * silently dropping good frames is worse than the motion gate's default-on).
    * See `ar/image-quality.ts` and
-   * `GpsPlusSlamJs_Docs/docs/2026-06-24-image-quality-gate-plan.md`.
+   * `GpsPlusSlamJs_Docs/docs/2026-06-24-1057-image-quality-gate-plan.md`.
    */
   qualityFilter: QualityFilterConfig;
 }
@@ -213,7 +213,7 @@ export interface OccupancyOptions {
    * briefly-glimpsed real surfaces may be dropped, so it is exposed for
    * on-device tuning. Read once when the visualizer is constructed (Enter-AR
    * / replay load). See
-   * `GpsPlusSlamJs_Docs/docs/2026-06-22-occupancy-grid-behind-surface-noise-plan.md`.
+   * `GpsPlusSlamJs_Docs/docs/2026-06-22-2146-occupancy-grid-behind-surface-noise-plan.md`.
    */
   minConfidence: number;
   /**
@@ -226,13 +226,13 @@ export interface OccupancyOptions {
    * per-refresh render stall that was the reason to keep it opt-in, so the
    * remembered occluder ships on by the default `'smooth'` mesher. Read once when
    * the mesh is wired (Enter-AR / replay load), like the other occupancy knobs.
-   * See `GpsPlusSlamJs_Docs/docs/2026-06-13-occupancy-mesh-options-plan.md` and
-   * `GpsPlusSlamJs_Docs/docs/2026-07-01-occluder-worker-and-chunked-remesh-plan.md`.
+   * See `GpsPlusSlamJs_Docs/docs/2026-06-13-0004-occupancy-mesh-options-plan.md` and
+   * `GpsPlusSlamJs_Docs/docs/2026-07-01-0733-occluder-worker-and-chunked-remesh-plan.md`.
    *
    * **Migration:** this field replaces the former `occlusionMeshEnabled`
    * boolean — `validateOccupancyOptions` maps a persisted
    * `occlusionMeshEnabled === true` onto `persistentOcclusion` (see that
-   * function and `2026-06-29-occupancy-mesh-followups.md`).
+   * function and `2026-06-29-1414-occupancy-mesh-followups.md`).
    */
   persistentOcclusion: boolean;
   /**
@@ -241,7 +241,7 @@ export interface OccupancyOptions {
    * sharp and registration-free (no out-of-view memory). It composes with
    * {@link persistentOcclusion}: both can be on (the live occluder wins where
    * this frame has depth, the persistent mesh fills out-of-view / depth holes —
-   * `2026-06-14-webxr-depth-occlusion-plan.md` §5). Requires the
+   * `2026-06-14-0009-webxr-depth-occlusion-plan.md` §5). Requires the
    * `requestDepthOcclusion` session feature so `cpu-optimized` depth is
    * negotiated even without depth recording. **Live-AR only** — replay has no
    * live depth stream, so this flag is a no-op there (persistent still applies).
@@ -258,8 +258,8 @@ export interface OccupancyOptions {
    * occluder's mesh); any other value is a harmless no-op. Default **`'off'`**.
    * Read once when the mesh is wired (Enter-AR / replay load), like the other
    * occupancy knobs. See
-   * `GpsPlusSlamJs_Docs/docs/2026-07-02-occluder-debug-viz-styles-plan.md` and
-   * `GpsPlusSlamJs_Docs/docs/2026-06-29-occlusion-debug-viz-and-live-occluder-user-feedback.md`.
+   * `GpsPlusSlamJs_Docs/docs/2026-07-02-0611-occluder-debug-viz-styles-plan.md` and
+   * `GpsPlusSlamJs_Docs/docs/2026-06-29-2130-occlusion-debug-viz-and-live-occluder-user-feedback.md`.
    *
    * **Migration:** this field replaces the former `occluderDebugViz` boolean —
    * `validateOccupancyOptions` maps a persisted `occluderDebugViz: true` onto
@@ -277,7 +277,7 @@ export interface OccupancyOptions {
    * {@link occluderDebugStyle} to actually *see* the mesh shape). Only has an
    * effect when {@link persistentOcclusion} is on. Read once when the mesh is
    * wired (Enter-AR / replay load), like the other occupancy knobs. See
-   * `GpsPlusSlamJs_Docs/docs/2026-06-30-occluder-tuning-followups.md`.
+   * `GpsPlusSlamJs_Docs/docs/2026-06-30-0829-occluder-tuning-followups.md`.
    */
   occluderMeshMode: OccluderMeshMode;
   /**
@@ -331,7 +331,7 @@ export interface FrameTileDisplayOptions {
 
 /**
  * Visibility toggles for the live AR debug overlays (Finding B / DB-2 of
- * 2026-06-14-followup-frame-tile-legacy-aspect-and-live-toggle.md).
+ * 2026-06-14-0012-frame-tile-legacy-aspect-and-live-toggle-followup.md).
  *
  * These gate **only what is drawn live during recording** — they never change
  * what is captured (frame blobs, depth samples, occupancy data, GPS events all
@@ -377,7 +377,7 @@ export interface VisualizationOptions {
 /**
  * Configuration for live QR detection + RAW recording (decision §0 of the
  * recorder live-QR follow-up,
- * `2026-06-17-followup-recorder-live-qr-next-steps.md`).
+ * `2026-06-17-2111-recorder-live-qr-next-steps-followup.md`).
  *
  * OPT-IN (`enabled` defaults to `false`): turning it on adds per-frame RGBA
  * capture + a `BarcodeDetector` decode to the session, so it is operator-gated
@@ -476,7 +476,7 @@ export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
   occupancy: {
     cellSizeM: 0.15, // 15 cm voxels — matches OccupancyGrid's own default (Unity parity); balances detail vs speed
     minConfidence: 3, // ≥3 observations to render a voxel — the FAST-reconstruction noise floor (2026-07-01; ~1.5s dwell before a surface meshes vs 2.5s at 5, +25% early coverage; 1 = legacy/unfiltered)
-    persistentOcclusion: true, // persistent depth-only mesh occluder ON by default (2026-07-01: Web-Worker offload removed the render stall — see 2026-07-01-occluder-worker-and-chunked-remesh-plan.md)
+    persistentOcclusion: true, // persistent depth-only mesh occluder ON by default (2026-07-01: Web-Worker offload removed the render stall — see 2026-07-01-0733-occluder-worker-and-chunked-remesh-plan.md)
     liveOcclusion: false, // live CPU-depth occluder OFF by default (device-gated quality; replay no-op)
     occluderDebugStyle: 'off', // debug visualization of the persistent occluder mesh OFF by default (occlusion is invisible in normal use)
     occluderMeshMode: 'smooth', // persistent-occluder mesher: Naive Surface Nets by default (smoothest/lightest); 'greedy' = blocky cubes (watertight), 'corner-fit' = surface-hugging + watertight
@@ -548,7 +548,7 @@ export const DEPTH_CONSTRAINTS = {
  * cannot overlap captures: `captureInProgress` serialises them and the
  * interval is measured from the actual capture time, so the pipeline
  * self-limits. See
- * GpsPlusSlamJs_Docs/docs/2026-07-10-splat-orbit-capture-rate-finding.md.
+ * GpsPlusSlamJs_Docs/docs/2026-07-10-0802-splat-orbit-capture-rate-finding.md.
  */
 export const IMAGE_CONSTRAINTS = {
   intervalMs: { min: 250, max: 10000, step: 250 },
@@ -914,7 +914,7 @@ export function validateImageOptions(
  * `true → persistentOcclusion: true` (the old mesh occluder is the persistent
  * one); the legacy shape never enabled a live occluder, so `liveOcclusion`
  * stays at its default. A present new field always wins over the legacy one.
- * See `2026-06-29-occupancy-mesh-followups.md`.
+ * See `2026-06-29-1414-occupancy-mesh-followups.md`.
  */
 /**
  * Resolve `persistentOcclusion` with legacy migration. A **present** new field

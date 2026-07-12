@@ -10,7 +10,7 @@
  * non-whitelisted control action is never written; (4) the recorder opts into
  * the longer live history cap without persisting that setup action.
  *
- * @see docs 2026-06-17-recorder-live-qr-detection-recording-plan.md (WS-1).
+ * @see docs 2026-06-17-1914-recorder-live-qr-detection-recording-plan.md (WS-1).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';

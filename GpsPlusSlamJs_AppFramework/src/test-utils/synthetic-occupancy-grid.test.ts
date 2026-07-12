@@ -2,7 +2,7 @@
  * buildSyntheticSurfaceGrid — placement-envelope regression tests.
  *
  * Why this test matters (PR #145 review, recorded in
- * 2026-07-01-pr145-occluder-followups.md §2): the slab's −Z push (`kBase`)
+ * 2026-07-01-1430-pr145-occluder-followups.md §2): the slab's −Z push (`kBase`)
  * must budget for EVERY transverse dimension of the box. It used to scale
  * with cellsX + cellsZ only, so a tall slab (large `thickness`) pushed the
  * top cells' worldY beyond the identity-projection view and tripped the loud

@@ -10,7 +10,7 @@
  * Both compute the same number — `acos(2·dot² − 1)` — so they are consolidated
  * here so a third consumer (the capture motion gate's angular-velocity helper,
  * `ar/pose-motion.ts`) reuses one definition instead of adding a fourth copy.
- * See `GpsPlusSlamJs_Docs/docs/2026-06-23-followup-consolidate-geodesic-angle-kernel.md`.
+ * See `GpsPlusSlamJs_Docs/docs/2026-06-23-2120-consolidate-geodesic-angle-kernel-followup.md`.
  */
 
 import { quat } from 'gl-matrix';

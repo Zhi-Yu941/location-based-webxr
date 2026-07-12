@@ -1,6 +1,6 @@
 /**
  * Derive-on-read layer for QR detections (decision D-A of the recorder live-QR
- * plan, docs `2026-06-17-recorder-live-qr-detection-recording-plan.md`).
+ * plan, docs `2026-06-17-1914-recorder-live-qr-detection-recording-plan.md`).
  *
  * The `qrDetected` slice persists the RAW detector output per observation —
  * pixel corners + the raw WebXR camera pose + the detector-frame projection

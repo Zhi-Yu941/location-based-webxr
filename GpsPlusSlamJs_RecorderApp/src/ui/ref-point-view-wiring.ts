@@ -2,7 +2,7 @@
  * AR-scoped wiring for BOTH ref-point views (3D spheres + live-map markers).
  *
  * Round-3 feedback (2026-07-05,
- * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-05-recorder-ar-ready-ref-point-views-user-feedback.md):
+ * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-05-2349-recorder-ar-ready-ref-point-views-user-feedback.md):
  * these view subscribers used to be owned by the RECORDING session, so in
  * the AR_READY phase (after Enter AR, before the first recording) the Redux
  * store filled with imported ref points and no view reacted. Ownership now

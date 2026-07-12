@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Wraps mrdoob's Stats.js (bundled with three as `three/addons/libs/stats.module.js`) into a side-by-side FPS / frame-ms / MB panel row for the long-session fps investigation — Step 0 of [2026-07-03-long-session-fps-and-voxel-grid-scaling-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-03-long-session-fps-and-voxel-grid-scaling-plan.md). Stock Stats.js shows one panel and cycles on tap, which is unusable mid-walk in AR, so one Stats instance is mounted per panel (2026-07-03 interview decision).
+Wraps mrdoob's Stats.js (bundled with three as `three/addons/libs/stats.module.js`) into a side-by-side FPS / frame-ms / MB panel row for the long-session fps investigation — Step 0 of [2026-07-03-1344-long-session-fps-and-voxel-grid-scaling-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-03-1344-long-session-fps-and-voxel-grid-scaling-plan.md). Stock Stats.js shows one panel and cycles on tap, which is unusable mid-walk in AR, so one Stats instance is mounted per panel (2026-07-03 interview decision).
 
 ## Public API
 

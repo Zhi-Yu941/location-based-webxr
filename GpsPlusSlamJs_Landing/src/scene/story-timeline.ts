@@ -134,9 +134,14 @@ export function buildStoryTimeline(
     // intro timeline (created later, touching the same camera properties)
     // silently CANCELS these tweens. Both timelines are seek-driven, so
     // last-seeked-wins is exactly the semantics we want.
+    // Camera/reveal tweens run in the FIRST ~55% of each chapter window:
+    // the scroll mapping centers a chapter's copy at ~mid-window, and the
+    // composition must be settled by then (not still mid-flight). The walk
+    // tweens keep full-window durations so the dot-person moves
+    // continuously.
     defaults: {
       ease: "inOutSine",
-      duration: CHAPTER_DURATION_MS,
+      duration: CHAPTER_DURATION_MS * 0.55,
       composition: "none",
     },
     onUpdate,
@@ -153,10 +158,10 @@ export function buildStoryTimeline(
   timeline.add(camera, { x: -3.5, y: 4.5, z: 15.5 }, 1000);
   timeline.add(
     lookTarget,
-    { x: WORLD_ANCHORS.sign.x, y: 1.6, z: WORLD_ANCHORS.sign.z, duration: 800 },
+    { x: WORLD_ANCHORS.sign.x, y: 1.6, z: WORLD_ANCHORS.sign.z, duration: 500 },
     1000,
   );
-  timeline.add(walk, { t: 0.14 }, 1000);
+  timeline.add(walk, { t: 0.14, duration: CHAPTER_DURATION_MS }, 1000);
   // The world "snaps into alignment": a settling wiggle with decaying
   // amplitude, ending perfectly at rest.
   timeline.add(
@@ -181,7 +186,7 @@ export function buildStoryTimeline(
           { to: 0.001, duration: 100 },
         ],
       },
-      1600,
+      1450,
     );
   }
 
@@ -193,11 +198,11 @@ export function buildStoryTimeline(
       x: WORLD_ANCHORS.markerPair.x,
       y: 1.2,
       z: WORLD_ANCHORS.markerPair.z,
-      duration: 800,
+      duration: 500,
     },
     2000,
   );
-  timeline.add(walk, { t: 0.45 }, 2000);
+  timeline.add(walk, { t: 0.45, duration: CHAPTER_DURATION_MS }, 2000);
   // Raw GPS jitter: meters of wander. The fused marker is deliberately
   // NEVER animated — its stillness is the message.
   timeline.add(
@@ -238,35 +243,35 @@ export function buildStoryTimeline(
   );
   timeline.add(
     lookTarget,
-    { x: diveLook.x, y: diveLook.y, z: diveLook.z, duration: 900 },
+    { x: diveLook.x, y: diveLook.y, z: diveLook.z, duration: 550 },
     3000,
   );
-  timeline.add(walk, { t: eyeT, duration: 600 }, 3000);
-  timeline.add(phone, { scale: 1, duration: 350, ease: "outBack" }, 3620);
+  timeline.add(walk, { t: eyeT, duration: 500 }, 3000);
+  timeline.add(phone, { scale: 1, duration: 300, ease: "outBack" }, 3320);
 
   // ── Chapter 4: works anywhere — pull back, reveal the unmapped park.
-  timeline.add(phone, { scale: 0.001, duration: 200 }, 4000);
+  timeline.add(phone, { scale: 0.001, duration: 150 }, 4000);
   timeline.add(camera, { x: 0, y: 44, z: 27 }, 4000);
-  timeline.add(lookTarget, { x: 0, y: 0, z: 0, duration: 800 }, 4000);
-  timeline.add(walk, { t: 0.6 }, 4000);
+  timeline.add(lookTarget, { x: 0, y: 0, z: 0, duration: 500 }, 4000);
+  timeline.add(walk, { t: 0.6, duration: CHAPTER_DURATION_MS }, 4000);
   const outer = world.getObjectByName(WORLD_NODE.outer);
   if (outer) {
-    timeline.add(outer, { y: 0, duration: 700, ease: "outCubic" }, 4200);
+    timeline.add(outer, { y: 0, duration: 500, ease: "outCubic" }, 4100);
   }
 
   // ── Chapter 5: use-case gallery pops in.
   timeline.add(camera, { x: -8, y: 11, z: -12 }, 5000);
-  timeline.add(lookTarget, { x: 4, y: 1, z: -3, duration: 800 }, 5000);
-  timeline.add(walk, { t: 0.78 }, 5000);
+  timeline.add(lookTarget, { x: 4, y: 1, z: -3, duration: 500 }, 5000);
+  timeline.add(walk, { t: 0.78, duration: CHAPTER_DURATION_MS }, 5000);
   const gallery = world.getObjectByName(WORLD_NODE.gallery);
   if (gallery) {
-    timeline.add(gallery, { scale: 1, duration: 600, ease: "outBack" }, 5200);
+    timeline.add(gallery, { scale: 1, duration: 450, ease: "outBack" }, 5150);
   }
 
   // ── Chapter 6: CTA — settle into a calm wide framing.
   timeline.add(camera, { x: 15, y: 17, z: 21 }, 6000);
-  timeline.add(lookTarget, { x: 0, y: 1, z: 0, duration: 900 }, 6000);
-  timeline.add(walk, { t: 0.92 }, 6000);
+  timeline.add(lookTarget, { x: 0, y: 1, z: 0, duration: 500 }, 6000);
+  timeline.add(walk, { t: 0.92, duration: CHAPTER_DURATION_MS }, 6000);
 
   // Materialize the full duration even if a chapter ends with a short
   // tween (keeps duration === CHAPTER_COUNT * CHAPTER_DURATION_MS).

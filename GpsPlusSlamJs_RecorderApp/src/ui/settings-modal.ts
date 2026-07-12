@@ -22,6 +22,10 @@ import {
   type OccluderDebugStyle,
 } from '../state/recording-options';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
+import {
+  BLUR_METRIC_IDS,
+  type BlurMetricId,
+} from 'gps-plus-slam-app-framework/ar/image-quality';
 import { getBuildInfo } from '../utils/build-info';
 import { showConfirmDialog } from './confirm-dialog';
 
@@ -70,6 +74,7 @@ let imagesResolutionDivisorSlider: HTMLInputElement | null = null;
 let imagesResolutionDivisorValue: HTMLElement | null = null;
 let imagesMotionFilterCheckbox: HTMLInputElement | null = null;
 let imagesQualityFilterCheckbox: HTMLInputElement | null = null;
+let imagesBlurMetricSelect: HTMLSelectElement | null = null;
 let imagesBlurThresholdSlider: HTMLInputElement | null = null;
 let imagesBlurThresholdValue: HTMLElement | null = null;
 let imagesMinLuminanceSlider: HTMLInputElement | null = null;
@@ -181,6 +186,9 @@ export function initSettingsModal(
   imagesQualityFilterCheckbox = document.getElementById(
     'images-quality-filter'
   ) as HTMLInputElement;
+  imagesBlurMetricSelect = document.getElementById(
+    'images-blur-metric'
+  ) as HTMLSelectElement;
   imagesBlurThresholdSlider = document.getElementById(
     'images-blur-threshold'
   ) as HTMLInputElement;
@@ -541,6 +549,20 @@ export function initSettingsModal(
       const value = parseFloat(imagesMinLuminanceSlider.value);
       workingOptions.images.qualityFilter.minMeanLuminance = value;
       imagesMinLuminanceValue.textContent = formatMinLuminance(value);
+    }
+  });
+
+  imagesBlurMetricSelect?.addEventListener('change', () => {
+    if (workingOptions && imagesBlurMetricSelect) {
+      // Membership-check rather than trusting the DOM value — save-time
+      // validation would catch it too, but never let an invalid id sit in
+      // the working copy.
+      const value = imagesBlurMetricSelect.value as BlurMetricId;
+      workingOptions.images.qualityFilter.blurMetric = BLUR_METRIC_IDS.includes(
+        value
+      )
+        ? value
+        : 'variance-of-laplacian';
     }
   });
 
@@ -929,6 +951,11 @@ function populateForm(options: RecordingOptions): void {
       options.images.qualityFilter.minMeanLuminance
     );
   }
+  if (imagesBlurMetricSelect) {
+    // Persisted pre-toggle options may lack blurMetric — render the default.
+    imagesBlurMetricSelect.value =
+      options.images.qualityFilter.blurMetric ?? 'variance-of-laplacian';
+  }
 
   if (arDomOverlayEnabledCheckbox) {
     arDomOverlayEnabledCheckbox.checked =
@@ -1178,7 +1205,8 @@ function updateImageControlsState(): void {
   if (imagesMaxLinearSlider) {
     imagesMaxLinearSlider.disabled = !motionEnabled;
   }
-  // The quality threshold sliders require BOTH capture and the quality gate on.
+  // The quality threshold sliders (and the metric select) require BOTH
+  // capture and the quality gate on.
   const qualityEnabled =
     enabled && (imagesQualityFilterCheckbox?.checked ?? false);
   if (imagesBlurThresholdSlider) {
@@ -1186,6 +1214,9 @@ function updateImageControlsState(): void {
   }
   if (imagesMinLuminanceSlider) {
     imagesMinLuminanceSlider.disabled = !qualityEnabled;
+  }
+  if (imagesBlurMetricSelect) {
+    imagesBlurMetricSelect.disabled = !qualityEnabled;
   }
 }
 

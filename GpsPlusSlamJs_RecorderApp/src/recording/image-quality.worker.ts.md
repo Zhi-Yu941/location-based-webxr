@@ -17,7 +17,15 @@
     `image-quality-client.test.ts` (fake worker).
   - **Downscale to `MAX_ANALYZE_EDGE` (320 px long edge).** Variance-of-Laplacian
     and mean-luminance are robust to downscaling, and a small buffer keeps the
-    per-frame cost trivial. Placeholder pending field tuning.
+    per-frame cost trivial. Placeholder pending field tuning. Confirmed
+    non-sensitive by the 2026-07-12 offline benchmark (256/320/384 flip ≤ 2 of
+    156 gate verdicts).
+  - **Metric selection stays in the framework.** The sharpness scorer is
+    resolved via `blurMetricScorer(config.blurMetric)` (2026-07-12 blur-metric
+    toggle plan): `'variance-of-laplacian'` (default; also the fallback for
+    `undefined`/unknown ids from pre-toggle persisted configs) or
+    `'high-frequency-energy-ratio'`. The worker never inspects the id itself,
+    so the mapping remains unit-tested framework logic.
   - **One gate instance per recording.** An `init` resets it, so the rolling
     sharpness baseline never carries across recordings.
   - **Fail-open.** A decode failure or any thrown error replies `accept:true`

@@ -261,7 +261,35 @@ describe('recording-options', () => {
         blurRelativeThreshold: 0.6,
         minMeanLuminance: 12,
         maxWaitMs: 3000,
+        // Missing in the input (pre-toggle persisted shape) → the default.
+        blurMetric: 'variance-of-laplacian',
       });
+    });
+
+    it('normalizes blurMetric: valid ids kept, missing/unknown → variance-of-laplacian', () => {
+      // Why this test matters: the blur-metric toggle (2026-07-12 plan) rides
+      // on persisted options — a pre-toggle persisted config (no blurMetric)
+      // or a value written by a different app version must silently fall back
+      // to variance-of-laplacian (the original behavior), never leak an
+      // invalid id to the worker.
+      const base = {
+        enabled: true,
+        blurRelativeThreshold: 0.5,
+        minMeanLuminance: 10,
+        maxWaitMs: 4000,
+      };
+      const kept = validateImageOptions({
+        qualityFilter: { ...base, blurMetric: 'high-frequency-energy-ratio' },
+      });
+      expect(kept.qualityFilter.blurMetric).toBe('high-frequency-energy-ratio');
+
+      const missing = validateImageOptions({ qualityFilter: { ...base } });
+      expect(missing.qualityFilter.blurMetric).toBe('variance-of-laplacian');
+
+      const bogus = validateImageOptions({
+        qualityFilter: { ...base, blurMetric: 'bogus' as never },
+      });
+      expect(bogus.qualityFilter.blurMetric).toBe('variance-of-laplacian');
     });
 
     it('clamps out-of-range qualityFilter thresholds and rejects NaN', () => {

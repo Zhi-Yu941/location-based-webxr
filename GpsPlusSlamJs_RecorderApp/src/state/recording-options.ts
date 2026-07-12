@@ -25,6 +25,8 @@ import {
 } from 'gps-plus-slam-app-framework/ar/capture-motion-gate';
 import {
   DEFAULT_QUALITY_FILTER,
+  BLUR_METRIC_IDS,
+  type BlurMetricId,
   type QualityFilterConfig,
 } from 'gps-plus-slam-app-framework/ar/image-quality';
 import {
@@ -831,7 +833,10 @@ export function validateMotionFilterOptions(
  * with a `Number.isFinite` guard (a stored `NaN` is `typeof 'number'` and would
  * survive `clamp`). A missing group default-fills entirely — a pre-feature
  * persisted options object that lacks `qualityFilter` loads with the gate
- * disabled (the safe default) rather than crashing.
+ * disabled (the safe default) rather than crashing. `blurMetric` is
+ * membership-validated against `BLUR_METRIC_IDS`: a missing (pre-toggle) or
+ * unknown (other-app-version) value falls back to variance-of-Laplacian —
+ * the original behavior (2026-07-12 blur-metric-toggle plan).
  */
 export function validateQualityFilterOptions(
   options: Partial<QualityFilterConfig>
@@ -854,6 +859,11 @@ export function validateQualityFilterOptions(
       QUALITY_FILTER_CONSTRAINTS.maxWaitMs.min,
       QUALITY_FILTER_CONSTRAINTS.maxWaitMs.max
     ),
+    // Last so the validated object serializes in DEFAULT_QUALITY_FILTER's key
+    // order (persisted JSON stays byte-comparable across save→validate).
+    blurMetric: BLUR_METRIC_IDS.includes(options.blurMetric as BlurMetricId)
+      ? options.blurMetric
+      : (defaults.blurMetric ?? 'variance-of-laplacian'),
   };
 }
 

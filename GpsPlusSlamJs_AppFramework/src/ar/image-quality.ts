@@ -262,8 +262,8 @@ function largestPow2AtMost(n: number): number {
 }
 
 /**
- * In-place iterative radix-2 Cooley-Tukey FFT. `re`/`im` length must be a
- * power of two (guaranteed by the caller's crop).
+ * In-place iterative radix-2 FFT (decimation-in-time). `re`/`im` length must
+ * be a power of two (guaranteed by the caller's crop).
  */
 function fftInPlace(re: Float64Array, im: Float64Array): void {
   const n = re.length;

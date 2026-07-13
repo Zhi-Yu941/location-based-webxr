@@ -5,8 +5,9 @@
 The entry document of the landing app served at the **root** (`/`) of
 `gps.csutil.com`. It carries the entire chapter copy as **real DOM text**
 (SEO, accessibility, and the no-WebGL floor — the plan's "Content in DOM"
-decision), the dual-theme CSS, and the mount points for the 3D scroll
-story that `src/main.ts` boots behind the copy.
+decision), the per-palette CSS (five palettes, see `src/theme.ts`), and
+the mount points for the 3D scroll story that `src/main.ts` boots behind
+the copy.
 
 ## Structure
 
@@ -16,9 +17,11 @@ story that `src/main.ts` boots behind the copy.
   button (its `aria-label` announces the active palette).
 - `<main id="story">` — seven `<section class="chapter" id="chapter-<id>">`
   in the order defined by `src/chapters.ts` (hero, qr, fusion, dive,
-  anywhere, gallery, cta). Each carries a `.copy` glass panel with the
-  punchy-marketing copy (round-2 interview decision). The active section
-  gets `.active` (full opacity) from `main.ts`.
+  anywhere, gallery, cta). The hero carries its content in a panel-less
+  `.hero-content` block (normal-landing layout, round-2 R4); every other
+  chapter carries a `.copy` glass panel with the punchy-marketing copy
+  (round-2 interview decision). The active section gets `.active` (full
+  opacity) from `main.ts`.
 - The CTA section holds the primary "Fork & start building" button, the
   demos hub (four `.demo-card`s with inline-SVG vignettes keeping the
   proven one-line descriptions), the external links, and the license

@@ -15,15 +15,15 @@ import { namedGroup } from "./palette";
 import type { CatmullRomCurve3, Group } from "three";
 
 /**
- * World-detail layer (v3 F7): instanced grass tufts, a low curb edge
- * along the path, and soft fake contact shadows under the anchored
- * props. Everything is deterministic (seeded LCG) and cheap — grass and
- * curb are ONE InstancedMesh each (single draw call), shadows are flat
- * alpha-gradient discs (no extra lights, no shadow-map cost).
+ * World-detail layer (v3 F7): instanced grass tufts and soft fake
+ * contact shadows under the anchored props. Everything is deterministic
+ * (seeded LCG) and cheap — the grass is ONE InstancedMesh (single draw
+ * call), shadows are flat alpha-gradient discs (no extra lights, no
+ * shadow-map cost). The F7 curb stones were REMOVED in round-9: they
+ * read as distracting spikes beside the path (test-pinned).
  */
 
 export const GRASS_NAME = "world-grass";
-export const CURB_NAME = "world-curb";
 export const CONTACT_SHADOWS_NAME = "world-contact-shadows";
 export const CONTACT_SHADOW_PREFIX = "contact-shadow-";
 
@@ -33,8 +33,6 @@ export const GRASS_COUNTS = { high: 300, low: 100 } as const;
 const PATH_CLEARANCE = 1.2;
 const ANCHOR_CLEARANCE = 2.5;
 const WORLD_RADIUS = 30;
-/** Curb stones sit just outside the 1.6-wide path slabs. */
-const CURB_OFFSET = 0.95;
 
 /** Deterministic LCG (same recipe as clay-world) — art, not crypto. */
 function createRng(seed: number): () => number {
@@ -117,39 +115,6 @@ export function buildGrass(
   }
   grass.instanceMatrix.needsUpdate = true;
   return grass;
-}
-
-/** Curb stones along BOTH edges of the path, following the tangent. */
-export function buildCurb(
-  detail: "high" | "low",
-  curve: CatmullRomCurve3,
-): InstancedMesh {
-  const stonesPerSide = detail === "high" ? 60 : 30;
-  const geometry = new ConeGeometry(0.09, 0.16, 5);
-  geometry.translate(0, 0.08, 0);
-  const curb = new InstancedMesh(geometry, detailMaterial(), stonesPerSide * 2);
-  curb.name = CURB_NAME;
-  curb.userData.paletteRole = "curb";
-  curb.castShadow = false;
-  curb.receiveShadow = false;
-
-  const matrix = new Matrix4();
-  const quaternion = new Quaternion();
-  for (let i = 0; i < stonesPerSide; i += 1) {
-    const t = i / (stonesPerSide - 1);
-    const point = curve.getPointAt(t);
-    const tangent = curve.getTangentAt(t);
-    const perpendicular = new Vector3(tangent.z, 0, -tangent.x).normalize();
-    for (const side of [-1, 1]) {
-      const position = point
-        .clone()
-        .add(perpendicular.clone().multiplyScalar(CURB_OFFSET * side));
-      matrix.compose(position, quaternion, new Vector3(1, 1, 1));
-      curb.setMatrixAt(i * 2 + (side === -1 ? 0 : 1), matrix);
-    }
-  }
-  curb.instanceMatrix.needsUpdate = true;
-  return curb;
 }
 
 /** Radial alpha falloff texture (procedural — works headless in tests). */

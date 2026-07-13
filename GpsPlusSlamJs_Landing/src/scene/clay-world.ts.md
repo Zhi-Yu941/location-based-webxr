@@ -15,9 +15,9 @@ via a seeded LCG.
 
 - `buildClayWorld(detail: 'high' | 'low') → Group` — the full world;
   `low` builds fewer decoration meshes and path segments. Includes the
-  v3 F7 detail layer from `world-detail.ts` (instanced grass + curb,
-  contact shadows — nodes `world-grass`, `world-curb`,
-  `world-contact-shadows`).
+  v3 F7 detail layer from `world-detail.ts` (instanced grass + contact
+  shadows — nodes `world-grass`, `world-contact-shadows`; the curb
+  stones were removed in round-9).
 - `WORLD_NODE` — the names of every addressable node (`root`, `ground`,
   `path`, `hills`, `trees`, `rocks`, `sign`, `statue`, `snapRing`,
   `outer`, `arContent`). The story timeline looks these up by name.

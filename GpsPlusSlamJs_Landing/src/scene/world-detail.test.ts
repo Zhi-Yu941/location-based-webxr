@@ -1,23 +1,22 @@
 /**
  * Why these tests matter: the world-detail layer (v3 F7) adds hundreds
- * of grass instances and curb stones — cheap ONLY as single-draw-call
- * InstancedMeshes with tier-scaled counts. These tests pin the counts
- * (low tier keeps its cost profile), the placement contracts (curb hugs
- * the path edge; grass never blocks the walk or the story anchors), the
- * contact shadows under the anchored props (flat on the ground, not
- * billboards), and determinism (two loads look identical).
+ * of grass instances — cheap ONLY as a single-draw-call InstancedMesh
+ * with tier-scaled counts. These tests pin the counts (low tier keeps
+ * its cost profile), the placement contracts (grass never blocks the
+ * walk or the story anchors), the contact shadows under the anchored
+ * props (flat on the ground, not billboards), determinism (two loads
+ * look identical) — and the round-9 REMOVAL of the curb stones.
  */
 import { describe, expect, it } from "vitest";
 import { Matrix4, Vector3, type InstancedMesh, type Mesh } from "three";
 import { THEME_IDS } from "../theme";
 import { getPalette } from "./palette";
-import { createPathCurve, WORLD_ANCHORS } from "./clay-world";
+import { buildClayWorld, createPathCurve, WORLD_ANCHORS } from "./clay-world";
 import {
   CONTACT_SHADOW_PREFIX,
   GRASS_COUNTS,
   buildContactShadow,
   buildContactShadows,
-  buildCurb,
   buildGrass,
 } from "./world-detail";
 import { buildDotPerson } from "./dot-person";
@@ -42,11 +41,10 @@ function pathSamples(): Vector3[] {
 }
 
 describe("palette roles for the detail layer", () => {
-  it("every palette styles grass and curb", () => {
+  it("every palette styles grass", () => {
     for (const theme of THEME_IDS) {
       const roles = getPalette(theme).roles;
       expect(roles.grass, theme).toBeDefined();
-      expect(roles.curb, theme).toBeDefined();
     }
   });
 });
@@ -84,22 +82,19 @@ describe("buildGrass", () => {
   });
 });
 
-describe("buildCurb", () => {
-  it("hugs the path: every curb stone sits just off the slab edge", () => {
-    const curb = buildCurb("high", createPathCurve());
-    const path = pathSamples();
-    for (const position of instancePositions(curb)) {
-      const distance = Math.min(...path.map((p) => p.distanceTo(position)));
-      // Slab half-width is 0.8; the curb line sits at ~0.95.
-      expect(distance).toBeGreaterThan(0.7);
-      expect(distance).toBeLessThan(1.3);
-    }
-  });
-
-  it("scales with the tier's path segment count", () => {
-    expect(buildCurb("high", createPathCurve()).count).toBeGreaterThan(
-      buildCurb("low", createPathCurve()).count,
-    );
+describe("curb stones — removed again (round-9)", () => {
+  it("the world carries NO curb-role objects (they read as distracting spikes beside the path)", () => {
+    // Round-9 feedback explicitly killed the v3 F7 curb ("Stacheln links
+    // und rechts neben dem Weg … die würde ich ganz wegmachen"). This
+    // pin keeps them from sneaking back in citing F7.
+    const world = buildClayWorld("high");
+    const curbNodes: string[] = [];
+    world.traverse((obj) => {
+      if ((obj.userData.paletteRole as string) === "curb") {
+        curbNodes.push(obj.name || obj.type);
+      }
+    });
+    expect(curbNodes).toEqual([]);
   });
 });
 

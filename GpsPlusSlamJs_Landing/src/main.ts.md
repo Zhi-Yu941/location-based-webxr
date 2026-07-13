@@ -32,6 +32,8 @@ None (side-effect entry module loaded by `index.html`).
   consumers: the CTA claim upgrade (`ar-support.ts`) and the desktop
   QR handoff (`qr-handoff.ts`, v2 B2 — fine pointer + ≥768 px viewport,
   QR encodes `location.href`).
+- `visibilitychange` is wired to `scene.setPageVisible` (v3 F2): the
+  continuous particle render stops entirely while the tab is hidden.
 
 ## Examples
 

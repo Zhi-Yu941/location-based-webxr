@@ -217,6 +217,50 @@ describe("createSceneController", () => {
     expect(camera.position.distanceTo(heroPos)).toBeLessThan(0.5);
   });
 
+  // Why these tests matter (v3 F2): the ambient particles moved the page
+  // from strict render-on-demand to CONTINUOUS rendering — acceptable
+  // only because it is gated by tab visibility and tier. If the gates
+  // leak, hidden tabs and weak/reduced-motion devices burn GPU forever.
+  it("renders continuously on the high scroll tier (particles), stopping while the tab is hidden", () => {
+    const { controller, renderer } = makeController({
+      ...TIER,
+      geometryDetail: "high",
+    });
+    controller?.setTargetProgress(0.5);
+    for (let i = 1; i <= 400; i++) {
+      controller?.tick(i * 16);
+    }
+    const settled = renderer.renders;
+    controller?.tick(401 * 16);
+    controller?.tick(402 * 16);
+    // Unlike the low tier, idle ticks KEEP rendering (particles move).
+    expect(renderer.renders).toBeGreaterThan(settled);
+
+    controller?.setPageVisible(false);
+    const hiddenAt = renderer.renders;
+    controller?.tick(403 * 16);
+    controller?.tick(404 * 16);
+    expect(renderer.renders).toBe(hiddenAt);
+
+    controller?.setPageVisible(true);
+    controller?.tick(405 * 16);
+    expect(renderer.renders).toBeGreaterThan(hiddenAt);
+  });
+
+  it("builds no particles under reduced motion — idle ticks stay render-free", () => {
+    const { controller, renderer } = makeController({
+      ...TIER,
+      geometryDetail: "high",
+      mode: "reduced-motion",
+    });
+    controller?.showChapterEndState(2);
+    controller?.tick(16);
+    const settled = renderer.renders;
+    controller?.tick(32);
+    controller?.tick(48);
+    expect(renderer.renders).toBe(settled);
+  });
+
   // Why these composer tests matter (v3 F1): bloom runs through an
   // EffectComposer that REPLACES the plain render call on the high tier.
   // If the gate leaks, weak devices pay for bloom; if disposal on context

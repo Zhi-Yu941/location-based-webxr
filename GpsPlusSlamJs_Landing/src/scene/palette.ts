@@ -75,6 +75,14 @@ export interface ScenePalette {
     readonly accents: SkyAccents;
     readonly accentColor: number;
   };
+  /**
+   * Ambient particle field (v3 F2); consumed by `particles.ts`. Style
+   * picks the motion/appearance tuning (fireflies bob, dust drifts).
+   */
+  readonly particles: {
+    readonly color: number;
+    readonly style: "fireflies" | "dust" | "motes";
+  };
   readonly roles: Readonly<Record<PaletteRole, RoleStyle>>;
 }
 
@@ -92,6 +100,7 @@ const LIGHT: ScenePalette = {
     accents: "none",
     accentColor: 0xffffff,
   },
+  particles: { color: 0xffffff, style: "motes" },
   roles: {
     ground: { color: 0xe9e6df },
     path: { color: 0xd8d2c6 },
@@ -136,6 +145,7 @@ const DARK: ScenePalette = {
     accents: "moon-stars",
     accentColor: 0xdde3ff,
   },
+  particles: { color: 0xffe9a8, style: "fireflies" },
   roles: {
     ground: { color: 0x2a2a34 },
     path: { color: 0x50505e },
@@ -180,6 +190,7 @@ const NEON: ScenePalette = {
     accents: "star-grid",
     accentColor: 0x22d3ee,
   },
+  particles: { color: 0x67e8f9, style: "dust" },
   roles: {
     ground: { color: 0x11162b },
     path: { color: 0x1c2340 },
@@ -218,6 +229,7 @@ const DUSK: ScenePalette = {
     accents: "sun",
     accentColor: 0xffc08a,
   },
+  particles: { color: 0xffd9a0, style: "fireflies" },
   roles: {
     ground: { color: 0x4b3566 },
     path: { color: 0x5d4680 },
@@ -258,6 +270,7 @@ const MONO: ScenePalette = {
     accents: "none",
     accentColor: 0xffffff,
   },
+  particles: { color: 0x8a8a84, style: "motes" },
   roles: {
     ground: { color: 0xe8e8e4 },
     path: { color: 0xd2d2cc },

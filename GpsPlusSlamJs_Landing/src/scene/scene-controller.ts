@@ -19,6 +19,11 @@ import type { QualityTier } from "../capability";
 import type { Theme } from "../theme";
 import { applyPaletteToScene, getPalette } from "./palette";
 import { applySkyPalette, buildSkyDome } from "./sky-dome";
+import {
+  applyParticlePalette,
+  buildParticleField,
+  updateParticles,
+} from "./particles";
 import { buildClayWorld } from "./clay-world";
 import { buildDotPerson } from "./dot-person";
 import { buildMarkerPair } from "./markers";
@@ -119,6 +124,13 @@ export interface SceneController {
   playIntro(): void;
   skipIntro(): void;
   handleResize(width: number, height: number): void;
+  /**
+   * Visibility gate for the continuous particle render (v3 F2): the
+   * bootstrap wires `visibilitychange` to this. While hidden (or on
+   * tiers without particles) the controller falls back to pure
+   * render-on-demand.
+   */
+  setPageVisible(visible: boolean): void;
   /** Advance smoothing/intro and render if dirty. Called by start()'s loop. */
   tick(nowMs: number): void;
   /** Begin the rAF loop (browser only; tests call tick directly). */
@@ -210,6 +222,13 @@ export function createSceneController(
     shadowCam.bottom = -30;
   }
   const sky = buildSkyDome();
+  // Ambient particles (v3 F2): scroll mode + high tier only — reduced
+  // motion must stay still and the low tier keeps its cost profile, so
+  // neither even builds the field.
+  const particles =
+    tier.mode === "scroll" && tier.geometryDetail === "high"
+      ? buildParticleField()
+      : null;
   scene.add(
     world,
     sky,
@@ -219,6 +238,9 @@ export function createSceneController(
     markers.connectors,
     camera,
   );
+  if (particles) {
+    scene.add(particles);
+  }
   scene.add(hemisphere, directional);
 
   let dirty = true;
@@ -235,6 +257,9 @@ export function createSceneController(
     const palette = getPalette(theme);
     applyPaletteToScene(scene, palette);
     applySkyPalette(sky, palette);
+    if (particles) {
+      applyParticlePalette(particles, palette);
+    }
     scene.background = new Color(palette.background);
     scene.fog = new Fog(palette.fog.color, palette.fog.near, palette.fog.far);
     hemisphere.color.setHex(palette.hemisphere.sky);
@@ -287,6 +312,7 @@ export function createSceneController(
 
   let targetProgress = 0;
   let displayedProgress = 0;
+  let pageVisible = true;
   let lastTickMs: number | null = null;
   let introStartedAt: number | null = null;
   // The camera pose the timelines produced, BEFORE the ambient hero drift
@@ -380,7 +406,12 @@ export function createSceneController(
         Math.max(0, chapterEndTime(chapterIndex)),
         story.duration,
       );
-      seekStory(story.duration === 0 ? 0 : time / story.duration);
+      const progress = story.duration === 0 ? 0 : time / story.duration;
+      // Also retarget the scrub: otherwise the next ticks would ease the
+      // composition back toward the stale target (visible as a slow
+      // slide to the hero framing in reduced-motion mode).
+      targetProgress = progress;
+      seekStory(progress);
     },
     applyTheme: applyThemeInternal,
     playIntro() {
@@ -393,6 +424,12 @@ export function createSceneController(
         syncStage(stage);
         scrubbedCameraPos.copy(stage.camera.position);
         introStartedAt = null;
+        dirty = true;
+      }
+    },
+    setPageVisible(visible: boolean) {
+      pageVisible = visible;
+      if (visible) {
         dirty = true;
       }
     },
@@ -417,6 +454,13 @@ export function createSceneController(
         advanceScrub(dt);
       }
       applyAmbientDrift(nowMs);
+      // Continuous particle animation (v3 F2), gated by tab visibility:
+      // a hidden tab burns no GPU, everything else renders every frame.
+      // This consciously supersedes strict render-on-demand (sidecar).
+      if (particles && pageVisible) {
+        updateParticles(particles, nowMs);
+        dirty = true;
+      }
       if (dirty) {
         camera.lookAt(stage.lookTarget);
         if (composer) {

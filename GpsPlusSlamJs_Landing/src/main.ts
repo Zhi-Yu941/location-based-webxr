@@ -214,6 +214,12 @@ function boot(): void {
     }
   };
 
+  // Visibility gate for the continuous particle render (v3 F2): a
+  // hidden tab must burn no GPU.
+  document.addEventListener("visibilitychange", () => {
+    scene?.setPageVisible(!document.hidden);
+  });
+
   let introRunning = false;
   if (scene && tier.mode === "scroll") {
     if (scroller.scrollTop < 40) {

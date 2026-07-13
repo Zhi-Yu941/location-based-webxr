@@ -21,16 +21,23 @@ renders on demand.
 - `SceneController`: `stage`, `setTargetProgress(0..1)`,
   `showChapterEndState(chapterIndex)` (reduced-motion),
   `applyTheme(theme)`, `playIntro()` / `skipIntro()`,
-  `handleResize(w, h)`, `tick(nowMs)`, `start()`.
+  `handleResize(w, h)`, `setPageVisible(visible)` (v3 F2 visibility
+  gate), `tick(nowMs)`, `start()`.
 - `RendererLike`, `ComposerLike`, `SceneControllerOptions` types (the
   container shape is structural/module-private).
 
 ## Invariants & assumptions
 
-- **Render on demand:** a frame renders only when something changed
-  (scrub, intro, theme, resize, ambient hero drift). Idle ticks away from
-  the hero render nothing (test-pinned) — battery matters on the phones
-  this page targets.
+- **Render on demand — SUPERSEDED on the high scroll tier (v3 F2):**
+  originally a frame rendered only when something changed, so an idle
+  page burned no GPU. The ambient particle field consciously relaxes
+  this: on `mode === "scroll"` + `geometryDetail === "high"` the page
+  renders CONTINUOUSLY so the particles drift — a deliberate battery
+  trade-off accepted in the v3 style exploration (F2). The old guarantee
+  still holds in full on the low tier and under reduced motion (no
+  particle field is even built), and for hidden tabs: the bootstrap
+  wires `visibilitychange` → `setPageVisible`, which stops rendering
+  entirely while hidden (all test-pinned).
 - **One driver:** `tick(nowMs)` advances everything by seeking; the anime
   engine's own loop is never used. `start()` merely wraps `tick` in rAF.
 - **Smoothing:** scroll sets a target; displayed progress converges

@@ -12,7 +12,9 @@ and keeps derived state (dot-person on the path) in sync.
 - `CHAPTER_DURATION_MS` (1000) and `chapterEndTime(index)` — the timeline
   time bases; total duration = `CHAPTER_COUNT × CHAPTER_DURATION_MS`.
 - `createStoryStage(parts: StageParts) → StoryStage` — positions person /
-  markers, parents the phone to the camera (held "in front of the lens"),
+  markers, parents the phone to the camera (held "in front of the lens";
+  the 2.3-unit distance is load-bearing, round-5 W4: the FULL frame must
+  fit the camera frustum incl. mobile-portrait width — test-pinned),
   primes reveal groups (visible but scaled/lowered away), sets the hero
   camera framing. Mutates the passed objects; call once at boot.
 - `buildStoryTimeline(stage, onUpdate) → Timeline` — paused timeline;

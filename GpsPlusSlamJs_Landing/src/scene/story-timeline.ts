@@ -85,9 +85,12 @@ export function createStoryStage(parts: StageParts): StoryStage {
   parts.markers.connectors.scale.setScalar(0.001);
 
   // The phone is held "in front of the lens": parent it to the camera so
-  // the dive works regardless of where the camera flies.
+  // the dive works regardless of where the camera flies. Distance 2.3 is
+  // load-bearing (round-5 W4): the FULL 0.95×1.9 frame must fit the
+  // camera frustum — at the old 1.6 the top/bottom bars ended outside
+  // the viewport, so the "frame" was invisible at final size.
   parts.camera.add(parts.phone);
-  parts.phone.position.set(0, -0.12, -1.6);
+  parts.phone.position.set(0, -0.05, -2.3);
   parts.phone.visible = true;
   parts.phone.scale.setScalar(0.001);
 

@@ -123,7 +123,9 @@ const DARK: ScenePalette = {
     snapRing: { color: ACCENT, emissiveIntensity: 0.9 },
     qrModule: { color: 0xfbbf24, emissiveIntensity: 0.5 },
     poi: { color: ACCENT, emissiveIntensity: 0.8 },
-    phone: { color: 0x101014 },
+    // Blue family + glow (round-5 W4): near-black-on-near-black made the
+    // frame invisible; blue groups it with the AR overlays it frames.
+    phone: { color: 0x3b5b9e, emissiveIntensity: 0.35 },
     screen: { color: 0x2c3550, emissiveIntensity: 0.5 },
     arrow: { color: 0x60a5fa, emissiveIntensity: 0.7 },
     label: { color: 0x93b4ff, emissiveIntensity: 0.7 },

@@ -58,6 +58,14 @@ describe("getPalette", () => {
     expect(contrast("skyline"), "skyline").toBeGreaterThanOrEqual(2.0);
     expect(contrast("path"), "path").toBeGreaterThanOrEqual(2.2);
     expect(contrast("statue"), "statue").toBeGreaterThanOrEqual(3.0);
+    // Round-5 W4: the phone frame was near-black on near-black — it must
+    // clearly stand out AND read as part of the blue (AR) family.
+    expect(contrast("phone"), "phone").toBeGreaterThanOrEqual(2.5);
+    const phone = dark.roles.phone.color;
+    expect(
+      (phone & 0xff) - ((phone >> 16) & 0xff),
+      "phone blue-ness",
+    ).toBeGreaterThan(40);
   });
 
   it("gives the dark theme glowing accents (emissive) and the light theme matte clay", () => {

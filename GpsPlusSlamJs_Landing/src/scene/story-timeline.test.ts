@@ -238,4 +238,26 @@ describe("createStoryStage", () => {
     // the miniature world.
     expect(stage.lookTarget).toBeInstanceOf(Vector3);
   });
+
+  it("anchors the phone so the FULL frame fits the camera frustum (round-5 W4)", () => {
+    // Round-5 feedback: at final size the phone flew in so big "that you
+    // don't see it at all anymore" — at the old 1.6-unit distance the
+    // camera's vertical frustum (fov 55° ⇒ ≈1.67 high) was SMALLER than
+    // the 1.9-high frame, so the top/bottom bars ended outside the
+    // viewport (and on phone portrait the side bars too). Pin: frame
+    // extents (body 0.95×1.9 ⇒ half 0.475/0.95, plus the anchor offset)
+    // fit the frustum at the anchor distance with a small margin, for
+    // desktop height AND mobile-portrait width.
+    const stage = makeStage();
+    const distance = Math.abs(stage.phone.position.z);
+    const halfHeight =
+      Math.tan(((stage.camera.fov / 2) * Math.PI) / 180) * distance;
+    const halfWidthPortrait = halfHeight * (412 / 915);
+    expect(0.95 + Math.abs(stage.phone.position.y)).toBeLessThanOrEqual(
+      halfHeight * 0.95,
+    );
+    expect(0.475 + Math.abs(stage.phone.position.x)).toBeLessThanOrEqual(
+      halfWidthPortrait * 0.95,
+    );
+  });
 });

@@ -13,6 +13,12 @@ import {
   type XrSystemLike,
 } from "./ar-support";
 import { applyQrHandoff, shouldShowQrHandoff } from "./qr-handoff";
+import {
+  CHAPTER_DOTS_CONTAINER_ID,
+  chapterDotsHtml,
+  dotIndexFromClick,
+  updateActiveDot,
+} from "./chapter-dots";
 import { CHAPTERS, sectionElementId } from "./chapters";
 import { heroVeilOpacity } from "./hero-veil";
 import { computeScrollState, type SectionMetrics } from "./scroll-story";
@@ -192,6 +198,27 @@ function boot(): void {
   });
   toggleButton?.addEventListener("click", () => themeController.cycle());
 
+  // Chapter dot rail (v3 F6): filled at boot, active dot follows the
+  // scroll state machine, click = scroll to the chapter (same scroller
+  // mechanism as jump-to-demos; instant under reduced motion).
+  const dots = document.getElementById(CHAPTER_DOTS_CONTAINER_ID);
+  if (dots) {
+    dots.innerHTML = chapterDotsHtml(CHAPTERS);
+    dots.addEventListener("click", (event) => {
+      const index = dotIndexFromClick(event.target);
+      if (index === null) {
+        return;
+      }
+      const top = metrics[index]?.top;
+      if (top !== undefined) {
+        scroller.scrollTo({
+          top,
+          behavior: tier.mode === "scroll" ? "smooth" : "auto",
+        });
+      }
+    });
+  }
+
   const updateHeroExtras = wireHeroExtras(scroller);
   let lastChapterIndex = -1;
   const onScrollChanged = (): void => {
@@ -204,6 +231,9 @@ function boot(): void {
     if (state.chapterIndex !== lastChapterIndex) {
       lastChapterIndex = state.chapterIndex;
       markActiveChapter(sections, state.chapterIndex);
+      if (dots) {
+        updateActiveDot(dots, state.chapterIndex);
+      }
       if (tier.mode === "reduced-motion") {
         // Static compositions instead of scroll scrubbing.
         scene?.showChapterEndState(state.chapterIndex);

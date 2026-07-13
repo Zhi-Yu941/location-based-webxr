@@ -34,6 +34,10 @@ None (side-effect entry module loaded by `index.html`).
   QR encodes `location.href`).
 - `visibilitychange` is wired to `scene.setPageVisible` (v3 F2): the
   continuous particle render stops entirely while the tab is hidden.
+- The chapter dot rail (v3 F6, `chapter-dots.ts`) is filled at boot;
+  the scroll state machine drives `updateActiveDot`, clicks scroll the
+  scroller to the chapter's measured top (smooth in scroll mode,
+  instant under reduced motion).
 
 ## Examples
 

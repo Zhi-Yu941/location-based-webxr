@@ -15,6 +15,11 @@ the copy.
   into (`aria-hidden`, z-index 0; hidden entirely under `body.no-webgl`).
 - `.top-bar` — brand ("Location-based WebXR") + `#theme-toggle` palette-icon
   button (its `aria-label` announces the active palette).
+- `#chapter-dots` — the fixed chapter progress rail (v3 F6): ships as an
+  EMPTY `<nav>` (`:empty` hides it — progressive enhancement);
+  `src/chapter-dots.ts` fills it at boot with one button per chapter,
+  labels from `chapters.ts` as aria-labels. Active dot = accent; click
+  scrolls to the chapter; smaller/tighter below 600 px.
 - The hero also carries the `.hero-snippet` code block (v2 B3/B9,
   "Framework-Minimal"): the shortest REAL `gps-plus-slam-app-framework`
   sequence to a GPS anchor, hand-highlighted with `.hl-kw`/`.hl-lit`

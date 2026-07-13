@@ -158,6 +158,18 @@ test("FAQ accordions exist and open natively", async ({ page }) => {
   await expect(first.locator("p")).toBeVisible();
 });
 
+test("chapter dot rail navigates the story", async ({ page }) => {
+  // v3 F6: seven dots (one per chapter, labels from chapters.ts as
+  // aria-labels), click scrolls to the chapter and the active dot moves.
+  await page.goto("/");
+  await expect(page.locator("#chapter-dots button")).toHaveCount(7);
+  await page.locator('#chapter-dots button[data-index="6"]').click();
+  await expect(page.locator("#chapter-cta.active")).toBeAttached();
+  await expect(
+    page.locator('#chapter-dots button[data-index="6"].active'),
+  ).toBeAttached();
+});
+
 test("desktop without WebXR gets the QR handoff in the CTA", async ({
   page,
 }) => {

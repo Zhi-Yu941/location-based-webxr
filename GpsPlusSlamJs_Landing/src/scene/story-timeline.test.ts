@@ -130,6 +130,37 @@ describe("buildStoryTimeline", () => {
     expect(arContent?.scale.x ?? 0).toBeGreaterThan(0.9);
   });
 
+  it("sequences the dive (round-4 V2): camera settles close behind the person, THEN the phone flies in, AR appears with its arrival", () => {
+    // Round-4 feedback: the phone frame used to fly toward the camera
+    // while the person (with the raised arm the phone is visibly NOT
+    // attached to) still filled the frame, and the AR content was already
+    // in place. Wanted dramaturgy, pinned here: (1) camera settles close
+    // behind/above the person ("a bit further forward" than round-2's 1.4
+    // units — less person in frame), (2) only then the phone flies in,
+    // (3) the AR elements fade in together with the phone's arrival.
+    const timeline = buildStoryTimeline(stage, () => {});
+    const arContent = stage.world.getObjectByName(WORLD_NODE.arContent);
+
+    timeline.seek(3550); // camera-settle time (framing tweens = 55% window)
+    syncStage(stage);
+    const horizontal = Math.hypot(
+      stage.camera.position.x - stage.person.position.x,
+      stage.camera.position.z - stage.person.position.z,
+    );
+    expect(horizontal).toBeLessThan(1.0);
+    expect(stage.phone.scale.x).toBeLessThan(0.05); // phone still hidden
+    expect(arContent?.scale.x ?? 99).toBeLessThan(0.05); // AR still collapsed
+
+    timeline.seek(3700); // phone mid-flight
+    expect(stage.person.scale.x).toBeLessThan(0.01); // person already gone
+    expect(stage.phone.scale.x).toBeGreaterThan(0.1);
+    expect(arContent?.scale.x ?? 99).toBeLessThan(0.05); // AR still waiting
+
+    timeline.seek(chapterEndTime(3)); // phone at target
+    expect(stage.phone.scale.x).toBeGreaterThan(0.9);
+    expect(arContent?.scale.x ?? 0).toBeGreaterThan(0.9); // faded in with it
+  });
+
   it("raises the phone arm, hides the person inside the view, and restores both", () => {
     // Round-2 R10: mid-dive the person raises the arm holding the phone;
     // once the camera is "inside" the phone view the person disappears

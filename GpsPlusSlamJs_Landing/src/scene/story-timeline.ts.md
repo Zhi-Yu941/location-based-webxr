@@ -52,12 +52,17 @@ and keeps derived state (dot-person on the path) in sync.
   raw marker's jitter IS the product message (test-pinned).
 - The camera look direction is decoupled: tweens move `stage.lookTarget`
   (a bare Vector3); the render loop calls `camera.lookAt(...)`.
-- Chapter staging summary (round-2): hero push-in (person hidden in the
-  sky above the QR drop point) → QR: settle-wiggle, accuracy ring fades
-  in LARGE and collapses onto the drop point, person sky-drops with a
-  bounce (`stage.drop.y`, applied in `syncStage`) → fusion: static
-  scattered rings, connector reveal, pin pulse → dive to eye level +
-  phone raise → pull-back + outer-terrain rise → calm CTA framing.
+- Chapter staging summary (round-2, dive re-sequenced round-4 V2): hero
+  push-in (person hidden in the sky above the QR drop point) → QR:
+  settle-wiggle, accuracy ring fades in LARGE and collapses onto the drop
+  point, person sky-drops with a bounce (`stage.drop.y`, applied in
+  `syncStage`) → fusion: static scattered rings, connector reveal, pin
+  pulse → dive: arm raise, camera settles CLOSE behind the person (0.6
+  units — the person hides as it closes in), only THEN the phone frame
+  flies in, and the AR content fades in together with the phone's
+  arrival (deliberately completing near the window END — the requested
+  dramaturgy, a documented deviation from the "settled by mid-window"
+  default) → pull-back + outer-terrain rise → calm CTA framing.
 - The walk starts at `DROP_PATH_T` (the QR drop point) — there is no walk
   tween in the QR chapter; the drop replaces the old slide-in.
 
@@ -75,5 +80,6 @@ camera.lookAt(stage.lookTarget);
 
 `story-timeline.test.ts` — duration coverage, camera movement per chapter,
 raw-jitters/fused-still, path walking (via the syncStage contract), phone +
-gallery reveals, dirty-notify on scrub, scrub-back restoration, intro
-hand-over framing, stage placement.
+gallery reveals, the round-4 dive ordering (camera → phone → AR), dirty-
+notify on scrub, scrub-back restoration, intro hand-over framing, stage
+placement.

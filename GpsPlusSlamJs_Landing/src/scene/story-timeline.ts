@@ -237,10 +237,13 @@ export function buildStoryTimeline(
   const eyeT = 0.5;
   const eyePoint = stage.curve.getPointAt(eyeT);
   const eyeTangent = stage.curve.getTangentAt(eyeT);
+  // 0.6 behind the person, just above the head (round-4 V2: "behind the
+  // arm and a bit further forward" — at round-2's 1.4 the whole person
+  // stayed in frame while the phone flew past them).
   const divePos = eyePoint
     .clone()
-    .sub(eyeTangent.clone().multiplyScalar(1.4))
-    .add(new Vector3(0, 1.9, 0));
+    .sub(eyeTangent.clone().multiplyScalar(0.6))
+    .add(new Vector3(0, 1.8, 0));
   const diveLook = stage.curve
     .getPointAt(Math.min(1, eyeT + 0.12))
     .add(new Vector3(0, 1.3, 0));
@@ -421,29 +424,15 @@ export function buildStoryTimeline(
     2550,
   );
 
-  // Dive chapter: the AR content (trail arrows, POI pin, hinted label)
-  // appears in the world just before the phone window rises...
+  // Dive chapter, re-sequenced per round-4 V2. The wanted dramaturgy:
+  // (1) the arm raises, (2) the camera flies close behind the arm (the
+  // person hides as it closes in — you cannot see yourself through your
+  // own screen, and this masks that the phone is not attached to the
+  // arm), (3) only THEN the phone frame flies in, (4) the AR content
+  // fades in together with the phone's arrival. DELIBERATE deviation from
+  // the "settled by mid-window" default: the composition completes near
+  // the window's end — that staging IS the requested effect.
   const arContent = world.getObjectByName(WORLD_NODE.arContent);
-  if (arContent) {
-    timeline.add(
-      arContent,
-      { scale: { from: 0.001, to: 1 }, duration: 350, ease: "outBack" },
-      3150,
-    );
-  }
-  // ...then the phone rises in front of the lens...
-  timeline.add(
-    phone,
-    { scale: { from: 0.001, to: 1 }, duration: 300, ease: "outBack" },
-    3320,
-  );
-  // ...and drops away again on the pull-back.
-  timeline.add(phone, { scale: { from: 1, to: 0.001 }, duration: 150 }, 4000);
-
-  // Dive body language (round-2 R10): the person raises the phone arm as
-  // the camera approaches, disappears once we are "inside" the phone view
-  // (you cannot see yourself through your own screen), and returns with
-  // the arm lowered on the pull-back.
   const phoneArm = person.getObjectByName(DOT_PERSON_ARM.right);
   if (phoneArm) {
     timeline.add(
@@ -457,7 +446,26 @@ export function buildStoryTimeline(
       4050,
     );
   }
-  timeline.add(person, { scale: { from: 1, to: 0.001 }, duration: 120 }, 3840);
+  // Person fades as the camera's final approach passes them (camera
+  // settles at 3550)...
+  timeline.add(person, { scale: { from: 1, to: 0.001 }, duration: 120 }, 3480);
+  // ...then the phone rises in front of the lens...
+  timeline.add(
+    phone,
+    { scale: { from: 0.001, to: 1 }, duration: 280, ease: "outBack" },
+    3580,
+  );
+  // ...and the AR content materializes in the world as the phone reaches
+  // its spot ("the overlays switch on").
+  if (arContent) {
+    timeline.add(
+      arContent,
+      { scale: { from: 0.001, to: 1 }, duration: 220, ease: "outCubic" },
+      3780,
+    );
+  }
+  // Pull-back: phone drops away, person + arm return.
+  timeline.add(phone, { scale: { from: 1, to: 0.001 }, duration: 150 }, 4000);
   timeline.add(person, { scale: { from: 0.001, to: 1 }, duration: 130 }, 4050);
 
   // Anywhere chapter: the unmapped-park ring rises into place.

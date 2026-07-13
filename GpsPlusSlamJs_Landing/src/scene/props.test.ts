@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Mesh, RingGeometry } from "three";
+import type { Mesh, MeshStandardMaterial, RingGeometry } from "three";
 import { Vector3 } from "three";
 import { buildDotPerson, DOT_PERSON_NAME } from "./dot-person";
 import { buildMarkerPair, MARKER_NODE, RING_OFFSETS } from "./markers";
@@ -160,5 +160,29 @@ describe("buildPhoneFrame", () => {
       }
     });
     expect(arrowCount).toBe(0);
+  });
+
+  it("carries a cheap glass effect: shiny screen + translucent glare strips (round-8 Z2)", () => {
+    // Round-8 feedback: the tinted pane alone was barely readable as
+    // glass — the LCD area needs a stronger reflection cue, still cheap
+    // for slow devices. Mechanism: a shiny (low-roughness) pane so the
+    // directional light puts a real specular sheen on it, plus diagonal
+    // translucent glare strips (the classic no-shader glass cue).
+    const phone = buildPhoneFrame();
+    const screen = phone.getObjectByName(PHONE_NODE.screen) as Mesh;
+    const screenMaterial = screen.material as MeshStandardMaterial;
+    expect(screenMaterial.roughness).toBeLessThan(0.5);
+    const strips: Mesh[] = [];
+    phone.traverse((obj) => {
+      if (obj.userData.paletteRole === "glare") {
+        strips.push(obj as Mesh);
+      }
+    });
+    expect(strips.length).toBeGreaterThanOrEqual(2);
+    for (const strip of strips) {
+      const material = strip.material as MeshStandardMaterial;
+      expect(material.transparent).toBe(true);
+      expect(material.opacity).toBeLessThan(0.3); // subtle, world stays visible
+    }
   });
 });

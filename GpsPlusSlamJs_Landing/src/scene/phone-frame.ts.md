@@ -25,9 +25,14 @@ nowhere and confused the message.
   frame fills the viewport the tint is what still reads as "looking
   through a phone") so the world shows through. **No overlay meshes on
   the screen plane** (test-pinned: zero `arrow`-role meshes in the
-  subtree).
+  subtree; the glare strips below are highlights, not content).
+- **Cheap glass cue (round-8 Z2, test-pinned):** the pane is SHINY
+  (roughness 0.15 — the directional light puts a specular sheen on it)
+  and carries two diagonal translucent `glare`-role strips (opacity
+  0.14, `depthWrite` off) — no shaders/env maps, negligible cost.
 - Roles: `phone` (frame bars — blue family in dark palettes since
-  round-5 W4), `screen` — the dark theme makes the screen glow slightly.
+  round-5 W4), `screen` (glows slightly in dark), `glare` (near-white
+  everywhere, emissive in dark palettes).
 
 ## Examples
 

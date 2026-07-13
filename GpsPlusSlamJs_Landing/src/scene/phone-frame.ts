@@ -49,13 +49,38 @@ export function buildPhoneFrame(): Group {
   // The screen is a WINDOW into the world ("this is what your users see"),
   // not a solid display: keep it glass-translucent so the clay world shows
   // through behind the AR overlays. 0.22 is the round-7 "light glass"
-  // floor (test-pinned 0.2–0.35): once the frame fills the viewport the
-  // tint is what still says "you are looking through a phone". Palette
-  // applies only touch color / emissive, so this stays stable across
-  // theme toggles.
+  // floor (test-pinned 0.2–0.35); the LOW roughness (round-8 Z2) makes
+  // the directional light put a real specular sheen on the pane — glass,
+  // not clay. Palette applies only touch color / emissive, so this stays
+  // stable across theme toggles.
   const screenMaterial = screen.material as MeshStandardMaterial;
   screenMaterial.transparent = true;
   screenMaterial.opacity = 0.22;
+  screenMaterial.roughness = 0.15;
+
+  // Two diagonal glare strips (round-8 Z2): the classic cheap "this is
+  // glass" cue — no shaders, no env maps, just two translucent quads
+  // floating a hair in front of the pane, sized to stay inside the
+  // screen area. `glare` role: near-white in every palette, slightly
+  // emissive in the dark ones.
+  const glareStripes: Array<[w: number, x: number]> = [
+    [0.13, -0.12],
+    [0.06, 0.16],
+  ];
+  for (const [width, x] of glareStripes) {
+    const strip = clayMesh(new PlaneGeometry(width, 1.45), "glare");
+    strip.position.set(x, 0, 0.05);
+    strip.rotation.z = -0.42;
+    strip.castShadow = false;
+    strip.receiveShadow = false;
+    const material = strip.material as MeshStandardMaterial;
+    material.transparent = true;
+    material.opacity = 0.14;
+    // Never occlude the world behind it in the depth buffer — the strip
+    // is a highlight, not a surface.
+    material.depthWrite = false;
+    screen.add(strip);
+  }
 
   phone.add(body, screen);
   phone.visible = false;

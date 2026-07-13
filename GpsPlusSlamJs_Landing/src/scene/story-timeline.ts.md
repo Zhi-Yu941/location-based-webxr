@@ -13,10 +13,12 @@ and keeps derived state (dot-person on the path) in sync.
   time bases; total duration = `CHAPTER_COUNT × CHAPTER_DURATION_MS`.
 - `createStoryStage(parts: StageParts) → StoryStage` — positions person /
   markers, parents the phone to the camera (held "in front of the lens";
-  the 2.3-unit distance is load-bearing, round-5 W4: the FULL frame must
-  fit the camera frustum incl. mobile-portrait width — test-pinned),
-  primes reveal groups (visible but scaled/lowered away), sets the hero
-  camera framing. Mutates the passed objects; call once at boot.
+  the 1.7-unit distance is load-bearing, round-7 Y4 superseding round-5
+  W4: the SCREEN must cover the full mobile-portrait viewport width and
+  the frame bars the vertical remainder, so no AR content is visible
+  outside the phone screen on phones — test-pinned), primes reveal
+  groups (visible but scaled/lowered away), sets the hero camera
+  framing. Mutates the passed objects; call once at boot.
 - `buildStoryTimeline(stage, onUpdate) → Timeline` — paused timeline;
   scrub with `seek(progress × duration)`.
 - `buildIntroTimeline(stage, onUpdate) → Timeline` — ~2.1 s intro that

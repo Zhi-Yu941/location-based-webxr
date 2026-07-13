@@ -35,6 +35,9 @@ export const PALETTE_ROLES = [
   "label",
   "skyline",
   "grass",
+  "tent",
+  "ruin",
+  "ghost",
 ] as const;
 
 export type PaletteRole = (typeof PALETTE_ROLES)[number];
@@ -125,6 +128,11 @@ const LIGHT: ScenePalette = {
     label: { color: 0x2563eb },
     skyline: { color: 0xbdbab2 },
     grass: { color: 0x94b984 },
+    tent: { color: 0xcfa15e },
+    ruin: { color: 0xc9c4b8 },
+    // Ghost = AR-blue family (the color-coding invariant: blue = AR
+    // overlay content); the mesh itself is translucent (builder-set).
+    ghost: { color: 0x60a5fa },
   },
 };
 
@@ -174,6 +182,9 @@ const DARK: ScenePalette = {
     // ~48 units (round-4 V3).
     skyline: { color: 0x4b4b60, emissiveIntensity: 0.18 },
     grass: { color: 0x28483a },
+    tent: { color: 0x7a5f3c, emissiveIntensity: 0.12 },
+    ruin: { color: 0x555562, emissiveIntensity: 0.12 },
+    ghost: { color: 0x7fb2ff, emissiveIntensity: 0.7 },
   },
 };
 
@@ -213,6 +224,9 @@ const NEON: ScenePalette = {
     label: { color: 0x67e8f9, emissiveIntensity: 0.8 },
     skyline: { color: 0x0f1326, emissiveIntensity: 0.15 },
     grass: { color: 0x0f3336 },
+    tent: { color: 0x394a76, emissiveIntensity: 0.2 },
+    ruin: { color: 0x232a48, emissiveIntensity: 0.12 },
+    ghost: { color: 0x22d3ee, emissiveIntensity: 0.9 },
   },
 };
 
@@ -252,6 +266,9 @@ const DUSK: ScenePalette = {
     label: { color: 0x93c5fd, emissiveIntensity: 0.6 },
     skyline: { color: 0x3a2a55, emissiveIntensity: 0.1 },
     grass: { color: 0x29635e },
+    tent: { color: 0x9c6b4e, emissiveIntensity: 0.15 },
+    ruin: { color: 0x5f4a7e, emissiveIntensity: 0.1 },
+    ghost: { color: 0x93c5fd, emissiveIntensity: 0.6 },
   },
 };
 
@@ -293,6 +310,9 @@ const MONO: ScenePalette = {
     label: { color: 0x1d4ed8 },
     skyline: { color: 0xb5b5ae },
     grass: { color: 0xacaca4 },
+    tent: { color: 0xb8b8b0 },
+    ruin: { color: 0xc4c4bd },
+    ghost: { color: 0x2563eb },
   },
 };
 

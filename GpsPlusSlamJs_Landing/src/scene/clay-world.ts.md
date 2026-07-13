@@ -32,6 +32,11 @@ via a seeded LCG.
   dot-person follows (same curve the path slabs are laid along).
 - `WORLD_ANCHORS` — story hot-spots (`sign`, `markerPair`, `statue`)
   derived to sit on/near the path.
+- `VIGNETTE_ANCHORS` — the round-11 use-case stages (`campus`,
+  `castle`) on the far ring beside the skyline; consumed by
+  `use-case-vignettes.ts` (as build parameters) and by the story
+  timeline (journey waypoints). Node `use-case-vignettes` is part of
+  the built world.
 
 ## Invariants & assumptions
 

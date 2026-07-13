@@ -18,6 +18,7 @@ import {
   CONTACT_SHADOWS_NAME,
   GRASS_NAME,
 } from "./world-detail";
+import { buildUseCaseVignettes, VIGNETTES_NAME } from "./use-case-vignettes";
 
 /**
  * Procedural low-poly "clay world": the miniature landscape every chapter
@@ -45,6 +46,7 @@ export const WORLD_NODE = {
   arContent: "world-ar-content",
   grass: GRASS_NAME,
   contactShadows: CONTACT_SHADOWS_NAME,
+  vignettes: VIGNETTES_NAME,
 } as const;
 
 const WORLD_RADIUS = 30;
@@ -111,6 +113,25 @@ const skylineCenter = anchorCurve
 const SKYLINE_TOWER_POS = skylineCenter
   .clone()
   .add(new Vector3(-skyDirection.z, 0, skyDirection.x).multiplyScalar(4));
+
+// The use-case vignettes (round-11) sit on the same far ring as the
+// skyline, spread sideways so the gallery camera journey sweeps the city
+// first, flies past the campus, and arrives at the castle.
+const vignetteAcross = new Vector3(-skyDirection.z, 0, skyDirection.x);
+export const VIGNETTE_ANCHORS = {
+  /** Trade-fair/campus stage (tents + static AR arrows). */
+  campus: skylineCenter
+    .clone()
+    .add(vignetteAcross.clone().multiplyScalar(-26))
+    .add(skyDirection.clone().multiplyScalar(-9))
+    .setY(0),
+  /** Historic-buildings stage (ruin + translucent ghost). */
+  castle: skylineCenter
+    .clone()
+    .add(vignetteAcross.clone().multiplyScalar(-48))
+    .add(skyDirection.clone().multiplyScalar(-16))
+    .setY(0),
+} as const;
 
 /** Deterministic LCG (numerical recipes constants) — NOT crypto, just art. */
 function createRng(seed: number): () => number {
@@ -505,6 +526,8 @@ export function buildClayWorld(detail: "high" | "low"): Group {
     buildOuter(counts, rng),
     buildSkyline(),
     buildArContent(),
+    // Use-case vignettes (round-11): the gallery journey's destinations.
+    buildUseCaseVignettes(VIGNETTE_ANCHORS),
     // World-detail layer (v3 F7, curb removed in round-9): instanced
     // grass + contact shadows.
     buildGrass(detail, createPathCurve(), Object.values(WORLD_ANCHORS)),

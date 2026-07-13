@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { PerspectiveCamera, Vector3 } from "three";
+import {
+  PerspectiveCamera,
+  Vector3,
+  type Mesh,
+  type MeshStandardMaterial,
+} from "three";
 import { CHAPTER_COUNT } from "../chapters";
 import { buildClayWorld, WORLD_NODE } from "./clay-world";
 import { buildDotPerson } from "./dot-person";
@@ -78,27 +83,43 @@ describe("buildStoryTimeline", () => {
     expect(stage.markers.connectors.scale.x).toBeGreaterThan(0.9);
   });
 
-  it("shrinks the accuracy ring from LARGE and drops the person into its center", () => {
-    // Round-2 R6: the ring fades in big (unknown accuracy), collapses to
-    // ~zero (QR fix acquired), and the person falls from the sky with a
-    // bounce onto the path exactly there — instead of sliding in from the
-    // left. All seek-driven; scrubbing back must restore the pre-drop sky
-    // position (covered by the scrub-path-independence property).
+  it("shrinks the accuracy ring UNDER the bouncing person and fades it out with the landing", () => {
+    // Round-2 R6 set the collapse; round-8 Z1 re-timed it: the ring used
+    // to be gone BEFORE the person arrived (dead stretch while
+    // scrolling). Now it fades in late, shrinks WHILE the person bounces
+    // on it, and disappears as the bouncing settles. All seek-driven;
+    // scrubbing back restores the pre-drop sky position (covered by the
+    // scrub-path-independence property).
     const timeline = buildStoryTimeline(stage, () => {});
     const ring = stage.world.getObjectByName(WORLD_NODE.snapRing);
     expect(ring).toBeDefined();
+    const ringMaterial = (ring?.children[0] as Mesh | undefined)
+      ?.material as MeshStandardMaterial;
+    expect(ringMaterial).toBeDefined();
 
     timeline.seek(50);
     syncStage(stage);
     expect(stage.person.position.y).toBeGreaterThan(5); // still in the sky
     expect(stage.person.scale.x).toBeLessThan(0.01);
 
-    timeline.seek(1300); // mid-shrink
-    expect(ring?.scale.x ?? 0).toBeGreaterThan(0.5);
+    timeline.seek(1250); // early in the chapter: ring NOT visible yet (Z1)
+    expect(ringMaterial.opacity).toBeLessThan(0.1);
 
-    timeline.seek(chapterEndTime(1)); // QR chapter done
+    timeline.seek(1450); // faded in, still LARGE (pre-drop)
+    expect(ringMaterial.opacity).toBeGreaterThan(0.5);
+    expect(ring?.scale.x ?? 0).toBeGreaterThan(2);
+
+    timeline.seek(1700); // mid-bounce: visible AND mid-shrink (Z1 overlap)
+    syncStage(stage);
+    expect(ringMaterial.opacity).toBeGreaterThan(0.5);
+    expect(ring?.scale.x ?? 0).toBeGreaterThan(0.2);
+    expect(ring?.scale.x ?? 99).toBeLessThan(2.5);
+    expect(stage.person.scale.x).toBeCloseTo(1, 2); // person already down here
+
+    timeline.seek(chapterEndTime(1)); // QR chapter done: bounce settled…
     syncStage(stage);
     expect(ring?.scale.x ?? 99).toBeLessThan(0.2); // collapsed = precise fix
+    expect(ringMaterial.opacity).toBeLessThan(0.1); // …and the ring is gone
     expect(stage.person.position.y).toBeCloseTo(0, 2); // landed
     expect(stage.person.scale.x).toBeCloseTo(1, 2);
   });

@@ -369,10 +369,12 @@ export function buildStoryTimeline(
     ],
     1200,
   );
-  // QR fix beat (R6): the accuracy ring fades in LARGE (unknown position
-  // uncertainty), collapses onto the drop point (fix acquired), then the
-  // person falls from the sky with a bounce exactly into its center and
-  // fades the ring away.
+  // QR fix beat (R6, re-timed in round-8 Z1): the accuracy ring fades in
+  // LARGE shortly before the drop, then collapses onto the drop point
+  // WHILE the person bounces on it (the collapse spans exactly the
+  // outBounce window) and fades away as the bouncing settles — the ring
+  // used to be gone before the person even arrived, leaving a dead
+  // stretch mid-scroll.
   const snapRing = world.getObjectByName(WORLD_NODE.snapRing);
   if (snapRing) {
     const ringMesh = snapRing.children[0];
@@ -383,21 +385,21 @@ export function buildStoryTimeline(
         "opacity",
         0,
         [{ to: 0.85, duration: 150 }],
-        1080,
+        1350,
       );
       addValueChain(
         timeline,
         ringMesh,
         "opacity",
         0.85,
-        [{ to: 0, duration: 140 }],
-        1860,
+        [{ to: 0, duration: 110 }],
+        1890,
       );
     }
     timeline.add(
       snapRing,
-      { scale: { from: 3, to: 0.06 }, duration: 270, ease: "inOutQuad" },
-      1250,
+      { scale: { from: 3, to: 0.06 }, duration: 350, ease: "inOutQuad" },
+      1540,
     );
   }
   timeline.add(person, { scale: { from: 0.001, to: 1 }, duration: 80 }, 1500);

@@ -8,6 +8,27 @@
       name="description"
       content="Build location-based AR experiences on the web. An Apache-2.0 framework plus demo apps, fusing GPS with WebXR odometry for install-free AR in the mobile browser — one URL, no app."
     />
+    <!-- Social cards (v2 B7). og:url/og:image MUST be absolute — they
+         hardcode the production origin (gps.csutil.com, base "/" in
+         scripts/build-site.mjs). The image is a curated `pnpm run shoot`
+         capture of the fusion chapter (dark), checked in statically at
+         public/og-card.png; regenerate + recommit when the scene or copy
+         changes materially. Verify with a card validator after deploy. -->
+    <meta
+      property="og:title"
+      content="Location-based WebXR — install-free AR in the mobile browser"
+    />
+    <meta
+      property="og:description"
+      content="GPS alone is too inaccurate for AR — so we fused it with WebXR tracking. Fully offline, no cloud positioning service. One URL, no app."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://gps.csutil.com/" />
+    <meta property="og:image" content="https://gps.csutil.com/og-card.png" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="800" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://gps.csutil.com/og-card.png" />
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='%23ef4444'/%3E%3Ccircle cx='50' cy='50' r='15' fill='%23fff'/%3E%3C/svg%3E"

@@ -53,6 +53,14 @@ the copy.
   on GitHub), never as a footer disclaimer; the meta description keeps
   its factual "Apache-2.0 framework" mention for SEO/social.
 
+- `<head>` carries the social-card meta (v2 B7): og:title/description/
+  type/url/image + twitter summary_large_image. The og:url/og:image URLs
+  are ABSOLUTE and hardcode the production origin `https://gps.csutil.com/`
+  — the image lives at `public/og-card.png` (a curated
+  `pnpm run shoot -- fusion` capture, dark palette, checked in
+  statically). Regenerate it when the scene/copy changes materially;
+  validate with a social-card validator after each deploy.
+
 ## Invariants & assumptions
 
 - **FOUC guard:** the inline `<script>` in `<head>` applies the persisted

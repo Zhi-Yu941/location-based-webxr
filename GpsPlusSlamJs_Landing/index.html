@@ -187,6 +187,21 @@
         display: none;
       }
 
+      /* On small screens (mobile portrait AND landscape) the hero copy
+         fills most of the viewport — extend the veil so the panel-less
+         hero text always sits on a calm backdrop; only the bottom edge
+         hints the 3D world until scrolling lifts the veil. */
+      @media (width <= 600px), (height <= 500px) {
+        #hero-veil {
+          background: linear-gradient(
+            to bottom,
+            var(--veil) 0%,
+            var(--veil) 72%,
+            transparent 100%
+          );
+        }
+      }
+
       .top-bar {
         position: fixed;
         top: 0;

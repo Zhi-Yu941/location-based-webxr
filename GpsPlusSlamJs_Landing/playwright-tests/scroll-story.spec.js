@@ -140,6 +140,32 @@ test("all four demo apps stay launchable from the demos hub", async ({
   }
 });
 
+// Most real users open the landing page on a phone (round-2 request):
+// pin that BOTH mobile orientations boot, show every chapter readable,
+// and keep the document non-scrolling — with touch + mobile emulation on.
+for (const [orientation, viewport] of [
+  ["portrait", { width: 412, height: 915 }],
+  ["landscape", { width: 915, height: 412 }],
+]) {
+  test.describe(`mobile ${orientation}`, () => {
+    test.use({ viewport, isMobile: true, hasTouch: true });
+
+    test(`shows every chapter readable on a phone (${orientation})`, async ({
+      page,
+    }) => {
+      const errors = collectErrors(page);
+      await page.goto("/");
+      for (const id of CHAPTER_IDS) {
+        await page.locator(`#chapter-${id}`).scrollIntoViewIfNeeded();
+        const content = id === "hero" ? ".hero-content" : ".copy";
+        await expect(page.locator(`#chapter-${id} ${content}`)).toBeVisible();
+      }
+      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+      expect(errors).toEqual([]);
+    });
+  });
+}
+
 test.describe("reduced motion", () => {
   test.use({ reducedMotion: "reduce" });
 

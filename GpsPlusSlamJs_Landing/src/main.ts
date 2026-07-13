@@ -76,15 +76,21 @@ function measureSections(
  * and the "jump to demos" fast smooth scroll (R17b). Returns the per-
  * scroll updater for the veil opacity.
  */
-function wireHeroExtras(scroller: HTMLElement): (progress: number) => void {
+function wireHeroExtras(scroller: HTMLElement): () => void {
   const veil = document.getElementById("hero-veil");
   document.getElementById("jump-demos")?.addEventListener("click", (event) => {
     event.preventDefault();
     scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
   });
-  return (progress: number) => {
+  return () => {
     if (veil) {
-      veil.style.opacity = String(heroVeilOpacity(progress));
+      // Keyed off the raw scroll offset (in viewport heights), NOT story
+      // progress — the veil must be fully opaque exactly at the top.
+      veil.style.opacity = String(
+        heroVeilOpacity(
+          scroller.scrollTop / Math.max(1, scroller.clientHeight),
+        ),
+      );
     }
   };
 }
@@ -166,7 +172,7 @@ function boot(): void {
       scroller.clientHeight,
       metrics,
     );
-    updateHeroExtras(state.overallProgress);
+    updateHeroExtras();
     if (state.chapterIndex !== lastChapterIndex) {
       lastChapterIndex = state.chapterIndex;
       markActiveChapter(sections, state.chapterIndex);

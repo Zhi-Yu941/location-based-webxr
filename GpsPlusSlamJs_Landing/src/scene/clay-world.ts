@@ -12,6 +12,14 @@ import {
 } from "three";
 import { clayMesh, namedGroup } from "./palette";
 import { buildPin } from "./markers";
+import {
+  buildContactShadows,
+  buildCurb,
+  buildGrass,
+  CONTACT_SHADOWS_NAME,
+  CURB_NAME,
+  GRASS_NAME,
+} from "./world-detail";
 
 /**
  * Procedural low-poly "clay world": the miniature landscape every chapter
@@ -37,6 +45,9 @@ export const WORLD_NODE = {
   outer: "world-outer",
   skyline: "world-skyline",
   arContent: "world-ar-content",
+  grass: GRASS_NAME,
+  curb: CURB_NAME,
+  contactShadows: CONTACT_SHADOWS_NAME,
 } as const;
 
 const WORLD_RADIUS = 30;
@@ -487,6 +498,10 @@ export function buildClayWorld(detail: "high" | "low"): Group {
     buildOuter(counts, rng),
     buildSkyline(),
     buildArContent(),
+    // World-detail layer (v3 F7): instanced grass + curb, contact shadows.
+    buildGrass(detail, createPathCurve(), Object.values(WORLD_ANCHORS)),
+    buildCurb(detail, createPathCurve()),
+    buildContactShadows(WORLD_ANCHORS),
   );
   return world;
 }

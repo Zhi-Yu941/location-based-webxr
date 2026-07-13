@@ -35,6 +35,8 @@ export const PALETTE_ROLES = [
   "arrow",
   "label",
   "skyline",
+  "grass",
+  "curb",
 ] as const;
 
 export type PaletteRole = (typeof PALETTE_ROLES)[number];
@@ -125,6 +127,8 @@ const LIGHT: ScenePalette = {
     arrow: { color: 0x3b82f6 },
     label: { color: 0x2563eb },
     skyline: { color: 0xbdbab2 },
+    grass: { color: 0x94b984 },
+    curb: { color: 0xc9c2b4 },
   },
 };
 
@@ -174,6 +178,8 @@ const DARK: ScenePalette = {
     // Emissive floor keeps the horizon city visible through the fog at
     // ~48 units (round-4 V3).
     skyline: { color: 0x4b4b60, emissiveIntensity: 0.18 },
+    grass: { color: 0x28483a },
+    curb: { color: 0x5e5e70 },
   },
 };
 
@@ -213,6 +219,8 @@ const NEON: ScenePalette = {
     arrow: { color: 0x22d3ee, emissiveIntensity: 0.9 },
     label: { color: 0x67e8f9, emissiveIntensity: 0.8 },
     skyline: { color: 0x0f1326, emissiveIntensity: 0.15 },
+    grass: { color: 0x0f3336 },
+    curb: { color: 0x293054 },
   },
 };
 
@@ -252,6 +260,8 @@ const DUSK: ScenePalette = {
     arrow: { color: 0x60a5fa, emissiveIntensity: 0.6 },
     label: { color: 0x93c5fd, emissiveIntensity: 0.6 },
     skyline: { color: 0x3a2a55, emissiveIntensity: 0.1 },
+    grass: { color: 0x29635e },
+    curb: { color: 0x6b5390 },
   },
 };
 
@@ -293,6 +303,8 @@ const MONO: ScenePalette = {
     arrow: { color: 0x2563eb },
     label: { color: 0x1d4ed8 },
     skyline: { color: 0xb5b5ae },
+    grass: { color: 0xacaca4 },
+    curb: { color: 0xbfbfb8 },
   },
 };
 

@@ -23,6 +23,9 @@ featureless so it reads as "a person" without demographic detail.
   arms were removed because the round-4 dive dramaturgy shows the phone
   only after the person has faded — the raise read as an unexplained
   gesture. Do not re-add them citing R10.
+- Carries a `contact-shadow-person` disc child (v3 F7, from
+  `world-detail.ts`) so the soft ground shadow walks along; it is NOT
+  `person`-role tagged (plain black alpha disc, palette-independent).
 
 ## Examples
 

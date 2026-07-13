@@ -1,5 +1,6 @@
 import { CapsuleGeometry, SphereGeometry, type Group } from "three";
 import { clayMesh, namedGroup } from "./palette";
+import { buildContactShadow } from "./world-detail";
 
 /**
  * The dot-person: the user's stand-in that walks the path through the
@@ -20,5 +21,7 @@ export function buildDotPerson(): Group {
   const head = clayMesh(new SphereGeometry(0.22, 10, 8), "person");
   head.position.y = 1.55;
   person.add(body, head);
+  // Soft fake contact shadow (v3 F7): a child, so it walks along.
+  person.add(buildContactShadow("person", 0.55));
   return person;
 }

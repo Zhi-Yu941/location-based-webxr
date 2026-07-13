@@ -126,7 +126,10 @@ function boot(): void {
   const applyTheme = (theme: Theme): void => {
     document.documentElement.dataset.theme = theme;
     scene?.applyTheme(theme);
-    toggleButton?.setAttribute("aria-pressed", String(theme === "light"));
+    toggleButton?.setAttribute(
+      "aria-label",
+      `Color palette: ${theme} — click to switch`,
+    );
   };
   const themeController = createThemeController({
     storage: safeLocalStorage(),

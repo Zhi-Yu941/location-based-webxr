@@ -89,7 +89,7 @@ describe("buildStoryTimeline", () => {
     expect(stage.person.position.y).toBeCloseTo(0, 3);
   });
 
-  it("reveals the AR content + phone during the dive and the gallery in its chapter", () => {
+  it("reveals the AR content + phone during the dive", () => {
     const timeline = buildStoryTimeline(stage, () => {});
     timeline.seek(50);
     const phoneScaleBefore = stage.phone.scale.x;
@@ -99,10 +99,6 @@ describe("buildStoryTimeline", () => {
     // phone window (round-1 feedback: overlays live in the WORLD now).
     const arContent = stage.world.getObjectByName(WORLD_NODE.arContent);
     expect(arContent?.scale.x ?? 0).toBeGreaterThan(0.9);
-
-    const gallery = stage.world.getObjectByName(WORLD_NODE.gallery);
-    timeline.seek(chapterEndTime(5)); // end of gallery chapter
-    expect(gallery?.scale.x ?? 0).toBeGreaterThan(0.9);
   });
 
   it("notifies the render loop on every scrub update", () => {

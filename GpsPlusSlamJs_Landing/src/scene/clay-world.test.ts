@@ -82,10 +82,9 @@ describe("buildClayWorld", () => {
     }
   });
 
-  it("hides the reveal groups (outer terrain, gallery, AR content) until their chapters", () => {
+  it("hides the reveal groups (outer terrain, AR content) until their chapters", () => {
     const world = buildClayWorld("high");
     expect(world.getObjectByName(WORLD_NODE.outer)?.visible).toBe(false);
-    expect(world.getObjectByName(WORLD_NODE.gallery)?.visible).toBe(false);
     expect(world.getObjectByName(WORLD_NODE.arContent)?.visible).toBe(false);
   });
 

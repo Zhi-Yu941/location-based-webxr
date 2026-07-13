@@ -2,7 +2,7 @@
   "name": "gps-plus-slam-landing",
   "version": "0.1.0",
   "private": true,
-  "description": "The gps.csutil.com root landing page: a three.js + anime.js scroll-story that explains the GPS+SLAM location-based-WebXR framework to non-technical decision makers and routes builders to the demo apps.",
+  "description": "The gps.csutil.com root landing page: a three.js + anime.js scroll-story that explains the Location-based WebXR framework to non-technical decision makers and routes builders to the demo apps.",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -12,8 +12,8 @@ story that `src/main.ts` boots behind the copy.
 
 - `#scene-root` — fixed full-viewport layer the WebGL canvas is appended
   into (`aria-hidden`, z-index 0; hidden entirely under `body.no-webgl`).
-- `.top-bar` — brand + `#theme-toggle` button (aria-pressed reflects the
-  light theme).
+- `.top-bar` — brand ("Location-based WebXR") + `#theme-toggle` palette-icon
+  button (its `aria-label` announces the active palette).
 - `<main id="story">` — seven `<section class="chapter" id="chapter-<id>">`
   in the order defined by `src/chapters.ts` (hero, qr, fusion, dive,
   anywhere, gallery, cta). Each carries a `.copy` glass panel with the

@@ -85,11 +85,6 @@ export function createStoryStage(parts: StageParts): StoryStage {
     outer.visible = true;
     outer.position.y = -6;
   }
-  const gallery = parts.world.getObjectByName(WORLD_NODE.gallery);
-  if (gallery) {
-    gallery.visible = true;
-    gallery.scale.setScalar(0.001);
-  }
   const arContent = parts.world.getObjectByName(WORLD_NODE.arContent);
   if (arContent) {
     arContent.visible = true;
@@ -417,16 +412,6 @@ export function buildStoryTimeline(
       outer,
       { y: { from: -6, to: 0 }, duration: 500, ease: "outCubic" },
       4100,
-    );
-  }
-
-  // Gallery chapter: the use-case props pop in.
-  const gallery = world.getObjectByName(WORLD_NODE.gallery);
-  if (gallery) {
-    timeline.add(
-      gallery,
-      { scale: { from: 0.001, to: 1 }, duration: 450, ease: "outBack" },
-      5150,
     );
   }
 

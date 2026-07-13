@@ -1,7 +1,7 @@
 # GpsPlusSlamJs_Landing
 
 The root landing page of <https://gps.csutil.com>: a three.js + anime.js
-scroll-story that explains the GPS+SLAM location-based-WebXR framework to
+scroll-story that explains the Location-based WebXR framework to
 non-technical decision makers, and routes builders to the live demo apps
 (`/starter/`, `/minimal/`, `/qr-demo/`, `/recorder/`).
 

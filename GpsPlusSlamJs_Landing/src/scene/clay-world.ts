@@ -34,7 +34,6 @@ export const WORLD_NODE = {
   statue: "world-statue",
   snapRing: "world-snap-ring",
   outer: "world-outer",
-  gallery: "world-gallery",
   arContent: "world-ar-content",
 } as const;
 
@@ -363,8 +362,10 @@ function buildArContent(): Group {
     bar.castShadow = false;
     label.add(bar);
   });
+  // LEFT of the pin from the dive camera's view (round-2 feedback R12:
+  // on the right it was off-screen on phones until it faded out).
   label.position.set(
-    WORLD_ANCHORS.statue.x + 1.9,
+    WORLD_ANCHORS.statue.x - 1.9,
     2.4,
     WORLD_ANCHORS.statue.z + 0.4,
   );
@@ -374,24 +375,6 @@ function buildArContent(): Group {
 
   arContent.visible = false;
   return arContent;
-}
-
-/** Use-case gallery props (chapter 5): scattered treasures to find. */
-function buildGallery(rng: () => number): Group {
-  const gallery = namedGroup(WORLD_NODE.gallery);
-  for (let i = 0; i < 4; i++) {
-    const treasure = clayMesh(new IcosahedronGeometry(0.3, 0), "treasure");
-    const angle = rng() * Math.PI * 2;
-    const radius = 6 + rng() * 14;
-    treasure.position.set(
-      Math.cos(angle) * radius,
-      0.35,
-      Math.sin(angle) * radius,
-    );
-    gallery.add(treasure);
-  }
-  gallery.visible = false;
-  return gallery;
 }
 
 export function buildClayWorld(detail: "high" | "low"): Group {
@@ -409,7 +392,6 @@ export function buildClayWorld(detail: "high" | "low"): Group {
     buildSnapRing(),
     buildOuter(counts, rng),
     buildArContent(),
-    buildGallery(rng),
   );
   return world;
 }

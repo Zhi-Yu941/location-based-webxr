@@ -8,6 +8,7 @@
  * motion is unavailable (see the plan doc's "Fallbacks" decision).
  */
 import { CHAPTERS, sectionElementId } from "./chapters";
+import { heroVeilOpacity } from "./hero-veil";
 import { computeScrollState, type SectionMetrics } from "./scroll-story";
 import { createThemeController, type Theme } from "./theme";
 import { decideQualityTier } from "./capability";
@@ -68,6 +69,24 @@ function measureSections(
       height: rect.height,
     };
   });
+}
+
+/**
+ * Hero extras: the veil that hides the 3D world at the top (round-2 R4)
+ * and the "jump to demos" fast smooth scroll (R17b). Returns the per-
+ * scroll updater for the veil opacity.
+ */
+function wireHeroExtras(scroller: HTMLElement): (progress: number) => void {
+  const veil = document.getElementById("hero-veil");
+  document.getElementById("jump-demos")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
+  });
+  return (progress: number) => {
+    if (veil) {
+      veil.style.opacity = String(heroVeilOpacity(progress));
+    }
+  };
 }
 
 function markActiveChapter(
@@ -139,6 +158,7 @@ function boot(): void {
   });
   toggleButton?.addEventListener("click", () => themeController.toggle());
 
+  const updateHeroExtras = wireHeroExtras(scroller);
   let lastChapterIndex = -1;
   const onScrollChanged = (): void => {
     const state = computeScrollState(
@@ -146,6 +166,7 @@ function boot(): void {
       scroller.clientHeight,
       metrics,
     );
+    updateHeroExtras(state.overallProgress);
     if (state.chapterIndex !== lastChapterIndex) {
       lastChapterIndex = state.chapterIndex;
       markActiveChapter(sections, state.chapterIndex);

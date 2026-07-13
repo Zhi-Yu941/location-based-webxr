@@ -446,11 +446,8 @@ export function buildIntroTimeline(
   const introFar = new Vector3(32, 30, 32);
   timeline.add(stage.camera, { x: 32, y: 30, z: 32, duration: 0 }, 0);
   timeline.add(stage.world, { y: { from: -1.2, to: 0 }, duration: 900 }, 0);
-  timeline.add(
-    stage.person,
-    { scale: { from: 0.001, to: 1 }, duration: 700, ease: "outBack" },
-    600,
-  );
+  // (No dot-person pop here — round-2 R6: they enter the story by
+  // dropping from the sky at the QR chapter.)
   // Explicit {from, to}: composition 'none' would otherwise capture the
   // build-time camera (already at HERO) as the start — turning the flight
   // into a hard snap at t=300 (the round-1 "buggy pause then nudge").

@@ -50,6 +50,7 @@
         --card-border: #34343c;
         --card-hover: #24242b;
         --link: #9db8ff;
+        --veil: #0b0b0d;
 
         color-scheme: dark;
       }
@@ -65,6 +66,7 @@
         --card-border: #ddd9d2;
         --card-hover: #f6f4f0;
         --link: #2954cc;
+        --veil: #f2f1ed;
 
         color-scheme: light;
       }
@@ -113,12 +115,35 @@
         display: none;
       }
 
+      /* The "normal landing page first" veil (round-2 R4): a gradient that
+         hides most of the 3D world at the top; src/hero-veil.ts drives its
+         opacity from scroll progress (back and forth, no latch). */
+      #hero-veil {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        /* stylelint-disable-next-line csstree/validator -- lvh is a valid viewport unit; the bundled css-tree grammar predates it (false positive). */
+        height: 100lvh;
+        z-index: 1;
+        pointer-events: none;
+        background: linear-gradient(
+          to bottom,
+          var(--veil) 0%,
+          var(--veil) 32%,
+          transparent 80%
+        );
+      }
+      body.no-webgl #hero-veil {
+        display: none;
+      }
+
       .top-bar {
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
-        z-index: 2;
+        z-index: 3;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -158,7 +183,7 @@
         position: fixed;
         inset: 0 0 -1px;
         overflow-y: auto;
-        z-index: 1;
+        z-index: 2;
       }
       .chapter {
         min-height: 130vh;
@@ -215,6 +240,69 @@
         font-size: 0.9rem;
         color: var(--accent);
         font-weight: 600;
+      }
+
+      /* Hero: a normal-looking landing page (no glass panel) that starts
+         ~1/3 down the screen; the 3D world hides behind the veil above. */
+      .chapter.hero {
+        display: block;
+        min-height: 112vh;
+        padding-top: 30vh;
+      }
+      .hero-content {
+        max-width: 760px;
+        margin-left: 8vw;
+        padding-right: 20px;
+      }
+      .hero-content h1 {
+        /* stylelint-disable-next-line csstree/validator -- clamp() is valid CSS; the bundled css-tree grammar rejects math functions (false positive). */
+        font-size: clamp(2.1rem, 6.5vw, 3.4rem);
+        margin: 0 0 16px;
+        letter-spacing: -0.02em;
+        line-height: 1.12;
+      }
+      .hero-sub {
+        margin: 0 0 20px;
+        max-width: 620px;
+        color: var(--muted);
+        font-size: 1.12rem;
+      }
+      .hero-points {
+        list-style: none;
+        margin: 0 0 26px;
+        padding: 0;
+      }
+      .hero-points li {
+        margin: 7px 0;
+        padding-left: 1.1em;
+        position: relative;
+        color: var(--text);
+        font-size: 1.02rem;
+      }
+      .hero-points li::before {
+        content: "—";
+        position: absolute;
+        left: 0;
+        color: var(--muted);
+      }
+      .hero-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 22px;
+        align-items: center;
+        margin: 0;
+      }
+      .hero-links .scroll-hint {
+        margin-top: 0;
+      }
+      #jump-demos {
+        color: var(--link);
+        text-decoration: none;
+        font-size: 0.95rem;
+        font-weight: 600;
+      }
+      #jump-demos:hover {
+        text-decoration: underline;
       }
 
       /* Copy highlights color-matched to the 3D elements they describe
@@ -349,6 +437,7 @@
   </head>
   <body>
     <div id="scene-root" aria-hidden="true"></div>
+    <div id="hero-veil" aria-hidden="true"></div>
 
     <header class="top-bar">
       <span class="brand">Location-based WebXR</span>
@@ -368,15 +457,30 @@
     </header>
 
     <main id="story">
-      <section class="chapter" id="chapter-hero" data-chapter="hero">
-        <div class="copy">
-          <h1>One URL. No app. Real&#8209;world AR.</h1>
-          <p>
-            GPS+SLAM turns the mobile browser into a window that pins digital
-            content to real places — streets, trails, squares — and keeps it
-            there.
+      <section class="chapter hero" id="chapter-hero" data-chapter="hero">
+        <div class="hero-content">
+          <h1>
+            <span class="hl-raw">GPS alone</span> is too inaccurate for AR.
+          </h1>
+          <p class="hero-sub">
+            Meters of wobble ruin the illusion. Location-based WebXR
+            <span class="hl-fused">fuses</span> it with the phone's own motion
+            tracking — and 3D content finally sticks to real places. In the
+            mobile browser, from a single URL.
           </p>
-          <p class="scroll-hint">Scroll to walk in ↓</p>
+          <ul class="hero-points">
+            <li>No app — one URL</li>
+            <li>
+              <span class="hl-raw">GPS</span> + WebXR
+              <span class="hl-fused">fusion</span>: anchors that hold still
+            </li>
+            <li>Fully offline — no cloud mapping</li>
+            <li>Any QR code = door + instant position fix</li>
+          </ul>
+          <p class="hero-links">
+            <span class="scroll-hint">Scroll to walk in ↓</span>
+            <a id="jump-demos" href="#chapter-cta">Jump to the demos →</a>
+          </p>
         </div>
       </section>
 

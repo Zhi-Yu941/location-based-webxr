@@ -52,10 +52,18 @@ test("boots and activates every chapter while scrolling, with zero errors", asyn
   for (const id of CHAPTER_IDS) {
     await page.locator(`#chapter-${id}`).scrollIntoViewIfNeeded();
     // The active class is set by the scroll state machine; expect() polls,
-    // so no fixed timeouts are needed.
+    // so no fixed timeouts are needed. The hero carries its content in
+    // .hero-content (normal-landing layout), the rest in .copy panels.
     await expect(page.locator(`#chapter-${id}.active`)).toBeAttached();
-    await expect(page.locator(`#chapter-${id} .copy`)).toBeVisible();
+    const content = id === "hero" ? ".hero-content" : ".copy";
+    await expect(page.locator(`#chapter-${id} ${content}`)).toBeVisible();
   }
+  // The hero veil must have fully lifted this far into the story (R4).
+  expect(
+    await page.evaluate(() =>
+      Number(document.getElementById("hero-veil")?.style.opacity ?? "1"),
+    ),
+  ).toBeLessThan(0.1);
   // The DOCUMENT must never scroll — #story is the page's only scroller
   // (keeps the mobile URL bar stationary; round-1 feedback F1b).
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
@@ -139,7 +147,8 @@ test.describe("reduced motion", () => {
     await page.goto("/");
     for (const id of CHAPTER_IDS) {
       await page.locator(`#chapter-${id}`).scrollIntoViewIfNeeded();
-      await expect(page.locator(`#chapter-${id} .copy`)).toBeVisible();
+      const content = id === "hero" ? ".hero-content" : ".copy";
+      await expect(page.locator(`#chapter-${id} ${content}`)).toBeVisible();
     }
     expect(errors).toEqual([]);
   });

@@ -1,23 +1,26 @@
-# `theme.ts` — persisted light/dark theme controller
+# `theme.ts` — persisted palette-cycle controller
 
 ## Purpose
 
-Owns the page's light/dark theme: resolves the initial value (persisted
-choice wins, else OS `prefers-color-scheme`), flips it on toggle, persists
-it, and pushes every change through one `applyTheme` seam that the
-bootstrap wires to both the DOM (`data-theme` → CSS custom properties)
-and the 3D scene palette.
+Owns the page's color palette (round-2 R19: five curated palettes
+cycled by the palette button, not a light/dark toggle): resolves the
+initial value (persisted id wins, else OS `prefers-color-scheme` →
+light/dark), advances on `cycle()`, persists the choice, and pushes
+every change through one `applyTheme` seam that the bootstrap wires to
+both the DOM (`data-theme` → CSS custom properties) and the 3D scene
+palette.
 
 ## Public API
 
+- `THEME_IDS` — the cycle order: `light, dark, neon, dusk, mono`.
 - `resolveInitialTheme(stored, prefersLight) → Theme` — pure resolution
-  rule: `'light'`/`'dark'` stored values win; anything else (null,
-  garbage) falls back to the OS preference.
+  rule: any valid stored id wins; anything else (null, garbage) falls
+  back to the OS preference (light/dark).
 - `createThemeController(env: ThemeEnvironment) → ThemeController`
   - `env.storage: ThemeStorage | null` — narrowed localStorage seam.
   - `env.prefersLight: () => boolean` — matchMedia seam.
-  - `env.applyTheme(theme)` — called once at creation and on every toggle.
-  - Controller: `theme` (current value), `toggle() → Theme`.
+  - `env.applyTheme(theme)` — called once at creation and on every cycle.
+  - Controller: `theme` (current value), `cycle() → Theme`.
 - `THEME_STORAGE_KEY` (`"gps-landing-theme"`), `Theme`, `ThemeEnvironment`,
   `ThemeController`. (The narrow `ThemeStorage` seam type is module-private —
   `env.storage` is typed structurally.)
@@ -26,14 +29,16 @@ and the 3D scene palette.
 
 - **Must stay in sync with the inline FOUC-guard script in `index.html`**,
   which duplicates the resolution rule (same storage key, same
-  valid-values check, same prefers-color-scheme fallback) to set
-  `data-theme` before first paint. If the rules diverge, the page flashes
-  the wrong theme on load. `theme.test.ts` documents this coupling.
+  valid-id list, same prefers-color-scheme fallback) to set
+  `data-theme` before first paint — AND with the CSS: every id in
+  `THEME_IDS` needs an `html[data-theme="<id>"]` custom-property block in
+  index.html and a `ScenePalette` in `scene/palette.ts` (test-pinned via
+  the palette completeness test).
 - **Storage is best-effort:** `getItem`/`setItem` throwing (Safari private
-  mode, blocked storage) or `storage === null` never breaks the toggle —
+  mode, blocked storage) or `storage === null` never breaks the cycle —
   persistence is silently skipped.
 - `applyTheme` is invoked exactly once at creation (with the resolved
-  initial theme) and once per toggle.
+  initial theme) and once per cycle step.
 - No browser globals are touched — all environment access is injected, so
   the module tests in plain node.
 

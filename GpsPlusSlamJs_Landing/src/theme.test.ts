@@ -2,19 +2,24 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createThemeController,
   resolveInitialTheme,
+  THEME_IDS,
   THEME_STORAGE_KEY,
 } from "./theme";
 
-// Why this test matters: the theme is a first-paint-visible product decision
-// (default follows the OS, the toggle persists across visits) and it drives
-// BOTH the CSS custom properties and the 3D palette. These tests pin the
-// resolution rules the inline FOUC-guard script in index.html duplicates —
-// if the two ever disagree, the page flashes the wrong theme on load.
+// Why this test matters: the palette is a first-paint-visible product
+// decision (default follows the OS, the choice persists across visits) and
+// it drives BOTH the CSS custom properties and the 3D palette. Round-2
+// turned the light/dark toggle into a CYCLE over five curated palettes —
+// these tests pin the cycle order, the persistence of every id, and the
+// resolution rules the inline FOUC-guard script in index.html duplicates.
 
 describe("resolveInitialTheme", () => {
-  it("uses a validly persisted theme over the OS preference", () => {
+  it("uses any validly persisted palette id over the OS preference", () => {
     expect(resolveInitialTheme("light", false)).toBe("light");
     expect(resolveInitialTheme("dark", true)).toBe("dark");
+    expect(resolveInitialTheme("neon", true)).toBe("neon");
+    expect(resolveInitialTheme("dusk", false)).toBe("dusk");
+    expect(resolveInitialTheme("mono", false)).toBe("mono");
   });
 
   it("falls back to the OS preference for missing or garbage stored values", () => {
@@ -37,18 +42,18 @@ function makeStorage(initial: Record<string, string> = {}) {
 }
 
 describe("createThemeController", () => {
-  it("applies the resolved initial theme once on creation", () => {
+  it("applies the resolved initial palette once on creation", () => {
     const applyTheme = vi.fn();
     const controller = createThemeController({
-      storage: makeStorage({ [THEME_STORAGE_KEY]: "light" }),
+      storage: makeStorage({ [THEME_STORAGE_KEY]: "dusk" }),
       prefersLight: () => false,
       applyTheme,
     });
-    expect(controller.theme).toBe("light");
-    expect(applyTheme).toHaveBeenCalledExactlyOnceWith("light");
+    expect(controller.theme).toBe("dusk");
+    expect(applyTheme).toHaveBeenCalledExactlyOnceWith("dusk");
   });
 
-  it("toggle flips the theme, applies it, and persists it", () => {
+  it("cycle walks through every palette in order and persists each step", () => {
     const storage = makeStorage();
     const applyTheme = vi.fn();
     const controller = createThemeController({
@@ -57,18 +62,24 @@ describe("createThemeController", () => {
       applyTheme,
     });
 
-    expect(controller.toggle()).toBe("light");
-    expect(controller.theme).toBe("light");
-    expect(applyTheme).toHaveBeenLastCalledWith("light");
-    expect(storage.setItem).toHaveBeenCalledWith(THEME_STORAGE_KEY, "light");
-
-    expect(controller.toggle()).toBe("dark");
-    expect(storage.setItem).toHaveBeenLastCalledWith(THEME_STORAGE_KEY, "dark");
+    // From dark the cycle continues with the ids after it, wrapping.
+    const darkIndex = THEME_IDS.indexOf("dark");
+    const expected = [
+      ...THEME_IDS.slice(darkIndex + 1),
+      ...THEME_IDS.slice(0, darkIndex + 1),
+    ];
+    for (const id of expected) {
+      expect(controller.cycle()).toBe(id);
+      expect(applyTheme).toHaveBeenLastCalledWith(id);
+      expect(storage.setItem).toHaveBeenLastCalledWith(THEME_STORAGE_KEY, id);
+    }
+    // Full loop: back at the start.
+    expect(controller.theme).toBe("dark");
   });
 
-  it("keeps toggling even when storage is unavailable or throws", () => {
+  it("keeps cycling even when storage is unavailable or throws", () => {
     // Safari private mode throws on setItem; storage can be null when
-    // localStorage access itself throws. The visual toggle must still work.
+    // localStorage access itself throws. The visual cycle must still work.
     const throwingStorage = {
       getItem: () => null,
       setItem: () => {
@@ -81,15 +92,15 @@ describe("createThemeController", () => {
       prefersLight: () => true,
       applyTheme,
     });
-    expect(withThrowing.toggle()).toBe("dark");
+    expect(withThrowing.cycle()).toBe("dark");
     expect(applyTheme).toHaveBeenLastCalledWith("dark");
 
     const withoutStorage = createThemeController({
       storage: null,
       prefersLight: () => false,
-      applyTheme,
+      applyTheme: () => {},
     });
-    expect(withoutStorage.toggle()).toBe("light");
+    expect(withoutStorage.cycle()).toBe("neon");
   });
 
   it("survives a getItem that throws by falling back to the OS preference", () => {

@@ -127,8 +127,108 @@ const DARK: ScenePalette = {
   },
 };
 
+// NEON (cyberpunk): near-black blue world, glowing cyan/teal accents.
+const NEON: ScenePalette = {
+  background: 0x05060e,
+  fog: { color: 0x05060e, near: 40, far: 90 },
+  hemisphere: { sky: 0x2b2f6e, ground: 0x0a0a14, intensity: 1.15 },
+  directional: { color: 0x7f8cff, intensity: 1.0 },
+  roles: {
+    ground: { color: 0x11162b },
+    path: { color: 0x1c2340 },
+    hill: { color: 0x151a30 },
+    foliage: { color: 0x123a3a },
+    trunk: { color: 0x232848 },
+    rock: { color: 0x1c2033 },
+    sign: { color: 0x232848 },
+    signPanel: { color: 0xd7e0ff, emissiveIntensity: 0.35 },
+    statue: { color: 0x2b3050 },
+    person: { color: 0x2dd4bf, emissiveIntensity: 0.7 },
+    markerRaw: { color: 0xfacc15, emissiveIntensity: 0.8 },
+    markerFused: { color: ACCENT, emissiveIntensity: 1.0 },
+    snapRing: { color: ACCENT, emissiveIntensity: 1.0 },
+    qrModule: { color: 0xfbbf24, emissiveIntensity: 0.7 },
+    poi: { color: ACCENT, emissiveIntensity: 0.9 },
+    phone: { color: 0x0c0f1c },
+    screen: { color: 0x3b4a8a, emissiveIntensity: 0.6 },
+    arrow: { color: 0x22d3ee, emissiveIntensity: 0.9 },
+    label: { color: 0x67e8f9, emissiveIntensity: 0.8 },
+    skyline: { color: 0x0f1326, emissiveIntensity: 0.15 },
+  },
+};
+
+// DUSK (vaporwave sunset): warm purple world under an orange-pink sky.
+const DUSK: ScenePalette = {
+  background: 0x2a1a3e,
+  fog: { color: 0x2a1a3e, near: 40, far: 90 },
+  hemisphere: { sky: 0xff9e7d, ground: 0x3c2a55, intensity: 1.15 },
+  directional: { color: 0xffb08a, intensity: 1.2 },
+  roles: {
+    ground: { color: 0x4b3566 },
+    path: { color: 0x5d4680 },
+    hill: { color: 0x543d72 },
+    foliage: { color: 0x2e6f6a },
+    trunk: { color: 0x7c5a4a },
+    rock: { color: 0x5a4478 },
+    sign: { color: 0x7c5a4a },
+    signPanel: { color: 0xffe8d6, emissiveIntensity: 0.2 },
+    statue: { color: 0x6d5590 },
+    person: { color: 0x2dd4bf, emissiveIntensity: 0.5 },
+    markerRaw: { color: 0xfacc15, emissiveIntensity: 0.5 },
+    markerFused: { color: ACCENT, emissiveIntensity: 0.7 },
+    snapRing: { color: ACCENT, emissiveIntensity: 0.7 },
+    qrModule: { color: 0xf59e0b, emissiveIntensity: 0.5 },
+    poi: { color: ACCENT, emissiveIntensity: 0.7 },
+    phone: { color: 0x241833 },
+    screen: { color: 0x8a5fa8, emissiveIntensity: 0.4 },
+    arrow: { color: 0x60a5fa, emissiveIntensity: 0.6 },
+    label: { color: 0x93c5fd, emissiveIntensity: 0.6 },
+    skyline: { color: 0x3a2a55, emissiveIntensity: 0.1 },
+  },
+};
+
+// MONO (ink/paper): high-contrast grayscale world — ONLY the coded colors
+// (amber GPS, red anchors, blue AR, teal user) pop. The strongest
+// storytelling palette.
+const MONO: ScenePalette = {
+  background: 0xf5f5f2,
+  fog: { color: 0xf5f5f2, near: 40, far: 90 },
+  hemisphere: { sky: 0xffffff, ground: 0xd9d9d4, intensity: 1.15 },
+  directional: { color: 0xffffff, intensity: 1.5 },
+  roles: {
+    ground: { color: 0xe8e8e4 },
+    path: { color: 0xd2d2cc },
+    hill: { color: 0xdfdfda },
+    foliage: { color: 0xb9b9b2 },
+    trunk: { color: 0xa5a59e },
+    rock: { color: 0xc9c9c2 },
+    sign: { color: 0xa5a59e },
+    signPanel: { color: 0xffffff },
+    statue: { color: 0xcfcfc8 },
+    person: { color: 0x0f766e },
+    markerRaw: { color: 0xca8a04 },
+    markerFused: { color: ACCENT, emissiveIntensity: 0 },
+    snapRing: { color: ACCENT },
+    qrModule: { color: 0xb45309 },
+    poi: { color: ACCENT },
+    phone: { color: 0x2a2a28 },
+    screen: { color: 0xffffff },
+    arrow: { color: 0x2563eb },
+    label: { color: 0x1d4ed8 },
+    skyline: { color: 0xb5b5ae },
+  },
+};
+
+const PALETTES: Readonly<Record<Theme, ScenePalette>> = {
+  light: LIGHT,
+  dark: DARK,
+  neon: NEON,
+  dusk: DUSK,
+  mono: MONO,
+};
+
 export function getPalette(theme: Theme): ScenePalette {
-  return theme === "light" ? LIGHT : DARK;
+  return PALETTES[theme];
 }
 
 function isPaletteRole(value: unknown): value is PaletteRole {

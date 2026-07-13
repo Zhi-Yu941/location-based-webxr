@@ -156,7 +156,7 @@ function boot(): void {
       window.matchMedia("(prefers-color-scheme: light)").matches,
     applyTheme,
   });
-  toggleButton?.addEventListener("click", () => themeController.toggle());
+  toggleButton?.addEventListener("click", () => themeController.cycle());
 
   const updateHeroExtras = wireHeroExtras(scroller);
   let lastChapterIndex = -1;

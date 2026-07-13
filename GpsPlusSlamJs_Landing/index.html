@@ -19,9 +19,10 @@
       // stays the source of truth after boot.
       (function () {
         try {
+          var valid = ["light", "dark", "neon", "dusk", "mono"];
           var stored = localStorage.getItem("gps-landing-theme");
           var theme =
-            stored === "light" || stored === "dark"
+            valid.indexOf(stored) >= 0
               ? stored
               : window.matchMedia &&
                   window.matchMedia("(prefers-color-scheme: light)").matches
@@ -67,6 +68,54 @@
         --card-hover: #f6f4f0;
         --link: #2954cc;
         --veil: #f2f1ed;
+
+        color-scheme: light;
+      }
+      html[data-theme="neon"] {
+        --bg: #05060e;
+        --text: #e6ebff;
+        --muted: #9aa5d9;
+        --hl-raw: #facc15;
+        --hl-code: #fbbf24;
+        --panel: rgb(10 12 28 / 62%);
+        --panel-border: rgb(120 140 255 / 18%);
+        --card: #10142a;
+        --card-border: #2b3050;
+        --card-hover: #181d38;
+        --link: #67e8f9;
+        --veil: #05060e;
+
+        color-scheme: dark;
+      }
+      html[data-theme="dusk"] {
+        --bg: #2a1a3e;
+        --text: #ffeadd;
+        --muted: #d9b8a8;
+        --hl-raw: #fcd34d;
+        --hl-code: #fbbf24;
+        --panel: rgb(42 26 62 / 62%);
+        --panel-border: rgb(255 176 138 / 18%);
+        --card: #3a2a55;
+        --card-border: #5d4680;
+        --card-hover: #47356a;
+        --link: #93c5fd;
+        --veil: #2a1a3e;
+
+        color-scheme: dark;
+      }
+      html[data-theme="mono"] {
+        --bg: #f5f5f2;
+        --text: #1a1a18;
+        --muted: #5f5f5a;
+        --hl-raw: #a16207;
+        --hl-code: #b45309;
+        --panel: rgb(255 255 255 / 66%);
+        --panel-border: rgb(0 0 0 / 10%);
+        --card: #fff;
+        --card-border: #d5d5cf;
+        --card-hover: #efefe9;
+        --link: #2563eb;
+        --veil: #f5f5f2;
 
         color-scheme: light;
       }

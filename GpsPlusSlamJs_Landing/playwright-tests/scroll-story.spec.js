@@ -113,7 +113,7 @@ test("renders the 3D canvas, or engages the static-DOM floor cleanly", async ({
   }).toPass({ timeout: 15000 });
 });
 
-test("theme toggle flips the page theme and persists across reload", async ({
+test("palette button cycles the palette and the choice persists across reload", async ({
   page,
 }) => {
   await page.goto("/");
@@ -121,11 +121,14 @@ test("theme toggle flips the page theme and persists across reload", async ({
     () => document.documentElement.dataset.theme,
   );
   await page.locator("#theme-toggle").click();
-  const flipped = initial === "dark" ? "light" : "dark";
-  await expect(page.locator(`html[data-theme="${flipped}"]`)).toBeAttached();
+  // Cycled to the NEXT palette (round-2 R19: five ids, not a toggle).
+  await expect(page.locator(`html[data-theme="${initial}"]`)).toHaveCount(0);
+  const cycled = await page.evaluate(
+    () => document.documentElement.dataset.theme,
+  );
   await page.reload();
   // The FOUC guard must restore the persisted choice before/at first paint.
-  await expect(page.locator(`html[data-theme="${flipped}"]`)).toBeAttached();
+  await expect(page.locator(`html[data-theme="${cycled}"]`)).toBeAttached();
 });
 
 test("all four demo apps stay launchable from the demos hub", async ({

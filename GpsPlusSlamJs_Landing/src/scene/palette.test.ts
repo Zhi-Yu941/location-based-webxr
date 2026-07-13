@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Group, Mesh, MeshStandardMaterial, SphereGeometry } from "three";
+import { THEME_IDS } from "../theme";
 import {
   applyPaletteToScene,
   getPalette,
@@ -13,8 +14,8 @@ import {
 // break the brand continuity with the page chrome (--accent: #ef4444).
 
 describe("getPalette", () => {
-  it("defines every role in both themes", () => {
-    for (const theme of ["light", "dark"] as const) {
+  it("defines every role in every palette", () => {
+    for (const theme of THEME_IDS) {
       const palette = getPalette(theme);
       for (const role of PALETTE_ROLES) {
         expect(palette.roles[role], `${theme}/${role}`).toBeDefined();
@@ -22,9 +23,18 @@ describe("getPalette", () => {
     }
   });
 
-  it("keeps the fused-anchor accent at the brand red #ef4444 in both themes", () => {
-    expect(getPalette("light").roles.markerFused.color).toBe(0xef4444);
-    expect(getPalette("dark").roles.markerFused.color).toBe(0xef4444);
+  it("keeps the color CODING invariant across ALL palettes (round-2 D3)", () => {
+    // GPS/QR = amber family, anchors = brand red, so the copy highlights
+    // and the story stay readable no matter which palette is cycled to.
+    for (const theme of THEME_IDS) {
+      const roles = getPalette(theme).roles;
+      expect(roles.markerFused.color, `${theme}/fused`).toBe(0xef4444);
+      expect(roles.poi.color, `${theme}/poi`).toBe(0xef4444);
+      // Amber family: red and green channels high, blue low.
+      const amber = roles.markerRaw.color;
+      expect((amber >> 16) & 0xff, `${theme}/raw R`).toBeGreaterThan(150);
+      expect(amber & 0xff, `${theme}/raw B`).toBeLessThan(100);
+    }
   });
 
   it("gives the dark theme glowing accents (emissive) and the light theme matte clay", () => {

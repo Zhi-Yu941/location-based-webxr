@@ -5,6 +5,8 @@ import { CHAPTER_COUNT } from "../chapters";
 import {
   createPathCurve,
   DROP_PATH_T,
+  SKYLINE_CENTER,
+  VIGNETTE_ANCHORS,
   WORLD_ANCHORS,
   WORLD_NODE,
 } from "./clay-world";
@@ -197,7 +199,8 @@ function addValueChain(
   }
 }
 
-/** One chapter's target composition (camera + look + walk progress). */
+/** One framing target (camera + look + walk progress). A chapter may
+ * carry SEVERAL of these (the round-11 gallery journey waypoints). */
 interface ChapterFraming {
   readonly at: number;
   readonly camera: Vector3;
@@ -205,6 +208,8 @@ interface ChapterFraming {
   readonly walkT: number;
   readonly cameraEase?: string;
   readonly walkDuration?: number;
+  /** Camera tween length; defaults to the 55%-of-window default. */
+  readonly cameraDuration?: number;
 }
 
 export function buildStoryTimeline(
@@ -257,6 +262,39 @@ export function buildStoryTimeline(
     .getPointAt(Math.min(1, eyeT + 0.12))
     .add(new Vector3(0, 1.3, 0));
 
+  // ── Round-11 journey geometry: viewpoints pulled back from each
+  // vignette toward the world center (the direction the camera travels
+  // from), at gentle heights.
+  const towardCenter = (anchor: Vector3, pullBack: number, height: number) =>
+    anchor
+      .clone()
+      .add(anchor.clone().setY(0).normalize().multiplyScalar(-pullBack))
+      .setY(height);
+  // City sweep viewpoint: above the meadow edge, looking out over the
+  // skyline row; laterally biased toward the campus so the next leg
+  // continues the same arc instead of reversing.
+  const citySweepCamera = towardCenter(SKYLINE_CENTER, 24, 13).add(
+    VIGNETTE_ANCHORS.campus
+      .clone()
+      .sub(SKYLINE_CENTER)
+      .setY(0)
+      .normalize()
+      .multiplyScalar(7),
+  );
+  const campusCamera = towardCenter(VIGNETTE_ANCHORS.campus, 13, 8);
+  // Far enough back that the castle rests in the BACKGROUND of the
+  // centered CTA copy ("kann im Hintergrund sichtbar bleiben"), not
+  // looming over it — and biased AWAY from the campus so the tent the
+  // journey just passed doesn't crowd the frame edge.
+  const awayFromCampus = VIGNETTE_ANCHORS.castle
+    .clone()
+    .sub(VIGNETTE_ANCHORS.campus)
+    .setY(0)
+    .normalize();
+  const castleCamera = towardCenter(VIGNETTE_ANCHORS.castle, 24, 7.5).add(
+    awayFromCampus.multiplyScalar(9),
+  );
+
   // The camera path as an explicit framing CHAIN: each move tweens from the
   // previous framing to its own, so scrubbing is continuous by construction
   // (no dependence on anime's from-capture).
@@ -308,18 +346,33 @@ export function buildStoryTimeline(
       look: new Vector3(0, 0, 0),
       walkT: 0.6,
     },
-    // gallery
+    // gallery + cta = the use-case JOURNEY (round-11): sweep over the
+    // city, fly past the campus vignette, arrive and REST at the castle.
+    // DELIBERATE deviation from the "settled by mid-window" default for
+    // the gallery window — the traveling shot is the requested effect
+    // (same documented-deviation pattern as the dive). Two waypoints
+    // back-to-back fill the window; gentle 500 ms sine-eased legs keep
+    // the ride slow ("dass dem Nutzer nicht schlecht wird").
     {
       at: 5000,
-      camera: new Vector3(-8, 11, -12),
-      look: new Vector3(4, 1, -3),
+      camera: citySweepCamera,
+      look: SKYLINE_CENTER.clone().setY(4),
       walkT: 0.78,
+      cameraDuration: 500,
     },
-    // cta
+    {
+      at: 5500,
+      camera: campusCamera,
+      look: VIGNETTE_ANCHORS.campus.clone().add(new Vector3(0, 1.2, 0)),
+      walkT: 0.78,
+      cameraDuration: 500,
+    },
+    // cta — the ARRIVAL: resting at the castle, which stays in the
+    // background while reading (no return to the start framing).
     {
       at: 6000,
-      camera: new Vector3(15, 17, 21),
-      look: new Vector3(0, 1, 0),
+      camera: castleCamera,
+      look: VIGNETTE_ANCHORS.castle.clone().add(new Vector3(0, 2.5, 0)),
       walkT: 0.92,
     },
   ];
@@ -330,6 +383,7 @@ export function buildStoryTimeline(
       {
         ...vec3Tween(previous.camera, framing.camera),
         ...(framing.cameraEase ? { ease: framing.cameraEase } : {}),
+        ...(framing.cameraDuration ? { duration: framing.cameraDuration } : {}),
       },
       framing.at,
     );

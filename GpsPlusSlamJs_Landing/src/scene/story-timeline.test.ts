@@ -6,7 +6,7 @@ import {
   type MeshStandardMaterial,
 } from "three";
 import { CHAPTER_COUNT } from "../chapters";
-import { buildClayWorld, WORLD_NODE } from "./clay-world";
+import { buildClayWorld, VIGNETTE_ANCHORS, WORLD_NODE } from "./clay-world";
 import { buildDotPerson } from "./dot-person";
 import { buildMarkerPair } from "./markers";
 import { buildPhoneFrame } from "./phone-frame";
@@ -48,6 +48,36 @@ describe("buildStoryTimeline", () => {
     const timeline = buildStoryTimeline(stage, () => {});
     expect(timeline.duration).toBe(CHAPTER_COUNT * CHAPTER_DURATION_MS);
     expect(chapterEndTime(2)).toBe(3 * CHAPTER_DURATION_MS - 1);
+  });
+
+  it("flies the gallery journey past the campus and arrives at the castle for the CTA (round-11)", () => {
+    // The maintainer's brainstorm: the gallery chapter is a use-case
+    // JOURNEY (city sweep → campus flyover → castle), and the CTA is an
+    // ARRIVAL — the camera rests at the castle instead of returning to
+    // the start framing.
+    const timeline = buildStoryTimeline(stage, () => {});
+    timeline.seek(50);
+    const heroPos = stage.camera.position.clone();
+
+    timeline.seek(chapterEndTime(5)); // gallery end: campus flyover
+    syncStage(stage);
+    expect(
+      stage.camera.position.distanceTo(VIGNETTE_ANCHORS.campus),
+    ).toBeLessThan(22);
+
+    timeline.seek(chapterEndTime(6)); // CTA: resting at the castle
+    syncStage(stage);
+    expect(
+      stage.camera.position.distanceTo(VIGNETTE_ANCHORS.castle),
+    ).toBeLessThan(30);
+    // No return-to-start: the arrival is the point.
+    expect(stage.camera.position.distanceTo(heroPos)).toBeGreaterThan(30);
+    // And the camera actually LOOKS at the castle.
+    expect(
+      stage.lookTarget.distanceTo(
+        VIGNETTE_ANCHORS.castle.clone().add(new Vector3(0, 2.5, 0)),
+      ),
+    ).toBeLessThan(8);
   });
 
   it("moves the camera between chapters when scrubbed", () => {

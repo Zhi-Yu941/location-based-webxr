@@ -109,6 +109,9 @@ const skylineCenter = anchorCurve
   .add(skyDirection.clone().multiplyScalar(48))
   .setY(0);
 
+/** Center of the skyline row — the round-11 city-sweep look target. */
+export const SKYLINE_CENTER = skylineCenter;
+
 /** World position of the skyline's TV tower (the second POI pin's spot). */
 const SKYLINE_TOWER_POS = skylineCenter
   .clone()

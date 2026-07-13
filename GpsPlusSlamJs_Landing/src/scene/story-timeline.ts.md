@@ -67,8 +67,13 @@ and keeps derived state (dot-person on the path) in sync.
   moment (round-5 W3 — no dead gap), and the AR content fades in
   together with the phone's arrival (deliberately completing near the window END — the
   requested dramaturgy, a documented deviation from the "settled by
-  mid-window" default) → pull-back + outer-terrain rise → calm CTA
-  framing.
+  mid-window" default) → pull-back + outer-terrain rise → the round-11
+  use-case JOURNEY: the gallery window carries TWO 500 ms waypoints
+  (city sweep over the skyline, then a campus-vignette flyover — a
+  second documented deviation from "settled by mid-window": the
+  traveling shot is the requested effect) and the CTA is an ARRIVAL at
+  the castle vignette, which stays in the background while reading (no
+  return to the start framing; test-pinned against `VIGNETTE_ANCHORS`).
 - The walk starts at `DROP_PATH_T` (the QR drop point) — there is no walk
   tween in the QR chapter; the drop replaces the old slide-in.
 
@@ -88,4 +93,5 @@ camera.lookAt(stage.lookTarget);
 raw-jitters/fused-still, path walking (via the syncStage contract), phone +
 gallery reveals, the round-4 dive ordering (camera → phone → AR), dirty-
 notify on scrub, scrub-back restoration, intro hand-over framing, stage
-placement.
+placement, and the round-11 journey (gallery end near the campus, CTA
+resting at the castle, no return-to-start).

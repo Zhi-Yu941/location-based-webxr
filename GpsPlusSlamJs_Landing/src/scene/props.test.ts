@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Mesh, RingGeometry } from "three";
 import { Vector3 } from "three";
-import { buildDotPerson, DOT_PERSON_ARM, DOT_PERSON_NAME } from "./dot-person";
+import { buildDotPerson, DOT_PERSON_NAME } from "./dot-person";
 import { buildMarkerPair, MARKER_NODE, RING_OFFSETS } from "./markers";
 import { buildPhoneFrame, PHONE_NODE } from "./phone-frame";
 
@@ -23,17 +23,19 @@ describe("buildDotPerson", () => {
     expect(tagged).toBeGreaterThan(0);
   });
 
-  it("has two shoulder-pivoted arms the dive can raise", () => {
-    // Round-2 R10: the person raises an arm holding the phone during the
-    // dive — the arms are pivot GROUPS at shoulder height so a rotation
-    // swings them naturally.
+  it("has NO arms (round-5 W1 removed them)", () => {
+    // Round-5 feedback: with the round-4 dive dramaturgy the phone only
+    // appears once the person is gone, so the round-2 R10 arm raise read
+    // as an unexplained gesture — the arms were removed entirely. This
+    // pin keeps them from coming back citing R10.
     const person = buildDotPerson();
-    const left = person.getObjectByName(DOT_PERSON_ARM.left);
-    const right = person.getObjectByName(DOT_PERSON_ARM.right);
-    expect(left).toBeDefined();
-    expect(right).toBeDefined();
-    expect(right?.position.y ?? 0).toBeGreaterThan(1); // shoulder pivot
-    expect(right?.rotation.x ?? 99).toBeCloseTo(0, 5); // hanging by default
+    const armNames: string[] = [];
+    person.traverse((obj) => {
+      if (obj.name.includes("arm")) {
+        armNames.push(obj.name);
+      }
+    });
+    expect(armNames).toEqual([]);
   });
 });
 

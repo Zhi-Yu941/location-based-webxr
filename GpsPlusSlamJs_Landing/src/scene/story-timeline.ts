@@ -8,7 +8,6 @@ import {
   WORLD_ANCHORS,
   WORLD_NODE,
 } from "./clay-world";
-import { DOT_PERSON_ARM } from "./dot-person";
 import type { MarkerPair } from "./markers";
 
 /**
@@ -424,28 +423,15 @@ export function buildStoryTimeline(
     2550,
   );
 
-  // Dive chapter, re-sequenced per round-4 V2. The wanted dramaturgy:
-  // (1) the arm raises, (2) the camera flies close behind the arm (the
-  // person hides as it closes in — you cannot see yourself through your
-  // own screen, and this masks that the phone is not attached to the
-  // arm), (3) only THEN the phone frame flies in, (4) the AR content
-  // fades in together with the phone's arrival. DELIBERATE deviation from
-  // the "settled by mid-window" default: the composition completes near
-  // the window's end — that staging IS the requested effect.
+  // Dive chapter, re-sequenced per round-4 V2 (arm beats removed in
+  // round-5 W1 — the arms are gone). The dramaturgy: (1) the camera
+  // flies close in beside the person, who hides as it closes in (you
+  // cannot see yourself through your own screen), (2) the phone frame
+  // flies in, (3) the AR content fades in together with the phone's
+  // arrival. DELIBERATE deviation from the "settled by mid-window"
+  // default: the composition completes near the window's end — that
+  // staging IS the requested effect.
   const arContent = world.getObjectByName(WORLD_NODE.arContent);
-  const phoneArm = person.getObjectByName(DOT_PERSON_ARM.right);
-  if (phoneArm) {
-    timeline.add(
-      phoneArm,
-      { rotateX: { from: 0, to: -100 }, duration: 300, ease: "outCubic" },
-      3050,
-    );
-    timeline.add(
-      phoneArm,
-      { rotateX: { from: -100, to: 0 }, duration: 250 },
-      4050,
-    );
-  }
   // Person fades as the camera's final approach passes them (camera
   // settles at 3550)...
   timeline.add(person, { scale: { from: 1, to: 0.001 }, duration: 120 }, 3480);
@@ -464,7 +450,7 @@ export function buildStoryTimeline(
       3780,
     );
   }
-  // Pull-back: phone drops away, person + arm return.
+  // Pull-back: phone drops away, person returns.
   timeline.add(phone, { scale: { from: 1, to: 0.001 }, duration: 150 }, 4000);
   timeline.add(person, { scale: { from: 0.001, to: 1 }, duration: 130 }, 4050);
 

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { PerspectiveCamera, Vector3 } from "three";
 import { CHAPTER_COUNT } from "../chapters";
 import { buildClayWorld, WORLD_NODE } from "./clay-world";
-import { buildDotPerson, DOT_PERSON_ARM } from "./dot-person";
+import { buildDotPerson } from "./dot-person";
 import { buildMarkerPair } from "./markers";
 import { buildPhoneFrame } from "./phone-frame";
 import {
@@ -161,27 +161,20 @@ describe("buildStoryTimeline", () => {
     expect(arContent?.scale.x ?? 0).toBeGreaterThan(0.9); // faded in with it
   });
 
-  it("raises the phone arm, hides the person inside the view, and restores both", () => {
-    // Round-2 R10: mid-dive the person raises the arm holding the phone;
-    // once the camera is "inside" the phone view the person disappears
+  it("hides the person inside the phone view and restores them on the pull-back", () => {
+    // Once the camera is "inside" the phone view the person disappears
     // (you cannot see yourself through your own phone) and returns on the
-    // pull-back with the arm lowered again.
+    // pull-back. (The round-2 R10 arm raise was removed in round-5 W1.)
     const timeline = buildStoryTimeline(stage, () => {});
-    const arm = stage.person.getObjectByName(DOT_PERSON_ARM.right);
-    expect(arm).toBeDefined();
 
-    timeline.seek(2999); // just before the dive: walking, arm down
-    expect(Math.abs(arm?.rotation.x ?? 99)).toBeLessThan(0.05);
-
-    timeline.seek(3500); // mid-dive: arm raised (negative X = up-forward)
-    expect(arm?.rotation.x ?? 0).toBeLessThan(-1);
+    timeline.seek(2999); // just before the dive: walking, fully visible
+    expect(stage.person.scale.x).toBeCloseTo(1, 2);
 
     timeline.seek(chapterEndTime(3)); // inside the phone view
     expect(stage.person.scale.x).toBeLessThan(0.01);
 
     timeline.seek(chapterEndTime(4)); // pulled back out
     expect(stage.person.scale.x).toBeCloseTo(1, 2);
-    expect(Math.abs(arm?.rotation.x ?? 99)).toBeLessThan(0.05);
   });
 
   it("notifies the render loop on every scrub update", () => {

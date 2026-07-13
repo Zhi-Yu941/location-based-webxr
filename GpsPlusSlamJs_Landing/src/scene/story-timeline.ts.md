@@ -57,12 +57,13 @@ and keeps derived state (dot-person on the path) in sync.
   settle-wiggle, accuracy ring fades in LARGE and collapses onto the drop
   point, person sky-drops with a bounce (`stage.drop.y`, applied in
   `syncStage`) → fusion: static scattered rings, connector reveal, pin
-  pulse → dive: arm raise, camera settles CLOSE behind the person (0.6
-  units — the person hides as it closes in), only THEN the phone frame
-  flies in, and the AR content fades in together with the phone's
-  arrival (deliberately completing near the window END — the requested
-  dramaturgy, a documented deviation from the "settled by mid-window"
-  default) → pull-back + outer-terrain rise → calm CTA framing.
+  pulse → dive: camera settles CLOSE beside the person (who hides as it
+  closes in; the round-2 R10 arm raise was removed in round-5 W1), the
+  phone frame flies in, and the AR content fades in together with the
+  phone's arrival (deliberately completing near the window END — the
+  requested dramaturgy, a documented deviation from the "settled by
+  mid-window" default) → pull-back + outer-terrain rise → calm CTA
+  framing.
 - The walk starts at `DROP_PATH_T` (the QR drop point) — there is no walk
   tween in the QR chapter; the drop replaces the old slide-in.
 

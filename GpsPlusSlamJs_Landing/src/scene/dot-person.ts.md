@@ -19,6 +19,10 @@ featureless so it reads as "a person" without demographic detail.
 - Meshes are `person`-role tagged so the theme toggle recolors them; the
   role carries the "user color" (round-2 R6b): teal/petrol in every
   palette, glowing slightly in dark ones.
+- **Deliberately armless** (round-5 W1, test-pinned): the round-2 R10
+  arms were removed because the round-4 dive dramaturgy shows the phone
+  only after the person has faded — the raise read as an unexplained
+  gesture. Do not re-add them citing R10.
 
 ## Examples
 
@@ -30,4 +34,4 @@ scene.add(person);
 
 ## Tests
 
-`props.test.ts` — name + role tagging.
+`props.test.ts` — name + role tagging + the no-arms pin (round-5 W1).

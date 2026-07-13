@@ -36,12 +36,18 @@ the copy.
   chapter carries a `.copy` glass panel with the punchy-marketing copy
   (round-2 interview decision). The active section gets `.active` (full
   opacity) from `main.ts`.
-- The CTA section holds the primary "Fork & start building" button, a
-  static "Open source on GitHub" badge (`.github-badge`, v2 B5 — a plain
-  styled link, deliberately NO live star-count fetch until the repo has a
-  convincing number), the demos hub (four `.demo-card`s with inline-SVG
-  vignettes keeping the proven one-line descriptions), and the external
-  links row (`.links`, which carries the story's terminal bottom padding). Its lead sentence
+- The CTA section holds ONE primary "Fork & start building" button that
+  carries the GitHub mark icon (round-9 R9-4 merged the former separate
+  "Open source on GitHub" badge into it — the badge duplicated the
+  button and was removed; still deliberately NO live star-count fetch),
+  the demos hub (four `.demo-card`s with inline-SVG vignettes keeping
+  the proven one-line descriptions), and the external links row
+  (`.links`, which carries the story's terminal bottom padding). ALL
+  external (https) links — primary CTA, links row, FAQ license link —
+  open a NEW TAB (`target="_blank" rel="noopener"`, round-9: the landing
+  stays open in the background; this also removes the bfcache-return
+  trigger of the firefly freeze, see R9-6). Demo cards stay same-tab
+  (they are the site's own apps). Its lead sentence
   starts with `#cta-device-claim` (round-8 Z6): the static text is the
   universally-true Android+Chrome claim; `src/ar-support.ts` upgrades it
   to "run on your phone right now" only on immersive-ar-capable devices

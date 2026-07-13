@@ -533,7 +533,9 @@
         text-align: center;
       }
       .btn-primary {
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
         margin-top: 18px;
         text-decoration: none;
         background: var(--accent);
@@ -547,6 +549,11 @@
           transform 0.15s ease,
           box-shadow 0.15s ease;
       }
+      .btn-primary svg {
+        width: 18px;
+        height: 18px;
+        fill: currentcolor;
+      }
       .btn-primary:hover {
         background: var(--accent-hover);
         transform: translateY(-1px);
@@ -555,39 +562,6 @@
       .btn-primary:active {
         transform: translateY(0) scale(0.98);
         box-shadow: none;
-      }
-      .cta-badges {
-        margin: 14px 0 0;
-      }
-      .github-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 7px;
-        padding: 7px 14px;
-        border: 1px solid var(--card-border);
-        border-radius: 999px;
-        background: var(--card);
-        color: var(--text);
-        font-size: 0.9rem;
-        font-weight: 600;
-        text-decoration: none;
-        transition:
-          border-color 0.15s ease,
-          background 0.15s ease,
-          transform 0.15s ease;
-      }
-      .github-badge:hover {
-        border-color: var(--accent);
-        background: var(--card-hover);
-        transform: translateY(-1px);
-      }
-      .github-badge:active {
-        transform: translateY(0) scale(0.98);
-      }
-      .github-badge svg {
-        width: 16px;
-        height: 16px;
-        fill: currentcolor;
       }
       .demos {
         max-width: 720px;
@@ -823,13 +797,11 @@
           transition: opacity 0.35s ease;
         }
         .btn-primary,
-        .github-badge,
         .demo-card,
         .demo-card::after {
           transition: none;
         }
         .btn-primary:hover,
-        .github-badge:hover,
         .demo-card:hover,
         .demo-card:hover::after {
           transform: none;
@@ -1003,26 +975,23 @@ world.add(marker);               <span class="c">// marker: any three.js Object3
             — same engine, same repo. No signup — everything you need comes
             included. Clone it, run it, bring your favorite place to life.
           </p>
+          <!-- ONE primary CTA (round-9 R9-4): the GitHub mark moved INTO
+               the button and the duplicate "Open source on GitHub" badge
+               was removed. target=_blank: the landing must stay open in
+               the background. -->
           <a
             class="btn-primary"
             href="https://github.com/cs-util-com/location-based-webxr"
-            >Fork &amp; start building</a
+            target="_blank"
+            rel="noopener"
           >
-          <p class="cta-badges">
-            <!-- Static badge on purpose (v2 B5): no live star count until the
-                 repo has a convincing number — no fetch, nothing to break. -->
-            <a
-              class="github-badge"
-              href="https://github.com/cs-util-com/location-based-webxr"
-            >
-              <svg viewBox="0 0 16 16" aria-hidden="true">
-                <path
-                  d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"
-                />
-              </svg>
-              Open source on GitHub
-            </a>
-          </p>
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path
+                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"
+              />
+            </svg>
+            Fork &amp; start building
+          </a>
           <!-- Desktop→phone handoff (v2 B2): stays hidden unless
                src/qr-handoff.ts decides this is a desktop-class viewport
                without immersive-ar. The QR encodes the LIVE URL
@@ -1135,7 +1104,10 @@ world.add(marker);               <span class="c">// marker: any three.js Object3
             <p>
               The app framework is Apache-2.0. It bundles a community-licensed
               core library — full details in the
-              <a href="https://github.com/cs-util-com/location-based-webxr"
+              <a
+                href="https://github.com/cs-util-com/location-based-webxr"
+                target="_blank"
+                rel="noopener"
                 >GitHub repository</a
               >.
             </p>
@@ -1159,13 +1131,24 @@ world.add(marker);               <span class="c">// marker: any three.js Object3
         </div>
 
         <div class="links">
-          <a href="https://github.com/cs-util-com/location-based-webxr"
+          <!-- External links open new tabs (round-9 R9-4): the landing
+               stays open in the background. -->
+          <a
+            href="https://github.com/cs-util-com/location-based-webxr"
+            target="_blank"
+            rel="noopener"
             >GitHub repository</a
           >
-          <a href="https://github.com/cs-util-com/location-based-webxr#readme"
+          <a
+            href="https://github.com/cs-util-com/location-based-webxr#readme"
+            target="_blank"
+            rel="noopener"
             >Documentation</a
           >
-          <a href="https://www.npmjs.com/package/gps-plus-slam-app-framework"
+          <a
+            href="https://www.npmjs.com/package/gps-plus-slam-app-framework"
+            target="_blank"
+            rel="noopener"
             >npm: gps-plus-slam-app-framework</a
           >
         </div>

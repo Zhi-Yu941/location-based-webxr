@@ -138,13 +138,20 @@ test("all four demo apps stay launchable from the demos hub", async ({
   for (const href of ["/starter/", "/minimal/", "/qr-demo/", "/recorder/"]) {
     await expect(page.locator(`a.demo-card[href="${href}"]`)).toBeAttached();
   }
-  // The static "Open source on GitHub" badge (v2 B5) must sit next to the
-  // primary CTA — it is the only social-proof element on the page.
-  await expect(
-    page.locator(
-      'a.github-badge[href="https://github.com/cs-util-com/location-based-webxr"]',
-    ),
-  ).toBeAttached();
+  // Round-9 R9-4: ONE primary CTA carrying the GitHub mark (the separate
+  // "Open source on GitHub" badge duplicated it and was removed), and
+  // every external link opens a NEW TAB — the landing must stay open.
+  const primary = page.locator(
+    'a.btn-primary[href="https://github.com/cs-util-com/location-based-webxr"]',
+  );
+  await expect(primary).toBeAttached();
+  await expect(primary).toHaveAttribute("target", "_blank");
+  await expect(primary.locator("svg")).toBeAttached();
+  await expect(page.locator("a.github-badge")).toHaveCount(0);
+  for (const external of await page.locator('a[href^="https://"]').all()) {
+    await expect(external).toHaveAttribute("target", "_blank");
+    await expect(external).toHaveAttribute("rel", /noopener/);
+  }
 });
 
 test("FAQ accordions exist and open natively", async ({ page }) => {

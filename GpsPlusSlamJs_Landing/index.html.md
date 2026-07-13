@@ -24,8 +24,11 @@ the copy.
   opacity) from `main.ts`.
 - The CTA section holds the primary "Fork & start building" button, the
   demos hub (four `.demo-card`s with inline-SVG vignettes keeping the
-  proven one-line descriptions), the external links, and the license
-  footer.
+  proven one-line descriptions), and the external links row (`.links`,
+  which carries the story's terminal bottom padding). There is
+  deliberately NO license text on the page (round-3 F-drop decision:
+  details live on GitHub only); the meta description keeps its factual
+  "Apache-2.0 framework" mention for SEO/social.
 
 ## Invariants & assumptions
 

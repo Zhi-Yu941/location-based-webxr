@@ -493,6 +493,9 @@
         max-width: 720px;
         margin: 34px auto 0;
         padding-top: 20px;
+        /* Terminal spacing of the story: the removed license footer used to
+           carry the page's closing 48px (round-3 F-drop). */
+        padding-bottom: 48px;
         border-top: 1px solid var(--card-border);
         display: flex;
         flex-wrap: wrap;
@@ -506,20 +509,6 @@
       }
       .links a:hover {
         text-decoration: underline;
-      }
-      footer {
-        margin: 30px auto 0;
-        max-width: 720px;
-        text-align: center;
-        font-size: 0.82rem;
-        color: var(--muted);
-        padding-bottom: 48px;
-      }
-      footer code {
-        background: var(--card);
-        padding: 1px 6px;
-        border-radius: 5px;
-        font-size: 0.9em;
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -555,21 +544,22 @@
         <div class="hero-content">
           <h1>
             <span class="hl-raw">GPS alone</span> is too inaccurate for AR.
+            <span class="hl-fused">So we fused it.</span>
           </h1>
           <p class="hero-sub">
-            Meters of wobble ruin the illusion. Location-based WebXR
-            <span class="hl-fused">fuses</span> it with the phone's own motion
-            tracking — and 3D content finally sticks to real places. In the
-            mobile browser, from a single URL.
+            The result: 3D content that sticks to real places and gets more
+            precise the longer the user walks. One URL, no app, fully offline.
           </p>
           <ul class="hero-points">
-            <li>No app — one URL</li>
             <li>
-              <span class="hl-raw">GPS</span> + WebXR
-              <span class="hl-fused">fusion</span>: anchors that hold still
+              Walk around your content —
+              <span class="hl-fused">WebXR anchors</span> hold, nothing floats
             </li>
-            <li>Fully offline — no cloud mapping</li>
-            <li>Any QR code = door + instant position fix</li>
+            <li>
+              Any ordinary <span class="hl-code">QR code</span> = door + instant
+              position fix
+            </li>
+            <li>Real 6DoF in the browser: Android + Chrome today</li>
           </ul>
           <p class="hero-links">
             <span class="scroll-hint">Scroll to walk in ↓</span>
@@ -581,13 +571,11 @@
       <section class="chapter" id="chapter-qr" data-chapter="qr">
         <div class="copy">
           <h2>
-            Any ordinary <span class="hl-code">QR code</span> is the door — and
-            the anchor.
+            Any ordinary <span class="hl-code">QR code</span> does two jobs.
           </h2>
           <p>
-            One scan and the page jumps straight into AR, no install. And the
-            code can double as an instant, precise first fix — before GPS has
-            even warmed up.
+            One scan jumps straight into AR, no install — and pins the user to
+            the exact spot they're standing on, before GPS has even warmed up.
           </p>
         </div>
       </section>
@@ -622,8 +610,10 @@
           <h2>Works anywhere. Fully offline.</h2>
           <p>
             No cloud mapping, no scanning vans, no pre-scanned city centers.
-            Everything aligns on the device — on a plaza, in a random park, or
-            in an enchanted forest where a dragon waits.
+            Everything aligns on the device — at a forest portal that opens only
+            at dawn, or on a plaza where a 3D scan of the place snaps back to
+            the exact spot it was captured. If the user can stand there, a story
+            can live there.
           </p>
         </div>
       </section>
@@ -642,6 +632,9 @@
             <li>Campus, venue &amp; trade-fair navigation</li>
             <li>Construction &amp; architecture previews at 1:1 scale</li>
             <li>Underground utilities made visible on site</li>
+            <li>
+              Reality capture: GPS-anchored 3D scans &amp; Gaussian splats
+            </li>
             <li>Safety training &amp; emergency drills on location</li>
           </ul>
         </div>
@@ -651,8 +644,9 @@
         <div class="copy">
           <h2>The code is on GitHub.</h2>
           <p>
-            No signup, no API key, no SDK download — clone it, run the demos,
-            ship your own experience.
+            The demos below run on your phone right now — same engine, same
+            repo. No signup, no keys: clone it, run it, point it at your
+            favorite place.
           </p>
           <a
             class="btn-primary"
@@ -750,13 +744,6 @@
             >npm: gps-plus-slam-app-framework</a
           >
         </div>
-
-        <footer>
-          Open-source framework under Apache-2.0. The
-          <code>gps-plus-slam-js</code> alignment core is closed-source with a
-          free community license bundled in, so you can start building right
-          away.
-        </footer>
       </section>
     </main>
 

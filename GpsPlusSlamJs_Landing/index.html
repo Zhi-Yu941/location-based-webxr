@@ -235,6 +235,15 @@
         color: var(--muted);
         font-size: 1.05rem;
       }
+      .copy ul {
+        margin: 10px 0 0;
+        padding-left: 1.2em;
+        color: var(--muted);
+        font-size: 0.98rem;
+      }
+      .copy li {
+        margin: 4px 0;
+      }
       .scroll-hint {
         margin-top: 18px;
         font-size: 0.9rem;
@@ -364,6 +373,9 @@
           grid-template-columns: 1fr 1fr;
         }
       }
+      /* Demo cards must LOOK clickable (round-2 R17): elevation, press
+         states and a trailing chevron distinguish them from the blurred
+         copy panels. */
       .demo-card {
         display: flex;
         gap: 14px;
@@ -374,9 +386,27 @@
         border-radius: 12px;
         padding: 14px 16px;
         color: var(--text);
+        box-shadow: 0 2px 10px rgb(0 0 0 / 14%);
+        transition:
+          transform 0.12s ease,
+          border-color 0.12s ease,
+          background 0.12s ease;
+      }
+      .demo-card::after {
+        content: "›";
+        margin-left: auto;
+        align-self: center;
+        color: var(--accent);
+        font-size: 1.6rem;
+        line-height: 1;
       }
       .demo-card:hover {
         background: var(--card-hover);
+        border-color: var(--accent);
+        transform: translateY(-2px);
+      }
+      .demo-card:active {
+        transform: translateY(0) scale(0.99);
       }
       .demo-card svg {
         flex: 0 0 auto;
@@ -487,12 +517,13 @@
       <section class="chapter" id="chapter-qr" data-chapter="qr">
         <div class="copy">
           <h2>
-            A <span class="hl-code">printed code</span> is the door — and the
-            anchor.
+            Any ordinary <span class="hl-code">QR code</span> is the door — and
+            the anchor.
           </h2>
           <p>
-            Visitors scan a QR code on a sign. The experience opens instantly —
-            and it knows exactly where it stands from the very first second.
+            One scan and the page jumps straight into AR, no install. And the
+            code can double as an instant, precise first fix — before GPS has
+            even warmed up.
           </p>
         </div>
       </section>
@@ -504,18 +535,17 @@
             <span class="hl-fused">Fusion</span> holds still.
           </h2>
           <p>
-            GPS alone jitters by meters — the
-            <span class="hl-raw">amber rings</span>. Fused with the phone's own
-            motion tracking, your content
-            <span class="hl-fused">stays put</span> — and gets steadier the
-            longer visitors walk.
+            Every <span class="hl-raw">GPS reading</span> lands somewhere else.
+            Averaging them nails the spot — and
+            <span class="hl-fused">fusion</span> with WebXR tracking keeps it
+            nailed while the user moves.
           </p>
         </div>
       </section>
 
       <section class="chapter" id="chapter-dive" data-chapter="dive">
         <div class="copy">
-          <h2>This is what your visitors see.</h2>
+          <h2>This is what your users see.</h2>
           <p>
             Their own phone becomes the window. No headset, no download —
             arrows, labels and stories laid over the real world.
@@ -528,7 +558,8 @@
           <h2>Works anywhere. Fully offline.</h2>
           <p>
             No cloud mapping, no scanning vans, no pre-scanned city centers.
-            Everything aligns on the device — on a plaza or in a random park.
+            Everything aligns on the device — on a plaza, in a random park, or
+            in an enchanted forest where a dragon waits.
           </p>
         </div>
       </section>
@@ -537,18 +568,27 @@
         <div class="copy">
           <h2>What will you build?</h2>
           <p>
-            Guided trails. Talking statues. Treasure hunts. Anything you can pin
-            to a place.
+            Anything that needs precise global positioning, runs offline, and
+            places 3D content in the physical world:
           </p>
+          <ul>
+            <li>
+              Guided tours &amp; city walks with content at the real spots
+            </li>
+            <li>Campus, venue &amp; trade-fair navigation</li>
+            <li>Construction &amp; architecture previews at 1:1 scale</li>
+            <li>Underground utilities made visible on site</li>
+            <li>Safety training &amp; emergency drills on location</li>
+          </ul>
         </div>
       </section>
 
       <section class="chapter" id="chapter-cta" data-chapter="cta">
         <div class="copy">
-          <h2>Free to start. No signup.</h2>
+          <h2>The code is on GitHub.</h2>
           <p>
-            The framework is Apache-2.0, with a free community license for the
-            alignment core bundled in. No API key. No account.
+            No signup, no API key, no SDK download — clone it, run the demos,
+            ship your own experience.
           </p>
           <a
             class="btn-primary"

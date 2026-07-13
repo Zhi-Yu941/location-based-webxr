@@ -48,8 +48,9 @@ the copy.
   external (https) links — primary CTA, links row, FAQ license link —
   open a NEW TAB (`target="_blank" rel="noopener"`, round-9: the landing
   stays open in the background; this also removes the bfcache-return
-  trigger of the firefly freeze, see R9-6). Demo cards stay same-tab
-  (they are the site's own apps). Its lead sentence
+  trigger of the firefly freeze, see R9-6). Since round-10 R10-1 the
+  four demo cards open new tabs as well (reversing the round-9 same-tab
+  call): EVERY outbound click keeps the landing alive. Its lead sentence
   starts with `#cta-device-claim` (round-8 Z6): the static text is the
   universally-true Android+Chrome claim; `src/ar-support.ts` upgrades it
   to "run on your phone right now" only on immersive-ar-capable devices

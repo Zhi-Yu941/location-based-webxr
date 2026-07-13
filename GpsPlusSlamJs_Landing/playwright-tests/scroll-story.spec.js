@@ -136,7 +136,12 @@ test("all four demo apps stay launchable from the demos hub", async ({
 }) => {
   await page.goto("/");
   for (const href of ["/starter/", "/minimal/", "/qr-demo/", "/recorder/"]) {
-    await expect(page.locator(`a.demo-card[href="${href}"]`)).toBeAttached();
+    const card = page.locator(`a.demo-card[href="${href}"]`);
+    await expect(card).toBeAttached();
+    // Round-10 R10-1: demo apps open in a NEW TAB as well — every
+    // outbound click keeps the landing alive in the background.
+    await expect(card).toHaveAttribute("target", "_blank");
+    await expect(card).toHaveAttribute("rel", /noopener/);
   }
   // Round-9 R9-4: ONE primary CTA carrying the GitHub mark (the separate
   // "Open source on GitHub" badge duplicated it and was removed), and

@@ -6,7 +6,12 @@ import {
   type MeshStandardMaterial,
 } from "three";
 import { CHAPTER_COUNT } from "../chapters";
-import { buildClayWorld, VIGNETTE_ANCHORS, WORLD_NODE } from "./clay-world";
+import {
+  buildClayWorld,
+  SKYLINE_CENTER,
+  VIGNETTE_ANCHORS,
+  WORLD_NODE,
+} from "./clay-world";
 import { buildDotPerson } from "./dot-person";
 import { buildMarkerPair } from "./markers";
 import { buildPhoneFrame } from "./phone-frame";
@@ -72,7 +77,30 @@ describe("buildStoryTimeline", () => {
     timeline.seek(50);
     const heroPos = stage.camera.position.clone();
 
-    timeline.seek(chapterEndTime(5)); // gallery end: campus flyover
+    // Round-12 R12-2 timing anchors: the turn happens in the LATE
+    // works-anywhere window, the sweep is AT the city when the gallery
+    // card arrives, the camera is over the camp well before the card
+    // leaves, and the castle arrival is COMPLETE before the CTA copy
+    // covers it (~mid CTA approach).
+    timeline.seek(5200);
+    syncStage(stage);
+    expect(stage.camera.position.distanceTo(SKYLINE_CENTER)).toBeLessThan(32);
+
+    timeline.seek(5800); // over the tent camp already
+    syncStage(stage);
+    expect(
+      stage.camera.position.distanceTo(VIGNETTE_ANCHORS.campus),
+    ).toBeLessThan(15);
+
+    timeline.seek(6350); // arrival must be COMPLETE (resting)
+    syncStage(stage);
+    const arrived = stage.camera.position.clone();
+    expect(arrived.distanceTo(VIGNETTE_ANCHORS.castle)).toBeLessThan(30);
+    timeline.seek(6650);
+    syncStage(stage);
+    expect(stage.camera.position.distanceTo(arrived)).toBeLessThan(0.8);
+
+    timeline.seek(chapterEndTime(5)); // gallery end: castle-bound near camp
     syncStage(stage);
     expect(
       stage.camera.position.distanceTo(VIGNETTE_ANCHORS.campus),

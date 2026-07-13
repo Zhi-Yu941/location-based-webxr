@@ -273,18 +273,19 @@ export function buildStoryTimeline(
       .clone()
       .add(anchor.clone().setY(0).normalize().multiplyScalar(-pullBack))
       .setY(height);
-  // City sweep viewpoint: above the meadow edge, looking out over the
-  // skyline row; laterally biased toward the campus so the next leg
-  // continues the same arc instead of reversing.
-  const citySweepCamera = towardCenter(SKYLINE_CENTER, 24, 13).add(
-    VIGNETTE_ANCHORS.campus
-      .clone()
-      .sub(SKYLINE_CENTER)
-      .setY(0)
-      .normalize()
-      .multiplyScalar(7),
+  // Round-12 R12-2: the sweep enters at the city's FAR side (right of
+  // the row as approached) and then flies ALONG the whole skyline —
+  // passing the TV tower and its red POI pin — straight toward the tent
+  // camp. `campusward` is the lateral direction along the row.
+  const campusward = VIGNETTE_ANCHORS.campus
+    .clone()
+    .sub(SKYLINE_CENTER)
+    .setY(0)
+    .normalize();
+  const citySweepCamera = towardCenter(SKYLINE_CENTER, 20, 12).add(
+    campusward.clone().multiplyScalar(-16),
   );
-  const campusCamera = towardCenter(VIGNETTE_ANCHORS.campus, 13, 8);
+  const campusCamera = towardCenter(VIGNETTE_ANCHORS.campus, 10, 8.5);
   // Far enough back that the castle rests in the BACKGROUND of the
   // centered CTA copy ("kann im Hintergrund sichtbar bleiben"), not
   // looming over it — and biased AWAY from the campus so the tent the
@@ -345,41 +346,49 @@ export function buildStoryTimeline(
       cameraEase: "inOutQuad",
       walkDuration: 500,
     },
-    // anywhere
+    // anywhere — the walk tween must END before the round-12 journey's
+    // first waypoint starts its own walk segment at 4650 (overlapping
+    // walk tweens under composition:none cut the person's position).
     {
       at: 4000,
       camera: new Vector3(0, 44, 27),
       look: new Vector3(0, 0, 0),
       walkT: 0.6,
+      walkDuration: 650,
     },
-    // gallery + cta = the use-case JOURNEY (round-11): sweep over the
-    // city, fly past the campus vignette, arrive and REST at the castle.
-    // DELIBERATE deviation from the "settled by mid-window" default for
-    // the gallery window — the traveling shot is the requested effect
-    // (same documented-deviation pattern as the dive). Two waypoints
-    // back-to-back fill the window; gentle 500 ms sine-eased legs keep
-    // the ride slow ("dass dem Nutzer nicht schlecht wird").
+    // gallery + cta = the use-case JOURNEY (round-11, retimed EARLIER in
+    // round-12 R12-2): the turn toward the city already starts in the
+    // late works-anywhere window, the sweep flies ALONG the skyline row
+    // (past the tower + red pin), is over the tent camp before the
+    // gallery card leaves, and the castle arrival COMPLETES before the
+    // CTA copy covers it. DELIBERATE deviation from the "settled by
+    // mid-window" default — the traveling shot is the requested effect.
+    // Gentle sine-eased legs keep the ride slow.
     {
-      at: 5000,
+      at: 4650,
       camera: citySweepCamera,
-      look: SKYLINE_CENTER.clone().setY(4),
-      walkT: 0.78,
-      cameraDuration: 500,
+      look: SKYLINE_CENTER.clone().setY(5),
+      walkT: 0.72,
+      cameraDuration: 550,
+      walkDuration: 550,
     },
     {
-      at: 5500,
+      at: 5250,
       camera: campusCamera,
       look: VIGNETTE_ANCHORS.campus.clone().add(new Vector3(0, 1.2, 0)),
-      walkT: 0.78,
-      cameraDuration: 500,
+      walkT: 0.8,
+      cameraDuration: 550,
+      walkDuration: 550,
     },
-    // cta — the ARRIVAL: resting at the castle, which stays in the
-    // background while reading (no return to the start framing).
+    // The ARRIVAL: resting at the castle from ~6300 on, which stays in
+    // the background while reading (no return to the start framing).
     {
-      at: 6000,
+      at: 5850,
       camera: castleCamera,
       look: VIGNETTE_ANCHORS.castle.clone().add(new Vector3(0, 2.5, 0)),
       walkT: 0.92,
+      cameraDuration: 450,
+      walkDuration: 1150,
     },
   ];
   let previous = start;

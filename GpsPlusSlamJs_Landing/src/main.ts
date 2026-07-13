@@ -12,6 +12,7 @@ import {
   detectImmersiveArSupport,
   type XrSystemLike,
 } from "./ar-support";
+import { applyQrHandoff, shouldShowQrHandoff } from "./qr-handoff";
 import { CHAPTERS, sectionElementId } from "./chapters";
 import { heroVeilOpacity } from "./hero-veil";
 import { computeScrollState, type SectionMetrics } from "./scroll-story";
@@ -114,7 +115,22 @@ function boot(): void {
   // immersive-ar-capable devices; everyone else keeps the honest static
   // default already in the HTML.
   void detectImmersiveArSupport((navigator as { xr?: XrSystemLike }).xr).then(
-    (supported) => applyCtaDeviceClaim(document, supported),
+    (supported) => {
+      applyCtaDeviceClaim(document, supported);
+      // Desktop→phone QR handoff (v2 B2): only when this device cannot
+      // run immersive-ar AND looks desktop-class.
+      applyQrHandoff(
+        document,
+        shouldShowQrHandoff({
+          arSupported: supported,
+          viewportWidth: window.innerWidth,
+          hasFinePointer: window.matchMedia(
+            "(hover: hover) and (pointer: fine)",
+          ).matches,
+        }),
+        window.location.href,
+      );
+    },
   );
 
   const scroller = document.getElementById("story");

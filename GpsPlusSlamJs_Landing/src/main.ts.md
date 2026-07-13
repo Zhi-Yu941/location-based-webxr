@@ -28,6 +28,10 @@ None (side-effect entry module loaded by `index.html`).
 - The initial theme read from `document.documentElement.dataset.theme`
   (stamped by index.html's FOUC guard) is only a pre-boot hint for the
   scene; `createThemeController` re-resolves and re-applies immediately.
+- The fire-and-forget `detectImmersiveArSupport` promise feeds BOTH Z6
+  consumers: the CTA claim upgrade (`ar-support.ts`) and the desktop
+  QR handoff (`qr-handoff.ts`, v2 B2 — fine pointer + ≥768 px viewport,
+  QR encodes `location.href`).
 
 ## Examples
 

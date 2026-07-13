@@ -514,6 +514,34 @@
         line-height: 1.4;
       }
 
+      /* Desktop→phone QR handoff (v2 B2); kept after .demo-card svg for
+         the no-descending-specificity lint order. */
+      #qr-handoff {
+        margin: 20px auto 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      #qr-handoff[hidden] {
+        display: none;
+      }
+      #qr-handoff svg {
+        width: 132px;
+        height: 132px;
+        /* White backing plate keeps the code scannable on dark palettes
+           (the padding doubles as extra quiet zone). */
+        background: #fff;
+        padding: 8px;
+        border-radius: 10px;
+      }
+      .qr-caption {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+
       .links {
         max-width: 720px;
         margin: 34px auto 0;
@@ -703,6 +731,11 @@
               Open source on GitHub
             </a>
           </p>
+          <!-- Desktop→phone handoff (v2 B2): stays hidden unless
+               src/qr-handoff.ts decides this is a desktop-class viewport
+               without immersive-ar. The QR encodes the LIVE URL
+               (location.href) so preview origins stay correct. -->
+          <div id="qr-handoff" hidden></div>
         </div>
 
         <div class="demos">

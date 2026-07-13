@@ -31,7 +31,11 @@ the copy.
   starts with `#cta-device-claim` (round-8 Z6): the static text is the
   universally-true Android+Chrome claim; `src/ar-support.ts` upgrades it
   to "run on your phone right now" only on immersive-ar-capable devices
-  — the static default must ALWAYS stay universally true. There is
+  — the static default must ALWAYS stay universally true. The copy panel
+  also ships an empty `#qr-handoff` container with the `hidden` attribute:
+  `src/qr-handoff.ts` (v2 B2) fills it with a client-generated QR of the
+  live URL on desktop-class devices without immersive-ar; on every other
+  device (and with JS disabled) it stays invisible. There is
   deliberately NO license text on the page (round-3 F-drop decision:
   details live on GitHub only); the meta description keeps its factual
   "Apache-2.0 framework" mention for SEO/social.

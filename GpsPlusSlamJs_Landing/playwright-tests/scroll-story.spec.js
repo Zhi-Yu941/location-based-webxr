@@ -147,6 +147,20 @@ test("all four demo apps stay launchable from the demos hub", async ({
   ).toBeAttached();
 });
 
+test("desktop without WebXR gets the QR handoff in the CTA", async ({
+  page,
+}) => {
+  // Headless desktop chromium reports no navigator.xr and the default
+  // context is a fine-pointer 1280px viewport — exactly the device class
+  // the QR handoff (v2 B2) targets.
+  await page.goto("/");
+  await page.locator("#chapter-cta").scrollIntoViewIfNeeded();
+  await expect(page.locator("#qr-handoff svg")).toBeVisible();
+  await expect(page.locator("#qr-handoff .qr-caption")).toHaveText(
+    "Scan to try on your phone",
+  );
+});
+
 // Most real users open the landing page on a phone (round-2 request):
 // pin that BOTH mobile orientations boot, show every chapter readable,
 // and keep the document non-scrolling — with touch + mobile emulation on.
@@ -167,6 +181,9 @@ for (const [orientation, viewport] of [
         const content = id === "hero" ? ".hero-content" : ".copy";
         await expect(page.locator(`#chapter-${id} ${content}`)).toBeVisible();
       }
+      // Phones never get the desktop QR handoff (v2 B2): the emulated
+      // mobile context reports a coarse pointer, so it must stay hidden.
+      await expect(page.locator("#qr-handoff")).toBeHidden();
       expect(await page.evaluate(() => window.scrollY)).toBe(0);
       expect(errors).toEqual([]);
     });

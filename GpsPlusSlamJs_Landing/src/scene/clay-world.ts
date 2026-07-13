@@ -411,8 +411,12 @@ function buildSkyline(): Group {
 function buildArContent(): Group {
   const arContent = namedGroup(WORLD_NODE.arContent);
   const curve = createPathCurve();
-  for (let i = 0; i < 4; i++) {
-    const t = 0.6 + i * 0.08; // ahead of the dive position (walk t = 0.5)
+  // 8 arrows, 0.05 apart, reaching t=0.91 (round-8 Z3: with 4 arrows
+  // spaced 0.08 only ONE was visible on a phone in landscape — denser
+  // and further keeps several in frame from the dive through the later
+  // framings). Test-pinned: ≥8, spacing ≤0.06, max t ≥0.9.
+  for (let i = 0; i < 8; i++) {
+    const t = 0.56 + i * 0.05; // ahead of the dive position (walk t = 0.5)
     const point = curve.getPointAt(t);
     const tangent = curve.getTangentAt(t);
     const arrow = clayMesh(new ConeGeometry(0.26, 0.75, 6), "arrow");

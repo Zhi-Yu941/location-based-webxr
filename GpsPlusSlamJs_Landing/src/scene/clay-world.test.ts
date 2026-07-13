@@ -112,6 +112,34 @@ describe("buildClayWorld", () => {
     expect(checked).toBeGreaterThanOrEqual(3);
   });
 
+  it("places a DENSE arrow trail reaching far along the path (round-8 Z3)", () => {
+    // Round-8 feedback: with 4 arrows spaced 0.08 apart only ONE was
+    // visible on a phone in landscape. Pin the densified trail: at least
+    // 8 arrows, neighbors no further than 0.06 apart in path parameter,
+    // and the trail reaching to t ≥ 0.9 so it carries further along the
+    // walk.
+    const world = buildClayWorld("high");
+    const arContent = world.getObjectByName(WORLD_NODE.arContent);
+    const ts: number[] = [];
+    arContent?.traverse((obj) => {
+      const t = obj.userData.pathT as number | undefined;
+      if (typeof t === "number") {
+        ts.push(t);
+      }
+    });
+    ts.sort((a, b) => a - b);
+    expect(ts.length).toBeGreaterThanOrEqual(8);
+    for (let i = 1; i < ts.length; i++) {
+      const current = ts[i];
+      const previous = ts[i - 1];
+      if (current === undefined || previous === undefined) {
+        throw new Error("sorted array access out of range");
+      }
+      expect(current - previous).toBeLessThanOrEqual(0.06);
+    }
+    expect(Math.max(...ts)).toBeGreaterThanOrEqual(0.9);
+  });
+
   it("marks the statue with a red POI pin and a hinted text label (dive AR content)", () => {
     const world = buildClayWorld("high");
     const arContent = world.getObjectByName(WORLD_NODE.arContent);

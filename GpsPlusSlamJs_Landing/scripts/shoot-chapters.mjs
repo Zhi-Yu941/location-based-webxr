@@ -24,6 +24,7 @@ const palettes = (args.find((a) => a.startsWith("--palettes=")) ?? "--palettes=d
   .split("=")[1]
   .split(",");
 const mobile = args.includes("--mobile");
+const landscape = args.includes("--landscape");
 const targets = args.filter((a) => !a.startsWith("--"));
 if (targets.length === 0) {
   targets.push(...CHAPTER_IDS);
@@ -43,7 +44,11 @@ const browser = await chromium.launch();
 try {
   for (const palette of palettes) {
     const context = await browser.newContext({
-      viewport: mobile ? { width: 412, height: 915 } : { width: 1280, height: 800 },
+      viewport: landscape
+        ? { width: 915, height: 412 }
+        : mobile
+          ? { width: 412, height: 915 }
+          : { width: 1280, height: 800 },
     });
     await context.addInitScript((p) => {
       localStorage.setItem("gps-landing-theme", p);
@@ -80,7 +85,8 @@ try {
       }
       await page.waitForTimeout(SETTLE_MS);
       const name = target.replace(":", "");
-      const file = `${outDir}/${name}-${palette}${mobile ? "-mobile" : ""}.png`;
+      const suffix = landscape ? "-landscape" : mobile ? "-mobile" : "";
+      const file = `${outDir}/${name}-${palette}${suffix}.png`;
       await page.screenshot({ path: file });
       console.log(file);
     }

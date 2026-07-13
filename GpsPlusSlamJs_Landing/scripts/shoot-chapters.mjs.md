@@ -21,7 +21,8 @@ machine ⇒ flaky).
   inverse of `scroll-story.ts`'s center-line mapping.
 - `--palettes=dark,light,...` (default `dark`) — seeds
   `localStorage["gps-landing-theme"]` before load.
-- `--mobile` — 412×915 viewport instead of 1280×800.
+- `--mobile` — 412×915 viewport instead of 1280×800; `--landscape` —
+  915×412 (wins over `--mobile`).
 - Output: `test-results/shots/<target>-<palette>[-mobile].png`
   (gitignored); paths are printed.
 

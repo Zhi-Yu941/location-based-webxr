@@ -18,9 +18,11 @@ via a seeded LCG.
 - `WORLD_NODE` — the names of every addressable node (`root`, `ground`,
   `path`, `hills`, `trees`, `rocks`, `sign`, `statue`, `snapRing`,
   `outer`, `arContent`). The story timeline looks these up by name.
-  `arContent` holds the dive's in-world AR overlays: path-forward trail
-  arrows (each carrying `userData.pathT`, orientation test-pinned to the
-  path tangent), the red `ar-poi-pin` over the statue, and the
+  `arContent` holds the dive's in-world AR overlays: a DENSE path-forward
+  arrow trail (8 arrows, 0.05 apart, reaching t≈0.91 — round-8 Z3,
+  count/spacing/extent test-pinned; each carries `userData.pathT`,
+  orientation test-pinned to the path tangent), the red `ar-poi-pin`
+  over the statue, and the
   `ar-poi-label` hinted-text board LEFT of the pin (round-2 R12). (The
   former gallery-treasures group was removed per round-2 R13.)
 - `createPathCurve() → CatmullRomCurve3` — the ground-level walk path the

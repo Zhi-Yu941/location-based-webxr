@@ -15,6 +15,15 @@ the copy.
   into (`aria-hidden`, z-index 0; hidden entirely under `body.no-webgl`).
 - `.top-bar` — brand ("Location-based WebXR") + `#theme-toggle` palette-icon
   button (its `aria-label` announces the active palette).
+- The hero also carries the `.hero-snippet` code block (v2 B3/B9,
+  "Framework-Minimal"): the shortest REAL `gps-plus-slam-app-framework`
+  sequence to a GPS anchor, hand-highlighted with `.hl-kw`/`.hl-lit`
+  spans (comments `.c`; `createGpsAnchor` reuses `.hl-fused` red and the
+  lat/lon literals `.hl-raw` amber — the page's color-coding invariant).
+  Verified against `GpsPlusSlamJs_MinimalExample/src/main.ts` and the
+  framework's `GpsAnchorOptions` (see the HTML comment above the block
+  for exact line refs). Hidden below 720 px width / 500 px height so it
+  never pushes the hero fold on phones.
 - `<main id="story">` — seven `<section class="chapter" id="chapter-<id>">`
   in the order defined by `src/chapters.ts` (hero, qr, fusion, dive,
   anywhere, gallery, cta). The hero carries its content in a panel-less

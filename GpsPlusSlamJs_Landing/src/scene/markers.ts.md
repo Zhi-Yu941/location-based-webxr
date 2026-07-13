@@ -30,8 +30,12 @@ colors via `.hl-raw` / `.hl-fused` spans in `index.html`.
   test-pinned. Ring meshes are named `uncertainty-ring-<i>`.
 - Connector bars: long axis = local +X, yawed from the ring offset toward
   the origin (orientation test-pinned).
-- Groups sit on the ground (y = 0 at placement); rings are
-  height-staggered a few cm against z-fighting.
+- Groups sit on the ground (y = 0 at placement). Rings are **flat
+  `RingGeometry` annuli** (round-4 V1: a flat-shaded torus tube rendered
+  as "thin ring + thick ring" bands and its underside sank into the path
+  slabs), thin band ≤ 0.1, placed ABOVE the path slab top (y > 0.12) and
+  height-staggered a few cm against z-fighting; shadows off both ways so
+  the band stays uniform. Test-pinned.
 
 ## Examples
 
@@ -43,4 +47,6 @@ pair.fused.position.copy(WORLD_ANCHORS.markerPair).add(new Vector3(1, 0, 0));
 
 ## Tests
 
-`props.test.ts` — names, role presence, and role disjointness.
+`props.test.ts` — names, role presence, role disjointness, zero-sum
+scatter, connector aim, and the flat-thin-ring-above-path pin (round-4
+V1).

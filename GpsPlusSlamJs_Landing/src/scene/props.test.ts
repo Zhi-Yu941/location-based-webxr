@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Mesh } from "three";
+import type { Mesh, RingGeometry } from "three";
 import { Vector3 } from "three";
 import { buildDotPerson, DOT_PERSON_ARM, DOT_PERSON_NAME } from "./dot-person";
 import { buildMarkerPair, MARKER_NODE, RING_OFFSETS } from "./markers";
@@ -61,6 +61,32 @@ describe("buildMarkerPair", () => {
     expect(
       new Set(RING_OFFSETS.map(([x, z]) => `${x},${z}`)).size,
     ).toBeGreaterThan(1);
+  });
+
+  it("renders each GPS sample as ONE uniform thin flat ring above the path surface", () => {
+    // Round-4 V1: the torus-based rings read as "a thin ring plus a thick
+    // ring around it" (flat-shaded octagon tube = a bright lit band next
+    // to darker bands) and arcs crossing the path VANISHED because the
+    // torus bottom dipped below the path slab top (y = 0.12). Pin the fix:
+    // a flat annulus (single normal = one uniform band), thin, lying flat
+    // ABOVE the path surface, with shadows off so nothing re-widens or
+    // darkens the band.
+    const pair = buildMarkerPair();
+    const rings: Mesh[] = [];
+    pair.raw.traverse((obj) => {
+      if (obj.name.startsWith("uncertainty-ring-")) {
+        rings.push(obj as Mesh);
+      }
+    });
+    expect(rings.length).toBeGreaterThanOrEqual(3);
+    for (const ring of rings) {
+      expect(ring.geometry.type).toBe("RingGeometry");
+      const params = (ring.geometry as RingGeometry).parameters;
+      expect(params.outerRadius - params.innerRadius).toBeLessThanOrEqual(0.1);
+      expect(ring.position.y).toBeGreaterThan(0.12); // path slab top
+      expect(ring.castShadow).toBe(false);
+      expect(ring.receiveShadow).toBe(false);
+    }
   });
 
   it("provides connector lines from each ring center aimed at the pin", () => {

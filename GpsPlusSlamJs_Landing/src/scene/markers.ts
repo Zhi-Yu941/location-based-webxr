@@ -1,8 +1,8 @@
 import {
   BoxGeometry,
   ConeGeometry,
+  RingGeometry,
   SphereGeometry,
-  TorusGeometry,
   type Group,
 } from "three";
 import { clayMesh, namedGroup, type PaletteRole } from "./palette";
@@ -53,15 +53,23 @@ function buildUncertaintyRings(): Group {
   const group = namedGroup(MARKER_NODE.raw);
   const radii = [1.15, 1.3, 1.05, 1.25];
   RING_OFFSETS.forEach(([dx, dz], index) => {
+    // A flat annulus, NOT a torus (round-4 V1): the flat-shaded torus tube
+    // split into a bright thin band plus darker wide bands ("doubled/thick
+    // rings"), and its underside dipped into the path slabs so arcs
+    // vanished. One planar band with a single normal reads as one uniform
+    // thin ring from every camera angle.
+    const radius = radii[index] ?? 1.2;
     const ring = clayMesh(
-      new TorusGeometry(radii[index] ?? 1.2, 0.05, 8, 36),
+      new RingGeometry(radius - 0.035, radius + 0.035, 48),
       "markerRaw",
       `uncertainty-ring-${index}`,
     );
     ring.rotation.x = -Math.PI / 2;
-    // Slightly staggered heights avoid z-fighting with the ground.
-    ring.position.set(dx, 0.06 + index * 0.02, dz);
+    // Above the path slab top (y = 0.12) so no arc is ever swallowed by
+    // the path; staggered heights avoid z-fighting where rings overlap.
+    ring.position.set(dx, 0.14 + index * 0.02, dz);
     ring.castShadow = false;
+    ring.receiveShadow = false;
     group.add(ring);
     const dot = clayMesh(new SphereGeometry(0.1, 10, 8), "markerRaw");
     dot.position.set(dx, 0.14, dz);

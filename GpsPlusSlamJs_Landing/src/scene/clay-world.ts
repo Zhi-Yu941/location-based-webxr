@@ -8,6 +8,7 @@ import {
   SphereGeometry,
   TorusGeometry,
   Vector3,
+  type MeshStandardMaterial,
 } from "three";
 import { clayMesh, namedGroup } from "./palette";
 import { buildPin } from "./markers";
@@ -57,16 +58,26 @@ export function createPathCurve(): CatmullRomCurve3 {
   );
 }
 
-// The marker anchor sits ON the path edge (round-2 R5: the red pin stands
-// exactly where the user walks; the sample rings scatter around it).
+// Anchors derived from the path curve (round-2 R5/R6): the marker anchor
+// sits ON the path edge (the red pin stands exactly where the user
+// walks); the QR drop point is ON the path near the sign, and the sign
+// stands BEHIND the path as seen from the QR chapter's camera (+z side).
 const anchorCurve = createPathCurve();
 const anchorPoint = anchorCurve.getPointAt(0.42);
 const anchorTangent = anchorCurve.getTangentAt(0.42);
+const dropT = 0.14;
+const dropPoint = anchorCurve.getPointAt(dropT);
+const dropTangent = anchorCurve.getTangentAt(dropT);
+// Perpendicular pointing to the path's -z side here = away from the QR
+// camera (which looks from +z), i.e. "behind" the path.
+const signPerp = new Vector3(dropTangent.z, 0, -dropTangent.x).normalize();
 
 /** Story hot-spots, derived from the path so they stay beside it. */
 export const WORLD_ANCHORS = {
-  /** QR sign near the path start (chapter: qr). */
-  sign: new Vector3(-9.5, 0, 8.2),
+  /** QR sign standing behind the path (chapter: qr). */
+  sign: dropPoint.clone().add(signPerp.clone().multiplyScalar(2.2)),
+  /** Where the QR fix drops the user onto the path (chapter: qr). */
+  dropPoint: dropPoint.clone(),
   /** GPS rings + fused pin anchor, on the path edge (chapter: fusion). */
   markerPair: anchorPoint
     .clone()
@@ -74,6 +85,9 @@ export const WORLD_ANCHORS = {
   /** Statue a short detour off the path (chapter: gallery labels). */
   statue: new Vector3(8, 0, -4),
 } as const;
+
+/** Path parameter of the QR drop point — the walk starts here. */
+export const DROP_PATH_T = dropT;
 
 /** Deterministic LCG (numerical recipes constants) — NOT crypto, just art. */
 function createRng(seed: number): () => number {
@@ -290,15 +304,23 @@ function buildStatue(): Group {
   return statue;
 }
 
-/** Pulsing ring used for the QR "snap" moment; hidden until then. */
+/**
+ * The QR accuracy ring (round-2 R6): fades in LARGE (position uncertainty
+ * unknown) and collapses to ~zero at the drop point (QR fix acquired).
+ * Material is transparent so the timeline can tween its opacity; hidden
+ * until the stage primes it.
+ */
 function buildSnapRing(): Group {
   const group = namedGroup(WORLD_NODE.snapRing);
   const ring = clayMesh(new TorusGeometry(1.2, 0.06, 8, 32), "snapRing");
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = 0.1;
   ring.castShadow = false;
+  const material = ring.material as MeshStandardMaterial;
+  material.transparent = true;
+  material.opacity = 0;
   group.add(ring);
-  group.position.copy(WORLD_ANCHORS.sign);
+  group.position.copy(WORLD_ANCHORS.dropPoint);
   group.visible = false;
   return group;
 }

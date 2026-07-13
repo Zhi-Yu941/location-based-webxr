@@ -78,6 +78,31 @@ describe("buildStoryTimeline", () => {
     expect(stage.markers.connectors.scale.x).toBeGreaterThan(0.9);
   });
 
+  it("shrinks the accuracy ring from LARGE and drops the person into its center", () => {
+    // Round-2 R6: the ring fades in big (unknown accuracy), collapses to
+    // ~zero (QR fix acquired), and the person falls from the sky with a
+    // bounce onto the path exactly there — instead of sliding in from the
+    // left. All seek-driven; scrubbing back must restore the pre-drop sky
+    // position (covered by the scrub-path-independence property).
+    const timeline = buildStoryTimeline(stage, () => {});
+    const ring = stage.world.getObjectByName(WORLD_NODE.snapRing);
+    expect(ring).toBeDefined();
+
+    timeline.seek(50);
+    syncStage(stage);
+    expect(stage.person.position.y).toBeGreaterThan(5); // still in the sky
+    expect(stage.person.scale.x).toBeLessThan(0.01);
+
+    timeline.seek(1300); // mid-shrink
+    expect(ring?.scale.x ?? 0).toBeGreaterThan(0.5);
+
+    timeline.seek(chapterEndTime(1)); // QR chapter done
+    syncStage(stage);
+    expect(ring?.scale.x ?? 99).toBeLessThan(0.2); // collapsed = precise fix
+    expect(stage.person.position.y).toBeCloseTo(0, 2); // landed
+    expect(stage.person.scale.x).toBeCloseTo(1, 2);
+  });
+
   it("walks the dot-person along the path as the story progresses", () => {
     // Contract: after every seek the render loop calls syncStage — anime
     // fires onUpdate BEFORE tween values apply, so deriving person
@@ -138,7 +163,9 @@ describe("buildIntroTimeline", () => {
     // The intro must hand over seamlessly: its end state is the story's
     // hero framing (otherwise the first scroll would jump-cut).
     expect(stage.camera.position.distanceTo(heroPos)).toBeLessThan(0.5);
-    expect(stage.person.scale.x).toBeCloseTo(1, 2);
+    // The person stays hidden through the intro — they enter the story by
+    // sky-dropping at the QR chapter (round-2 R6).
+    expect(stage.person.scale.x).toBeLessThan(0.01);
   });
 });
 

@@ -16,8 +16,9 @@ featureless so it reads as "a person" without demographic detail.
 - The story timeline moves/rotates the GROUP; meshes keep their local
   offsets (body at y≈0.75, head at y≈1.55 → total height ≈ 1.8 world
   units ≙ a person).
-- Meshes are `person`-role tagged so the theme toggle recolors them
-  (light: dark figure on light world; dark: light glowing figure).
+- Meshes are `person`-role tagged so the theme toggle recolors them; the
+  role carries the "user color" (round-2 R6b): teal/petrol in every
+  palette, glowing slightly in dark ones.
 
 ## Examples
 

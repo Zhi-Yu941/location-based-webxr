@@ -52,9 +52,14 @@ and keeps derived state (dot-person on the path) in sync.
   raw marker's jitter IS the product message (test-pinned).
 - The camera look direction is decoupled: tweens move `stage.lookTarget`
   (a bare Vector3); the render loop calls `camera.lookAt(...)`.
-- Chapter staging summary: hero push-in → QR settle-wiggle + snap-ring
-  pulse → marker jitter vs. stillness → dive to eye level + phone raise →
-  pull-back + outer-terrain rise → gallery pop-in → calm CTA framing.
+- Chapter staging summary (round-2): hero push-in (person hidden in the
+  sky above the QR drop point) → QR: settle-wiggle, accuracy ring fades
+  in LARGE and collapses onto the drop point, person sky-drops with a
+  bounce (`stage.drop.y`, applied in `syncStage`) → fusion: static
+  scattered rings, connector reveal, pin pulse → dive to eye level +
+  phone raise → pull-back + outer-terrain rise → calm CTA framing.
+- The walk starts at `DROP_PATH_T` (the QR drop point) — there is no walk
+  tween in the QR chapter; the drop replaces the old slide-in.
 
 ## Examples
 

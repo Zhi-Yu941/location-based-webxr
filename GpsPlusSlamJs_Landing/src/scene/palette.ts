@@ -78,7 +78,9 @@ const LIGHT: ScenePalette = {
     sign: { color: 0xb59a7a },
     signPanel: { color: 0xffffff },
     statue: { color: 0xd8d5cf },
-    person: { color: 0x35353d },
+    // The "user color" (round-2 R6b): teal/petrol, distinct from amber
+    // (GPS), red (anchors) and blue (AR overlays) in EVERY palette.
+    person: { color: 0x0f766e },
     markerRaw: { color: 0xeab308 },
     markerFused: { color: ACCENT, emissiveIntensity: 0 },
     snapRing: { color: ACCENT },
@@ -109,7 +111,7 @@ const DARK: ScenePalette = {
     sign: { color: 0x4d4136 },
     signPanel: { color: 0xd9d9e0, emissiveIntensity: 0.25 },
     statue: { color: 0x50505c },
-    person: { color: 0xe7e7ea, emissiveIntensity: 0.35 },
+    person: { color: 0x2dd4bf, emissiveIntensity: 0.5 },
     markerRaw: { color: 0xfacc15, emissiveIntensity: 0.6 },
     markerFused: { color: ACCENT, emissiveIntensity: 0.9 },
     snapRing: { color: ACCENT, emissiveIntensity: 0.9 },

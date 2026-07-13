@@ -98,22 +98,31 @@ describe("story timeline camera continuity", () => {
     expect(maxAccel).toBeLessThan(MAX_STEP_ACCEL);
   });
 
-  it("keeps the dot-person walking continuously (no position cuts)", () => {
+  it("keeps the dot-person moving continuously (no position cuts)", () => {
     const stage = makeStage();
     const timeline = buildStoryTimeline(stage, () => {});
     let previous: Vector3 | null = null;
     let maxStep = 0;
+    let maxHorizontalStep = 0;
     for (const t of forwardTimes(timeline.duration)) {
       timeline.seek(t);
       syncStage(stage);
       const current = stage.person.position.clone();
       if (previous) {
         maxStep = Math.max(maxStep, current.distanceTo(previous));
+        maxHorizontalStep = Math.max(
+          maxHorizontalStep,
+          Math.hypot(current.x - previous.x, current.z - previous.z),
+        );
       }
       previous = current;
     }
-    // The whole path is ~45 units walked across ~6s of timeline — any
-    // per-5ms step above this is a cut, not a walk.
-    expect(maxStep).toBeLessThan(0.5);
+    // Horizontal: the walk covers ~45 units over ~6s — any per-5ms step
+    // above this is a cut, not a walk.
+    expect(maxHorizontalStep).toBeLessThan(0.5);
+    // Total: the DELIBERATE sky-drop (round-2 R6, outBounce impact speed
+    // ~0.68/step measured) is the fastest legitimate motion; anything
+    // above this bound is a teleport.
+    expect(maxStep).toBeLessThan(0.9);
   });
 });

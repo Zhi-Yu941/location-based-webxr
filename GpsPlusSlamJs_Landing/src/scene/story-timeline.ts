@@ -2,7 +2,12 @@ import "animejs/adapters/three";
 import { createTimeline, type Timeline } from "animejs";
 import { Vector3, type Group, type PerspectiveCamera } from "three";
 import { CHAPTER_COUNT } from "../chapters";
-import { createPathCurve, WORLD_ANCHORS, WORLD_NODE } from "./clay-world";
+import {
+  createPathCurve,
+  DROP_PATH_T,
+  WORLD_ANCHORS,
+  WORLD_NODE,
+} from "./clay-world";
 import type { MarkerPair } from "./markers";
 
 /**
@@ -39,10 +44,14 @@ export interface StoryStage {
   readonly lookTarget: Vector3;
   /** Path parameter of the dot-person, animated 0..1. */
   readonly walk: { t: number };
+  /** Height of the dot-person above the path (round-2 R6 sky-drop). */
+  readonly drop: { y: number };
   readonly curve: ReturnType<typeof createPathCurve>;
 }
 
 const HERO_CAMERA = new Vector3(20, 19, 20);
+/** Sky height the dot-person falls from at the QR chapter (R6). */
+const DROP_START_HEIGHT = 9;
 
 export interface StageParts {
   readonly world: Group;
@@ -60,9 +69,13 @@ export interface StageParts {
  */
 export function createStoryStage(parts: StageParts): StoryStage {
   const curve = createPathCurve();
-  const walk = { t: 0.02 };
-
-  parts.person.position.copy(curve.getPointAt(walk.t));
+  // The walk starts at the QR drop point: the person enters the story by
+  // falling from the sky there (round-2 R6), hidden (scale ~0) and high
+  // above the path until the QR chapter's drop beat.
+  const walk = { t: DROP_PATH_T };
+  const drop = { y: DROP_START_HEIGHT };
+  parts.person.position.copy(curve.getPointAt(walk.t)).setY(drop.y);
+  parts.person.scale.setScalar(0.001);
 
   // Rings, pin and connectors all sit on ONE anchor (round-2 R5): the
   // rings scatter via their internal offsets whose average is the pin.
@@ -91,8 +104,10 @@ export function createStoryStage(parts: StageParts): StoryStage {
   }
   const snapRing = parts.world.getObjectByName(WORLD_NODE.snapRing);
   if (snapRing) {
+    // Starts LARGE but fully transparent (builder sets opacity 0): the QR
+    // beat fades it in, then collapses it to the precise fix (R6).
     snapRing.visible = true;
-    snapRing.scale.setScalar(0.001);
+    snapRing.scale.setScalar(3);
   }
 
   parts.camera.position.copy(HERO_CAMERA);
@@ -102,7 +117,7 @@ export function createStoryStage(parts: StageParts): StoryStage {
   const lookTarget = new Vector3(-4, 2, 0);
   parts.camera.lookAt(lookTarget);
 
-  return { ...parts, lookTarget, walk, curve };
+  return { ...parts, lookTarget, walk, drop, curve };
 }
 
 /**
@@ -116,7 +131,8 @@ export function createStoryStage(parts: StageParts): StoryStage {
 export function syncStage(stage: StoryStage): void {
   const t = Math.min(1, Math.max(0, stage.walk.t));
   const point = stage.curve.getPointAt(t);
-  stage.person.position.set(point.x, 0, point.z);
+  // drop.y > 0 while the person is still falling from the sky (R6).
+  stage.person.position.set(point.x, Math.max(0, stage.drop.y), point.z);
   const tangent = stage.curve.getTangentAt(t);
   stage.person.rotation.y = Math.atan2(tangent.x, tangent.z);
 }
@@ -213,7 +229,8 @@ export function buildStoryTimeline(
     onUpdate,
   });
 
-  const { camera, lookTarget, walk, world, markers, phone } = stage;
+  const { camera, lookTarget, walk, drop, person, world, markers, phone } =
+    stage;
 
   // ── Chapter 3 geometry (computed up front; used in the framing chain).
   const eyeT = 0.5;
@@ -234,7 +251,7 @@ export function buildStoryTimeline(
     at: 0,
     camera: HERO_CAMERA.clone(),
     look: new Vector3(-4, 2, 0), // must match createStoryStage's lookTarget
-    walkT: 0.02,
+    walkT: DROP_PATH_T, // the walk begins at the QR drop point (R6)
   };
   const framings: readonly ChapterFraming[] = [
     // hero push-in
@@ -242,14 +259,14 @@ export function buildStoryTimeline(
       at: 0,
       camera: new Vector3(16.5, 15, 16.5),
       look: new Vector3(-3.5, 1.5, 0.5),
-      walkT: 0.02,
+      walkT: DROP_PATH_T,
     },
-    // qr
+    // qr — no walk tween: the person DROPS onto the path here instead
     {
       at: 1000,
       camera: new Vector3(-3.5, 4.5, 15.5),
       look: new Vector3(WORLD_ANCHORS.sign.x, 1.6, WORLD_ANCHORS.sign.z),
-      walkT: 0.14,
+      walkT: DROP_PATH_T,
     },
     // fusion
     {
@@ -339,20 +356,47 @@ export function buildStoryTimeline(
     ],
     1200,
   );
+  // QR fix beat (R6): the accuracy ring fades in LARGE (unknown position
+  // uncertainty), collapses onto the drop point (fix acquired), then the
+  // person falls from the sky with a bounce exactly into its center and
+  // fades the ring away.
   const snapRing = world.getObjectByName(WORLD_NODE.snapRing);
   if (snapRing) {
-    addValueChain(
-      timeline,
+    const ringMesh = snapRing.children[0];
+    if (ringMesh) {
+      addValueChain(
+        timeline,
+        ringMesh,
+        "opacity",
+        0,
+        [{ to: 0.85, duration: 150 }],
+        1080,
+      );
+      addValueChain(
+        timeline,
+        ringMesh,
+        "opacity",
+        0.85,
+        [{ to: 0, duration: 140 }],
+        1860,
+      );
+    }
+    timeline.add(
       snapRing,
-      "scale",
-      0.001,
-      [
-        { to: 2.2, duration: 300, ease: "outCubic" },
-        { to: 0.001, duration: 100 },
-      ],
-      1450,
+      { scale: { from: 3, to: 0.06 }, duration: 270, ease: "inOutQuad" },
+      1250,
     );
   }
+  timeline.add(person, { scale: { from: 0.001, to: 1 }, duration: 80 }, 1500);
+  timeline.add(
+    drop,
+    {
+      y: { from: DROP_START_HEIGHT, to: 0 },
+      duration: 350,
+      ease: "outBounce",
+    },
+    1540,
+  );
 
   // Fusion chapter (round-2 R8): the scattered GPS sample rings stay
   // perfectly STILL — instead, connector lines draw from the ring centers

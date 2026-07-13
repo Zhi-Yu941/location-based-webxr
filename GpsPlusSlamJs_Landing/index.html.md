@@ -80,6 +80,16 @@ the copy.
 - `csstree/validator` disable comments on `clamp()` lines are false-
   positive suppressions (the bundled css-tree grammar rejects math
   functions), same as in the sibling apps.
+- **2D polish package (v3 F5):** copy panels use a gradient border
+  (padding-box/border-box double background — the `--panel-border-hi`
+  vars) + saturated backdrop blur, and a soft rise+fade entrance on
+  `.active` (the panel stays visible at ALL times — opacity floor 0.55 +
+  14 px offset — so e2e visibility checks are unaffected; reduced motion
+  drops the transform entirely). Buttons/badges/demo cards carry small
+  hover/press transforms (reduced-motion-safe), `body::after` is a
+  fixed SVG-noise grain overlay (opacity 0.035, pointer-transparent),
+  and the hero H1 color spans glow faintly via `--hl-glow-*` vars that
+  only the dark palettes define.
 
 ## Examples
 

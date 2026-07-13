@@ -70,6 +70,9 @@
         --hl-lit: #86efac;
         --panel: rgb(19 19 23 / 62%);
         --panel-border: rgb(255 255 255 / 10%);
+        --panel-border-hi: rgb(255 255 255 / 30%);
+        --hl-glow-raw: 0 0 18px rgb(250 204 21 / 35%);
+        --hl-glow-fused: 0 0 18px rgb(239 68 68 / 45%);
         --card: #1b1b20;
         --card-border: #34343c;
         --card-hover: #24242b;
@@ -88,6 +91,7 @@
         --hl-lit: #15803d;
         --panel: rgb(255 255 255 / 66%);
         --panel-border: rgb(0 0 0 / 8%);
+        --panel-border-hi: rgb(0 0 0 / 20%);
         --card: #fff;
         --card-border: #ddd9d2;
         --card-hover: #f6f4f0;
@@ -106,6 +110,9 @@
         --hl-lit: #86efac;
         --panel: rgb(10 12 28 / 62%);
         --panel-border: rgb(120 140 255 / 18%);
+        --panel-border-hi: rgb(120 240 255 / 50%);
+        --hl-glow-raw: 0 0 18px rgb(250 204 21 / 40%);
+        --hl-glow-fused: 0 0 20px rgb(239 68 68 / 55%);
         --card: #10142a;
         --card-border: #2b3050;
         --card-hover: #181d38;
@@ -124,6 +131,9 @@
         --hl-lit: #a7f3d0;
         --panel: rgb(42 26 62 / 62%);
         --panel-border: rgb(255 176 138 / 18%);
+        --panel-border-hi: rgb(255 176 138 / 50%);
+        --hl-glow-raw: 0 0 18px rgb(252 211 77 / 40%);
+        --hl-glow-fused: 0 0 20px rgb(239 68 68 / 50%);
         --card: #3a2a55;
         --card-border: #5d4680;
         --card-hover: #47356a;
@@ -142,6 +152,7 @@
         --hl-lit: #15803d;
         --panel: rgb(255 255 255 / 66%);
         --panel-border: rgb(0 0 0 / 10%);
+        --panel-border-hi: rgb(0 0 0 / 24%);
         --card: #fff;
         --card-border: #d5d5cf;
         --card-hover: #efefe9;
@@ -291,21 +302,38 @@
       }
       .copy {
         max-width: 460px;
-        background: var(--panel);
-        border: 1px solid var(--panel-border);
+        /* Gradient border (v3 F5): translucent panel fill over a border-
+           box gradient — the border stays visible through the glass. */
+        background:
+          linear-gradient(var(--panel), var(--panel)) padding-box,
+          linear-gradient(
+              160deg,
+              var(--panel-border-hi),
+              var(--panel-border) 55%
+            )
+            border-box;
+        border: 1px solid transparent;
         border-radius: 16px;
         padding: 26px 28px;
-        backdrop-filter: blur(10px);
+        backdrop-filter: blur(12px) saturate(150%);
         margin-left: 6vw;
         opacity: 0.55;
-        transition: opacity 0.35s ease;
+        /* Entrance (v3 F5): soft rise+fade instead of the bare opacity
+           toggle. The panel stays VISIBLE at all times (opacity floor +
+           small offset), so e2e visibility checks are unaffected. */
+        transform: translateY(14px);
+        transition:
+          opacity 0.35s ease,
+          transform 0.45s ease;
       }
       body.no-webgl .copy {
         backdrop-filter: none;
         opacity: 1;
+        transform: none;
       }
       .chapter.active .copy {
         opacity: 1;
+        transform: translateY(0);
       }
       .chapter:nth-of-type(even) .copy {
         margin-left: auto;
@@ -409,6 +437,19 @@
         text-decoration: underline;
       }
 
+      /* Subtle full-page grain (v3 F5): a tiny tiled SVG noise, fixed
+         over everything, pointer-transparent. Kills banding in the big
+         soft gradients without reading as dirt. */
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 6;
+        pointer-events: none;
+        opacity: 0.035;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      }
+
       /* Copy highlights color-matched to the 3D elements they describe
          (round-1 feedback): raw-GPS rings + QR modules = amber family,
          fused anchor = brand red. */
@@ -420,6 +461,16 @@
       }
       .hl-fused {
         color: var(--accent);
+      }
+
+      /* Faint hero text glows (v3 F5): defined only where the dark
+         palettes set the --hl-glow-* vars; light palettes fall back to
+         none. Echoes the 3D bloom on the same color-coded elements. */
+      .hero-content h1 .hl-raw {
+        text-shadow: var(--hl-glow-raw, none);
+      }
+      .hero-content h1 .hl-fused {
+        text-shadow: var(--hl-glow-fused, none);
       }
       /* Snippet-only token colors (v2 B3): keywords + literals get their
          own per-palette vars; API color-coding reuses the page invariant
@@ -491,9 +542,19 @@
         font-size: 1.05rem;
         padding: 14px 26px;
         border-radius: 12px;
+        transition:
+          background 0.15s ease,
+          transform 0.15s ease,
+          box-shadow 0.15s ease;
       }
       .btn-primary:hover {
         background: var(--accent-hover);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 18px rgb(239 68 68 / 30%);
+      }
+      .btn-primary:active {
+        transform: translateY(0) scale(0.98);
+        box-shadow: none;
       }
       .cta-badges {
         margin: 14px 0 0;
@@ -510,10 +571,18 @@
         font-size: 0.9rem;
         font-weight: 600;
         text-decoration: none;
+        transition:
+          border-color 0.15s ease,
+          background 0.15s ease,
+          transform 0.15s ease;
       }
       .github-badge:hover {
         border-color: var(--accent);
         background: var(--card-hover);
+        transform: translateY(-1px);
+      }
+      .github-badge:active {
+        transform: translateY(0) scale(0.98);
       }
       .github-badge svg {
         width: 16px;
@@ -568,11 +637,16 @@
         color: var(--accent);
         font-size: 1.6rem;
         line-height: 1;
+        transition: transform 0.15s ease;
       }
       .demo-card:hover {
         background: var(--card-hover);
         border-color: var(--accent);
         transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgb(0 0 0 / 22%);
+      }
+      .demo-card:hover::after {
+        transform: translateX(3px);
       }
       .demo-card:active {
         transform: translateY(0) scale(0.99);
@@ -685,6 +759,25 @@
       @media (prefers-reduced-motion: reduce) {
         .scroll-hint {
           animation: none;
+        }
+
+        /* v3 F5: entrance + micro-interaction motion off; static
+           compositions stay complete (opacity change only). */
+        .copy {
+          transform: none;
+          transition: opacity 0.35s ease;
+        }
+        .btn-primary,
+        .github-badge,
+        .demo-card,
+        .demo-card::after {
+          transition: none;
+        }
+        .btn-primary:hover,
+        .github-badge:hover,
+        .demo-card:hover,
+        .demo-card:hover::after {
+          transform: none;
         }
       }
     </style>

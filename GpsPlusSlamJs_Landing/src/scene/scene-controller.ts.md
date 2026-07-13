@@ -36,8 +36,9 @@ renders on demand.
   trade-off accepted in the v3 style exploration (F2). The old guarantee
   still holds in full on the low tier and under reduced motion (no
   particle field is even built), and for hidden tabs: the bootstrap
-  wires `visibilitychange` → `setPageVisible`, which stops rendering
-  entirely while hidden (all test-pinned).
+  wires `visibilitychange` AND `pageshow` (round-9 R9-6: bfcache
+  restores can skip the visible event) → `setPageVisible`, which stops
+  rendering entirely while hidden (all test-pinned).
 - **One driver:** `tick(nowMs)` advances everything by seeking; the anime
   engine's own loop is never used. `start()` merely wraps `tick` in rAF.
 - **Smoothing:** scroll sets a target; displayed progress converges

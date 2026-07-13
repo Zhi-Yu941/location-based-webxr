@@ -260,9 +260,16 @@ function boot(): void {
 
   // Visibility gate for the continuous particle render (v3 F2): a
   // hidden tab must burn no GPU.
-  document.addEventListener("visibilitychange", () => {
+  const syncPageVisible = (): void => {
     scene?.setPageVisible(!document.hidden);
-  });
+  };
+  document.addEventListener("visibilitychange", syncPageVisible);
+  // Round-9 R9-6: a bfcache restore (navigate away in the SAME tab, then
+  // back) can deliver `pageshow` WITHOUT a visibilitychange-to-visible —
+  // the flag then stays false and exactly the particles freeze while
+  // scroll-driven re-renders still happen. Re-sync on pageshow so the
+  // state self-heals.
+  window.addEventListener("pageshow", syncPageVisible);
 
   let introRunning = false;
   if (scene && tier.mode === "scroll") {

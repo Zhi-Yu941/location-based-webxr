@@ -32,8 +32,12 @@ None (side-effect entry module loaded by `index.html`).
   consumers: the CTA claim upgrade (`ar-support.ts`) and the desktop
   QR handoff (`qr-handoff.ts`, v2 B2 — fine pointer + ≥768 px viewport,
   QR encodes `location.href`).
-- `visibilitychange` is wired to `scene.setPageVisible` (v3 F2): the
-  continuous particle render stops entirely while the tab is hidden.
+- `visibilitychange` AND `pageshow` are wired to `scene.setPageVisible`
+  (v3 F2 + round-9 R9-6): the continuous particle render stops entirely
+  while the tab is hidden, and the flag self-heals after a bfcache
+  restore (which can deliver `pageshow` without a
+  visibilitychange-to-visible — the observed "frozen fireflies" bug
+  after navigating away and back in the same tab).
 - The hero snippet default (round-9 R9-5, `hero-snippet.ts`) is applied
   first thing in boot: expanded on desktop-class viewports, collapsed
   otherwise (the static HTML ships it closed).

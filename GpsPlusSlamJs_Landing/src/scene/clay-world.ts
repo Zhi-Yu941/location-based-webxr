@@ -57,12 +57,20 @@ export function createPathCurve(): CatmullRomCurve3 {
   );
 }
 
+// The marker anchor sits ON the path edge (round-2 R5: the red pin stands
+// exactly where the user walks; the sample rings scatter around it).
+const anchorCurve = createPathCurve();
+const anchorPoint = anchorCurve.getPointAt(0.42);
+const anchorTangent = anchorCurve.getTangentAt(0.42);
+
 /** Story hot-spots, derived from the path so they stay beside it. */
 export const WORLD_ANCHORS = {
   /** QR sign near the path start (chapter: qr). */
   sign: new Vector3(-9.5, 0, 8.2),
-  /** Raw-vs-fused marker pair at mid-path (chapter: fusion). */
-  markerPair: new Vector3(1.5, 0, 6.5),
+  /** GPS rings + fused pin anchor, on the path edge (chapter: fusion). */
+  markerPair: anchorPoint
+    .clone()
+    .add(new Vector3(anchorTangent.z, 0, -anchorTangent.x).multiplyScalar(0.5)),
   /** Statue a short detour off the path (chapter: gallery labels). */
   statue: new Vector3(8, 0, -4),
 } as const;

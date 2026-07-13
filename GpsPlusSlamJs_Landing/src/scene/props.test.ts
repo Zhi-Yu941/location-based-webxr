@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Mesh } from "three";
+import { Vector3 } from "three";
 import { buildDotPerson, DOT_PERSON_NAME } from "./dot-person";
-import { buildMarkerPair, MARKER_NODE } from "./markers";
+import { buildMarkerPair, MARKER_NODE, RING_OFFSETS } from "./markers";
 import { buildPhoneFrame, PHONE_NODE } from "./phone-frame";
 
 // Why this test matters: the props are addressed by name from the story
@@ -24,10 +25,11 @@ describe("buildDotPerson", () => {
 });
 
 describe("buildMarkerPair", () => {
-  it("visualizes raw GPS as concentric uncertainty rings, not a pin", () => {
-    // Round-1 feedback: the gray raw-GPS pin was unreadable ("keine
-    // Ahnung, was der sein soll") — raw GPS is shown as jittering
-    // uncertainty rings instead, color-matched to the copy highlight.
+  it("scatters the GPS sample rings so their center-of-centers is the pin", () => {
+    // Round-2 R5: the rings are GPS READINGS — larger, overlapping,
+    // offset around the group origin such that the AVERAGE of the ring
+    // centers is exactly the origin (where the red pin stands). That
+    // spatial relationship IS the averaging message.
     const pair = buildMarkerPair();
     const ringNames: string[] = [];
     pair.raw.traverse((obj) => {
@@ -35,7 +37,37 @@ describe("buildMarkerPair", () => {
         ringNames.push(obj.name);
       }
     });
-    expect(ringNames.length).toBeGreaterThanOrEqual(2);
+    expect(ringNames.length).toBeGreaterThanOrEqual(3);
+    const sum = RING_OFFSETS.reduce(
+      (acc, [x, z]) => ({ x: acc.x + x, z: acc.z + z }),
+      { x: 0, z: 0 },
+    );
+    expect(Math.abs(sum.x)).toBeLessThan(1e-9);
+    expect(Math.abs(sum.z)).toBeLessThan(1e-9);
+    // Scattered, not concentric: at least two distinct centers.
+    expect(
+      new Set(RING_OFFSETS.map(([x, z]) => `${x},${z}`)).size,
+    ).toBeGreaterThan(1);
+  });
+
+  it("provides connector lines from each ring center aimed at the pin", () => {
+    // Round-2 R8: the fusion chapter draws lines from the ring centers to
+    // the average point — each connector's long axis must point from its
+    // ring offset toward the group origin.
+    const pair = buildMarkerPair();
+    expect(pair.connectors.name).toBe(MARKER_NODE.connectors);
+    const bars = pair.connectors.children;
+    expect(bars.length).toBe(RING_OFFSETS.length);
+    bars.forEach((bar, i) => {
+      const offset = RING_OFFSETS[i];
+      if (!offset) {
+        throw new Error("offset missing");
+      }
+      const [dx, dz] = offset;
+      const along = new Vector3(1, 0, 0).applyQuaternion(bar.quaternion);
+      const toOrigin = new Vector3(-dx, 0, -dz).normalize();
+      expect(Math.abs(along.dot(toOrigin))).toBeGreaterThan(0.99);
+    });
   });
 
   it("returns a raw (wobbly) and a fused (stable) marker with distinct roles", () => {

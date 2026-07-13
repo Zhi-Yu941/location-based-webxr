@@ -139,10 +139,11 @@ describe("createPathCurve / WORLD_ANCHORS", () => {
       }
       return best;
     };
-    // Sign and marker pair sit beside the path (< 4m); the statue is a bit
-    // further off but still a short detour.
+    // Sign sits beside the path; the statue is a short detour away. The
+    // marker anchor must be ON the path (round-2 R5: the red pin stands
+    // exactly where the user walks, the rings scatter around it).
     expect(nearestDistance(WORLD_ANCHORS.sign)).toBeLessThan(4);
-    expect(nearestDistance(WORLD_ANCHORS.markerPair)).toBeLessThan(4);
+    expect(nearestDistance(WORLD_ANCHORS.markerPair)).toBeLessThan(0.6);
     expect(nearestDistance(WORLD_ANCHORS.statue)).toBeLessThan(8);
   });
 });

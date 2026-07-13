@@ -147,7 +147,14 @@ export function createSceneController(
     shadowCam.top = 30;
     shadowCam.bottom = -30;
   }
-  scene.add(world, stage.person, markers.raw, markers.fused, camera);
+  scene.add(
+    world,
+    stage.person,
+    markers.raw,
+    markers.fused,
+    markers.connectors,
+    camera,
+  );
   scene.add(hemisphere, directional);
 
   let dirty = true;

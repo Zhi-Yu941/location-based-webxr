@@ -43,7 +43,6 @@ export interface StoryStage {
 }
 
 const HERO_CAMERA = new Vector3(20, 19, 20);
-const MARKER_GAP = 1.2;
 
 export interface StageParts {
   readonly world: Group;
@@ -65,12 +64,12 @@ export function createStoryStage(parts: StageParts): StoryStage {
 
   parts.person.position.copy(curve.getPointAt(walk.t));
 
-  parts.markers.raw.position
-    .copy(WORLD_ANCHORS.markerPair)
-    .add(new Vector3(-MARKER_GAP, 0, 0));
-  parts.markers.fused.position
-    .copy(WORLD_ANCHORS.markerPair)
-    .add(new Vector3(MARKER_GAP, 0, 0));
+  // Rings, pin and connectors all sit on ONE anchor (round-2 R5): the
+  // rings scatter via their internal offsets whose average is the pin.
+  parts.markers.raw.position.copy(WORLD_ANCHORS.markerPair);
+  parts.markers.fused.position.copy(WORLD_ANCHORS.markerPair);
+  parts.markers.connectors.position.copy(WORLD_ANCHORS.markerPair);
+  parts.markers.connectors.scale.setScalar(0.001);
 
   // The phone is held "in front of the lens": parent it to the camera so
   // the dive works regardless of where the camera flies.
@@ -215,7 +214,6 @@ export function buildStoryTimeline(
   });
 
   const { camera, lookTarget, walk, world, markers, phone } = stage;
-  const rawBase = markers.raw.position.clone();
 
   // ── Chapter 3 geometry (computed up front; used in the framing chain).
   const eyeT = 0.5;
@@ -356,34 +354,26 @@ export function buildStoryTimeline(
     );
   }
 
-  // Fusion chapter: raw GPS jitter — meters of wander. The fused marker is
-  // deliberately NEVER animated; its stillness is the message.
-  addValueChain(
-    timeline,
-    markers.raw,
-    "x",
-    rawBase.x,
-    [
-      { to: rawBase.x + 0.9, duration: 180 },
-      { to: rawBase.x - 0.5, duration: 180 },
-      { to: rawBase.x + 0.6, duration: 180 },
-      { to: rawBase.x - 0.3, duration: 180 },
-      { to: rawBase.x, duration: 160 },
-    ],
-    2100,
+  // Fusion chapter (round-2 R8): the scattered GPS sample rings stay
+  // perfectly STILL — instead, connector lines draw from the ring centers
+  // to their average point, and the red pin (which stands exactly there)
+  // pulses once to say "this is the anchor". Neither rings nor pin ever
+  // change position; the averaging picture is the message.
+  timeline.add(
+    markers.connectors,
+    { scale: { from: 0.001, to: 1 }, duration: 350, ease: "outCubic" },
+    2150,
   );
   addValueChain(
     timeline,
-    markers.raw,
-    "z",
-    rawBase.z,
+    markers.fused,
+    "scale",
+    1,
     [
-      { to: rawBase.z - 0.6, duration: 220 },
-      { to: rawBase.z + 0.5, duration: 220 },
-      { to: rawBase.z - 0.4, duration: 220 },
-      { to: rawBase.z, duration: 220 },
+      { to: 1.3, duration: 200, ease: "outCubic" },
+      { to: 1, duration: 200 },
     ],
-    2100,
+    2550,
   );
 
   // Dive chapter: the AR content (trail arrows, POI pin, hinted label)

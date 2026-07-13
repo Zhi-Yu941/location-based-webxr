@@ -1,30 +1,37 @@
-# `scene/markers.ts` — raw-GPS uncertainty rings vs. fused-anchor pin
+# `scene/markers.ts` — scattered GPS sample rings, averaging connectors, fused pin
 
 ## Purpose
 
-Builds the twin proof visuals of the fusion chapter: raw GPS as jittering
-amber **uncertainty rings** (round-1 feedback replaced the unreadable gray
-pin) and the fused anchor as a rock-solid red map pin. The contrast —
-wandering fuzz vs. still pin — IS the product message ("GPS alone is
-wobbly → fusion fixes it"); the chapter copy echoes both colors via
-`.hl-raw` / `.hl-fused` spans in `index.html`.
+Builds the proof visuals of the fusion chapter (round-2 R5/R8): raw GPS
+as **static, scattered amber sample rings** whose center offsets sum to
+zero — so the average of the ring centers is exactly the group origin,
+where the rock-solid red pin stands — plus **connector lines** from each
+ring center to that average point. The spatial relationship IS the
+product message ("average the scatter"); the chapter copy echoes the
+colors via `.hl-raw` / `.hl-fused` spans in `index.html`.
 
 ## Public API
 
-- `buildMarkerPair() → { raw: Group, fused: Group }` — groups named
-  `MARKER_NODE.raw` (`"marker-raw"`, the ring stack) / `MARKER_NODE.fused`
-  (`"marker-fused"`, the pin).
-- `MARKER_NODE` — the names the story timeline uses (jitter the raw
-  group, keep the fused one still).
+- `buildMarkerPair() → { raw, fused, connectors }` — groups named
+  `MARKER_NODE.raw` / `MARKER_NODE.fused` / `MARKER_NODE.connectors`.
+- `RING_OFFSETS` — the ring-center (x, z) offsets; scattered AND summing
+  to exactly zero (test-pinned).
+- `buildPin(name, role)` — classic map pin, tip on the ground (also used
+  for the AR POI markers).
+- `MARKER_NODE` — the names the story timeline uses.
 
 ## Invariants & assumptions
 
+- **Nothing in this trio ever moves** — the stage puts all three groups
+  on ONE anchor (on the path edge); the fusion chapter only reveals the
+  connectors (scale) and pulses the pin (uniform scale). Test-pinned.
 - **Disjoint palette roles** (`markerRaw` amber, glowing in dark theme vs
   `markerFused` brand red) — sharing a role would blur the contrast;
-  test-pinned. Ring meshes are named `uncertainty-ring-<i>` (test-pinned).
-- Both groups sit tip/rings-on-ground: placing one means setting the
-  group position at ground level (y = 0); rings are height-staggered a
-  few cm to avoid z-fighting with the ground.
+  test-pinned. Ring meshes are named `uncertainty-ring-<i>`.
+- Connector bars: long axis = local +X, yawed from the ring offset toward
+  the origin (orientation test-pinned).
+- Groups sit on the ground (y = 0 at placement); rings are
+  height-staggered a few cm against z-fighting.
 
 ## Examples
 

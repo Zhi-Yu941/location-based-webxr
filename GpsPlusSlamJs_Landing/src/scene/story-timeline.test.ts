@@ -53,25 +53,29 @@ describe("buildStoryTimeline", () => {
     expect(stage.camera.position.distanceTo(heroPos)).toBeGreaterThan(1);
   });
 
-  it("jitters the raw marker during fusion while the fused anchor holds still", () => {
+  it("keeps the GPS rings still and reveals the averaging connectors during fusion", () => {
+    // Round-2 R8: instead of wandering rings, the fusion chapter shows
+    // STATIC scattered readings and draws connector lines whose meeting
+    // point is the red pin — "average the scatter" as a picture. Neither
+    // the rings nor the pin may move.
     const timeline = buildStoryTimeline(stage, () => {});
     timeline.seek(50);
     const rawStart = stage.markers.raw.position.clone();
     const fusedStart = stage.markers.fused.position.clone();
+    expect(stage.markers.connectors.scale.x).toBeLessThan(0.01);
 
-    let rawMoved = false;
     const fusionStart = 2 * CHAPTER_DURATION_MS;
     for (let i = 1; i <= 8; i++) {
       timeline.seek(fusionStart + (i * CHAPTER_DURATION_MS) / 10);
-      if (stage.markers.raw.position.distanceTo(rawStart) > 0.05) {
-        rawMoved = true;
-      }
-      // The fused anchor must NEVER move — that stability is the message.
+      expect(stage.markers.raw.position.distanceTo(rawStart)).toBeLessThan(
+        1e-6,
+      );
       expect(stage.markers.fused.position.distanceTo(fusedStart)).toBeLessThan(
         1e-6,
       );
     }
-    expect(rawMoved).toBe(true);
+    timeline.seek(chapterEndTime(2));
+    expect(stage.markers.connectors.scale.x).toBeGreaterThan(0.9);
   });
 
   it("walks the dot-person along the path as the story progresses", () => {
@@ -139,11 +143,18 @@ describe("buildIntroTimeline", () => {
 });
 
 describe("createStoryStage", () => {
-  it("places the markers beside the path anchor and the person at the walk start", () => {
+  it("stacks rings, connectors and pin on ONE anchor and places the person at the walk start", () => {
     const stage = makeStage();
+    // Round-2 R5: pin and ring group share the anchor — the rings scatter
+    // via their internal offsets, whose average is the pin.
     expect(
       stage.markers.raw.position.distanceTo(stage.markers.fused.position),
-    ).toBeGreaterThan(1.5);
+    ).toBeLessThan(0.01);
+    expect(
+      stage.markers.connectors.position.distanceTo(
+        stage.markers.fused.position,
+      ),
+    ).toBeLessThan(0.01);
     expect(stage.person.position.length()).toBeGreaterThan(0); // on the path, not at origin
     // Lens target starts at the world center so the hero framing looks at
     // the miniature world.

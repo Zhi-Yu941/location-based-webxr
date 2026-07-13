@@ -44,10 +44,14 @@ the copy.
   also ships an empty `#qr-handoff` container with the `hidden` attribute:
   `src/qr-handoff.ts` (v2 B2) fills it with a client-generated QR of the
   live URL on desktop-class devices without immersive-ar; on every other
-  device (and with JS disabled) it stays invisible. There is
-  deliberately NO license text on the page (round-3 F-drop decision:
-  details live on GitHub only); the meta description keeps its factual
-  "Apache-2.0 framework" mention for SEO/social.
+  device (and with JS disabled) it stays invisible. Between the demos hub
+  and the links row sits the compact FAQ (v2 B6): five native `<details>`
+  accordions (devices, accuracy in the locked B10 qualitative wording,
+  license, offline, how to start) — no JS. The license question
+  consciously softens round-3's F-drop: license honesty returns in FAQ
+  form (Apache-2.0 framework + bundled community-licensed core, details
+  on GitHub), never as a footer disclaimer; the meta description keeps
+  its factual "Apache-2.0 framework" mention for SEO/social.
 
 ## Invariants & assumptions
 

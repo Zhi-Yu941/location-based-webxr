@@ -147,6 +147,17 @@ test("all four demo apps stay launchable from the demos hub", async ({
   ).toBeAttached();
 });
 
+test("FAQ accordions exist and open natively", async ({ page }) => {
+  // The FAQ (v2 B6) is native <details> — no JS involved. Five questions
+  // incl. the license one (round-3 F-drop softened by decision B6).
+  await page.goto("/");
+  await expect(page.locator(".faq details")).toHaveCount(5);
+  const first = page.locator(".faq details").first();
+  await first.locator("summary").click();
+  await expect(first).toHaveAttribute("open", "");
+  await expect(first.locator("p")).toBeVisible();
+});
+
 test("desktop without WebXR gets the QR handoff in the CTA", async ({
   page,
 }) => {

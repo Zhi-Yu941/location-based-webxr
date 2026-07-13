@@ -7,6 +7,11 @@
  * step degrades gracefully — the DOM copy must stand alone when WebGL or
  * motion is unavailable (see the plan doc's "Fallbacks" decision).
  */
+import {
+  applyCtaDeviceClaim,
+  detectImmersiveArSupport,
+  type XrSystemLike,
+} from "./ar-support";
 import { CHAPTERS, sectionElementId } from "./chapters";
 import { heroVeilOpacity } from "./hero-veil";
 import { computeScrollState, type SectionMetrics } from "./scroll-story";
@@ -105,6 +110,13 @@ function markActiveChapter(
 }
 
 function boot(): void {
+  // Fire-and-forget (round-8 Z6): upgrade the CTA's device claim on
+  // immersive-ar-capable devices; everyone else keeps the honest static
+  // default already in the HTML.
+  void detectImmersiveArSupport((navigator as { xr?: XrSystemLike }).xr).then(
+    (supported) => applyCtaDeviceClaim(document, supported),
+  );
+
   const scroller = document.getElementById("story");
   if (!scroller) {
     console.warn("landing: missing #story scroller; page stays static");

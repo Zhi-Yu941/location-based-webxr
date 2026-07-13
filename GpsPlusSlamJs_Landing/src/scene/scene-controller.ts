@@ -11,6 +11,7 @@ import {
 import type { QualityTier } from "../capability";
 import type { Theme } from "../theme";
 import { applyPaletteToScene, getPalette } from "./palette";
+import { applySkyPalette, buildSkyDome } from "./sky-dome";
 import { buildClayWorld } from "./clay-world";
 import { buildDotPerson } from "./dot-person";
 import { buildMarkerPair } from "./markers";
@@ -147,8 +148,10 @@ export function createSceneController(
     shadowCam.top = 30;
     shadowCam.bottom = -30;
   }
+  const sky = buildSkyDome();
   scene.add(
     world,
+    sky,
     stage.person,
     markers.raw,
     markers.fused,
@@ -170,6 +173,7 @@ export function createSceneController(
   function applyThemeInternal(theme: Theme): void {
     const palette = getPalette(theme);
     applyPaletteToScene(scene, palette);
+    applySkyPalette(sky, palette);
     scene.background = new Color(palette.background);
     scene.fog = new Fog(palette.fog.color, palette.fog.near, palette.fog.far);
     hemisphere.color.setHex(palette.hemisphere.sky);

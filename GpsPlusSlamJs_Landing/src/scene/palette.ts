@@ -47,6 +47,11 @@ interface RoleStyle {
   readonly emissiveIntensity?: number;
 }
 
+// Which celestial accent set a palette's sky shows (v3 F3). Consumers
+// reference it via `ScenePalette['sky']['accents']`; keep the alias
+// module-private until an importer needs it by name (knip enforces this).
+type SkyAccents = "moon-stars" | "sun" | "star-grid" | "none";
+
 export interface ScenePalette {
   readonly background: number;
   readonly fog: {
@@ -60,6 +65,16 @@ export interface ScenePalette {
     readonly intensity: number;
   };
   readonly directional: { readonly color: number; readonly intensity: number };
+  /**
+   * Sky dome gradient + celestial accents (v3 F3); consumed by
+   * `sky-dome.ts`, not by the role traversal (the dome is unlit).
+   */
+  readonly sky: {
+    readonly zenith: number;
+    readonly horizon: number;
+    readonly accents: SkyAccents;
+    readonly accentColor: number;
+  };
   readonly roles: Readonly<Record<PaletteRole, RoleStyle>>;
 }
 
@@ -70,6 +85,13 @@ const LIGHT: ScenePalette = {
   fog: { color: 0xf2f1ed, near: 40, far: 90 },
   hemisphere: { sky: 0xffffff, ground: 0xd8d4cc, intensity: 1.15 },
   directional: { color: 0xffffff, intensity: 1.6 },
+  // Soft blue zenith fading into the page background at the horizon.
+  sky: {
+    zenith: 0xcfe4f7,
+    horizon: 0xf2f1ed,
+    accents: "none",
+    accentColor: 0xffffff,
+  },
   roles: {
     ground: { color: 0xe9e6df },
     path: { color: 0xd8d2c6 },
@@ -107,6 +129,13 @@ const DARK: ScenePalette = {
   fog: { color: 0x0b0b0d, near: 40, far: 90 },
   hemisphere: { sky: 0x565f80, ground: 0x23232c, intensity: 1.15 },
   directional: { color: 0xbfd0ff, intensity: 1.1 },
+  // Night sky: near-black zenith, faintly lifted horizon, moon + stars.
+  sky: {
+    zenith: 0x06060c,
+    horizon: 0x181822,
+    accents: "moon-stars",
+    accentColor: 0xdde3ff,
+  },
   roles: {
     ground: { color: 0x2a2a34 },
     path: { color: 0x50505e },
@@ -144,6 +173,13 @@ const NEON: ScenePalette = {
   fog: { color: 0x05060e, near: 40, far: 90 },
   hemisphere: { sky: 0x2b2f6e, ground: 0x0a0a14, intensity: 1.15 },
   directional: { color: 0x7f8cff, intensity: 1.0 },
+  // Cyber sky: deep blue-black with a synthwave star grid in cyan.
+  sky: {
+    zenith: 0x030410,
+    horizon: 0x131a3a,
+    accents: "star-grid",
+    accentColor: 0x22d3ee,
+  },
   roles: {
     ground: { color: 0x11162b },
     path: { color: 0x1c2340 },
@@ -175,6 +211,13 @@ const DUSK: ScenePalette = {
   fog: { color: 0x2a1a3e, near: 40, far: 90 },
   hemisphere: { sky: 0xff9e7d, ground: 0x3c2a55, intensity: 1.15 },
   directional: { color: 0xffb08a, intensity: 1.2 },
+  // Sunset sky: purple zenith melting into a hot orange horizon + low sun.
+  sky: {
+    zenith: 0x241536,
+    horizon: 0xff8f66,
+    accents: "sun",
+    accentColor: 0xffc08a,
+  },
   roles: {
     ground: { color: 0x4b3566 },
     path: { color: 0x5d4680 },
@@ -208,6 +251,13 @@ const MONO: ScenePalette = {
   fog: { color: 0xf5f5f2, near: 40, far: 90 },
   hemisphere: { sky: 0xffffff, ground: 0xd9d9d4, intensity: 1.15 },
   directional: { color: 0xffffff, intensity: 1.5 },
+  // Ink/paper: the sky stays a barely-there gray wash — no accents.
+  sky: {
+    zenith: 0xe6e6e1,
+    horizon: 0xf5f5f2,
+    accents: "none",
+    accentColor: 0xffffff,
+  },
   roles: {
     ground: { color: 0xe8e8e4 },
     path: { color: 0xd2d2cc },
@@ -233,6 +283,7 @@ const MONO: ScenePalette = {
   },
 };
 
+// The five palettes. Sky blocks (v3 F3) are consumed by sky-dome.ts.
 const PALETTES: Readonly<Record<Theme, ScenePalette>> = {
   light: LIGHT,
   dark: DARK,

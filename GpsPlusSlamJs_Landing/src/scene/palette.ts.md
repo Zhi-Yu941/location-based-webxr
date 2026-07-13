@@ -12,8 +12,12 @@ factories all scene builders use.
 
 - `PALETTE_ROLES` / `PaletteRole` — the closed set of role tags.
 - `getPalette(theme: Theme) → ScenePalette` — `background`, `fog`,
-  `hemisphere` + `directional` light settings, and `roles` (per-role
+  `hemisphere` + `directional` light settings, `sky` (v3 F3: zenith/
+  horizon gradient colors + `accents` kind + `accentColor`, consumed by
+  `sky-dome.ts` — NOT by the role traversal), and `roles` (per-role
   `{ color, emissive?, emissiveIntensity? }`).
+- The accent-set union (`"moon-stars" | "sun" | "star-grid" | "none"`)
+  is module-private (`SkyAccents`), same knip rule as `RoleStyle`.
 - `applyPaletteToScene(root, palette)` — recolors every role-tagged
   `MeshStandardMaterial` under `root` (color + emissive).
 - `clayMesh(geometry, role, name?)` — flat-shaded standard-material mesh

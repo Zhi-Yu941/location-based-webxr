@@ -89,14 +89,23 @@ function measureSections(
 
 /**
  * Hero extras: the veil that hides the 3D world at the top (round-2 R4)
- * and the "jump to demos" fast smooth scroll (R17b). Returns the per-
- * scroll updater for the veil opacity.
+ * and the "jump to demos" fast smooth scroll (R17b). The jump targets
+ * the CTA chapter's measured top (round-10 R10-2) — scrolling to
+ * `scrollHeight` overshot into the FAQ once it existed below the demos.
+ * Returns the per-scroll updater for the veil opacity.
  */
-function wireHeroExtras(scroller: HTMLElement): () => void {
+function wireHeroExtras(
+  scroller: HTMLElement,
+  demosTop: () => number | undefined,
+  smoothScroll: boolean,
+): () => void {
   const veil = document.getElementById("hero-veil");
   document.getElementById("jump-demos")?.addEventListener("click", (event) => {
     event.preventDefault();
-    scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
+    scroller.scrollTo({
+      top: demosTop() ?? scroller.scrollHeight,
+      behavior: smoothScroll ? "smooth" : "auto",
+    });
   });
   return () => {
     if (veil) {
@@ -233,7 +242,12 @@ function boot(): void {
     });
   }
 
-  const updateHeroExtras = wireHeroExtras(scroller);
+  const updateHeroExtras = wireHeroExtras(
+    scroller,
+    // Closure over the mutable metrics: resize re-measurements stay live.
+    () => metrics[CHAPTERS.length - 1]?.top,
+    tier.mode === "scroll",
+  );
   let lastChapterIndex = -1;
   const onScrollChanged = (): void => {
     const state = computeScrollState(

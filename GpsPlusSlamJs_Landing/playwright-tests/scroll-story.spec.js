@@ -170,6 +170,25 @@ test("FAQ accordions exist and open natively", async ({ page }) => {
   await expect(first.locator("p")).toBeVisible();
 });
 
+test("jump-to-demos stops at the demos hub, not the page bottom", async ({
+  page,
+}) => {
+  // Round-10 R10-2: the hero link used to scroll to scroller.scrollHeight
+  // — the absolute bottom, which since the FAQ landed is the FAQ, not
+  // the demos. It must stop at the CTA chapter's top instead.
+  await page.goto("/");
+  await page.locator("#jump-demos").click();
+  await expect(page.locator("#chapter-cta h2")).toBeInViewport();
+  const atBottom = await page.evaluate(() => {
+    const story = document.getElementById("story");
+    if (!story) {
+      return true;
+    }
+    return story.scrollTop >= story.scrollHeight - story.clientHeight - 50;
+  });
+  expect(atBottom).toBe(false);
+});
+
 test("hero code snippet starts expanded on desktop", async ({ page }) => {
   // Round-9 R9-5: the snippet is a <details> expander — desktop-class
   // viewports get it open at boot (the developer hook stays one glance

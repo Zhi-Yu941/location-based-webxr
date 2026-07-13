@@ -45,6 +45,9 @@ None (side-effect entry module loaded by `index.html`).
   the scroll state machine drives `updateActiveDot`, clicks scroll the
   scroller to the chapter's measured top (smooth in scroll mode,
   instant under reduced motion).
+- "Jump to the demos" (R17b) targets the CTA chapter's measured top via
+  the same metrics (round-10 R10-2) — scrolling to `scrollHeight`
+  overshot into the FAQ once it existed below the demos hub.
 
 ## Examples
 

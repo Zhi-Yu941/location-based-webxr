@@ -181,10 +181,21 @@ function boot(): void {
     },
     { passive: true },
   );
+  // Debounced: a collapsing/expanding mobile browser bar fires a resize
+  // burst mid-gesture; re-measuring sections during it would remap scroll
+  // progress under the user's finger (round-2 R2). One settle-time pass
+  // is enough — the canvas itself is 100lvh-sized and needs no mid-burst
+  // resize either.
+  let resizeTimer: ReturnType<typeof setTimeout> | undefined;
   window.addEventListener("resize", () => {
-    metrics = measureSections(scroller, sections);
-    scene?.handleResize(window.innerWidth, window.innerHeight);
-    onScrollChanged();
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      metrics = measureSections(scroller, sections);
+      if (sceneRoot) {
+        scene?.handleResize(sceneRoot.clientWidth, sceneRoot.clientHeight);
+      }
+      onScrollChanged();
+    }, 150);
   });
 
   onScrollChanged();

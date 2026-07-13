@@ -92,10 +92,16 @@
         line-height: 1.55;
       }
 
-      /* Fixed 3D stage behind the scrolling copy. */
+      /* Fixed 3D stage behind the scrolling copy. Sized to the LARGE
+         viewport (100lvh): if the mobile browser bar does collapse, the
+         canvas is already painted behind it — no black band (round-2 R2). */
       #scene-root {
         position: fixed;
-        inset: 0;
+        top: 0;
+        left: 0;
+        right: 0;
+        /* stylelint-disable-next-line csstree/validator -- lvh is a valid viewport unit; the bundled css-tree grammar predates it (false positive). */
+        height: 100lvh;
         z-index: 0;
       }
       #scene-root canvas {
@@ -143,9 +149,14 @@
       }
 
       main {
-        /* The page's one and only scroller (see html/body overflow note). */
+        /* The page's one and only scroller (see html/body overflow note).
+           bottom: -1px makes it 1px TALLER than the viewport on purpose:
+           Android Chrome promotes an EXACTLY viewport-filling scroller to
+           the "implicit root scroller", which re-attaches the URL-bar
+           show/hide heuristics (the round-2 R2 bar sliding + scene jumps).
+           Off-by-one defeats the promotion so the bar stays put. */
         position: fixed;
-        inset: 0;
+        inset: 0 0 -1px;
         overflow-y: auto;
         z-index: 1;
       }

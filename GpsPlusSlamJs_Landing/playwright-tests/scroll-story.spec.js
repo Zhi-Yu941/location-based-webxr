@@ -59,6 +59,17 @@ test("boots and activates every chapter while scrolling, with zero errors", asyn
   // The DOCUMENT must never scroll — #story is the page's only scroller
   // (keeps the mobile URL bar stationary; round-1 feedback F1b).
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  // The canvas layer must cover at least the full (large) viewport so a
+  // collapsing mobile browser bar can never expose a black band (R2) —
+  // unless the WebGL-context-loss floor legitimately hid it (no-webgl).
+  expect(
+    await page.evaluate(
+      () =>
+        document.body.classList.contains("no-webgl") ||
+        (document.getElementById("scene-root")?.offsetHeight ?? 0) >=
+          window.innerHeight,
+    ),
+  ).toBe(true);
   expect(
     await page.evaluate(() => document.getElementById("story")?.scrollTop ?? 0),
   ).toBeGreaterThan(0);

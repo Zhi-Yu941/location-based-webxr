@@ -130,29 +130,33 @@ describe("buildStoryTimeline", () => {
     expect(arContent?.scale.x ?? 0).toBeGreaterThan(0.9);
   });
 
-  it("sequences the dive (round-4 V2): camera settles close behind the person, THEN the phone flies in, AR appears with its arrival", () => {
-    // Round-4 feedback: the phone frame used to fly toward the camera
-    // while the person (with the raised arm the phone is visibly NOT
-    // attached to) still filled the frame, and the AR content was already
-    // in place. Wanted dramaturgy, pinned here: (1) camera settles close
-    // behind/above the person ("a bit further forward" than round-2's 1.4
-    // units — less person in frame), (2) only then the phone flies in,
-    // (3) the AR elements fade in together with the phone's arrival.
+  it("sequences the dive (round-4 V2 + round-5 W2/W3): camera settles at the LEFT shoulder, phone launches WITH the person fade, AR appears with the phone's arrival", () => {
+    // Round-4 set the dramaturgy (camera in close → phone → AR); round-5
+    // refined it: the camera stops beside the LEFT shoulder instead of
+    // above the head, and the phone must launch the MOMENT the person
+    // starts fading (the round-4 gap — person long gone, empty frame,
+    // phone arrives late — was explicitly flagged). AR still waits for
+    // the phone's arrival.
     const timeline = buildStoryTimeline(stage, () => {});
     const arContent = stage.world.getObjectByName(WORLD_NODE.arContent);
 
+    timeline.seek(3510); // just after the person fade begins (3480)
+    syncStage(stage);
+    expect(stage.person.scale.x).toBeLessThan(1); // fading out...
+    expect(stage.phone.scale.x).toBeGreaterThan(0.05); // ...phone launching
+
     timeline.seek(3550); // camera-settle time (framing tweens = 55% window)
     syncStage(stage);
-    const horizontal = Math.hypot(
-      stage.camera.position.x - stage.person.position.x,
-      stage.camera.position.z - stage.person.position.z,
-    );
-    expect(horizontal).toBeLessThan(1.0);
-    expect(stage.phone.scale.x).toBeLessThan(0.05); // phone still hidden
-    expect(arContent?.scale.x ?? 99).toBeLessThan(0.05); // AR still collapsed
+    const offsetX = stage.camera.position.x - stage.person.position.x;
+    const offsetZ = stage.camera.position.z - stage.person.position.z;
+    expect(Math.hypot(offsetX, offsetZ)).toBeLessThan(1.0); // in close
+    expect(stage.camera.position.y).toBeLessThan(1.7); // shoulder, not overhead
+    // On the person's LEFT: left = up × walking direction = (tz, 0, -tx).
+    const tangent = stage.curve.getTangentAt(0.5);
+    expect(offsetX * tangent.z + offsetZ * -tangent.x).toBeGreaterThan(0.25);
 
     timeline.seek(3700); // phone mid-flight
-    expect(stage.person.scale.x).toBeLessThan(0.01); // person already gone
+    expect(stage.person.scale.x).toBeLessThan(0.01); // person gone
     expect(stage.phone.scale.x).toBeGreaterThan(0.1);
     expect(arContent?.scale.x ?? 99).toBeLessThan(0.05); // AR still waiting
 

@@ -236,13 +236,17 @@ export function buildStoryTimeline(
   const eyeT = 0.5;
   const eyePoint = stage.curve.getPointAt(eyeT);
   const eyeTangent = stage.curve.getTangentAt(eyeT);
-  // 0.6 behind the person, just above the head (round-4 V2: "behind the
-  // arm and a bit further forward" — at round-2's 1.4 the whole person
-  // stayed in frame while the phone flew past them).
+  // Beside the person's LEFT shoulder (round-5 W2: round-4 stopped above
+  // the head and the person tipped away right under the lens): 0.55
+  // behind, 0.4 to the left (left = up × walking direction), at shoulder/
+  // eye height — below the head top, so the camera passes the person, not
+  // over them.
+  const eyeLeft = new Vector3(eyeTangent.z, 0, -eyeTangent.x);
   const divePos = eyePoint
     .clone()
-    .sub(eyeTangent.clone().multiplyScalar(0.6))
-    .add(new Vector3(0, 1.8, 0));
+    .sub(eyeTangent.clone().multiplyScalar(0.55))
+    .add(eyeLeft.multiplyScalar(0.4))
+    .add(new Vector3(0, 1.55, 0));
   const diveLook = stage.curve
     .getPointAt(Math.min(1, eyeT + 0.12))
     .add(new Vector3(0, 1.3, 0));
@@ -433,13 +437,15 @@ export function buildStoryTimeline(
   // staging IS the requested effect.
   const arContent = world.getObjectByName(WORLD_NODE.arContent);
   // Person fades as the camera's final approach passes them (camera
-  // settles at 3550)...
+  // settles at 3550), and the phone launches at the SAME moment (round-5
+  // W3: any gap between "person gone" and "phone visible" reads as a
+  // dead, empty frame — the round-4 100 ms offset was already too much
+  // because the scale-in keeps the phone tiny at first)...
   timeline.add(person, { scale: { from: 1, to: 0.001 }, duration: 120 }, 3480);
-  // ...then the phone rises in front of the lens...
   timeline.add(
     phone,
-    { scale: { from: 0.001, to: 1 }, duration: 280, ease: "outBack" },
-    3580,
+    { scale: { from: 0.001, to: 1 }, duration: 300, ease: "outBack" },
+    3480,
   );
   // ...and the AR content materializes in the world as the phone reaches
   // its spot ("the overlays switch on").
@@ -447,7 +453,7 @@ export function buildStoryTimeline(
     timeline.add(
       arContent,
       { scale: { from: 0.001, to: 1 }, duration: 220, ease: "outCubic" },
-      3780,
+      3730,
     );
   }
   // Pull-back: phone drops away, person returns.

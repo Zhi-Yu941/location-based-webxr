@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Vector3, type Mesh } from "three";
+import { Box3, Vector3, type Mesh } from "three";
 import { PALETTE_ROLES } from "./palette";
 import {
   buildClayWorld,
@@ -22,6 +22,21 @@ describe("buildClayWorld", () => {
         world.getObjectByName(name),
         `missing world node ${name}`,
       ).toBeDefined();
+    }
+  });
+
+  it("sinks every skyline piece well below ground level (round-10 R10-3)", () => {
+    // The skyline stands ~48 units out — beyond the 30-unit ground disc —
+    // so pieces whose bottoms end at y=0 visibly FLOAT over the void from
+    // the story's camera angles. Every skyline child must extend below
+    // ground; the visual tops stay where they were.
+    const world = buildClayWorld("high");
+    const skyline = world.getObjectByName(WORLD_NODE.skyline);
+    expect(skyline).toBeDefined();
+    skyline?.updateWorldMatrix(true, true);
+    for (const child of skyline?.children ?? []) {
+      const box = new Box3().setFromObject(child);
+      expect(box.min.y, `${child.name || child.type} floats`).toBeLessThan(-2);
     }
   });
 

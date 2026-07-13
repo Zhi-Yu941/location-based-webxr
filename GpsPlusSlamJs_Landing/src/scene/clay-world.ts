@@ -382,21 +382,31 @@ function buildSkyline(): Group {
   const skyline = namedGroup(WORLD_NODE.skyline);
   const across = new Vector3(-skyDirection.z, 0, skyDirection.x);
   const rng = createRng(42);
+  // The skyline stands beyond the ground disc, over the void — every
+  // piece is extended SINK units below y=0 (tops unchanged) so nothing
+  // reads as floating from the story's camera angles (round-10 R10-3).
+  const SINK = 8;
   const blocks = [-9, -5.5, -2, 1.5, 5, 8.5];
   for (const offset of blocks) {
     const width = 2 + rng() * 2;
     const height = 3 + rng() * 6;
-    const block = clayMesh(new BoxGeometry(width, height, 2.5), "skyline");
+    const block = clayMesh(
+      new BoxGeometry(width, height + SINK, 2.5),
+      "skyline",
+    );
     block.position
       .copy(skylineCenter)
       .add(across.clone().multiplyScalar(offset))
-      .setY(height / 2);
+      .setY(height / 2 - SINK / 2);
     block.castShadow = false;
     skyline.add(block);
   }
   const tower = namedGroup("skyline-tower");
-  const shaft = clayMesh(new CylinderGeometry(0.4, 0.7, 12, 8), "skyline");
-  shaft.position.y = 6;
+  const shaft = clayMesh(
+    new CylinderGeometry(0.4, 0.7, 12 + SINK, 8),
+    "skyline",
+  );
+  shaft.position.y = 6 - SINK / 2;
   shaft.castShadow = false;
   const bulb = clayMesh(new SphereGeometry(0.9, 8, 6), "skyline");
   bulb.position.y = 12.4;

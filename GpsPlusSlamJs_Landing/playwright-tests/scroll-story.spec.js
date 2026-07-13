@@ -138,6 +138,13 @@ test("all four demo apps stay launchable from the demos hub", async ({
   for (const href of ["/starter/", "/minimal/", "/qr-demo/", "/recorder/"]) {
     await expect(page.locator(`a.demo-card[href="${href}"]`)).toBeAttached();
   }
+  // The static "Open source on GitHub" badge (v2 B5) must sit next to the
+  // primary CTA — it is the only social-proof element on the page.
+  await expect(
+    page.locator(
+      'a.github-badge[href="https://github.com/cs-util-com/location-based-webxr"]',
+    ),
+  ).toBeAttached();
 });
 
 // Most real users open the landing page on a phone (round-2 request):

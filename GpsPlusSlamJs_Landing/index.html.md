@@ -22,10 +22,12 @@ the copy.
   chapter carries a `.copy` glass panel with the punchy-marketing copy
   (round-2 interview decision). The active section gets `.active` (full
   opacity) from `main.ts`.
-- The CTA section holds the primary "Fork & start building" button, the
-  demos hub (four `.demo-card`s with inline-SVG vignettes keeping the
-  proven one-line descriptions), and the external links row (`.links`,
-  which carries the story's terminal bottom padding). Its lead sentence
+- The CTA section holds the primary "Fork & start building" button, a
+  static "Open source on GitHub" badge (`.github-badge`, v2 B5 — a plain
+  styled link, deliberately NO live star-count fetch until the repo has a
+  convincing number), the demos hub (four `.demo-card`s with inline-SVG
+  vignettes keeping the proven one-line descriptions), and the external
+  links row (`.links`, which carries the story's terminal bottom padding). Its lead sentence
   starts with `#cta-device-claim` (round-8 Z6): the static text is the
   universally-true Android+Chrome claim; `src/ar-support.ts` upgrades it
   to "run on your phone right now" only on immersive-ar-capable devices

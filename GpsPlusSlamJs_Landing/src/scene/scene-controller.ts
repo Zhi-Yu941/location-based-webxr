@@ -8,6 +8,13 @@ import {
   Vector3,
   WebGLRenderer,
 } from "three";
+import {
+  BloomEffect,
+  EffectComposer,
+  EffectPass,
+  RenderPass,
+  VignetteEffect,
+} from "postprocessing";
 import type { QualityTier } from "../capability";
 import type { Theme } from "../theme";
 import { applyPaletteToScene, getPalette } from "./palette";
@@ -51,6 +58,17 @@ export interface RendererLike {
   readonly domElement: HTMLCanvasElement;
 }
 
+/**
+ * The post-processing surface the controller needs (real: pmndrs
+ * EffectComposer, v3 F1). When present it REPLACES the plain render
+ * call; it never coexists with direct rendering in the same frame.
+ */
+export interface ComposerLike {
+  render(deltaTimeSeconds?: number): void;
+  setSize(width: number, height: number): void;
+  dispose(): void;
+}
+
 interface SceneContainer {
   readonly clientWidth: number;
   readonly clientHeight: number;
@@ -63,6 +81,18 @@ export interface SceneControllerOptions {
   readonly initialTheme: Theme;
   /** Injectable for tests; defaults to a real WebGLRenderer. */
   readonly createRenderer?: () => RendererLike;
+  /**
+   * Injectable for tests; defaults to a pmndrs EffectComposer with
+   * half-res (mipmap) bloom + vignette. Only consulted when
+   * `tier.postprocessing` is true. May return null (e.g. the default
+   * cannot compose over a non-WebGLRenderer fake) — the controller then
+   * renders directly.
+   */
+  readonly createComposer?: (
+    renderer: RendererLike,
+    scene: Scene,
+    camera: PerspectiveCamera,
+  ) => ComposerLike | null;
   /** rAF seam for `start()`; defaults to window.requestAnimationFrame. */
   readonly requestFrame?: (callback: (nowMs: number) => void) => void;
   /**
@@ -110,6 +140,37 @@ function defaultCreateRenderer(): RendererLike {
     antialias: true,
     powerPreference: "high-performance",
   });
+}
+
+/**
+ * Default composer (v3 F1): mipmap-blurred (≈half-res cost) selective
+ * bloom via luminance threshold — only emissive-bright parts glow — plus
+ * a near-free vignette, merged into one effect pass by pmndrs.
+ */
+function defaultCreateComposer(
+  renderer: RendererLike,
+  scene: Scene,
+  camera: PerspectiveCamera,
+): ComposerLike | null {
+  if (!(renderer instanceof WebGLRenderer)) {
+    return null;
+  }
+  const composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  composer.addPass(
+    new EffectPass(
+      camera,
+      new BloomEffect({
+        mipmapBlur: true,
+        luminanceThreshold: 0.55,
+        luminanceSmoothing: 0.25,
+        intensity: 0.8,
+        radius: 0.8,
+      }),
+      new VignetteEffect({ offset: 0.32, darkness: 0.42 }),
+    ),
+  );
+  return composer;
 }
 
 export function createSceneController(
@@ -195,15 +256,29 @@ export function createSceneController(
     Math.max(1, container.clientWidth) / Math.max(1, container.clientHeight);
   camera.updateProjectionMatrix();
   container.appendChild(renderer.domElement);
+
+  // Post-processing path (v3 F1): high tier only. The composer owns GPU
+  // render targets, so it is disposed on context loss and rebuilt on
+  // restore — three.js only re-uploads its OWN resources.
+  const composerFactory = options.createComposer ?? defaultCreateComposer;
+  let composer: ComposerLike | null = tier.postprocessing
+    ? composerFactory(renderer, scene, camera)
+    : null;
+
   if (typeof renderer.domElement.addEventListener === "function") {
     renderer.domElement.addEventListener("webglcontextlost", (event) => {
       // preventDefault ALLOWS the browser to restore the context later
       // (three.js re-uploads its GPU resources on restore). Until then
       // the caller shows the static DOM floor.
       event.preventDefault?.();
+      composer?.dispose();
+      composer = null;
       options.onContextLost?.();
     });
     renderer.domElement.addEventListener("webglcontextrestored", () => {
+      if (tier.postprocessing) {
+        composer = composerFactory(renderer, scene, camera);
+      }
       dirty = true;
       options.onContextRestored?.();
     });
@@ -325,6 +400,7 @@ export function createSceneController(
       const w = Math.max(1, width);
       const h = Math.max(1, height);
       renderer.setSize(w, h, false);
+      composer?.setSize(w, h);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       dirty = true;
@@ -343,7 +419,11 @@ export function createSceneController(
       applyAmbientDrift(nowMs);
       if (dirty) {
         camera.lookAt(stage.lookTarget);
-        renderer.render(scene, camera);
+        if (composer) {
+          composer.render(dt / 1000);
+        } else {
+          renderer.render(scene, camera);
+        }
         dirty = false;
       }
     },

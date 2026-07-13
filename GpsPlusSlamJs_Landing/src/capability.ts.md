@@ -14,7 +14,9 @@ shadows, geometry detail).
     `deviceMemoryGb` (undefined outside Chromium), `hardwareConcurrency`
     (undefined when unavailable), `devicePixelRatio`.
   - `QualityTier`: `mode`, `dprCap` (always in [1, 2]), `shadows`,
-    `geometryDetail: 'high' | 'low'`. (The mode union `StoryMode` is
+    `geometryDetail: 'high' | 'low'`, `postprocessing` (v3 F1: bloom +
+    vignette, high tier only — the gate is decided HERE so it stays
+    testable in one place). (The mode union `StoryMode` is
     module-private; consumers use `QualityTier['mode']`.)
 
 ## Invariants & assumptions
@@ -27,7 +29,9 @@ shadows, geometry detail).
   as capable (Firefox/Safari never expose deviceMemory; punishing unknown
   would degrade most desktops).
 - **Weak hardware:** `deviceMemoryGb < 4` or `hardwareConcurrency <= 4` →
-  DPR cap 1.5, shadows off, low-poly geometry. High tier caps DPR at 2.
+  DPR cap 1.5, shadows off, low-poly geometry, no post-processing (the
+  low tier keeps exactly its pre-bloom cost profile). High tier caps DPR
+  at 2 and enables post-processing.
 - **Defensive:** non-finite or sub-1 `devicePixelRatio` clamps to 1 — a
   garbage DPR must never produce a zero-sized framebuffer.
 - Pure function, no browser globals — callers gather the inputs (see

@@ -39,6 +39,13 @@ export interface QualityTier {
   readonly dprCap: number;
   readonly shadows: boolean;
   readonly geometryDetail: "high" | "low";
+  /**
+   * Post-processing (v3 F1: half-res bloom + vignette) — high tier only,
+   * so the low tier keeps exactly its pre-bloom cost profile. Decided
+   * here (not in the scene controller) to keep the gate testable in one
+   * place.
+   */
+  readonly postprocessing: boolean;
 }
 
 const HIGH_TIER_DPR_CAP = 2;
@@ -71,6 +78,7 @@ export function decideQualityTier(inputs: CapabilityInputs): QualityTier {
       dprCap: 1,
       shadows: false,
       geometryDetail: "low",
+      postprocessing: false,
     };
   }
   const mode: StoryMode = inputs.prefersReducedMotion
@@ -82,6 +90,7 @@ export function decideQualityTier(inputs: CapabilityInputs): QualityTier {
       dprCap: clampDpr(inputs.devicePixelRatio, LOW_TIER_DPR_CAP),
       shadows: false,
       geometryDetail: "low",
+      postprocessing: false,
     };
   }
   return {
@@ -89,5 +98,6 @@ export function decideQualityTier(inputs: CapabilityInputs): QualityTier {
     dprCap: clampDpr(inputs.devicePixelRatio, HIGH_TIER_DPR_CAP),
     shadows: true,
     geometryDetail: "high",
+    postprocessing: true,
   };
 }

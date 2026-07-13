@@ -23,6 +23,7 @@ describe("decideQualityTier", () => {
       dprCap: 2,
       shadows: true,
       geometryDetail: "high",
+      postprocessing: true,
     });
   });
 
@@ -32,6 +33,9 @@ describe("decideQualityTier", () => {
     expect(weakMemory.shadows).toBe(false);
     expect(weakMemory.geometryDetail).toBe("low");
     expect(weakMemory.dprCap).toBeLessThanOrEqual(1.5);
+    // Bloom (v3 F1) is a high-tier luxury: the low tier must keep
+    // exactly its pre-bloom cost profile.
+    expect(weakMemory.postprocessing).toBe(false);
 
     const weakCpu = decideQualityTier({
       ...CAPABLE,
@@ -70,6 +74,7 @@ describe("decideQualityTier", () => {
     });
     expect(noWebgl.mode).toBe("static-dom");
     expect(noWebgl.shadows).toBe(false);
+    expect(noWebgl.postprocessing).toBe(false);
   });
 
   it("never caps DPR above the device's actual ratio and never below 1", () => {

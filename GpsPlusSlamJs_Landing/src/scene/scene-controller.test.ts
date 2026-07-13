@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Color, PerspectiveCamera, Scene } from "three";
 import type { QualityTier } from "../capability";
-import { createSceneController, type RendererLike } from "./scene-controller";
+import {
+  createSceneController,
+  type ComposerLike,
+  type RendererLike,
+} from "./scene-controller";
 
 // Why this test matters: the controller is the only stateful glue between
 // scroll input, the anime.js timeline, and the WebGL renderer. Its
@@ -15,6 +19,7 @@ const TIER: QualityTier = {
   dprCap: 2,
   shadows: true,
   geometryDetail: "low",
+  postprocessing: false,
 };
 
 function makeFakeRenderer() {
@@ -210,6 +215,85 @@ describe("createSceneController", () => {
     controller?.skipIntro();
     controller?.tick(116);
     expect(camera.position.distanceTo(heroPos)).toBeLessThan(0.5);
+  });
+
+  // Why these composer tests matter (v3 F1): bloom runs through an
+  // EffectComposer that REPLACES the plain render call on the high tier.
+  // If the gate leaks, weak devices pay for bloom; if disposal on context
+  // loss is missed, the restore path renders through dead GPU resources.
+  function makeComposerFixture(tier: QualityTier) {
+    const composer = {
+      render: vi.fn<(deltaTimeSeconds?: number) => void>(),
+      setSize: vi.fn<(width: number, height: number) => void>(),
+      dispose: vi.fn<() => void>(),
+    } satisfies ComposerLike;
+    const createComposer = vi.fn(() => composer);
+    const listeners = new Map<string, (event: unknown) => void>();
+    // Built inline (NOT spread from makeFakeRenderer): the spread would
+    // detach the render() closure from this object's `renders` counter.
+    const renderer: RendererLike & { renders: number } = {
+      renders: 0,
+      shadowMap: { enabled: false },
+      domElement: {
+        addEventListener: (type: string, handler: (event: unknown) => void) => {
+          listeners.set(type, handler);
+        },
+      } as unknown as HTMLCanvasElement,
+      setSize: vi.fn(),
+      setPixelRatio: vi.fn(),
+      render: vi.fn(function (this: void) {
+        renderer.renders++;
+      }),
+      dispose: vi.fn(),
+    };
+    const controller = createSceneController({
+      container: { clientWidth: 800, clientHeight: 600, appendChild: () => {} },
+      tier,
+      initialTheme: "dark",
+      createRenderer: () => renderer,
+      createComposer,
+    });
+    return { controller, renderer, composer, createComposer, listeners };
+  }
+
+  it("renders through the composer on the postprocessing tier, plain renderer otherwise", () => {
+    const on = makeComposerFixture({ ...TIER, postprocessing: true });
+    on.controller?.tick(16);
+    expect(on.composer.render).toHaveBeenCalled();
+    expect(on.renderer.renders).toBe(0);
+
+    const off = makeComposerFixture({ ...TIER, postprocessing: false });
+    off.controller?.tick(16);
+    expect(off.createComposer).not.toHaveBeenCalled();
+    expect(off.renderer.renders).toBeGreaterThan(0);
+  });
+
+  it("disposes the composer on context loss, falls back to plain rendering, and rebuilds on restore", () => {
+    const { controller, renderer, composer, createComposer, listeners } =
+      makeComposerFixture({ ...TIER, postprocessing: true });
+    controller?.tick(16);
+    expect(composer.render).toHaveBeenCalled();
+
+    listeners.get("webglcontextlost")?.({ preventDefault: () => {} });
+    expect(composer.dispose).toHaveBeenCalledOnce();
+    const composerRenders = composer.render.mock.calls.length;
+    controller?.setTargetProgress(0.4);
+    controller?.tick(32);
+    // Composer gone: the plain renderer carries the frame.
+    expect(composer.render.mock.calls.length).toBe(composerRenders);
+    expect(renderer.renders).toBeGreaterThan(0);
+
+    listeners.get("webglcontextrestored")?.({});
+    expect(createComposer).toHaveBeenCalledTimes(2);
+  });
+
+  it("forwards resizes to the composer so bloom buffers match the canvas", () => {
+    const { controller, composer } = makeComposerFixture({
+      ...TIER,
+      postprocessing: true,
+    });
+    controller?.handleResize(1024, 512);
+    expect(composer.setSize).toHaveBeenLastCalledWith(1024, 512);
   });
 
   it("applies the tier's DPR cap and shadow setting to the renderer", () => {

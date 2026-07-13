@@ -12,15 +12,18 @@ renders on demand.
 - `createSceneController(options) → SceneController | null`
   - `options`: `container` (canvas parent + measurements), `tier`
     (`QualityTier`), `initialTheme`, `createRenderer?` (test seam,
-    defaults to a real `WebGLRenderer`), `requestFrame?` (rAF seam).
+    defaults to a real `WebGLRenderer`), `createComposer?` (test seam
+    for the v3 F1 post-processing path; default = pmndrs EffectComposer
+    with mipmap-blurred selective bloom + vignette; only consulted when
+    `tier.postprocessing`), `requestFrame?` (rAF seam).
   - **Returns `null` when renderer creation throws** — the caller falls
     back to the static DOM floor (`body.no-webgl`).
 - `SceneController`: `stage`, `setTargetProgress(0..1)`,
   `showChapterEndState(chapterIndex)` (reduced-motion),
   `applyTheme(theme)`, `playIntro()` / `skipIntro()`,
   `handleResize(w, h)`, `tick(nowMs)`, `start()`.
-- `RendererLike`, `SceneControllerOptions` types (the container shape is
-  structural/module-private).
+- `RendererLike`, `ComposerLike`, `SceneControllerOptions` types (the
+  container shape is structural/module-private).
 
 ## Invariants & assumptions
 
@@ -47,6 +50,13 @@ renders on demand.
   place — no scene rebuild.
 - Tier application: `setPixelRatio(tier.dprCap)`, `shadowMap.enabled`,
   world geometry detail (`buildClayWorld(tier.geometryDetail)`).
+- **Post-processing (v3 F1):** when `tier.postprocessing`, frames render
+  through a `ComposerLike` INSTEAD of `renderer.render` (never both).
+  The composer owns GPU render targets, so it is **disposed on
+  `webglcontextlost` and rebuilt on `webglcontextrestored`** (three.js
+  only re-uploads its own resources); while lost/absent the plain render
+  path carries the frame. Resizes are forwarded via `composer.setSize`.
+  All test-pinned against a fake composer factory.
 - Sizes are clamped to ≥ 1px; non-finite progress inputs are ignored.
 
 ## Examples
@@ -69,4 +79,5 @@ window.addEventListener("scroll", () =>
 `scene-controller.test.ts` — null on renderer failure, render-on-demand
 (no idle re-render), smoothing convergence, reduced-motion end-state seek,
 theme swap re-render, intro play/skip landing on the hero framing, DPR/
-shadow tier application, resize.
+shadow tier application, resize, composer tier gating (on/off), composer
+disposal on context loss + rebuild on restore, composer resize.

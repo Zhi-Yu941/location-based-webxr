@@ -165,6 +165,15 @@ test("FAQ accordions exist and open natively", async ({ page }) => {
   await expect(first.locator("p")).toBeVisible();
 });
 
+test("hero code snippet starts expanded on desktop", async ({ page }) => {
+  // Round-9 R9-5: the snippet is a <details> expander — desktop-class
+  // viewports get it open at boot (the developer hook stays one glance
+  // away), phones keep it collapsed (see the mobile suite).
+  await page.goto("/");
+  await expect(page.locator("#hero-snippet")).toHaveAttribute("open", "");
+  await expect(page.locator("#hero-snippet pre")).toBeVisible();
+});
+
 test("chapter dot rail navigates the story", async ({ page }) => {
   // v3 F6: seven dots (one per chapter, labels from chapters.ts as
   // aria-labels), click scrolls to the chapter and the active dot moves.
@@ -214,6 +223,13 @@ for (const [orientation, viewport] of [
       // Phones never get the desktop QR handoff (v2 B2): the emulated
       // mobile context reports a coarse pointer, so it must stay hidden.
       await expect(page.locator("#qr-handoff")).toBeHidden();
+      // The hero snippet stays COLLAPSED on phones (round-9 R9-5): the
+      // summary is tappable but the code must not push the fold.
+      await expect(page.locator("#hero-snippet")).not.toHaveAttribute(
+        "open",
+        "",
+      );
+      await expect(page.locator("#hero-snippet summary")).toBeVisible();
       expect(await page.evaluate(() => window.scrollY)).toBe(0);
       expect(errors).toEqual([]);
     });

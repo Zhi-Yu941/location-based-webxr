@@ -34,6 +34,9 @@ None (side-effect entry module loaded by `index.html`).
   QR encodes `location.href`).
 - `visibilitychange` is wired to `scene.setPageVisible` (v3 F2): the
   continuous particle render stops entirely while the tab is hidden.
+- The hero snippet default (round-9 R9-5, `hero-snippet.ts`) is applied
+  first thing in boot: expanded on desktop-class viewports, collapsed
+  otherwise (the static HTML ships it closed).
 - The chapter dot rail (v3 F6, `chapter-dots.ts`) is filled at boot;
   the scroll state machine drives `updateActiveDot`, clicks scroll the
   scroller to the chapter's measured top (smooth in scroll mode,

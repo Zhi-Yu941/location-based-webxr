@@ -27,8 +27,10 @@ the copy.
   lat/lon literals `.hl-raw` amber — the page's color-coding invariant).
   Verified against `GpsPlusSlamJs_MinimalExample/src/main.ts` and the
   framework's `GpsAnchorOptions` (see the HTML comment above the block
-  for exact line refs). Hidden below 720 px width / 500 px height so it
-  never pushes the hero fold on phones.
+  for exact line refs). Since round-9 R9-5 it is a `<details
+  id="hero-snippet">` expander: ships COLLAPSED (phones keep their
+  fold, no-JS floor safe), `src/hero-snippet.ts` opens it at boot on
+  desktop-class viewports (>720×500).
 - `<main id="story">` — seven `<section class="chapter" id="chapter-<id>">`
   in the order defined by `src/chapters.ts` (hero, qr, fusion, dive,
   anywhere, gallery, cta). The hero carries its content in a panel-less

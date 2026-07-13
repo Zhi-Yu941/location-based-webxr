@@ -495,7 +495,7 @@
         overflow-x: auto;
       }
       .hero-snippet pre {
-        margin: 0;
+        margin: 10px 0 0;
         font-family: ui-monospace, SFMono-Regular, Consolas, Menlo, monospace;
         font-size: 0.8rem;
         line-height: 1.6;
@@ -503,14 +503,6 @@
       }
       .hero-snippet .c {
         color: var(--muted);
-      }
-
-      /* Small screens: the snippet would push the hero fold — the story
-         (and the FAQ's how-to-start) carries the message there instead. */
-      @media (width <= 720px), (height <= 500px) {
-        .hero-snippet {
-          display: none;
-        }
       }
 
       /* Short desktop viewports: with the snippet in place, the default
@@ -695,8 +687,22 @@
         font-weight: 600;
         font-size: 0.98rem;
       }
+      /* Round-9 R9-5: the hero snippet is a <details> expander —
+         collapsed by default (phones keep their fold), opened at boot on
+         desktop. Plain summary rules sit BEFORE the :hover ones for the
+         no-descending-specificity lint order. */
+      .hero-snippet summary {
+        cursor: pointer;
+        font-family: ui-monospace, SFMono-Regular, Consolas, Menlo, monospace;
+        font-size: 0.8rem;
+        color: var(--muted);
+        font-weight: 600;
+      }
       .faq summary:hover {
         color: var(--accent);
+      }
+      .hero-snippet summary:hover {
+        color: var(--text);
       }
       .faq p {
         margin: 10px 0 2px;
@@ -864,10 +870,15 @@
                GpsPlusSlamJs_AppFramework/src/visualization/gps-anchor.ts
                (GpsAnchorOptions L36-77). Update this block if that API
                changes. -->
-          <div
+          <!-- Round-9 R9-5: a <details> expander — ships COLLAPSED (safe
+               phone fold, no-JS floor); src/hero-snippet.ts opens it at
+               boot on desktop-class viewports. -->
+          <details
             class="hero-snippet"
+            id="hero-snippet"
             aria-label="Code example: a GPS anchor in a few lines"
           >
+            <summary>// the code — a GPS anchor in ~5 lines</summary>
             <pre><span class="c">// the whole flow — gps-plus-slam-app-framework</span>
 <span class="hl-kw">const</span> store = createSlamAppStore({ storageBackend: <span class="hl-kw">new</span> NullStorageBackend() });
 <span class="hl-kw">await</span> initAR(container);         <span class="c">// one tap → 6DoF AR in the browser</span>
@@ -877,7 +888,7 @@ world.add(marker);               <span class="c">// marker: any three.js Object3
   gpsPoint: { lat: <span class="hl-raw">48.137</span>, lon: <span class="hl-raw">11.575</span> },  <span class="c">// ← your real-world spot</span>
   getAlignmentMatrix: () => selectAlignmentMatrix(store.getState()),
   getGpsZeroRef: () => selectZeroReference(store.getState()) });</pre>
-          </div>
+          </details>
           <p class="hero-links">
             <span class="scroll-hint">Scroll to walk in ↓</span>
             <a id="jump-demos" href="#chapter-cta">Jump to the demos →</a>

@@ -14,6 +14,10 @@ import {
 } from "./ar-support";
 import { applyQrHandoff, shouldShowQrHandoff } from "./qr-handoff";
 import {
+  applyHeroSnippetDefault,
+  shouldExpandHeroSnippet,
+} from "./hero-snippet";
+import {
   CHAPTER_DOTS_CONTAINER_ID,
   chapterDotsHtml,
   dotIndexFromClick,
@@ -137,6 +141,16 @@ function boot(): void {
         window.location.href,
       );
     },
+  );
+
+  // Hero snippet default (round-9 R9-5): collapsed in the static HTML,
+  // expanded on desktop-class viewports.
+  applyHeroSnippetDefault(
+    document,
+    shouldExpandHeroSnippet({
+      width: window.innerWidth,
+      height: window.innerHeight,
+    }),
   );
 
   const scroller = document.getElementById("story");

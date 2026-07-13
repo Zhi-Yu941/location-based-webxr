@@ -33,6 +33,7 @@ export const PALETTE_ROLES = [
   "screen",
   "arrow",
   "label",
+  "skyline",
 ] as const;
 
 export type PaletteRole = (typeof PALETTE_ROLES)[number];
@@ -90,6 +91,7 @@ const LIGHT: ScenePalette = {
     screen: { color: 0xffffff },
     arrow: { color: 0x3b82f6 },
     label: { color: 0x2563eb },
+    skyline: { color: 0xbdbab2 },
   },
 };
 
@@ -121,6 +123,7 @@ const DARK: ScenePalette = {
     screen: { color: 0x2c3550, emissiveIntensity: 0.5 },
     arrow: { color: 0x60a5fa, emissiveIntensity: 0.7 },
     label: { color: 0x93b4ff, emissiveIntensity: 0.7 },
+    skyline: { color: 0x2e2e3a, emissiveIntensity: 0.1 },
   },
 };
 

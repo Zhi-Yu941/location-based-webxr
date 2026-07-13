@@ -35,6 +35,7 @@ export const WORLD_NODE = {
   statue: "world-statue",
   snapRing: "world-snap-ring",
   outer: "world-outer",
+  skyline: "world-skyline",
   arContent: "world-ar-content",
 } as const;
 
@@ -88,6 +89,20 @@ export const WORLD_ANCHORS = {
 
 /** Path parameter of the QR drop point — the walk starts here. */
 export const DROP_PATH_T = dropT;
+
+// The skyline sits on the horizon in the direction the dive camera faces
+// (round-2 R11), far enough out to sit hazily in the fog.
+const skyDirection = anchorCurve.getTangentAt(0.56).setY(0).normalize();
+const skylineCenter = anchorCurve
+  .getPointAt(0.5)
+  .clone()
+  .add(skyDirection.clone().multiplyScalar(48))
+  .setY(0);
+
+/** World position of the skyline's TV tower (the second POI pin's spot). */
+const SKYLINE_TOWER_POS = skylineCenter
+  .clone()
+  .add(new Vector3(-skyDirection.z, 0, skyDirection.x).multiplyScalar(4));
 
 /** Deterministic LCG (numerical recipes constants) — NOT crypto, just art. */
 function createRng(seed: number): () => number {
@@ -350,6 +365,44 @@ function buildOuter(counts: DetailCounts, rng: () => number): Group {
 }
 
 /**
+ * Quiet horizon scenery (round-2 R11): a handful of dark blocky
+ * buildings + one TV tower, placed in the dive camera's view direction.
+ * Always visible (it is scenery); only the tower's red pin reveals with
+ * the AR content group.
+ */
+function buildSkyline(): Group {
+  const skyline = namedGroup(WORLD_NODE.skyline);
+  const across = new Vector3(-skyDirection.z, 0, skyDirection.x);
+  const rng = createRng(42);
+  const blocks = [-9, -5.5, -2, 1.5, 5, 8.5];
+  for (const offset of blocks) {
+    const width = 2 + rng() * 2;
+    const height = 3 + rng() * 6;
+    const block = clayMesh(new BoxGeometry(width, height, 2.5), "skyline");
+    block.position
+      .copy(skylineCenter)
+      .add(across.clone().multiplyScalar(offset))
+      .setY(height / 2);
+    block.castShadow = false;
+    skyline.add(block);
+  }
+  const tower = namedGroup("skyline-tower");
+  const shaft = clayMesh(new CylinderGeometry(0.4, 0.7, 12, 8), "skyline");
+  shaft.position.y = 6;
+  shaft.castShadow = false;
+  const bulb = clayMesh(new SphereGeometry(0.9, 8, 6), "skyline");
+  bulb.position.y = 12.4;
+  bulb.castShadow = false;
+  const spike = clayMesh(new CylinderGeometry(0.06, 0.12, 2.4, 6), "skyline");
+  spike.position.y = 14;
+  spike.castShadow = false;
+  tower.add(shaft, bulb, spike);
+  tower.position.copy(SKYLINE_TOWER_POS);
+  skyline.add(tower);
+  return skyline;
+}
+
+/**
  * The AR content seen "through the phone" from the dive on (round-1
  * feedback shaped this): trail arrows hovering over the path pointing
  * FORWARD along the walk direction, a red POI pin over the statue, and a
@@ -380,6 +433,13 @@ function buildArContent(): Group {
   const poi = buildPin("ar-poi-pin", "poi");
   poi.position.set(WORLD_ANCHORS.statue.x, 3.0, WORLD_ANCHORS.statue.z);
   arContent.add(poi);
+
+  // Second POI over the skyline's TV tower (R11): "there can be many
+  // pins". Scaled up so it reads at horizon distance.
+  const towerPin = buildPin("ar-skyline-pin", "poi");
+  towerPin.position.copy(SKYLINE_TOWER_POS).setY(16);
+  towerPin.scale.setScalar(2.2);
+  arContent.add(towerPin);
 
   const label = namedGroup("ar-poi-label");
   const board = clayMesh(new BoxGeometry(1.7, 0.62, 0.04), "signPanel");
@@ -421,6 +481,7 @@ export function buildClayWorld(detail: "high" | "low"): Group {
     buildStatue(),
     buildSnapRing(),
     buildOuter(counts, rng),
+    buildSkyline(),
     buildArContent(),
   );
   return world;

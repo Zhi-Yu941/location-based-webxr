@@ -8,6 +8,7 @@ import {
   WORLD_ANCHORS,
   WORLD_NODE,
 } from "./clay-world";
+import { DOT_PERSON_ARM } from "./dot-person";
 import type { MarkerPair } from "./markers";
 
 /**
@@ -438,6 +439,26 @@ export function buildStoryTimeline(
   );
   // ...and drops away again on the pull-back.
   timeline.add(phone, { scale: { from: 1, to: 0.001 }, duration: 150 }, 4000);
+
+  // Dive body language (round-2 R10): the person raises the phone arm as
+  // the camera approaches, disappears once we are "inside" the phone view
+  // (you cannot see yourself through your own screen), and returns with
+  // the arm lowered on the pull-back.
+  const phoneArm = person.getObjectByName(DOT_PERSON_ARM.right);
+  if (phoneArm) {
+    timeline.add(
+      phoneArm,
+      { rotateX: { from: 0, to: -100 }, duration: 300, ease: "outCubic" },
+      3050,
+    );
+    timeline.add(
+      phoneArm,
+      { rotateX: { from: -100, to: 0 }, duration: 250 },
+      4050,
+    );
+  }
+  timeline.add(person, { scale: { from: 1, to: 0.001 }, duration: 120 }, 3840);
+  timeline.add(person, { scale: { from: 0.001, to: 1 }, duration: 130 }, 4050);
 
   // Anywhere chapter: the unmapped-park ring rises into place.
   const outer = world.getObjectByName(WORLD_NODE.outer);

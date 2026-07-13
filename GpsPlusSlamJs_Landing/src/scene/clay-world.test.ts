@@ -118,6 +118,27 @@ describe("buildClayWorld", () => {
     expect(arContent?.getObjectByName("ar-poi-pin")).toBeDefined();
     expect(arContent?.getObjectByName("ar-poi-label")).toBeDefined();
   });
+
+  it("raises a city skyline with a pinned TV tower on the horizon", () => {
+    // Round-2 R11: quiet dark-blocky scenery on the horizon + one TV
+    // tower carrying a second red pin — "there can be many pins". The
+    // skyline is always-visible scenery; ONLY the tower's pin reveals
+    // with the AR content group.
+    const world = buildClayWorld("high");
+    const skyline = world.getObjectByName(WORLD_NODE.skyline);
+    expect(skyline).toBeDefined();
+    expect(skyline?.visible).toBe(true);
+    let buildings = 0;
+    skyline?.traverse((obj) => {
+      if ((obj as Mesh).isMesh && obj.userData.paletteRole === "skyline") {
+        buildings++;
+      }
+    });
+    expect(buildings).toBeGreaterThanOrEqual(5);
+    expect(skyline?.getObjectByName("skyline-tower")).toBeDefined();
+    const arContent = world.getObjectByName(WORLD_NODE.arContent);
+    expect(arContent?.getObjectByName("ar-skyline-pin")).toBeDefined();
+  });
 });
 
 describe("createPathCurve / WORLD_ANCHORS", () => {

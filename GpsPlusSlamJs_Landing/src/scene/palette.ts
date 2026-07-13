@@ -96,23 +96,27 @@ const LIGHT: ScenePalette = {
 };
 
 // Brightened after round-1 feedback ("dark theme too dark, needs a tick
-// more contrast"): lifted surface tones + stronger lights against the
-// near-black background, glow accents unchanged.
+// more contrast") and AGAIN after round-4 V3 ("path/statue/skyline barely
+// recognizable"): object grays lifted one visible step — floors are
+// test-pinned as WCAG contrast over the background — while background,
+// fog and the glow accents keep the night mood.
 const DARK: ScenePalette = {
   background: 0x0b0b0d,
   fog: { color: 0x0b0b0d, near: 40, far: 90 },
   hemisphere: { sky: 0x565f80, ground: 0x23232c, intensity: 1.15 },
   directional: { color: 0xbfd0ff, intensity: 1.1 },
   roles: {
-    ground: { color: 0x23232b },
-    path: { color: 0x3a3a46 },
-    hill: { color: 0x2a2a33 },
+    ground: { color: 0x2a2a34 },
+    path: { color: 0x50505e },
+    hill: { color: 0x32323c },
     foliage: { color: 0x2e5240 },
     trunk: { color: 0x4d4136 },
-    rock: { color: 0x3c3c45 },
+    rock: { color: 0x484852 },
     sign: { color: 0x4d4136 },
     signPanel: { color: 0xd9d9e0, emissiveIntensity: 0.25 },
-    statue: { color: 0x50505c },
+    // Emissive floor: the statue often sits in the directional light's
+    // shadow, so a brighter base color alone stays invisible (round-4 V3).
+    statue: { color: 0x6a6a78, emissiveIntensity: 0.15 },
     person: { color: 0x2dd4bf, emissiveIntensity: 0.5 },
     markerRaw: { color: 0xfacc15, emissiveIntensity: 0.6 },
     markerFused: { color: ACCENT, emissiveIntensity: 0.9 },
@@ -123,7 +127,9 @@ const DARK: ScenePalette = {
     screen: { color: 0x2c3550, emissiveIntensity: 0.5 },
     arrow: { color: 0x60a5fa, emissiveIntensity: 0.7 },
     label: { color: 0x93b4ff, emissiveIntensity: 0.7 },
-    skyline: { color: 0x2e2e3a, emissiveIntensity: 0.1 },
+    // Emissive floor keeps the horizon city visible through the fog at
+    // ~48 units (round-4 V3).
+    skyline: { color: 0x4b4b60, emissiveIntensity: 0.18 },
   },
 };
 

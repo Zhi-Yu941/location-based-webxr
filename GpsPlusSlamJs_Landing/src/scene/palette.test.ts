@@ -37,6 +37,29 @@ describe("getPalette", () => {
     }
   });
 
+  it("keeps the dark theme's world objects readable against the background (round-4 V3)", () => {
+    // Round-4 feedback: skyline city, statue and path were "dark gray on
+    // near-black" — barely recognizable. Pin a WCAG-contrast floor per
+    // flagged role over the dark background so a future palette tweak can
+    // never silently sink the world into the night again. Floors sit one
+    // visible step above the flagged (too dark) values.
+    const wcagChannel = (byte: number): number => {
+      const c = byte / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    };
+    const luminance = (hex: number): number =>
+      0.2126 * wcagChannel((hex >> 16) & 0xff) +
+      0.7152 * wcagChannel((hex >> 8) & 0xff) +
+      0.0722 * wcagChannel(hex & 0xff);
+    const dark = getPalette("dark");
+    const background = luminance(dark.background);
+    const contrast = (role: PaletteRole): number =>
+      (luminance(dark.roles[role].color) + 0.05) / (background + 0.05);
+    expect(contrast("skyline"), "skyline").toBeGreaterThanOrEqual(2.0);
+    expect(contrast("path"), "path").toBeGreaterThanOrEqual(2.2);
+    expect(contrast("statue"), "statue").toBeGreaterThanOrEqual(3.0);
+  });
+
   it("gives the dark theme glowing accents (emissive) and the light theme matte clay", () => {
     // The plan's visual decision: dark = glowing anchors/traces, light =
     // matte clay. Emissive intensity is the mechanism.

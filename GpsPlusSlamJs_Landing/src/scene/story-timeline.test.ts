@@ -50,6 +50,19 @@ describe("buildStoryTimeline", () => {
     expect(chapterEndTime(2)).toBe(3 * CHAPTER_DURATION_MS - 1);
   });
 
+  it("opens far out and keeps flying through the whole hero window (round-12 R12-1)", () => {
+    // The story must start with a sense of the WHOLE world and the
+    // camera must never stand still — it immediately approaches the QR.
+    const timeline = buildStoryTimeline(stage, () => {});
+    timeline.seek(1);
+    expect(stage.camera.position.length()).toBeGreaterThan(45);
+    timeline.seek(600);
+    const midWindow = stage.camera.position.clone();
+    timeline.seek(950);
+    // Still moving LATE in the hero window (no settled dead zone).
+    expect(stage.camera.position.distanceTo(midWindow)).toBeGreaterThan(0.5);
+  });
+
   it("flies the gallery journey past the campus and arrives at the castle for the CTA (round-11)", () => {
     // The maintainer's brainstorm: the gallery chapter is a use-case
     // JOURNEY (city sweep → campus flyover → castle), and the CTA is an

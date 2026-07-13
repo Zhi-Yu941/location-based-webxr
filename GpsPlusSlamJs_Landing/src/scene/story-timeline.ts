@@ -51,7 +51,10 @@ export interface StoryStage {
   readonly curve: ReturnType<typeof createPathCurve>;
 }
 
-const HERO_CAMERA = new Vector3(20, 19, 20);
+// Round-12 R12-1: the story OPENS far out — a sense of the whole world
+// (curiosity), nothing needs to be recognizable yet. The hero window then
+// flies continuously toward the QR approach (no settled dead zone).
+const HERO_CAMERA = new Vector3(32, 27, 32);
 /** Sky height the dot-person falls from at the QR chapter (R6). */
 const DROP_START_HEIGHT = 9;
 
@@ -305,12 +308,15 @@ export function buildStoryTimeline(
     walkT: DROP_PATH_T, // the walk begins at the QR drop point (R6)
   };
   const framings: readonly ChapterFraming[] = [
-    // hero push-in
+    // hero: a FULL-window continuous approach from far out toward the QR
+    // flight (round-12 R12-1 — a documented deviation from "settled by
+    // mid-window": the camera must never stand still here).
     {
       at: 0,
       camera: new Vector3(16.5, 15, 16.5),
       look: new Vector3(-3.5, 1.5, 0.5),
       walkT: DROP_PATH_T,
+      cameraDuration: CHAPTER_DURATION_MS,
     },
     // qr — no walk tween: the person DROPS onto the path here instead
     {
@@ -563,8 +569,8 @@ export function buildIntroTimeline(
     defaults: { ease: "outCubic", composition: "none" },
     onUpdate,
   });
-  const introFar = new Vector3(32, 30, 32);
-  timeline.add(stage.camera, { x: 32, y: 30, z: 32, duration: 0 }, 0);
+  const introFar = new Vector3(52, 42, 52);
+  timeline.add(stage.camera, { x: 52, y: 42, z: 52, duration: 0 }, 0);
   timeline.add(stage.world, { y: { from: -1.2, to: 0 }, duration: 900 }, 0);
   // (No dot-person pop here — round-2 R6: they enter the story by
   // dropping from the sky at the QR chapter.)

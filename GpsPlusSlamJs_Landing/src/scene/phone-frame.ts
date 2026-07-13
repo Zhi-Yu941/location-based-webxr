@@ -48,11 +48,14 @@ export function buildPhoneFrame(): Group {
   screen.castShadow = false;
   // The screen is a WINDOW into the world ("this is what your users see"),
   // not a solid display: keep it glass-translucent so the clay world shows
-  // through behind the AR overlays. Palette applies only touch color /
-  // emissive, so this stays stable across theme toggles.
+  // through behind the AR overlays. 0.22 is the round-7 "light glass"
+  // floor (test-pinned 0.2–0.35): once the frame fills the viewport the
+  // tint is what still says "you are looking through a phone". Palette
+  // applies only touch color / emissive, so this stays stable across
+  // theme toggles.
   const screenMaterial = screen.material as MeshStandardMaterial;
   screenMaterial.transparent = true;
-  screenMaterial.opacity = 0.16;
+  screenMaterial.opacity = 0.22;
 
   phone.add(body, screen);
   phone.visible = false;

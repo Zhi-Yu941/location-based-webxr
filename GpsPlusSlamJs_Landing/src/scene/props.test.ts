@@ -144,7 +144,15 @@ describe("buildPhoneFrame", () => {
     const phone = buildPhoneFrame();
     expect(phone.name).toBe(PHONE_NODE.root);
     expect(phone.visible).toBe(false);
-    expect(phone.getObjectByName(PHONE_NODE.screen)).toBeDefined();
+    const screen = phone.getObjectByName(PHONE_NODE.screen) as Mesh;
+    expect(screen).toBeDefined();
+    // Light glass effect (round-7 Y4): once the frame fills the viewport
+    // the tinted screen is what still says "you are looking through a
+    // phone" — clearly present, but the world must stay readable through
+    // the glass (a WINDOW, not a display).
+    const opacity = (screen.material as { opacity?: number }).opacity ?? 1;
+    expect(opacity).toBeGreaterThanOrEqual(0.2);
+    expect(opacity).toBeLessThanOrEqual(0.35);
     let arrowCount = 0;
     phone.traverse((obj) => {
       if (obj.userData.paletteRole === "arrow") {

@@ -165,6 +165,20 @@ describe("buildStoryTimeline", () => {
     expect(arContent?.scale.x ?? 0).toBeGreaterThan(0.9); // faded in with it
   });
 
+  it("grows the phone monotonically — no overshoot-and-shrink (round-7 Y4)", () => {
+    // Round-7 feedback: the frame briefly filled the screen, then visibly
+    // SHRANK again — the outBack scale-in overshoots ~10 % past the final
+    // size and settles back. The scale must never decrease while the
+    // phone is on its way in.
+    const timeline = buildStoryTimeline(stage, () => {});
+    let previous = 0;
+    for (let t = 3480; t <= chapterEndTime(3); t += 5) {
+      timeline.seek(t);
+      expect(stage.phone.scale.x).toBeGreaterThanOrEqual(previous - 1e-6);
+      previous = stage.phone.scale.x;
+    }
+  });
+
   it("hides the person inside the phone view and restores them on the pull-back", () => {
     // Once the camera is "inside" the phone view the person disappears
     // (you cannot see yourself through your own phone) and returns on the
@@ -239,25 +253,27 @@ describe("createStoryStage", () => {
     expect(stage.lookTarget).toBeInstanceOf(Vector3);
   });
 
-  it("anchors the phone so the FULL frame fits the camera frustum (round-5 W4)", () => {
-    // Round-5 feedback: at final size the phone flew in so big "that you
-    // don't see it at all anymore" — at the old 1.6-unit distance the
-    // camera's vertical frustum (fov 55° ⇒ ≈1.67 high) was SMALLER than
-    // the 1.9-high frame, so the top/bottom bars ended outside the
-    // viewport (and on phone portrait the side bars too). Pin: frame
-    // extents (body 0.95×1.9 ⇒ half 0.475/0.95, plus the anchor offset)
-    // fit the frustum at the anchor distance with a small margin, for
-    // desktop height AND mobile-portrait width.
+  it("anchors the phone so its SCREEN fills the mobile viewport at final size (round-7 Y4, supersedes round-5 W4)", () => {
+    // Round-7 feedback: AR objects (markers, label, arrows) must never be
+    // visible OUTSIDE the phone screen on phones — impossible in reality.
+    // So at the anchor distance the 0.82×1.72 screen plane must cover the
+    // FULL mobile-portrait width, and the frame's outer edge (bars up to
+    // ±0.95) must reach past the frustum's top/bottom so the remainder is
+    // frame, not world. (Round-5 W4's "frame fits entirely with margin"
+    // pin is deliberately gone — visible edge bars + the glass screen now
+    // carry the "this is a phone" message instead.)
     const stage = makeStage();
     const distance = Math.abs(stage.phone.position.z);
     const halfHeight =
       Math.tan(((stage.camera.fov / 2) * Math.PI) / 180) * distance;
     const halfWidthPortrait = halfHeight * (412 / 915);
-    expect(0.95 + Math.abs(stage.phone.position.y)).toBeLessThanOrEqual(
-      halfHeight * 0.95,
+    // Screen half-width 0.41 covers the portrait frustum width…
+    expect(0.41 - Math.abs(stage.phone.position.x)).toBeGreaterThanOrEqual(
+      halfWidthPortrait,
     );
-    expect(0.475 + Math.abs(stage.phone.position.x)).toBeLessThanOrEqual(
-      halfWidthPortrait * 0.95,
+    // …and the frame reaches past the viewport's top/bottom edge.
+    expect(0.95 - Math.abs(stage.phone.position.y)).toBeGreaterThanOrEqual(
+      halfHeight,
     );
   });
 });

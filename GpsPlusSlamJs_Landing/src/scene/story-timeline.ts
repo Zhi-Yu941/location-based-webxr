@@ -85,12 +85,15 @@ export function createStoryStage(parts: StageParts): StoryStage {
   parts.markers.connectors.scale.setScalar(0.001);
 
   // The phone is held "in front of the lens": parent it to the camera so
-  // the dive works regardless of where the camera flies. Distance 2.3 is
-  // load-bearing (round-5 W4): the FULL 0.95×1.9 frame must fit the
-  // camera frustum — at the old 1.6 the top/bottom bars ended outside
-  // the viewport, so the "frame" was invisible at final size.
+  // the dive works regardless of where the camera flies. Distance 1.7 is
+  // load-bearing (round-7 Y4, supersedes round-5 W4's fit-entirely): the
+  // SCREEN plane must cover the full mobile-portrait viewport width and
+  // the frame bars the vertical remainder, so no AR content is ever
+  // visible OUTSIDE the phone screen on phones — while the bars still
+  // reach the desktop top/bottom edges (visible frame + glass screen keep
+  // the "this is a phone" message).
   parts.camera.add(parts.phone);
-  parts.phone.position.set(0, -0.05, -2.3);
+  parts.phone.position.set(0, 0, -1.7);
   parts.phone.visible = true;
   parts.phone.scale.setScalar(0.001);
 
@@ -445,9 +448,12 @@ export function buildStoryTimeline(
   // dead, empty frame — the round-4 100 ms offset was already too much
   // because the scale-in keeps the phone tiny at first)...
   timeline.add(person, { scale: { from: 1, to: 0.001 }, duration: 120 }, 3480);
+  // outCubic, NOT outBack (round-7 Y4): the back-overshoot made the frame
+  // fill the screen and then visibly SHRINK again — the grow must be
+  // monotone (test-pinned).
   timeline.add(
     phone,
-    { scale: { from: 0.001, to: 1 }, duration: 300, ease: "outBack" },
+    { scale: { from: 0.001, to: 1 }, duration: 300, ease: "outCubic" },
     3480,
   );
   // ...and the AR content materializes in the world as the phone reaches

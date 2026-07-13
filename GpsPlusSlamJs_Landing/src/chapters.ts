@@ -17,13 +17,13 @@ export interface Chapter {
 }
 
 export const CHAPTERS = [
-  { id: "hero", label: "One URL, no app" },
+  { id: "hero", label: "GPS alone → fused for AR" },
   { id: "qr", label: "QR code = door + instant anchor" },
   { id: "fusion", label: "Wobbly GPS vs. fused anchor" },
   { id: "dive", label: "Ego view through the phone" },
   { id: "anywhere", label: "Works anywhere, offline" },
   { id: "gallery", label: "Use-case gallery" },
-  { id: "cta", label: "Free start + demos" },
+  { id: "cta", label: "Code on GitHub + live demos" },
 ] as const satisfies readonly Chapter[];
 
 export type ChapterId = (typeof CHAPTERS)[number]["id"];

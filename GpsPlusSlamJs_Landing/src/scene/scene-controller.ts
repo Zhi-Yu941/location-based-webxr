@@ -38,6 +38,10 @@ import {
 import { DOT_PERSON_NAME } from "./dot-person";
 import { parkourOffset, triggerParkourHop } from "./parkour";
 import { BIRD_NAME } from "./bird";
+import {
+  gyroFrameOffset,
+  type DeviceOrientationReading,
+} from "./gyro-parallax";
 import { buildClayWorld } from "./clay-world";
 import { buildDotPerson } from "./dot-person";
 import { buildMarkerPair } from "./markers";
@@ -145,6 +149,9 @@ export interface SceneController {
    * hit egg. Returns what happened, or null on a miss.
    */
   clickAt(pointer: PointerNdc): EggClickResult | null;
+  /** Gyro parallax egg (№8): feed the latest device-orientation reading
+   * (main.ts only attaches the listener on permissionless platforms). */
+  setGyroOrientation(orientation: DeviceOrientationReading): void;
   /** Scroll mode: set the story progress target (0..1); eased in tick(). */
   setTargetProgress(progress: number): void;
   /** Reduced-motion mode: jump to a chapter's end composition. */
@@ -379,6 +386,9 @@ export function createSceneController(
     (t): t is NonNullable<typeof t> => t !== null,
   );
   let parkourActive = false;
+  // Latest device-orientation reading for the gyro-parallax egg (№8);
+  // null until a permissionless reading arrives.
+  let gyroReading: DeviceOrientationReading | null = null;
   let introStartedAt: number | null = null;
   // The camera pose the timelines produced, BEFORE the ambient hero drift
   // is layered on top (the drift is an additive offset, never baked in).
@@ -495,6 +505,9 @@ export function createSceneController(
       }
       return null;
     },
+    setGyroOrientation(orientation: DeviceOrientationReading) {
+      gyroReading = orientation;
+    },
     setTargetProgress(progress: number) {
       if (Number.isFinite(progress)) {
         targetProgress = Math.min(1, Math.max(0, progress));
@@ -571,6 +584,16 @@ export function createSceneController(
         dirty = true;
       }
       if (castle && updateGhostRestore(castle, nowMs)) {
+        dirty = true;
+      }
+      // Gyro parallax (№8): a light additive rotation on the phone frame
+      // while it's flown in (dive). SET (not add) each frame — the
+      // timeline never rotates the phone, so this is idempotent and
+      // returns to neutral when no reading arrives.
+      if (gyroReading && stage.phone.scale.x > 0.05) {
+        const off = gyroFrameOffset(gyroReading);
+        stage.phone.rotation.x = off.x;
+        stage.phone.rotation.y = off.y;
         dirty = true;
       }
       // Hero idle beat (№6): only "idle at hero" while the intro is done,

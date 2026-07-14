@@ -32,6 +32,7 @@ import { showEggToast } from "./egg-toast";
 import { isGenuineClick } from "./scene/egg-picker";
 import { printConsoleEgg } from "./console-egg";
 import { BIRD_LINK } from "./scene/bird";
+import { isPermissionlessDeviceOrientation } from "./scene/gyro-parallax";
 import { decideQualityTier } from "./capability";
 import {
   createSceneController,
@@ -354,6 +355,13 @@ function boot(): void {
   let introRunning = false;
   if (scene && tier.mode === "scroll") {
     wireEggClicks(scroller, scene);
+    // Gyro parallax egg (№8, E9): permissionless platforms only (iOS's
+    // requestPermission prompt would break the fully-hidden rule).
+    if (isPermissionlessDeviceOrientation(window)) {
+      window.addEventListener("deviceorientation", (event) => {
+        scene.setGyroOrientation({ beta: event.beta, gamma: event.gamma });
+      });
+    }
     if (scroller.scrollTop < 40) {
       scene.playIntro();
       introRunning = true;

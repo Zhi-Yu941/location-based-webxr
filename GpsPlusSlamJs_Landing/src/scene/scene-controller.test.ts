@@ -213,6 +213,23 @@ describe("createSceneController", () => {
     expect(controller!.clickAt({ x: 0, y: 0 })).toEqual({ egg: "bird" });
   });
 
+  it("applies a small gyro rotation to the phone only while it's flown in (egg §2/№8)", () => {
+    const { controller } = makeController();
+    const phone = controller!.stage.phone;
+    // Phone hidden away from the dive → gyro is ignored.
+    phone.scale.setScalar(0.001);
+    controller!.setGyroOrientation({ beta: 120, gamma: 40 });
+    controller!.tick(0);
+    expect(phone.rotation.y).toBe(0);
+
+    // Phone flown in (dive) → the reading nudges it, but only slightly.
+    phone.scale.setScalar(1);
+    controller!.tick(16);
+    expect(phone.rotation.y).not.toBe(0);
+    expect(Math.abs(phone.rotation.y)).toBeLessThanOrEqual(0.12);
+    expect(Math.abs(phone.rotation.x)).toBeLessThanOrEqual(0.12);
+  });
+
   it("renders on demand only once away from the hero (battery)", () => {
     // The hero has an ambient drift (below), so render-on-demand is
     // asserted at a mid-story progress where the scene is truly idle.

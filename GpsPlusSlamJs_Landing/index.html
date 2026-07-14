@@ -328,6 +328,9 @@
       }
       .copy {
         max-width: 460px;
+        /* Round-14 R14-4 default: full highlight color unless the scroll
+           driver lowers it (no-JS / reduced-motion stay full-color). */
+        --hl-strength: 1;
         /* Gradient border (v3 F5): translucent panel fill over a border-
            box gradient — the border stays visible through the glass. */
         background:
@@ -508,6 +511,37 @@
       }
       .hl-fused {
         color: var(--accent);
+      }
+
+      /* Round-14 R14-4: in the scrolling COPY blocks (not the hero, not
+         the snippet) the color-coded words fade from plain text color to
+         their target as the block rises toward the top — scroll-color.ts
+         writes --hl-strength (0 low on screen → 1 in the top band) per
+         .copy (default 1 = full color, so no-JS / reduced-motion keep the
+         current look). Placed here so specificity stays ascending. */
+      .copy .hl-raw {
+        /* stylelint-disable-next-line csstree/validator -- color-mix is valid CSS; the bundled css-tree grammar predates it (false positive). */
+        color: color-mix(
+          in srgb,
+          var(--hl-raw) calc(var(--hl-strength) * 100%),
+          var(--text)
+        );
+      }
+      .copy .hl-code {
+        /* stylelint-disable-next-line csstree/validator -- color-mix is valid CSS; the bundled css-tree grammar predates it (false positive). */
+        color: color-mix(
+          in srgb,
+          var(--hl-code) calc(var(--hl-strength) * 100%),
+          var(--text)
+        );
+      }
+      .copy .hl-fused {
+        /* stylelint-disable-next-line csstree/validator -- color-mix is valid CSS; the bundled css-tree grammar predates it (false positive). */
+        color: color-mix(
+          in srgb,
+          var(--accent) calc(var(--hl-strength) * 100%),
+          var(--text)
+        );
       }
 
       /* Faint hero text glows (v3 F5): defined only where the dark

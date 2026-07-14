@@ -26,6 +26,7 @@ import {
 import { CHAPTERS, sectionElementId } from "./chapters";
 import { heroVeilOpacity } from "./hero-veil";
 import { computeScrollState, type SectionMetrics } from "./scroll-story";
+import { scrollColorStrength } from "./scroll-color";
 import { createThemeController, SECRET_THEME_ID, type Theme } from "./theme";
 import { createSecretUnlock } from "./secret-palette";
 import { showEggToast } from "./egg-toast";
@@ -315,6 +316,25 @@ function boot(): void {
     () => metrics[CHAPTERS.length - 1]?.top,
     tier.mode === "scroll",
   );
+  // Scroll-linked copy color (round-14 R14-4): each chapter's copy panel
+  // fades its color-coded words in as it rises toward the top. Off under
+  // reduced motion (no new scroll-driven change) — the default
+  // --hl-strength:1 keeps the words full-color there.
+  const copyPanels: HTMLElement[] =
+    tier.mode === "scroll"
+      ? Array.from(document.querySelectorAll<HTMLElement>(".copy"))
+      : [];
+  const updateCopyColor = (): void => {
+    const vh = scroller.clientHeight;
+    for (const panel of copyPanels) {
+      const top = panel.getBoundingClientRect().top;
+      panel.style.setProperty(
+        "--hl-strength",
+        scrollColorStrength(top, vh).toFixed(3),
+      );
+    }
+  };
+
   let lastChapterIndex = -1;
   const onScrollChanged = (): void => {
     const state = computeScrollState(
@@ -323,6 +343,7 @@ function boot(): void {
       metrics,
     );
     updateHeroExtras();
+    updateCopyColor();
     if (state.chapterIndex !== lastChapterIndex) {
       lastChapterIndex = state.chapterIndex;
       markActiveChapter(sections, state.chapterIndex);

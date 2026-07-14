@@ -213,6 +213,10 @@ interface ChapterFraming {
   readonly walkDuration?: number;
   /** Camera tween length; defaults to the 55%-of-window default. */
   readonly cameraDuration?: number;
+  /** Look tween length; defaults to 500 ms. Shorten when the NEXT framing
+   * starts less than 500 ms later (overlapping look tweens under
+   * composition:none cut the look target, same as the walk lesson). */
+  readonly lookDuration?: number;
 }
 
 export function buildStoryTimeline(
@@ -346,49 +350,53 @@ export function buildStoryTimeline(
       cameraEase: "inOutQuad",
       walkDuration: 500,
     },
-    // anywhere — the walk tween must END before the round-12 journey's
-    // first waypoint starts its own walk segment at 4650 (overlapping
-    // walk tweens under composition:none cut the person's position).
+    // anywhere — ALL its tweens must END before the round-13 journey's
+    // city leg starts at 4400 (overlapping camera/look/walk tweens under
+    // composition:none cut their target's position).
     {
       at: 4000,
       camera: new Vector3(0, 44, 27),
       look: new Vector3(0, 0, 0),
       walkT: 0.6,
-      walkDuration: 650,
+      cameraDuration: 400,
+      lookDuration: 400,
+      walkDuration: 400,
     },
-    // gallery + cta = the use-case JOURNEY (round-11, retimed EARLIER in
-    // round-12 R12-2): the turn toward the city already starts in the
-    // late works-anywhere window, the sweep flies ALONG the skyline row
-    // (past the tower + red pin), is over the tent camp before the
-    // gallery card leaves, and the castle arrival COMPLETES before the
-    // CTA copy covers it. DELIBERATE deviation from the "settled by
-    // mid-window" default — the traveling shot is the requested effect.
-    // Gentle sine-eased legs keep the ride slow.
+    // gallery + cta = the use-case JOURNEY (round-11; retimed earlier in
+    // round-12 and AGAIN in round-13 R13-1 — "immer noch viel zu
+    // langsam"): the camera is AT the city before the gallery card
+    // ("What will you build") arrives, flies ALONG the skyline row (past
+    // the tower + red pin) to be over the tent camp mid-gallery, turns
+    // toward the castle immediately after the tents, and the arrival is
+    // COMPLETE before the CTA window starts. DELIBERATE deviation from
+    // the "settled by mid-window" default — the traveling shot is the
+    // requested effect. Gentle sine-eased legs keep the ride slow.
     {
-      at: 4650,
+      at: 4400,
       camera: citySweepCamera,
       look: SKYLINE_CENTER.clone().setY(5),
       walkT: 0.72,
-      cameraDuration: 550,
-      walkDuration: 550,
+      cameraDuration: 500,
+      walkDuration: 500,
     },
     {
-      at: 5250,
+      at: 4950,
       camera: campusCamera,
       look: VIGNETTE_ANCHORS.campus.clone().add(new Vector3(0, 1.2, 0)),
       walkT: 0.8,
-      cameraDuration: 550,
-      walkDuration: 550,
+      cameraDuration: 500,
+      walkDuration: 500,
     },
-    // The ARRIVAL: resting at the castle from ~6300 on, which stays in
-    // the background while reading (no return to the start framing).
+    // The ARRIVAL: resting at the castle from ~5980 on — complete before
+    // the CTA copy arrives, and it stays in the background while reading
+    // (no return to the start framing).
     {
-      at: 5850,
+      at: 5500,
       camera: castleCamera,
       look: VIGNETTE_ANCHORS.castle.clone().add(new Vector3(0, 2.5, 0)),
       walkT: 0.92,
-      cameraDuration: 450,
-      walkDuration: 1150,
+      cameraDuration: 480,
+      walkDuration: 1000,
     },
   ];
   let previous = start;
@@ -404,7 +412,10 @@ export function buildStoryTimeline(
     );
     timeline.add(
       lookTarget,
-      { ...vec3Tween(previous.look, framing.look), duration: 500 },
+      {
+        ...vec3Tween(previous.look, framing.look),
+        duration: framing.lookDuration ?? 500,
+      },
       framing.at,
     );
     if (framing.walkT !== previous.walkT) {

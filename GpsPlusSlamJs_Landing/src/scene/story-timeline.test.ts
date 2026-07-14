@@ -77,22 +77,22 @@ describe("buildStoryTimeline", () => {
     timeline.seek(50);
     const heroPos = stage.camera.position.clone();
 
-    // Round-12 R12-2 timing anchors: the turn happens in the LATE
-    // works-anywhere window, the sweep is AT the city when the gallery
-    // card arrives, the camera is over the camp well before the card
-    // leaves, and the castle arrival is COMPLETE before the CTA copy
-    // covers it (~mid CTA approach).
-    timeline.seek(5200);
+    // Round-13 R13-1 timing anchors (tightened again from round-12): the
+    // sweep is AT the city BEFORE the gallery card ("What will you
+    // build") arrives, over the camp mid-gallery, and the castle arrival
+    // is COMPLETE before the CTA window even starts ("da ist man dann
+    // schon längst bei der Burg").
+    timeline.seek(4900);
     syncStage(stage);
     expect(stage.camera.position.distanceTo(SKYLINE_CENTER)).toBeLessThan(32);
 
-    timeline.seek(5800); // over the tent camp already
+    timeline.seek(5450); // over the tent camp already (mid-gallery)
     syncStage(stage);
     expect(
       stage.camera.position.distanceTo(VIGNETTE_ANCHORS.campus),
     ).toBeLessThan(15);
 
-    timeline.seek(6350); // arrival must be COMPLETE (resting)
+    timeline.seek(6000); // arrival must be COMPLETE (resting) at CTA start
     syncStage(stage);
     const arrived = stage.camera.position.clone();
     expect(arrived.distanceTo(VIGNETTE_ANCHORS.castle)).toBeLessThan(30);
@@ -100,11 +100,11 @@ describe("buildStoryTimeline", () => {
     syncStage(stage);
     expect(stage.camera.position.distanceTo(arrived)).toBeLessThan(0.8);
 
-    timeline.seek(chapterEndTime(5)); // gallery end: castle-bound near camp
+    timeline.seek(chapterEndTime(5)); // gallery end: already resting at castle
     syncStage(stage);
     expect(
-      stage.camera.position.distanceTo(VIGNETTE_ANCHORS.campus),
-    ).toBeLessThan(22);
+      stage.camera.position.distanceTo(VIGNETTE_ANCHORS.castle),
+    ).toBeLessThan(30);
 
     timeline.seek(chapterEndTime(6)); // CTA: resting at the castle
     syncStage(stage);

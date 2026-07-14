@@ -31,6 +31,7 @@ import { createSecretUnlock } from "./secret-palette";
 import { showEggToast } from "./egg-toast";
 import { isGenuineClick } from "./scene/egg-picker";
 import { printConsoleEgg } from "./console-egg";
+import { BIRD_LINK } from "./scene/bird";
 import { decideQualityTier } from "./capability";
 import {
   createSceneController,
@@ -170,6 +171,9 @@ function wireEggClicks(scroller: HTMLElement, scene: SceneController): void {
     });
     if (result?.egg === "geocache" && result.opened) {
       showEggToast("🎉 Cache found — GCLANDING, logged.");
+    } else if (result?.egg === "bird") {
+      // Hidden bird (№10): open the cs-util X profile in a new tab.
+      window.open(BIRD_LINK, "_blank", "noopener");
     }
   });
 }

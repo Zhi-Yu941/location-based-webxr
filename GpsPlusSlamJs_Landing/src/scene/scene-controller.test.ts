@@ -199,6 +199,20 @@ describe("createSceneController", () => {
     expect(person.position.y).toBeCloseTo(groundY, 5);
   });
 
+  it("clickAt returns the bird egg when aimed at the hidden bird (egg §2/№10)", () => {
+    const { controller } = makeController();
+    const bird = controller!.stage.world.getObjectByName("hidden-bird");
+    expect(bird).toBeDefined();
+    const birdPos = bird!.getWorldPosition(new Vector3());
+    // Straight down at the bird atop the sign; nothing taller shares the
+    // column above it.
+    controller!.stage.camera.position.copy(
+      birdPos.clone().add(new Vector3(0, 2, 0.001)),
+    );
+    controller!.stage.camera.lookAt(birdPos);
+    expect(controller!.clickAt({ x: 0, y: 0 })).toEqual({ egg: "bird" });
+  });
+
   it("renders on demand only once away from the hero (battery)", () => {
     // The hero has an ambient drift (below), so render-on-demand is
     // asserted at a mid-story progress where the scene is truly idle.

@@ -10,6 +10,7 @@ import {
   Vector3,
   type MeshStandardMaterial,
 } from "three";
+import { buildBird } from "./bird";
 import { buildGeocache } from "./geocache";
 import { clayMesh, namedGroup } from "./palette";
 import { buildPin } from "./markers";
@@ -156,6 +157,11 @@ const GEOCACHE_ANCHOR = VIGNETTE_ANCHORS.castle
       .multiplyScalar(1.6),
   )
   .setY(0);
+
+// Hidden bird anchor (easter-egg №10): perched on top of the QR sign
+// panel (panel top ≈ 2.55), a touch to one side — small and in frame
+// during the QR chapter, easy to miss.
+const BIRD_ANCHOR = WORLD_ANCHORS.sign.clone().add(new Vector3(0.25, 2.55, 0));
 
 /** Deterministic LCG (numerical recipes constants) — NOT crypto, just art. */
 function createRng(seed: number): () => number {
@@ -556,6 +562,9 @@ export function buildClayWorld(detail: "high" | "low"): Group {
     // side the CTA arrival camera faces — palm-sized, hidden in plain
     // sight. The chest faces the world center like the castle does.
     buildGeocache(GEOCACHE_ANCHOR),
+    // Hidden bird (easter-egg №10): perched atop the QR sign, in frame
+    // during the QR chapter — small and easy to miss (fully hidden).
+    buildBird(BIRD_ANCHOR),
     // World-detail layer (v3 F7, curb removed in round-9): instanced
     // grass + contact shadows.
     buildGrass(detail, createPathCurve(), Object.values(WORLD_ANCHORS)),

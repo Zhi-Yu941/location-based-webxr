@@ -37,6 +37,7 @@ import {
 } from "./ghost-restore";
 import { DOT_PERSON_NAME } from "./dot-person";
 import { parkourOffset, triggerParkourHop } from "./parkour";
+import { BIRD_NAME } from "./bird";
 import { buildClayWorld } from "./clay-world";
 import { buildDotPerson } from "./dot-person";
 import { buildMarkerPair } from "./markers";
@@ -131,7 +132,7 @@ export interface SceneControllerOptions {
  * Not exported — callers consume it structurally via `clickAt`'s
  * return type (knip keeps the export surface minimal). */
 interface EggClickResult {
-  readonly egg: "geocache" | "ghost-restore" | "parkour";
+  readonly egg: "geocache" | "ghost-restore" | "parkour" | "bird";
   /** Geocache: whether this click OPENED the chest (toast on open only). */
   readonly opened?: boolean;
 }
@@ -368,12 +369,13 @@ export function createSceneController(
   // to these registered objects, never the whole scene.
   const geocache = world.getObjectByName(GEOCACHE_NAME) ?? null;
   const castle = world.getObjectByName(VIGNETTE_NODE.castle) ?? null;
+  const bird = world.getObjectByName(BIRD_NAME) ?? null;
   if (castle) {
     initGhostRestore(castle);
   }
   // The dot-person lives on the stage, not the world graph.
   const person = stage.person;
-  const eggTargets = [geocache, castle, person].filter(
+  const eggTargets = [geocache, castle, person, bird].filter(
     (t): t is NonNullable<typeof t> => t !== null,
   );
   let parkourActive = false;
@@ -486,6 +488,10 @@ export function createSceneController(
         triggerParkourHop(person, lastTickMs ?? 0);
         dirty = true;
         return { egg: "parkour" };
+      }
+      if (hit === BIRD_NAME) {
+        // No scene change — main.ts opens the profile link.
+        return { egg: "bird" };
       }
       return null;
     },

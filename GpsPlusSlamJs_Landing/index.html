@@ -361,6 +361,24 @@
         margin-left: auto;
         margin-right: 6vw;
       }
+
+      /* Phone LANDSCAPE (round-16): give the 3D world room beside the copy.
+         At the full 460px the panel owns ~60% of a 915px-wide landscape
+         frame, which swallows whatever the camera frames near the centre —
+         and the journey's tent camp has to be centred (round-16: "look more
+         on the center of the tents") for portrait to work at all. Camera
+         work cannot satisfy both: landscape's panel obstructs a SIDE while
+         portrait's obstructs the vertical MIDDLE. Narrowing the panel here
+         is the fix that lets ONE camera framing serve both orientations. */
+      @media (orientation: landscape) and (height <= 560px) {
+        .copy {
+          max-width: 340px;
+          font-size: 0.94rem;
+        }
+        .chapter:nth-of-type(even) .copy {
+          margin-right: 3vw;
+        }
+      }
       .copy h1 {
         /* stylelint-disable-next-line csstree/validator -- clamp() is valid CSS; the bundled css-tree grammar rejects math functions (false positive). */
         font-size: clamp(2rem, 6vw, 3rem);

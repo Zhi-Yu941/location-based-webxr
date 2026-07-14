@@ -327,32 +327,30 @@ export function buildStoryTimeline(
   const inwardFrom = (anchor: Vector3) =>
     anchor.clone().setY(0).normalize().multiplyScalar(-1);
 
-  // Camp: 14 units short of the tents on the travel axis at height 7,
-  // looking 10 units past them at head height. Every number here is
-  // pinned by the R14-2 framing test, because the two phone orientations
-  // pull in OPPOSITE directions:
-  //  • The stand-off (14, not 6) — a first attempt flew 6 short at height
-  //    8.5, which put the camp ~38° below the view axis, outside the 55°
-  //    vertical FOV: the tents fell clean out of frame.
-  //  • The lateral bias (−11) — landscape's copy panel owns everything
-  //    right of ndc.x ≈ −0.17, so the camp is pushed left of it. This is
-  //    tuned for LANDSCAPE, which is the orientation the round-14 report
-  //    came from. KNOWN TRADE-OFF (flagged, awaiting a call): portrait's
-  //    horizontal FOV is ~4.9× narrower, so the same push carries the
-  //    camp centre to its left frame edge. The two orientations cannot
-  //    both be satisfied by camera work alone — landscape's panel owns a
-  //    SIDE while portrait's owns the vertical MIDDLE, so "left" and
-  //    "low" are mutually exclusive escapes. The real fix is a narrower
-  //    landscape copy panel; see the round-14 doc.
+  // Camp (round-16): stand WELL BACK on the travel axis and look at the
+  // CAMP ITSELF, not past it.
+  //
+  // The device shot that drove this: the camera sat only 14 short and
+  // aimed 10 units BEYOND the tents, so it framed the castle instead —
+  // one tent loomed over the bottom edge, the other two were gone, and
+  // the blue AR arrows were cut off at the frame edge (portrait measured
+  // the camp centre at ndc.x 1.22 — literally off-screen).
+  //
+  // The geometry that fixes it without losing R14-1: because the camera
+  // sits BACK ALONG THE TRAVEL AXIS, looking AT the camp is still looking
+  // along the flight direction (dot ≈ 0.95), so the fly-over reads as a
+  // fly-over AND the tents + their arrows are properly framed. The small
+  // forward lead keeps the camp just off dead-centre so it does not sit
+  // squarely under the landscape copy panel.
   const campusCamera = VIGNETTE_ANCHORS.campus
     .clone()
-    .sub(travelAxis.clone().multiplyScalar(14))
-    .add(inwardFrom(VIGNETTE_ANCHORS.campus).multiplyScalar(-11))
-    .setY(7);
+    .sub(travelAxis.clone().multiplyScalar(26))
+    .add(inwardFrom(VIGNETTE_ANCHORS.campus).multiplyScalar(-9))
+    .setY(10);
   const campusLook = VIGNETTE_ANCHORS.campus
     .clone()
-    .add(travelAxis.clone().multiplyScalar(10))
-    .setY(2.5);
+    .add(travelAxis.clone().multiplyScalar(3))
+    .setY(1.8);
 
   // Castle: approached HEAD-ON from the camp side (20 short of it on the
   // same axis, angled inward so the ruin's ghost face is toward us). The

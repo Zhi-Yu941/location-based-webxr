@@ -96,7 +96,7 @@ describe("buildStoryTimeline", () => {
     syncStage(stage);
     expect(
       stage.camera.position.distanceTo(VIGNETTE_ANCHORS.campus),
-    ).toBeLessThan(19);
+    ).toBeLessThan(34);
 
     // Round-14: the camp pose is an APPROACH pose ON the travel axis (the
     // fly-OVER happens just after, early in the castle leg) — sitting
@@ -108,7 +108,7 @@ describe("buildStoryTimeline", () => {
     syncStage(stage);
     expect(
       stage.camera.position.distanceTo(VIGNETTE_ANCHORS.campus),
-    ).toBeLessThan(19);
+    ).toBeLessThan(34);
 
     timeline.seek(6000); // arrival must be COMPLETE (resting) at CTA start
     syncStage(stage);
@@ -305,45 +305,74 @@ describe("buildStoryTimeline", () => {
     expect(toCastle.dot(travel)).toBeGreaterThan(0.6);
   });
 
-  it("keeps the tents in frame and clear of the copy panel on a LANDSCAPE phone (round-14 R14-2)", () => {
-    // Round-14: "die Zelte sind … hinter dem 'What will you build'
-    // Textblock so versteckt" — reported while scrolling in LANDSCAPE, so
-    // landscape is what this pins. That panel owns the right ~60% (its
-    // left edge sits at ndc.x ≈ −0.17), so the camp must sit LEFT of it —
-    // and be inside the frustum at all (a first look-ahead attempt flew so
-    // close over the tents that they fell BELOW the 55° vertical FOV).
+  // NOTE: round-14's "push the camp LEFT of the landscape copy panel" pin
+  // is deliberately GONE — round-16 supersedes it. That pin encoded a
+  // compromise (shove the tents to a frame edge to dodge a panel) which
+  // is precisely what the round-16 device shot rejected: it cost the
+  // framing of the tents and cut the AR arrows off. The requirement below
+  // — camp centred-ish and every arrow on screen, in BOTH orientations —
+  // is the honest replacement, and the pull-back that achieves it happens
+  // to make the camp small enough that the panels no longer swallow it.
+  it("frames the CAMP CENTRE with its AR arrows visible, in both orientations (round-16)", () => {
+    // Round-16 device shot: over the camp the camera sat too CLOSE and
+    // aimed PAST the tents (the castle ended up centred, one tent loomed
+    // over the bottom edge, and the blue AR arrows were cut off at the
+    // frame edge). The maintainer: "the camera should look more on the
+    // center of the tents and be further away so that also the ar overlay
+    // arrows are visible."
     //
-    // Portrait is deliberately NOT pinned here, and that is a flagged
-    // trade-off rather than an oversight: portrait's horizontal FOV is
-    // ~4.9× narrower (the same leftward push carries the camp centre to
-    // its frame edge — measured ndc.x −1.22) and its copy panel covers the
-    // vertical MIDDLE rather than a side. So landscape wants the camp LEFT
-    // while portrait wants it LOW, and camera work alone cannot satisfy
-    // both. Recorded in the round-14 doc; the real fix is a narrower
-    // landscape copy panel, which is the maintainer's call.
-    const landscape = createStoryStage({
-      world: buildClayWorld("low"),
-      person: buildDotPerson(),
-      markers: buildMarkerPair(),
-      phone: buildPhoneFrame(),
-      camera: new PerspectiveCamera(55, 915 / 412),
-    });
-    const timeline = buildStoryTimeline(landscape, () => {});
-    for (const t of [5350, 5450]) {
-      timeline.seek(t);
-      syncStage(landscape);
-      landscape.camera.lookAt(landscape.lookTarget);
-      landscape.camera.updateMatrixWorld(true);
-      // Tent-height point on the camp, not the ground plane.
-      const ndc = VIGNETTE_ANCHORS.campus
-        .clone()
-        .setY(1.5)
-        .project(landscape.camera);
-      expect(ndc.z, `camp behind camera at ${t}`).toBeLessThan(1);
-      expect(Math.abs(ndc.y), `camp ndc.y at ${t}`).toBeLessThan(0.85);
-      // Left of the panel's left edge (−0.17), and still on screen.
-      expect(ndc.x, `camp ndc.x at ${t}`).toBeLessThan(-0.1);
-      expect(ndc.x, `camp off-frame left at ${t}`).toBeGreaterThan(-0.9);
+    // So the thing to pin is exactly that: every arrow — and the camp
+    // itself — inside the frustum with margin, in BOTH orientations,
+    // across the camp dwell.
+    for (const [label, aspect] of [
+      ["landscape", 915 / 412],
+      ["portrait", 412 / 915],
+    ] as const) {
+      const stage2 = createStoryStage({
+        world: buildClayWorld("low"),
+        person: buildDotPerson(),
+        markers: buildMarkerPair(),
+        phone: buildPhoneFrame(),
+        camera: new PerspectiveCamera(55, aspect),
+      });
+      const timeline = buildStoryTimeline(stage2, () => {});
+      const arrowGroup = stage2.world.getObjectByName(
+        VIGNETTE_NODE.campusArrows,
+      );
+      expect(arrowGroup).toBeDefined();
+
+      for (const t of [5200, 5400]) {
+        timeline.seek(t);
+        syncStage(stage2);
+        stage2.camera.lookAt(stage2.lookTarget);
+        stage2.camera.updateMatrixWorld(true);
+        stage2.world.updateWorldMatrix(true, true);
+
+        // The camp centre is genuinely FRAMED (not shoved to an edge).
+        const camp = VIGNETTE_ANCHORS.campus
+          .clone()
+          .setY(1.5)
+          .project(stage2.camera);
+        expect(camp.z, `${label} ${t}: camp behind camera`).toBeLessThan(1);
+        expect(Math.abs(camp.x), `${label} ${t}: camp x`).toBeLessThan(0.65);
+        expect(Math.abs(camp.y), `${label} ${t}: camp y`).toBeLessThan(0.65);
+
+        // …and EVERY AR arrow is on screen with margin.
+        arrowGroup!.children.forEach((arrow, i) => {
+          const ndc = arrow
+            .getWorldPosition(new Vector3())
+            .project(stage2.camera);
+          expect(ndc.z, `${label} ${t}: arrow ${i} behind camera`).toBeLessThan(
+            1,
+          );
+          expect(Math.abs(ndc.x), `${label} ${t}: arrow ${i} x`).toBeLessThan(
+            0.9,
+          );
+          expect(Math.abs(ndc.y), `${label} ${t}: arrow ${i} y`).toBeLessThan(
+            0.9,
+          );
+        });
+      }
     }
   });
 

@@ -30,6 +30,9 @@ export const VIGNETTES_NAME = "use-case-vignettes";
 export const VIGNETTE_NODE = {
   root: VIGNETTES_NAME,
   campus: "vignette-campus",
+  /** The campus AR trail arrows — a named group so the story timeline
+   * can pop them in one by one during the camp flyover (round-13). */
+  campusArrows: "campus-arrows",
   castle: "vignette-castle",
   ghost: "castle-ghost",
 } as const;
@@ -95,18 +98,22 @@ function buildCampus(anchor: Vector3): Group {
   campus.add(bigTent, sideTentA, sideTentB);
 
   // The static arrow trail runs BETWEEN the side tents toward the big
-  // tent's entrance — through the corridor, never through canvas.
+  // tent's entrance — through the corridor, never through canvas. The
+  // arrows live in their own named group so the story timeline can pop
+  // them in one by one during the camp flyover (round-13 R13-4).
   const trail: Array<[x: number, z: number, yaw: number]> = [
     [5.6, 0.8, -1.85],
     [3.5, 0.2, -1.77],
     [1.5, -0.2, -1.86],
     [0.5, -0.5, -1.91],
   ];
+  const arrows = namedGroup(VIGNETTE_NODE.campusArrows);
   for (const [x, z, yaw] of trail) {
     const arrow = staticArrow(yaw);
     arrow.position.set(x, 1.1, z);
-    campus.add(arrow);
+    arrows.add(arrow);
   }
+  campus.add(arrows);
 
   campus.position.copy(anchor);
   return campus;

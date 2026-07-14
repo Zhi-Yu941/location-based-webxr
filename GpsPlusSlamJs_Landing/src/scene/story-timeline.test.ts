@@ -17,6 +17,7 @@ import {
 import { buildDotPerson } from "./dot-person";
 import { buildMarkerPair } from "./markers";
 import { buildPhoneFrame } from "./phone-frame";
+import { VIGNETTE_NODE } from "./use-case-vignettes";
 import {
   buildIntroTimeline,
   buildStoryTimeline,
@@ -167,6 +168,61 @@ describe("buildStoryTimeline", () => {
       ),
     ).toBeLessThan(2);
     expect(stage.lookTarget.y).toBeGreaterThan(10);
+  });
+
+  it("pops the campus arrows one by one over the camp and spawns the castle ghost on approach (round-13 R13-4)", () => {
+    // Round-13: the vignettes' AR overlays must not sit pre-built in the
+    // scene — the arrows pop up one after another ("nach und nach plopp
+    // plopp plopp") WHILE the camera flies over the tents, and the ghost
+    // spawns in while flying toward the castle. Both must be COMPLETE by
+    // the castle arrival so chapter end states (reduced motion) stay
+    // whole compositions.
+    const timeline = buildStoryTimeline(stage, () => {});
+    const arrowGroup = stage.world.getObjectByName(VIGNETTE_NODE.campusArrows);
+    const ghost = stage.world.getObjectByName(VIGNETTE_NODE.ghost);
+    expect(arrowGroup).toBeDefined();
+    expect(ghost).toBeDefined();
+    const arrows = arrowGroup!.children;
+    const ghostParts = ghost!.children;
+    expect(arrows.length).toBeGreaterThanOrEqual(3);
+    expect(ghostParts.length).toBeGreaterThanOrEqual(2);
+
+    timeline.seek(4900); // at the city: nothing has popped yet
+    for (const arrow of arrows) {
+      expect(arrow.scale.x).toBeLessThan(0.01);
+    }
+    for (const part of ghostParts) {
+      expect(part.scale.x).toBeLessThan(0.01);
+    }
+
+    timeline.seek(5250); // mid camp approach: STAGGERED — some, not all
+    const popped = arrows.filter((a) => a.scale.x > 0.5).length;
+    expect(popped).toBeGreaterThan(0);
+    expect(popped).toBeLessThan(arrows.length);
+
+    timeline.seek(5560); // camp flyover done: every arrow stands
+    for (const arrow of arrows) {
+      expect(arrow.scale.x).toBeGreaterThan(0.9);
+    }
+
+    timeline.seek(5700); // approaching the castle: ghost mid-spawn
+    const spawned = ghostParts.filter((p) => p.scale.x > 0.5).length;
+    expect(spawned).toBeGreaterThan(0);
+    expect(spawned).toBeLessThan(ghostParts.length);
+
+    timeline.seek(5990); // arrival: the ghost stands complete
+    for (const part of ghostParts) {
+      expect(part.scale.x).toBeGreaterThan(0.9);
+    }
+
+    // Scrubbing back re-hides everything (explicit {from,to} contract).
+    timeline.seek(4500);
+    for (const arrow of arrows) {
+      expect(arrow.scale.x).toBeLessThan(0.01);
+    }
+    for (const part of ghostParts) {
+      expect(part.scale.x).toBeLessThan(0.01);
+    }
   });
 
   it("moves the camera between chapters when scrubbed", () => {

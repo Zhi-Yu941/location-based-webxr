@@ -37,6 +37,10 @@ via a seeded LCG.
   `use-case-vignettes.ts` (as build parameters) and by the story
   timeline (journey waypoints). Node `use-case-vignettes` is part of
   the built world.
+- `SKYLINE_TOWER_POS` — world position of the skyline's TV tower (base
+  of the `ar-skyline-pin` spot); the round-13 city-sweep framing aims
+  at its upper section so the red pin stays in a landscape-phone
+  frustum.
 
 ## Invariants & assumptions
 

@@ -68,12 +68,27 @@ and keeps derived state (dot-person on the path) in sync.
   together with the phone's arrival (deliberately completing near the window END — the
   requested dramaturgy, a documented deviation from the "settled by
   mid-window" default) → pull-back + outer-terrain rise → the round-11
-  use-case JOURNEY: the gallery window carries TWO 500 ms waypoints
-  (city sweep over the skyline, then a campus-vignette flyover — a
-  second documented deviation from "settled by mid-window": the
-  traveling shot is the requested effect) and the CTA is an ARRIVAL at
-  the castle vignette, which stays in the background while reading (no
-  return to the start framing; test-pinned against `VIGNETTE_ANCHORS`).
+  use-case JOURNEY (retimed earlier in round-12 AND round-13): the city
+  leg starts at 4400 in the works-anywhere window and arrives BEFORE
+  the gallery card (a further documented deviation from "settled by
+  mid-window": the traveling shot is the requested effect), aiming at
+  the TV tower's TOP so its red pin stays inside a landscape-phone
+  frustum (round-13 R13-2, NDC-pinned); the camp flyover completes
+  mid-gallery; and the CTA is an ARRIVAL at the castle vignette,
+  complete before the CTA window starts, resting in the background
+  while reading (no return to the start framing; test-pinned against
+  `VIGNETTE_ANCHORS`).
+- **Vignette AR pop-ins (round-13 R13-4):** the campus trail arrows and
+  the castle-ghost parts are primed hidden (per-part scale ~0) by
+  `createStoryStage` and spawn DURING the journey — arrows staggered
+  over the camp approach (outBack "plopp"; the round-7 monotone-grow
+  rule applies only to the viewport-filling phone frame), ghost parts
+  bottom-up while approaching the castle. All pops complete by the
+  castle arrival so chapter END states (what reduced motion shows) stay
+  whole compositions.
+- A framing's look tween defaults to 500 ms; framings followed by
+  another framing less than 500 ms later must set `lookDuration`
+  (overlapping tweens under `composition: 'none'` cut the target).
 - The walk starts at `DROP_PATH_T` (the QR drop point) — there is no walk
   tween in the QR chapter; the drop replaces the old slide-in.
 
@@ -93,5 +108,8 @@ camera.lookAt(stage.lookTarget);
 raw-jitters/fused-still, path walking (via the syncStage contract), phone +
 gallery reveals, the round-4 dive ordering (camera → phone → AR), dirty-
 notify on scrub, scrub-back restoration, intro hand-over framing, stage
-placement, and the round-11 journey (gallery end near the campus, CTA
-resting at the castle, no return-to-start).
+placement, the round-11/12/13 journey timing anchors (at-city before the
+gallery card, over-camp mid-gallery, castle arrival complete at the CTA
+window, no return-to-start), the round-13 tower-pin landscape-frustum
+NDC pin, and the round-13 vignette pop-ins (staggered arrows, bottom-up
+ghost, scrub-back re-hides).

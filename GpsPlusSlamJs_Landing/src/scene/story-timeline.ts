@@ -12,6 +12,7 @@ import {
   WORLD_NODE,
 } from "./clay-world";
 import type { MarkerPair } from "./markers";
+import { VIGNETTE_NODE } from "./use-case-vignettes";
 
 /**
  * The scroll-scrubbed story timeline: one anime.js timeline covering all
@@ -120,6 +121,14 @@ export function createStoryStage(parts: StageParts): StoryStage {
     // beat fades it in, then collapses it to the precise fix (R6).
     snapRing.visible = true;
     snapRing.scale.setScalar(3);
+  }
+  // Round-13 R13-4: the vignettes' AR overlays (campus trail arrows,
+  // castle ghost) spawn DURING the journey flyover — primed hidden per
+  // PART so the timeline can pop them in staggered.
+  for (const name of [VIGNETTE_NODE.campusArrows, VIGNETTE_NODE.ghost]) {
+    parts.world.getObjectByName(name)?.children.forEach((part) => {
+      part.scale.setScalar(0.001);
+    });
   }
 
   parts.camera.position.copy(HERO_CAMERA);
@@ -568,6 +577,32 @@ export function buildStoryTimeline(
       4100,
     );
   }
+
+  // Round-13 R13-4: the vignette AR overlays spawn DURING the journey.
+  // The campus arrows pop up one after another while the camera
+  // approaches and crosses the tent camp ("nach und nach plopp plopp
+  // plopp" — outBack gives the plopp; the round-7 monotone-grow rule is
+  // specific to the viewport-filling phone frame), and the castle ghost
+  // builds itself bottom-up (tower → roof → wall) while the camera
+  // flies toward the castle. Everything completes by the castle arrival
+  // (~5980) so chapter END states stay whole compositions (reduced
+  // motion shows those directly).
+  const campusArrows = world.getObjectByName(VIGNETTE_NODE.campusArrows);
+  campusArrows?.children.forEach((arrow, index) => {
+    timeline.add(
+      arrow,
+      { scale: { from: 0.001, to: 1 }, duration: 180, ease: "outBack" },
+      5080 + index * 120,
+    );
+  });
+  const castleGhost = world.getObjectByName(VIGNETTE_NODE.ghost);
+  castleGhost?.children.forEach((part, index) => {
+    timeline.add(
+      part,
+      { scale: { from: 0.001, to: 1 }, duration: 200, ease: "outCubic" },
+      5580 + index * 100,
+    );
+  });
 
   // Materialize the full duration even if a chapter ends with a short
   // tween (keeps duration === CHAPTER_COUNT * CHAPTER_DURATION_MS).

@@ -82,20 +82,25 @@ function buildCampus(anchor: Vector3): Group {
   const campus = namedGroup(VIGNETTE_NODE.campus);
   campus.add(groundDisc(9));
 
+  // Round-13 R13-3: spread apart — the old layout stood so close the
+  // big tent's roof hull overlapped side tent A's, and the arrow trail
+  // ran INSIDE two tents ("sieht halt buggy aus"). Clearances are
+  // test-pinned (arrow↔tent hull + tent↔tent gap).
   const bigTent = tent(2.4, 2.6);
-  bigTent.position.set(-1.5, 0, -1);
+  bigTent.position.set(-2.6, 0, -1.6);
   const sideTentA = tent(1.3, 1.8);
-  sideTentA.position.set(2.6, 0, -2.2);
+  sideTentA.position.set(3.6, 0, -2.8);
   const sideTentB = tent(1.1, 1.6);
-  sideTentB.position.set(2.2, 0, 1.8);
+  sideTentB.position.set(3.2, 0, 2.8);
   campus.add(bigTent, sideTentA, sideTentB);
 
-  // A short static arrow trail curving toward the big tent's entrance.
+  // The static arrow trail runs BETWEEN the side tents toward the big
+  // tent's entrance — through the corridor, never through canvas.
   const trail: Array<[x: number, z: number, yaw: number]> = [
-    [4.8, 3.6, -2.2],
-    [3.2, 2.2, -2.5],
-    [1.4, 1.2, -2.9],
-    [0, 0.4, -3.3],
+    [5.6, 0.8, -1.85],
+    [3.5, 0.2, -1.77],
+    [1.5, -0.2, -1.86],
+    [0.5, -0.5, -1.91],
   ];
   for (const [x, z, yaw] of trail) {
     const arrow = staticArrow(yaw);

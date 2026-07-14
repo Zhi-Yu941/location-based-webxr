@@ -90,6 +90,63 @@ describe("buildUseCaseVignettes", () => {
     }
   });
 
+  it("spreads the tents apart and routes the arrow trail BETWEEN them (round-13 R13-3)", () => {
+    // Round-13 device test: "die blauen Pfeile … sind teilweise innerhalb
+    // der Zelte und sieht halt buggy aus" — and the tents themselves
+    // stood so close their roof hulls overlapped. Every arrow must keep
+    // clear horizontal distance from every tent's widest hull (the roof
+    // cone), and the tents must leave a walkable gap between each other.
+    const group = vignettes();
+    const campus = group.getObjectByName(VIGNETTE_NODE.campus)!;
+    campus.updateWorldMatrix(true, true);
+
+    const tents: { center: Vector3; radius: number }[] = [];
+    for (const child of campus.children) {
+      if (child.name === "tent") {
+        const box = new Box3().setFromObject(child);
+        const center = box.getCenter(new Vector3());
+        // Cones/cylinders are rotationally symmetric, so the box's x
+        // half-extent IS the widest hull radius (the roof cone).
+        tents.push({ center, radius: (box.max.x - box.min.x) / 2 });
+      }
+    }
+    expect(tents.length).toBeGreaterThanOrEqual(3);
+
+    const arrows: Vector3[] = [];
+    campus.traverse((obj) => {
+      if ((obj as Mesh).userData?.paletteRole === "arrow") {
+        arrows.push(obj.getWorldPosition(new Vector3()));
+      }
+    });
+    expect(arrows.length).toBeGreaterThanOrEqual(3);
+
+    for (const [i, arrow] of arrows.entries()) {
+      for (const [j, tent] of tents.entries()) {
+        const distance = Math.hypot(
+          arrow.x - tent.center.x,
+          arrow.z - tent.center.z,
+        );
+        expect(
+          distance,
+          `arrow ${i} clips tent ${j} (hull radius ${tent.radius.toFixed(2)})`,
+        ).toBeGreaterThan(tent.radius + 0.3);
+      }
+    }
+
+    // Tents keep a real gap between their hulls ("stehen ein bisschen zu
+    // nah beieinander") — wide enough for the trail to read as a path.
+    for (let a = 0; a < tents.length; a++) {
+      for (let b = a + 1; b < tents.length; b++) {
+        const centerDistance = Math.hypot(
+          tents[a]!.center.x - tents[b]!.center.x,
+          tents[a]!.center.z - tents[b]!.center.z,
+        );
+        const hullGap = centerDistance - tents[a]!.radius - tents[b]!.radius;
+        expect(hullGap, `tents ${a}/${b} too close`).toBeGreaterThan(1.2);
+      }
+    }
+  });
+
   it("stands each vignette on its own sunken ground disc (nothing floats — the R10-3 lesson)", () => {
     const group = vignettes();
     group.updateWorldMatrix(true, true);

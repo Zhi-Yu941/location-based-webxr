@@ -437,6 +437,12 @@ function buildSkyline(): Group {
   // piece is extended SINK units below y=0 (tops unchanged) so nothing
   // reads as floating from the story's camera angles (round-10 R10-3).
   const SINK = 8;
+  // The TV tower sits at across-offset +4 (SKYLINE_TOWER_POS). Round-14
+  // R14-11: the block nearest that lateral spot used to sit AT the
+  // tower's depth, so the tower poked THROUGH it. Pull that block a good
+  // step FORWARD (toward the viewer, −skyDirection) so the tower reads as
+  // clearly BEHIND a foreground highrise.
+  const TOWER_ACROSS = 4;
   const blocks = [-9, -5.5, -2, 1.5, 5, 8.5];
   for (const offset of blocks) {
     const width = 2 + rng() * 2;
@@ -445,9 +451,11 @@ function buildSkyline(): Group {
       new BoxGeometry(width, height + SINK, 2.5),
       "skyline",
     );
+    const forwardPull = Math.abs(offset - TOWER_ACROSS) < 2 ? 6 : 0;
     block.position
       .copy(skylineCenter)
       .add(across.clone().multiplyScalar(offset))
+      .add(skyDirection.clone().multiplyScalar(-forwardPull))
       .setY(height / 2 - SINK / 2);
     block.castShadow = false;
     skyline.add(block);

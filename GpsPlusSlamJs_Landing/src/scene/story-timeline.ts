@@ -305,7 +305,11 @@ export function buildStoryTimeline(
   // The tower's upper section: bulb at ~12.4, spike to ~15.2, pin above.
   // Aiming here keeps tower top + red pin centered ("mehr auf die Spitze
   // vom Turm"), not the whole-city average.
-  const cityLook = SKYLINE_TOWER_POS.clone().setY(12);
+  // Round-15: raised 12 → 15 (the pin itself sits at ~16). Aiming lower
+  // pushed the tower TOP — and its red pin — into the upper frame, where
+  // the works-anywhere copy still sits while it scrolls away; centring
+  // the look nearer the pin drops it clear of that copy.
+  const cityLook = SKYLINE_TOWER_POS.clone().setY(18);
 
   // ── Round-14 R14-1/R14-4: the journey now looks where it is GOING.
   // Until now the camp waypoint looked sideways AT the tents (the camera
@@ -409,17 +413,18 @@ export function buildStoryTimeline(
       cameraEase: "inOutQuad",
       walkDuration: 500,
     },
-    // anywhere — ALL its tweens must END before the round-13 journey's
-    // city leg starts at 4400 (overlapping camera/look/walk tweens under
-    // composition:none cut their target's position).
+    // anywhere — ALL its tweens must END before the journey's city leg
+    // starts (overlapping camera/look/walk tweens under composition:none
+    // cut their target's position). Shortened to 300 in round-15 so the
+    // city leg can start at 4300 and reach the tower earlier.
     {
       at: 4000,
       camera: new Vector3(0, 44, 27),
       look: new Vector3(0, 0, 0),
       walkT: 0.6,
-      cameraDuration: 400,
-      lookDuration: 400,
-      walkDuration: 400,
+      cameraDuration: 300,
+      lookDuration: 300,
+      walkDuration: 300,
     },
     // gallery + cta = the use-case JOURNEY (round-11; retimed earlier in
     // round-12 and AGAIN in round-13 R13-1 — "immer noch viel zu
@@ -430,21 +435,31 @@ export function buildStoryTimeline(
     // COMPLETE before the CTA window starts. DELIBERATE deviation from
     // the "settled by mid-window" default — the traveling shot is the
     // requested effect. Gentle sine-eased legs keep the ride slow.
+    // Round-15: the camera must be SETTLED on the tower + red pin while
+    // the works-anywhere copy is still leaving the screen (~4800), and it
+    // must NOT linger there — the swing to the tents follows immediately
+    // and fast ("gar nicht bei dem Turm verweilen … sondern sofort weiter
+    // schwenken Richtung Zelte"). City arrives 4750 and holds ~100 ms.
     {
-      at: 4400,
+      at: 4300,
       camera: citySweepCamera,
       look: cityLook,
       walkT: 0.72,
-      cameraDuration: 500,
-      walkDuration: 500,
+      cameraDuration: 450,
+      lookDuration: 450,
+      walkDuration: 450,
     },
+    // The fast swing: a 300 ms run at the tents, flown entirely in the
+    // gap BETWEEN the two copy blocks, arriving by ~10 % into the gallery
+    // window (5150) — where the arrows are already popping (below).
     {
-      at: 4950,
+      at: 4850,
       camera: campusCamera,
       look: campusLook,
       walkT: 0.8,
-      cameraDuration: 500,
-      walkDuration: 500,
+      cameraDuration: 300,
+      lookDuration: 280,
+      walkDuration: 300,
     },
     // The ARRIVAL: resting at the castle from ~5980 on — complete before
     // the CTA copy arrives, and it stays in the background while reading
@@ -625,10 +640,12 @@ export function buildStoryTimeline(
   //
   // The campus arrows pop one after another ("nach und nach plopp plopp
   // plopp" — outBack gives the plopp; the round-7 monotone-grow rule is
-  // specific to the viewport-filling phone frame) — but only once the
-  // tents are genuinely in the viewport and the camera is crossing them,
-  // NOT during the approach (round-14: "die sollten sich erst einblenden,
-  // wenn man schon die Zelte so im Viewport hat").
+  // specific to the viewport-filling phone frame). Round-15 moved them
+  // onto the RUN AT the tents rather than the crossing: they appear while
+  // the camera is flying at the camp in the gap between the two copy
+  // blocks, so the first is already up by ~10 % into the gallery window
+  // ("dort fliegt man auf die Zelte zu. Und dort sieht man auch schon,
+  // dass in den Zelten die AR-Overlay-Wegpunkte auftauchen").
   //
   // The castle ghost then builds itself bottom-up (tower → roof → wall)
   // only AFTER the camp is behind us, while flying at the castle
@@ -640,8 +657,8 @@ export function buildStoryTimeline(
   campusArrows?.children.forEach((arrow, index) => {
     timeline.add(
       arrow,
-      { scale: { from: 0.001, to: 1 }, duration: 130, ease: "outBack" },
-      5350 + index * 70,
+      { scale: { from: 0.001, to: 1 }, duration: 110, ease: "outBack" },
+      4940 + index * 60,
     );
   });
   const castleGhost = world.getObjectByName(VIGNETTE_NODE.ghost);

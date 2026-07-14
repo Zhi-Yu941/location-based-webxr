@@ -80,21 +80,30 @@ describe("buildStoryTimeline", () => {
     timeline.seek(50);
     const heroPos = stage.camera.position.clone();
 
-    // Round-13 R13-1 timing anchors (tightened again from round-12): the
-    // sweep is AT the city BEFORE the gallery card ("What will you
-    // build") arrives, over the camp mid-gallery, and the castle arrival
-    // is COMPLETE before the CTA window even starts ("da ist man dann
-    // schon längst bei der Burg").
-    timeline.seek(4900);
+    // Round-15 timing anchors — the whole pre-castle stretch moved
+    // EARLIER: the camera must be SETTLED on the tower while the
+    // works-anywhere copy is still leaving (≈4800, "in dem Moment schon
+    // komplett auf dem Turm platziert"), must NOT linger there, and must
+    // already be AT the tents by ~10 % into the gallery window (5150,
+    // "wenn der 'What will you build'-Textblock zu ~10 % zu sehen ist,
+    // dass man dann schon bei den drei Zelten ist"). The castle leg is
+    // deliberately untouched — round-15 called that part "super so".
+    timeline.seek(4800);
     syncStage(stage);
     expect(stage.camera.position.distanceTo(SKYLINE_CENTER)).toBeLessThan(32);
 
-    // Round-14: the camp waypoint is now an APPROACH pose ON the travel
-    // axis (the fly-OVER happens just after, early in the castle leg) —
-    // sitting right on top of the tents put them below the landscape
-    // frustum. What actually matters (tents visible, left of the copy
-    // panel) is pinned by the R14-2 framing test below; this stays a
-    // loose "the journey really is at the camp by now" bound.
+    timeline.seek(5150); // already at the tents, very early in the gallery
+    syncStage(stage);
+    expect(
+      stage.camera.position.distanceTo(VIGNETTE_ANCHORS.campus),
+    ).toBeLessThan(19);
+
+    // Round-14: the camp pose is an APPROACH pose ON the travel axis (the
+    // fly-OVER happens just after, early in the castle leg) — sitting
+    // right on top of the tents put them below the landscape frustum.
+    // What actually matters (tents visible, left of the copy panel) is
+    // pinned by the R14-2 framing test below; this stays a loose "still
+    // at the camp" bound across the dwell.
     timeline.seek(5450);
     syncStage(stage);
     expect(
@@ -148,13 +157,13 @@ describe("buildStoryTimeline", () => {
     const pin = stage.world.getObjectByName("ar-skyline-pin");
     expect(pin).toBeDefined();
 
-    // The CITY MOMENT (arrival + the beat it rests there): the pin must
-    // sit inside the frame with margin (|ndc| < 0.85). The window stops
-    // at the camp framing's start (4950) on purpose — round-14 asks the
-    // camera to turn DECISIVELY toward the tents right after the tower
-    // ("deutlich mehr Richtung Zelte guckt"), so holding the tower pin
-    // framed past that point would directly contradict R14-1.
-    for (const t of [4900, 4950]) {
+    // The CITY MOMENT — round-15 moved it EARLIER and made it BRIEF: the
+    // camera is settled on the tower from ~4750 and swings away at 4850
+    // ("gar nicht bei dem Turm verweilen, sondern viel früher auf dem
+    // Turm sein und dann sofort weiter schwenken Richtung Zelte"). The
+    // pin must sit inside the frame with margin (|ndc| < 0.85) across
+    // that hold; asserting it past the swing would contradict R14-1/R15.
+    for (const t of [4750, 4850]) {
       timeline.seek(t);
       syncStage(stage);
       stage.camera.lookAt(stage.lookTarget);
@@ -168,8 +177,9 @@ describe("buildStoryTimeline", () => {
     }
 
     // And the look target is the TOWER's upper section, not the city
-    // average at ground-ish height.
-    timeline.seek(4900);
+    // average at ground-ish height — asserted inside the (round-15,
+    // deliberately brief) tower hold, before the swing to the tents.
+    timeline.seek(4800);
     syncStage(stage);
     expect(
       Math.hypot(
@@ -197,7 +207,7 @@ describe("buildStoryTimeline", () => {
     expect(arrows.length).toBeGreaterThanOrEqual(3);
     expect(ghostParts.length).toBeGreaterThanOrEqual(2);
 
-    timeline.seek(4900); // at the city: nothing has popped yet
+    timeline.seek(4800); // settled on the tower: nothing has popped yet
     for (const arrow of arrows) {
       expect(arrow.scale.x).toBeLessThan(0.01);
     }
@@ -205,20 +215,28 @@ describe("buildStoryTimeline", () => {
       expect(part.scale.x).toBeLessThan(0.01);
     }
 
-    // Round-14 R14-3: the arrows must still be DOWN while the tents are
-    // only being approached — they pop late, quickly, while the camera is
-    // actually flying over the camp.
-    timeline.seek(5250);
+    // Round-15: the arrows now pop while the camera is FLYING AT the
+    // tents — during the stretch between the two copy blocks — so the
+    // FIRST one is already visible by ~10 % into the gallery window
+    // ("während man bei 10 % ist … sollte schon der erste AR-Pfeil bei
+    // den Zelten sichtbar sein"). They must still be down before that
+    // approach begins.
+    timeline.seek(4880);
     for (const arrow of arrows) {
       expect(arrow.scale.x).toBeLessThan(0.01);
     }
 
-    timeline.seek(5450); // over the camp: STAGGERED — some, not all
-    const popped = arrows.filter((a) => a.scale.x > 0.5).length;
-    expect(popped).toBeGreaterThan(0);
-    expect(popped).toBeLessThan(arrows.length);
+    // Mid-run at the tents (they are at their best framing here, between
+    // the two copy blocks): the first arrows are already popping.
+    timeline.seek(5040);
+    const onRun = arrows.filter((a) => a.scale.x > 0.5).length;
+    expect(onRun).toBeGreaterThan(0);
+    expect(onRun).toBeLessThan(arrows.length); // …still staggering
 
-    timeline.seek(5700); // camp flyover done: every arrow stands
+    timeline.seek(5100); // ~10 % into the gallery: arrows visibly up
+    expect(arrows.filter((a) => a.scale.x > 0.5).length).toBeGreaterThan(1);
+
+    timeline.seek(5400); // at the camp: every arrow stands
     for (const arrow of arrows) {
       expect(arrow.scale.x).toBeGreaterThan(0.9);
     }

@@ -25,6 +25,7 @@ import {
   updateParticles,
 } from "./particles";
 import { buildSatellites, updateSatellites } from "./satellites";
+import { buildShootingStar, updateShootingStar } from "./shooting-stars";
 import { pickEggTarget, type PointerNdc } from "./egg-picker";
 import { GEOCACHE_NAME, toggleGeocache, updateGeocache } from "./geocache";
 import { VIGNETTE_NODE } from "./use-case-vignettes";
@@ -259,10 +260,14 @@ export function createSceneController(
   // tier — reduced motion / low tier show them parked at the built
   // t=0 pose; only the continuous loop below animates the orbits.
   const satellites = buildSatellites();
+  // Shooting stars (easter-egg №7): dark palettes only; built always,
+  // gated per-theme + by the continuous loop below.
+  const shootingStar = buildShootingStar();
   scene.add(
     world,
     sky,
     satellites,
+    shootingStar,
     stage.person,
     markers.raw,
     markers.fused,
@@ -284,7 +289,11 @@ export function createSceneController(
   story.seek(0);
   syncStage(stage);
 
+  // Shooting stars show only over a dark sky (dark/neon/dusk/terminal),
+  // never light/mono where they'd be invisible.
+  let darkSky = false;
   function applyThemeInternal(theme: Theme): void {
+    darkSky = theme !== "light" && theme !== "mono";
     const palette = getPalette(theme);
     applyPaletteToScene(scene, palette);
     applySkyPalette(sky, palette);
@@ -536,6 +545,9 @@ export function createSceneController(
       if (particles && pageVisible) {
         updateParticles(particles, nowMs);
         updateSatellites(satellites, nowMs);
+        // The meteor is mid-streak only ~1.2s per 30–60s; it rides the
+        // particle loop's dirty flag while a streak is crossing.
+        updateShootingStar(shootingStar, nowMs, darkSky);
         dirty = true;
       }
       // Event-driven egg transitions (wall-clock, not scroll-driven).

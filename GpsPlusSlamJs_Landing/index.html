@@ -257,11 +257,15 @@
          hints the 3D world until scrolling lifts the veil. */
       @media (width <= 600px), (height <= 500px) {
         #hero-veil {
+          /* Round-14 R14-2: fade a touch earlier (72%→62%) and reach
+             transparent before the very bottom (100%→96%) so a bit more
+             of the 3D world peeks through low on the hero — a nudge to
+             scroll. */
           background: linear-gradient(
             to bottom,
             var(--veil) 0%,
-            var(--veil) 72%,
-            transparent 100%
+            var(--veil) 62%,
+            transparent 96%
           );
         }
       }
@@ -414,12 +418,15 @@
         font-weight: 600;
       }
 
-      /* Hero: a normal-looking landing page (no glass panel) that starts
-         ~1/3 down the screen; the 3D world hides behind the veil above. */
+      /* Hero: a normal-looking landing page (no glass panel). Round-14
+         R14-1: raised from 30vh — on a portrait phone the block sat so
+         low its last line ("Scroll to walk in") hit the bottom edge with
+         a big empty gap above the H1; 15vh reclaims most of that gap
+         while still leaving breathing room over the headline. */
       .chapter.hero {
         display: block;
         min-height: 112vh;
-        padding-top: 30vh;
+        padding-top: 15vh;
       }
       .hero-content {
         max-width: 760px;

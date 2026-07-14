@@ -89,11 +89,17 @@ describe("buildStoryTimeline", () => {
     syncStage(stage);
     expect(stage.camera.position.distanceTo(SKYLINE_CENTER)).toBeLessThan(32);
 
-    timeline.seek(5450); // over the tent camp already (mid-gallery)
+    // Round-14: the camp waypoint is now an APPROACH pose ON the travel
+    // axis (the fly-OVER happens just after, early in the castle leg) —
+    // sitting right on top of the tents put them below the landscape
+    // frustum. What actually matters (tents visible, left of the copy
+    // panel) is pinned by the R14-2 framing test below; this stays a
+    // loose "the journey really is at the camp by now" bound.
+    timeline.seek(5450);
     syncStage(stage);
     expect(
       stage.camera.position.distanceTo(VIGNETTE_ANCHORS.campus),
-    ).toBeLessThan(15);
+    ).toBeLessThan(19);
 
     timeline.seek(6000); // arrival must be COMPLETE (resting) at CTA start
     syncStage(stage);
@@ -142,9 +148,13 @@ describe("buildStoryTimeline", () => {
     const pin = stage.world.getObjectByName("ar-skyline-pin");
     expect(pin).toBeDefined();
 
-    // City-sweep arrival + early along-the-row flight: the pin must sit
-    // inside the frame with margin (|ndc| < 0.85) the whole stretch.
-    for (const t of [4900, 5100]) {
+    // The CITY MOMENT (arrival + the beat it rests there): the pin must
+    // sit inside the frame with margin (|ndc| < 0.85). The window stops
+    // at the camp framing's start (4950) on purpose — round-14 asks the
+    // camera to turn DECISIVELY toward the tents right after the tower
+    // ("deutlich mehr Richtung Zelte guckt"), so holding the tower pin
+    // framed past that point would directly contradict R14-1.
+    for (const t of [4900, 4950]) {
       timeline.seek(t);
       syncStage(stage);
       stage.camera.lookAt(stage.lookTarget);
@@ -195,17 +205,33 @@ describe("buildStoryTimeline", () => {
       expect(part.scale.x).toBeLessThan(0.01);
     }
 
-    timeline.seek(5250); // mid camp approach: STAGGERED — some, not all
+    // Round-14 R14-3: the arrows must still be DOWN while the tents are
+    // only being approached — they pop late, quickly, while the camera is
+    // actually flying over the camp.
+    timeline.seek(5250);
+    for (const arrow of arrows) {
+      expect(arrow.scale.x).toBeLessThan(0.01);
+    }
+
+    timeline.seek(5450); // over the camp: STAGGERED — some, not all
     const popped = arrows.filter((a) => a.scale.x > 0.5).length;
     expect(popped).toBeGreaterThan(0);
     expect(popped).toBeLessThan(arrows.length);
 
-    timeline.seek(5560); // camp flyover done: every arrow stands
+    timeline.seek(5700); // camp flyover done: every arrow stands
     for (const arrow of arrows) {
       expect(arrow.scale.x).toBeGreaterThan(0.9);
     }
 
-    timeline.seek(5700); // approaching the castle: ghost mid-spawn
+    // Round-14 R14-4: the ghost tower may only fade in AFTER the camp is
+    // behind us, while flying at the castle — not while still over the
+    // tents.
+    timeline.seek(5650);
+    for (const part of ghostParts) {
+      expect(part.scale.x).toBeLessThan(0.01);
+    }
+
+    timeline.seek(5820); // flying at the castle: ghost mid-spawn
     const spawned = ghostParts.filter((p) => p.scale.x > 0.5).length;
     expect(spawned).toBeGreaterThan(0);
     expect(spawned).toBeLessThan(ghostParts.length);
@@ -259,6 +285,39 @@ describe("buildStoryTimeline", () => {
       .setY(0)
       .normalize();
     expect(toCastle.dot(travel)).toBeGreaterThan(0.6);
+  });
+
+  it("keeps the tents IN FRAME and clear of the copy panel on a landscape phone (round-14 R14-2)", () => {
+    // Round-14: "die Zelte sind … hinter dem 'What will you build'
+    // Textblock so versteckt". On a landscape phone that panel occupies
+    // the RIGHT ~60% of the frame, so the camp must sit in the LEFT half
+    // — and it must be inside the frustum at all (the first attempt at a
+    // look-ahead framing flew so close over the tents that they fell
+    // BELOW the 55° vertical FOV entirely).
+    const landscape = createStoryStage({
+      world: buildClayWorld("low"),
+      person: buildDotPerson(),
+      markers: buildMarkerPair(),
+      phone: buildPhoneFrame(),
+      camera: new PerspectiveCamera(55, 915 / 412),
+    });
+    const timeline = buildStoryTimeline(landscape, () => {});
+    for (const t of [5350, 5450]) {
+      timeline.seek(t);
+      syncStage(landscape);
+      landscape.camera.lookAt(landscape.lookTarget);
+      landscape.camera.updateMatrixWorld(true);
+      // Tent-height point on the camp, not the ground plane.
+      const ndc = VIGNETTE_ANCHORS.campus
+        .clone()
+        .setY(1.5)
+        .project(landscape.camera);
+      expect(ndc.z, `camp behind camera at ${t}`).toBeLessThan(1);
+      expect(Math.abs(ndc.y), `camp ndc.y at ${t}`).toBeLessThan(0.85);
+      // Left of centre → clear of the right-hand copy panel.
+      expect(ndc.x, `camp ndc.x at ${t}`).toBeLessThan(-0.1);
+      expect(ndc.x, `camp off-frame left at ${t}`).toBeGreaterThan(-0.9);
+    }
   });
 
   it("has the castle in frame EARLY on the approach, on a landscape phone (round-14 R14-4)", () => {

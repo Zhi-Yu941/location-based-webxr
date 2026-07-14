@@ -323,17 +323,22 @@ export function buildStoryTimeline(
   const inwardFrom = (anchor: Vector3) =>
     anchor.clone().setY(0).normalize().multiplyScalar(-1);
 
-  // Camp: 6 units short of the tents on the travel axis, a little inward
-  // for a 3/4 angle, looking 14 units PAST them — the tents fill the
-  // lower centre on approach and pass beneath during the flyover.
+  // Camp: 14 units short of the tents on the travel axis at height 7,
+  // looking 10 units PAST them. The stand-off is load-bearing: a first
+  // attempt sat 6 short at height 8.5, which put the camp ~38° below the
+  // view axis — outside the 55° vertical FOV, so on a landscape phone the
+  // tents fell clean out of frame. At 14/7 the tents sit ~16° below the
+  // axis (comfortably inside) and the camera still flies straight over
+  // them into the castle leg. The lateral offset pushes the camp into the
+  // LEFT half of the frame, clear of the right-hand copy panel (R14-2).
   const campusCamera = VIGNETTE_ANCHORS.campus
     .clone()
-    .sub(travelAxis.clone().multiplyScalar(6))
-    .add(inwardFrom(VIGNETTE_ANCHORS.campus).multiplyScalar(3))
-    .setY(8.5);
+    .sub(travelAxis.clone().multiplyScalar(14))
+    .add(inwardFrom(VIGNETTE_ANCHORS.campus).multiplyScalar(-11))
+    .setY(7);
   const campusLook = VIGNETTE_ANCHORS.campus
     .clone()
-    .add(travelAxis.clone().multiplyScalar(14))
+    .add(travelAxis.clone().multiplyScalar(10))
     .setY(2.5);
 
   // Castle: approached HEAD-ON from the camp side (20 short of it on the
@@ -606,29 +611,36 @@ export function buildStoryTimeline(
     );
   }
 
-  // Round-13 R13-4: the vignette AR overlays spawn DURING the journey.
-  // The campus arrows pop up one after another while the camera
-  // approaches and crosses the tent camp ("nach und nach plopp plopp
+  // Round-13 R13-4 / round-14 R14-3+R14-4: the vignette AR overlays spawn
+  // DURING the journey, each strictly INSIDE its own beat.
+  //
+  // The campus arrows pop one after another ("nach und nach plopp plopp
   // plopp" — outBack gives the plopp; the round-7 monotone-grow rule is
-  // specific to the viewport-filling phone frame), and the castle ghost
-  // builds itself bottom-up (tower → roof → wall) while the camera
-  // flies toward the castle. Everything completes by the castle arrival
-  // (~5980) so chapter END states stay whole compositions (reduced
-  // motion shows those directly).
+  // specific to the viewport-filling phone frame) — but only once the
+  // tents are genuinely in the viewport and the camera is crossing them,
+  // NOT during the approach (round-14: "die sollten sich erst einblenden,
+  // wenn man schon die Zelte so im Viewport hat").
+  //
+  // The castle ghost then builds itself bottom-up (tower → roof → wall)
+  // only AFTER the camp is behind us, while flying at the castle
+  // (round-14: "erst einblenden, wenn man über die Zelte hinweggeflogen
+  // ist und jetzt auf die Burg zufliegt"). The two windows do not
+  // overlap, and both complete by the castle arrival (~5980) so chapter
+  // END states stay whole compositions (reduced motion shows those).
   const campusArrows = world.getObjectByName(VIGNETTE_NODE.campusArrows);
   campusArrows?.children.forEach((arrow, index) => {
     timeline.add(
       arrow,
-      { scale: { from: 0.001, to: 1 }, duration: 180, ease: "outBack" },
-      5080 + index * 120,
+      { scale: { from: 0.001, to: 1 }, duration: 130, ease: "outBack" },
+      5350 + index * 70,
     );
   });
   const castleGhost = world.getObjectByName(VIGNETTE_NODE.ghost);
   castleGhost?.children.forEach((part, index) => {
     timeline.add(
       part,
-      { scale: { from: 0.001, to: 1 }, duration: 200, ease: "outCubic" },
-      5580 + index * 100,
+      { scale: { from: 0.001, to: 1 }, duration: 130, ease: "outCubic" },
+      5720 + index * 65,
     );
   });
 

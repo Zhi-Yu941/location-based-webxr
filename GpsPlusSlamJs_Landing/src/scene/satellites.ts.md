@@ -1,43 +1,44 @@
-# `scene/satellites.ts` — permanent orbiting GPS satellites (№0)
+# `scene/satellites.ts` — roaming GPS satellites (№0)
 
 ## Purpose
 
-Tiny low-poly GPS satellites on slow, tilted circular orbits far above
-the little world — a PERMANENT ambient scene feature (easter-egg catalog
-E2/№0, the maintainer's twist on the dropped Konami satellite show). They
+Tiny low-poly GPS satellites that drift slowly and AUTONOMOUSLY across
+the high sky — a permanent ambient scene feature (catalog E2/№0). They
 echo the real GNSS constellation the product builds on.
 
 ## Public API
 
 - `buildSatellites(): Group` — the `gps-satellites` group (name exported
   as `SATELLITES_NAME`) with two satellites (box body + two solar-panel
-  wings, palette role `satellite` — blue family per the color coding),
-  PARKED at the deterministic clock-zero orbit pose.
-- `updateSatellites(group, timeMs): void` — advance the orbits. Pure in
-  `timeMs`: the same timestamp always yields the same poses.
+  wings, palette role `satellite` — blue family), placed at a fixed,
+  pleasant static PARK pose (visible, high).
+- `updateSatellites(group, timeMs): void` — advance the roaming passes.
+  Pure in `timeMs`: the same timestamp always yields the same poses +
+  visibility.
 
 ## Invariants & assumptions
 
-- **Clock-pure motion:** position/rotation depend only on `timeMs`, never
-  on scroll progress or call history — the story's scrub-path-independence
-  is untouched (same contract as `particles.ts`).
-- **Orbit envelope (test-pinned):** y stays within 28–36, horizontal
-  radius ≤ 20 — over the disc, far above all world content (skyline tops
-  out ~15). The catalog's 35–45 band was consciously lowered at
-  implementation: the screenshot pass (the decision mechanism the
-  catalog itself prescribed) showed 35–45 orbits ABOVE every story
-  framing's frustum — invisible in practice. At 28–36 they cross the
-  visible sky of the pull-back framings (works-anywhere, journey).
-- **Parked = built (test-pinned):** `buildSatellites` places satellites
-  at the t=0 pose, so reduced-motion and low-tier visitors (whose
-  controller never runs the continuous loop) see a complete, static
-  composition — the satellites are never hidden, only frozen.
-- **Gating lives in `scene-controller.ts`:** `updateSatellites` is called
-  next to `updateParticles` under the same scroll-mode + high-tier + tab-
+- **Roaming passes (round-14 R14-9):** instead of fixed circular orbits,
+  each satellite crosses the sky on a long straight track, goes away
+  (`visible = false`) between passes, and returns later on a different,
+  HASHED track — so you only catch one "wenn man Glück hat" while the
+  camera is far out (works-anywhere / journey pull-backs). Two satellites
+  are phase-offset (46 s / 58 s periods) so their windows rarely overlap.
+- **Clock-pure motion:** position/rotation/visibility depend only on
+  `timeMs`, never on scroll or call history (scrub-path independence,
+  test-pinned).
+- **High + within reach (test-pinned):** visible satellites stay y > 20
+  (above the ~15-unit skyline) and within an 80-unit horizontal radius.
+- **Parked = built (test-pinned):** `buildSatellites` places them at a
+  fixed visible high pose; reduced-motion / low-tier visitors (whose
+  controller never runs the continuous loop) see that complete static
+  composition. The roaming schedule takes over on the first
+  `updateSatellites` with no visible jump (scroll mode overwrites the
+  park pose immediately).
+- **Gating lives in `scene-controller.ts`:** `updateSatellites` runs next
+  to `updateParticles` under the same scroll-mode + high-tier + tab-
   visible gate (v3 F2 continuous render).
-- Orbit line consciously omitted (screenshot pass judged the bare
-  satellites sufficient; "keep simple").
-- Deterministic; no RNG.
+- Deterministic; no runtime RNG (a cheap integer hash seeds each pass).
 
 ## Examples
 
@@ -50,6 +51,7 @@ updateSatellites(satellites, performance.now());
 
 ## Tests
 
-`satellites.test.ts` — group/name/role contract, palette-role coverage in
-all palettes, deterministic build parked at t=0, clock purity (history-
-independent poses), orbit envelope sweep (height band + radius bound).
+`satellites.test.ts` — group/name/role contract, palette-role coverage,
+visible-high park pose, deterministic build, clock purity, a pass that
+crosses the sky then goes away, a later differing pass, and the
+height/reach sweep over visible satellites.

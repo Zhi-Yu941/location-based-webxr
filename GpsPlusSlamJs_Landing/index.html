@@ -662,6 +662,35 @@
         font-weight: 600;
       }
 
+      /* Easter-egg toast (catalog №1): the eggs' only feedback channel —
+         a transient status pill above the page chrome, voiced like the
+         .qr-caption. Created lazily by egg-toast.ts; .visible drives the
+         fade so CSS owns the motion. */
+      #egg-toast {
+        position: fixed;
+        left: 50%;
+        bottom: 26px;
+        transform: translate(-50%, 8px);
+        z-index: 30;
+        padding: 10px 18px;
+        border-radius: 999px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        backdrop-filter: blur(10px);
+        color: var(--text);
+        font-size: 0.85rem;
+        font-weight: 600;
+        opacity: 0;
+        pointer-events: none;
+        transition:
+          opacity 0.35s ease,
+          transform 0.35s ease;
+      }
+      #egg-toast.visible {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+
       /* Compact FAQ accordions (v2 B6): native <details>, card-styled to
          match the demo grid. */
       .faq {

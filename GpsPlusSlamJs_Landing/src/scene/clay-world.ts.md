@@ -41,6 +41,9 @@ via a seeded LCG.
   of the `ar-skyline-pin` spot); the round-13 city-sweep framing aims
   at its upper section so the red pin stays in a landscape-phone
   frustum.
+- The built world also contains the geocache chest egg (`geocache.ts`,
+  catalog №1) on the castle vignette's disc, on the side the CTA
+  arrival camera faces.
 
 ## Invariants & assumptions
 

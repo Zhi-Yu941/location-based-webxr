@@ -27,6 +27,8 @@ import { CHAPTERS, sectionElementId } from "./chapters";
 import { heroVeilOpacity } from "./hero-veil";
 import { computeScrollState, type SectionMetrics } from "./scroll-story";
 import { createThemeController, type Theme } from "./theme";
+import { showEggToast } from "./egg-toast";
+import { isGenuineClick } from "./scene/egg-picker";
 import { decideQualityTier } from "./capability";
 import {
   createSceneController,
@@ -126,6 +128,47 @@ function markActiveChapter(
 ): void {
   sections.forEach((el, index) => {
     el.classList.toggle("active", index === activeIndex);
+  });
+}
+
+/**
+ * Easter-egg click glue (catalog §2): forward genuine clicks (no drag,
+ * not on interactive elements or copy panels) to the scene's egg
+ * plumbing as NDC, and surface egg feedback through the toast. Scroll
+ * mode only — under reduced motion the eggs stay static (guardrail:
+ * reduced motion = no new motion).
+ */
+function wireEggClicks(scroller: HTMLElement, scene: SceneController): void {
+  let downAt: { x: number; y: number } | null = null;
+  scroller.addEventListener("pointerdown", (event) => {
+    downAt = { x: event.clientX, y: event.clientY };
+  });
+  scroller.addEventListener("pointerup", (event) => {
+    const start = downAt;
+    downAt = null;
+    if (
+      !start ||
+      !isGenuineClick(start, { x: event.clientX, y: event.clientY })
+    ) {
+      return;
+    }
+    // Interactive elements and copy panels keep their own semantics —
+    // eggs only fire on clicks into the open 3D world.
+    if (
+      event.target instanceof Element &&
+      event.target.closest(
+        "a, button, details, summary, input, .copy, .hero-content",
+      )
+    ) {
+      return;
+    }
+    const result = scene.clickAt({
+      x: (event.clientX / window.innerWidth) * 2 - 1,
+      y: -(event.clientY / window.innerHeight) * 2 + 1,
+    });
+    if (result?.egg === "geocache" && result.opened) {
+      showEggToast("🎉 Cache found — GCLANDING, logged.");
+    }
   });
 }
 
@@ -287,6 +330,7 @@ function boot(): void {
 
   let introRunning = false;
   if (scene && tier.mode === "scroll") {
+    wireEggClicks(scroller, scene);
     if (scroller.scrollTop < 40) {
       scene.playIntro();
       introRunning = true;

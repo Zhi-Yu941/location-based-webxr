@@ -48,6 +48,11 @@ None (side-effect entry module loaded by `index.html`).
 - "Jump to the demos" (R17b) targets the CTA chapter's measured top via
   the same metrics (round-10 R10-2) — scrolling to `scrollHeight`
   overshot into the FAQ once it existed below the demos hub.
+- Easter-egg click glue (catalog §2, scroll mode ONLY — reduced motion
+  keeps eggs static): pointerdown/up on the scroller, drag-filtered via
+  `isGenuineClick`, skipped on interactive elements and copy panels,
+  forwarded to `scene.clickAt` as NDC; egg feedback surfaces through
+  `egg-toast.ts` (geocache open → "Cache found" toast).
 
 ## Examples
 

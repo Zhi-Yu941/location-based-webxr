@@ -10,6 +10,7 @@ import {
   Vector3,
   type MeshStandardMaterial,
 } from "three";
+import { buildGeocache } from "./geocache";
 import { clayMesh, namedGroup } from "./palette";
 import { buildPin } from "./markers";
 import {
@@ -137,6 +138,23 @@ export const VIGNETTE_ANCHORS = {
     .add(skyDirection.clone().multiplyScalar(-16))
     .setY(0),
 } as const;
+
+// Geocache chest anchor (easter-egg №1): on the castle vignette's disc
+// (radius 9 — offset stays well inside), pulled toward the world center
+// (the side the CTA arrival camera looks from) and biased away from the
+// campus like the camera itself.
+const GEOCACHE_ANCHOR = VIGNETTE_ANCHORS.castle
+  .clone()
+  .add(VIGNETTE_ANCHORS.castle.clone().setY(0).normalize().multiplyScalar(-5.2))
+  .add(
+    VIGNETTE_ANCHORS.castle
+      .clone()
+      .sub(VIGNETTE_ANCHORS.campus)
+      .setY(0)
+      .normalize()
+      .multiplyScalar(2.2),
+  )
+  .setY(0);
 
 /** Deterministic LCG (numerical recipes constants) — NOT crypto, just art. */
 function createRng(seed: number): () => number {
@@ -533,6 +551,10 @@ export function buildClayWorld(detail: "high" | "low"): Group {
     buildArContent(),
     // Use-case vignettes (round-11): the gallery journey's destinations.
     buildUseCaseVignettes(VIGNETTE_ANCHORS),
+    // Geocache chest (easter-egg №1): tucked on the castle disc, on the
+    // side the CTA arrival camera faces — palm-sized, hidden in plain
+    // sight. The chest faces the world center like the castle does.
+    buildGeocache(GEOCACHE_ANCHOR),
     // World-detail layer (v3 F7, curb removed in round-9): instanced
     // grass + contact shadows.
     buildGrass(detail, createPathCurve(), Object.values(WORLD_ANCHORS)),

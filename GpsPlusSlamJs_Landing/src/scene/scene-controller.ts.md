@@ -22,7 +22,11 @@ renders on demand.
   `showChapterEndState(chapterIndex)` (reduced-motion),
   `applyTheme(theme)`, `playIntro()` / `skipIntro()`,
   `handleResize(w, h)`, `setPageVisible(visible)` (v3 F2 visibility
-  gate), `tick(nowMs)`, `start()`.
+  gate), `clickAt(ndc) → EggClickResult | null` (easter-egg §2 plumbing:
+  hit-tests the registered egg targets via `egg-picker.ts`, toggles the
+  hit egg — currently the geocache — and reports what happened so
+  main.ts can toast; egg transitions run on wall-clock tick time),
+  `tick(nowMs)`, `start()`.
 - `RendererLike`, `ComposerLike`, `SceneControllerOptions` types (the
   container shape is structural/module-private).
 

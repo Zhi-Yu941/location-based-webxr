@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Color, PerspectiveCamera, Scene } from "three";
+import { Vector3, type Color, type PerspectiveCamera, type Scene } from "three";
 import type { QualityTier } from "../capability";
 import {
   createSceneController,
@@ -97,6 +97,43 @@ describe("createSceneController", () => {
       },
     });
     expect(controller).toBeNull();
+  });
+
+  it("clickAt opens the geocache when aimed at it, misses do nothing (egg §2/№1)", () => {
+    const { controller } = makeController();
+    expect(controller).not.toBeNull();
+    const chest = controller!.stage.world.getObjectByName("geocache-chest");
+    expect(chest).toBeDefined();
+    // Aim the stage camera straight at the chest and click dead-center.
+    const chestPos = chest!.getWorldPosition(new Vector3());
+    controller!.stage.camera.position.copy(
+      chestPos.clone().add(new Vector3(2.5, 1.6, 2.5)),
+    );
+    controller!.stage.camera.lookAt(
+      chestPos.clone().add(new Vector3(0, 0.2, 0)),
+    );
+
+    // A miss (top-left corner) triggers nothing.
+    expect(controller!.clickAt({ x: -0.95, y: 0.95 })).toBeNull();
+
+    const hit = controller!.clickAt({ x: 0, y: 0 });
+    expect(hit).toEqual({ egg: "geocache", opened: true });
+    // The tick loop animates the lid open (wall-clock transition).
+    controller!.tick(0);
+    controller!.tick(400);
+    const lid = chest!.getObjectByName("geocache-lid");
+    expect(lid!.rotation.x).toBeLessThan(-1.5);
+    // Second aimed click closes it again.
+    controller!.stage.camera.position.copy(
+      chestPos.clone().add(new Vector3(2.5, 1.6, 2.5)),
+    );
+    controller!.stage.camera.lookAt(
+      chestPos.clone().add(new Vector3(0, 0.2, 0)),
+    );
+    expect(controller!.clickAt({ x: 0, y: 0 })).toEqual({
+      egg: "geocache",
+      opened: false,
+    });
   });
 
   it("renders on demand only once away from the hero (battery)", () => {

@@ -25,6 +25,8 @@ import {
   updateParticles,
 } from "./particles";
 import { buildSatellites, updateSatellites } from "./satellites";
+import { pickEggTarget, type PointerNdc } from "./egg-picker";
+import { GEOCACHE_NAME, toggleGeocache, updateGeocache } from "./geocache";
 import { buildClayWorld } from "./clay-world";
 import { buildDotPerson } from "./dot-person";
 import { buildMarkerPair } from "./markers";
@@ -115,8 +117,23 @@ export interface SceneControllerOptions {
   readonly onContextRestored?: () => void;
 }
 
+/** What a pointer click on the 3D world hit (easter-egg catalog §2).
+ * Not exported — callers consume it structurally via `clickAt`'s
+ * return type (knip keeps the export surface minimal). */
+interface EggClickResult {
+  readonly egg: "geocache";
+  /** Geocache: whether this click OPENED the chest (toast on open only). */
+  readonly opened: boolean;
+}
+
 export interface SceneController {
   readonly stage: StoryStage;
+  /**
+   * Egg plumbing (§2): hit-test a genuine click (already drag-filtered
+   * by the caller) against the registered egg targets and trigger the
+   * hit egg. Returns what happened, or null on a miss.
+   */
+  clickAt(pointer: PointerNdc): EggClickResult | null;
   /** Scroll mode: set the story progress target (0..1); eased in tick(). */
   setTargetProgress(progress: number): void;
   /** Reduced-motion mode: jump to a chapter's end composition. */
@@ -320,6 +337,9 @@ export function createSceneController(
   let displayedProgress = 0;
   let pageVisible = true;
   let lastTickMs: number | null = null;
+  // Egg targets (§2 plumbing): resolved once — hit-testing is limited
+  // to these registered objects, never the whole scene.
+  const geocache = world.getObjectByName(GEOCACHE_NAME) ?? null;
   let introStartedAt: number | null = null;
   // The camera pose the timelines produced, BEFORE the ambient hero drift
   // is layered on top (the drift is an additive offset, never baked in).
@@ -402,6 +422,22 @@ export function createSceneController(
 
   const controller: SceneController = {
     stage,
+    clickAt(pointer: PointerNdc): EggClickResult | null {
+      if (!geocache) {
+        return null;
+      }
+      // Clicks are rare — refreshing matrices here keeps the pick
+      // correct even when no frame rendered since the last scrub.
+      stage.camera.updateMatrixWorld(true);
+      world.updateWorldMatrix(true, true);
+      const hit = pickEggTarget(pointer, stage.camera, [geocache]);
+      if (hit === GEOCACHE_NAME) {
+        const { opened } = toggleGeocache(geocache, lastTickMs ?? 0);
+        dirty = true;
+        return { egg: "geocache", opened };
+      }
+      return null;
+    },
     setTargetProgress(progress: number) {
       if (Number.isFinite(progress)) {
         targetProgress = Math.min(1, Math.max(0, progress));
@@ -468,6 +504,10 @@ export function createSceneController(
       if (particles && pageVisible) {
         updateParticles(particles, nowMs);
         updateSatellites(satellites, nowMs);
+        dirty = true;
+      }
+      // Event-driven egg transitions (wall-clock, not scroll-driven).
+      if (geocache && updateGeocache(geocache, nowMs)) {
         dirty = true;
       }
       if (dirty) {

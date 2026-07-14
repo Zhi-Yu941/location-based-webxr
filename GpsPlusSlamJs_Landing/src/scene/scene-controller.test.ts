@@ -175,6 +175,30 @@ describe("createSceneController", () => {
     expect(ghostMat().opacity).toBeCloseTo(built, 5);
   });
 
+  it("clickAt makes the dot-person hop and lands it back on the ground (egg §2/№2)", () => {
+    const { controller } = makeController();
+    const person = controller!.stage.person;
+    // Put the walk somewhere on the ground and place the person there.
+    controller!.stage.walk.t = 0.5;
+    controller!.tick(0);
+    const groundY = person.position.y;
+
+    // Aim straight down at the person and click.
+    const personPos = person.getWorldPosition(new Vector3());
+    controller!.stage.camera.position.copy(
+      personPos.clone().add(new Vector3(0, 4, 0.001)),
+    );
+    controller!.stage.camera.lookAt(personPos);
+    expect(controller!.clickAt({ x: 0, y: 0 })).toEqual({ egg: "parkour" });
+
+    // Mid-hop: airborne, clearly above the ground.
+    controller!.tick(250);
+    expect(person.position.y).toBeGreaterThan(groundY + 0.4);
+    // After the hop: back on the ground (offset fully cleared).
+    controller!.tick(1200);
+    expect(person.position.y).toBeCloseTo(groundY, 5);
+  });
+
   it("renders on demand only once away from the hero (battery)", () => {
     // The hero has an ambient drift (below), so render-on-demand is
     // asserted at a mid-story progress where the scene is truly idle.

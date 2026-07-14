@@ -33,6 +33,8 @@ import {
   triggerGhostRestore,
   updateGhostRestore,
 } from "./ghost-restore";
+import { DOT_PERSON_NAME } from "./dot-person";
+import { parkourOffset, triggerParkourHop } from "./parkour";
 import { buildClayWorld } from "./clay-world";
 import { buildDotPerson } from "./dot-person";
 import { buildMarkerPair } from "./markers";
@@ -127,7 +129,7 @@ export interface SceneControllerOptions {
  * Not exported — callers consume it structurally via `clickAt`'s
  * return type (knip keeps the export surface minimal). */
 interface EggClickResult {
-  readonly egg: "geocache" | "ghost-restore";
+  readonly egg: "geocache" | "ghost-restore" | "parkour";
   /** Geocache: whether this click OPENED the chest (toast on open only). */
   readonly opened?: boolean;
 }
@@ -350,9 +352,12 @@ export function createSceneController(
   if (castle) {
     initGhostRestore(castle);
   }
-  const eggTargets = [geocache, castle].filter(
+  // The dot-person lives on the stage, not the world graph.
+  const person = stage.person;
+  const eggTargets = [geocache, castle, person].filter(
     (t): t is NonNullable<typeof t> => t !== null,
   );
+  let parkourActive = false;
   let introStartedAt: number | null = null;
   // The camera pose the timelines produced, BEFORE the ambient hero drift
   // is layered on top (the drift is an additive offset, never baked in).
@@ -440,9 +445,13 @@ export function createSceneController(
         return null;
       }
       // Clicks are rare — refreshing matrices here keeps the pick
-      // correct even when no frame rendered since the last scrub.
+      // correct even when no frame rendered since the last scrub. The
+      // person is a scene child (not under `world`), so update each
+      // target explicitly rather than just the world subtree.
       stage.camera.updateMatrixWorld(true);
-      world.updateWorldMatrix(true, true);
+      for (const target of eggTargets) {
+        target.updateWorldMatrix(true, true);
+      }
       const hit = pickEggTarget(pointer, stage.camera, eggTargets);
       if (hit === GEOCACHE_NAME && geocache) {
         const { opened } = toggleGeocache(geocache, lastTickMs ?? 0);
@@ -453,6 +462,11 @@ export function createSceneController(
         triggerGhostRestore(castle, lastTickMs ?? 0);
         dirty = true;
         return { egg: "ghost-restore" };
+      }
+      if (hit === DOT_PERSON_NAME) {
+        triggerParkourHop(person, lastTickMs ?? 0);
+        dirty = true;
+        return { egg: "parkour" };
       }
       return null;
     },
@@ -531,6 +545,17 @@ export function createSceneController(
       if (castle && updateGhostRestore(castle, nowMs)) {
         dirty = true;
       }
+      // Parkour hop: an additive offset layered on the freshly placed
+      // walk pose. syncStage runs each active frame (and once more when
+      // the hop ends) so the offset never accumulates and resets clean.
+      const hop = parkourOffset(person, nowMs);
+      if (hop.active || parkourActive) {
+        syncStage(stage);
+        person.position.y += hop.y;
+        person.rotation.y += hop.spin;
+        dirty = true;
+      }
+      parkourActive = hop.active;
       if (dirty) {
         camera.lookAt(stage.lookTarget);
         if (composer) {

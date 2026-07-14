@@ -160,14 +160,24 @@ test("all four demo apps stay launchable from the demos hub", async ({
 });
 
 test("FAQ accordions exist and open natively", async ({ page }) => {
-  // The FAQ (v2 B6) is native <details> — no JS involved. Five questions
-  // incl. the license one (round-3 F-drop softened by decision B6).
+  // The FAQ (v2 B6) is native <details> — no JS involved. Round-14
+  // R14-21: four expanders + the license row, which is now a LINK that
+  // opens the repo LICENSE in a new tab (looks like a row, doesn't
+  // expand).
   await page.goto("/");
-  await expect(page.locator(".faq details")).toHaveCount(5);
+  await expect(page.locator(".faq details")).toHaveCount(4);
   const first = page.locator(".faq details").first();
   await first.locator("summary").click();
   await expect(first).toHaveAttribute("open", "");
   await expect(first.locator("p")).toBeVisible();
+
+  const license = page.locator(".faq .faq-link");
+  await expect(license).toHaveAttribute(
+    "href",
+    "https://github.com/cs-util-com/location-based-webxr/blob/main/LICENSE",
+  );
+  await expect(license).toHaveAttribute("target", "_blank");
+  await expect(license).toHaveAttribute("rel", /noopener/);
 });
 
 test("jump-to-demos stops at the demos hub, not the page bottom", async ({

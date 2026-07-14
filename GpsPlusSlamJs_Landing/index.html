@@ -797,6 +797,28 @@
       .faq a {
         color: var(--link);
       }
+      /* License FAQ (round-14 R14-21): looks like a collapsed FAQ row but
+         is an anchor that OPENS the repo LICENSE in a new tab instead of
+         expanding — no community-license prose to maintain. */
+      .faq-link {
+        display: block;
+        background: var(--card);
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        padding: 12px 16px;
+        margin: 0 0 10px;
+        font-weight: 600;
+        font-size: 0.98rem;
+        color: var(--text);
+        text-decoration: none;
+      }
+      .faq-link::before {
+        content: "▸ ";
+      }
+      .faq-link:hover {
+        color: var(--accent);
+        border-color: var(--accent);
+      }
 
       .links {
         max-width: 720px;
@@ -1201,41 +1223,38 @@ world.add(marker);               <span class="c">// marker: any three.js Object3
           </div>
         </div>
 
-        <!-- Compact FAQ (v2 B6): native <details>, no JS. The license
-             question consciously softens round-3's F-drop — license
-             honesty returns in FAQ form, not as a footer disclaimer.
-             The accuracy answer is the locked B10 wording: qualitative,
-             no numeric accuracy classes on the page. -->
+        <!-- Compact FAQ (v2 B6): native <details>, no JS. Round-14
+             reworked the wording; the license row (R14-21) is now a LINK
+             that opens the repo LICENSE in a new tab rather than an
+             expander, so there is no license prose to keep in sync. The
+             accuracy answer stays qualitative (no numeric accuracy
+             classes on the page). -->
         <div class="faq">
           <h3>Common questions</h3>
           <details>
             <summary>Which devices are supported?</summary>
             <p>
-              Android phones with Chrome today — that's where WebXR immersive-ar
-              ships. The framework targets the open WebXR standard, so
-              WebXR-capable headset browsers can render the same experiences.
+              Android phones support full 6-DoF tracking on Chrome today —
+              that's why the framework currently works there and not on iOS. It
+              targets standard WebXR, so any headset that fully supports that
+              standard (including 6-DoF SLAM tracking) will work as well.
             </p>
           </details>
           <details>
             <summary>How accurate is the positioning?</summary>
             <p>
-              Raw GPS is meters off; fusion averages it down as the user walks,
-              and a QR scan snaps the anchor into place instantly.
+              Raw GPS is meters off; fusion averages it down. Try the demo apps
+              to see whether it works for your use case — and use QR codes for
+              extremely accurate, instant anchoring.
             </p>
           </details>
-          <details>
-            <summary>What's the license?</summary>
-            <p>
-              The app framework is Apache-2.0. It bundles a community-licensed
-              core library — full details in the
-              <a
-                href="https://github.com/cs-util-com/location-based-webxr"
-                target="_blank"
-                rel="noopener"
-                >GitHub repository</a
-              >.
-            </p>
-          </details>
+          <a
+            class="faq-link"
+            href="https://github.com/cs-util-com/location-based-webxr/blob/main/LICENSE"
+            target="_blank"
+            rel="noopener"
+            >What's the license?</a
+          >
           <details>
             <summary>Does it need a server or an internet connection?</summary>
             <p>
@@ -1247,9 +1266,10 @@ world.add(marker);               <span class="c">// marker: any three.js Object3
           <details>
             <summary>How do I start building?</summary>
             <p>
-              Clone the repo and run the demos — everything you need comes
-              included. The Minimal Example above is the smallest starting
-              point; the Anchor Starter shows persistent GPS anchors.
+              Clone the repo and run the demo apps to learn the basics. The
+              Minimal Example App is a good starting point, and the Recorder App
+              is the most complex example — you can also use it to record
+              realistic user input for your test-driven development.
             </p>
           </details>
         </div>

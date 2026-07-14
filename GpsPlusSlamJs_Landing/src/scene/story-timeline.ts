@@ -324,13 +324,22 @@ export function buildStoryTimeline(
     anchor.clone().setY(0).normalize().multiplyScalar(-1);
 
   // Camp: 14 units short of the tents on the travel axis at height 7,
-  // looking 10 units PAST them. The stand-off is load-bearing: a first
-  // attempt sat 6 short at height 8.5, which put the camp ~38° below the
-  // view axis — outside the 55° vertical FOV, so on a landscape phone the
-  // tents fell clean out of frame. At 14/7 the tents sit ~16° below the
-  // axis (comfortably inside) and the camera still flies straight over
-  // them into the castle leg. The lateral offset pushes the camp into the
-  // LEFT half of the frame, clear of the right-hand copy panel (R14-2).
+  // looking 10 units past them at head height. Every number here is
+  // pinned by the R14-2 framing test, because the two phone orientations
+  // pull in OPPOSITE directions:
+  //  • The stand-off (14, not 6) — a first attempt flew 6 short at height
+  //    8.5, which put the camp ~38° below the view axis, outside the 55°
+  //    vertical FOV: the tents fell clean out of frame.
+  //  • The lateral bias (−11) — landscape's copy panel owns everything
+  //    right of ndc.x ≈ −0.17, so the camp is pushed left of it. This is
+  //    tuned for LANDSCAPE, which is the orientation the round-14 report
+  //    came from. KNOWN TRADE-OFF (flagged, awaiting a call): portrait's
+  //    horizontal FOV is ~4.9× narrower, so the same push carries the
+  //    camp centre to its left frame edge. The two orientations cannot
+  //    both be satisfied by camera work alone — landscape's panel owns a
+  //    SIDE while portrait's owns the vertical MIDDLE, so "left" and
+  //    "low" are mutually exclusive escapes. The real fix is a narrower
+  //    landscape copy panel; see the round-14 doc.
   const campusCamera = VIGNETTE_ANCHORS.campus
     .clone()
     .sub(travelAxis.clone().multiplyScalar(14))

@@ -6,6 +6,7 @@ import {
   createPathCurve,
   DROP_PATH_T,
   SKYLINE_CENTER,
+  SKYLINE_TOWER_POS,
   VIGNETTE_ANCHORS,
   WORLD_ANCHORS,
   WORLD_NODE,
@@ -281,14 +282,21 @@ export function buildStoryTimeline(
   // the row as approached) and then flies ALONG the whole skyline —
   // passing the TV tower and its red POI pin — straight toward the tent
   // camp. `campusward` is the lateral direction along the row.
+  // Round-13 R13-2: pulled farther back AND aimed at the tower's TOP
+  // (see cityLook below) — up close with a ground-ish look target the
+  // red pin sat ABOVE the landscape-phone frustum (test-pinned via NDC).
   const campusward = VIGNETTE_ANCHORS.campus
     .clone()
     .sub(SKYLINE_CENTER)
     .setY(0)
     .normalize();
-  const citySweepCamera = towardCenter(SKYLINE_CENTER, 20, 12).add(
+  const citySweepCamera = towardCenter(SKYLINE_CENTER, 28, 13).add(
     campusward.clone().multiplyScalar(-16),
   );
+  // The tower's upper section: bulb at ~12.4, spike to ~15.2, pin above.
+  // Aiming here keeps tower top + red pin centered ("mehr auf die Spitze
+  // vom Turm"), not the whole-city average.
+  const cityLook = SKYLINE_TOWER_POS.clone().setY(12);
   const campusCamera = towardCenter(VIGNETTE_ANCHORS.campus, 10, 8.5);
   // Far enough back that the castle rests in the BACKGROUND of the
   // centered CTA copy ("kann im Hintergrund sichtbar bleiben"), not
@@ -374,7 +382,7 @@ export function buildStoryTimeline(
     {
       at: 4400,
       camera: citySweepCamera,
-      look: SKYLINE_CENTER.clone().setY(5),
+      look: cityLook,
       walkT: 0.72,
       cameraDuration: 500,
       walkDuration: 500,

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  Box3,
   PerspectiveCamera,
   Vector3,
   type Mesh,
@@ -9,6 +10,7 @@ import { CHAPTER_COUNT } from "../chapters";
 import {
   buildClayWorld,
   SKYLINE_CENTER,
+  SKYLINE_TOWER_POS,
   VIGNETTE_ANCHORS,
   WORLD_NODE,
 } from "./clay-world";
@@ -119,6 +121,52 @@ describe("buildStoryTimeline", () => {
         VIGNETTE_ANCHORS.castle.clone().add(new Vector3(0, 2.5, 0)),
       ),
     ).toBeLessThan(8);
+  });
+
+  it("focuses the city sweep on the TV tower and keeps its red pin in frame on a landscape phone (round-13 R13-2)", () => {
+    // Round-13 device test: the sweep was "viel zu nah an der Stadt dran"
+    // — the red marker above the tower left the frame exactly when the
+    // camera flew over to it. The framing must aim at the tower's TOP
+    // (not the whole-city average) and stay far enough back that the pin
+    // is comfortably inside the frustum on a LANDSCAPE phone (fov 55 is
+    // vertical, so landscape is the tightest vertical viewport).
+    const stage = createStoryStage({
+      world: buildClayWorld("low"),
+      person: buildDotPerson(),
+      markers: buildMarkerPair(),
+      phone: buildPhoneFrame(),
+      camera: new PerspectiveCamera(55, 915 / 412),
+    });
+    const timeline = buildStoryTimeline(stage, () => {});
+    const pin = stage.world.getObjectByName("ar-skyline-pin");
+    expect(pin).toBeDefined();
+
+    // City-sweep arrival + early along-the-row flight: the pin must sit
+    // inside the frame with margin (|ndc| < 0.85) the whole stretch.
+    for (const t of [4900, 5100]) {
+      timeline.seek(t);
+      syncStage(stage);
+      stage.camera.lookAt(stage.lookTarget);
+      stage.camera.updateMatrixWorld(true);
+      stage.world.updateWorldMatrix(true, true);
+      const pinCenter = new Box3().setFromObject(pin!).getCenter(new Vector3());
+      const ndc = pinCenter.project(stage.camera);
+      expect(Math.abs(ndc.x), `pin ndc.x at ${t}`).toBeLessThan(0.85);
+      expect(Math.abs(ndc.y), `pin ndc.y at ${t}`).toBeLessThan(0.85);
+      expect(ndc.z, `pin behind camera at ${t}`).toBeLessThan(1);
+    }
+
+    // And the look target is the TOWER's upper section, not the city
+    // average at ground-ish height.
+    timeline.seek(4900);
+    syncStage(stage);
+    expect(
+      Math.hypot(
+        stage.lookTarget.x - SKYLINE_TOWER_POS.x,
+        stage.lookTarget.z - SKYLINE_TOWER_POS.z,
+      ),
+    ).toBeLessThan(2);
+    expect(stage.lookTarget.y).toBeGreaterThan(10);
   });
 
   it("moves the camera between chapters when scrubbed", () => {

@@ -112,8 +112,10 @@ const skylineCenter = anchorCurve
 /** Center of the skyline row — the round-11 city-sweep look target. */
 export const SKYLINE_CENTER = skylineCenter;
 
-/** World position of the skyline's TV tower (the second POI pin's spot). */
-const SKYLINE_TOWER_POS = skylineCenter
+/** World position of the skyline's TV tower (the second POI pin's spot).
+ * Exported for the round-13 city-sweep framing: the journey camera aims
+ * at the tower TOP, not the city average. */
+export const SKYLINE_TOWER_POS = skylineCenter
   .clone()
   .add(new Vector3(-skyDirection.z, 0, skyDirection.x).multiplyScalar(4));
 

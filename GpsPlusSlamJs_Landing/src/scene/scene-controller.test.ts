@@ -104,18 +104,28 @@ describe("createSceneController", () => {
     expect(controller).not.toBeNull();
     const chest = controller!.stage.world.getObjectByName("geocache-chest");
     expect(chest).toBeDefined();
-    // Aim the stage camera straight at the chest and click dead-center.
+    // Aim straight DOWN at the chest: the castle vignette shares the disc,
+    // so a shallow angle would graze it — top-down isolates the chest.
     const chestPos = chest!.getWorldPosition(new Vector3());
+    // Camera JUST above the chest looking straight down: any taller
+    // castle tower sharing the column sits above/behind the camera, so
+    // only the chest (nearest) is on the downward ray.
+    const aimAtChest = () => {
+      controller!.stage.camera.position.copy(
+        chestPos.clone().add(new Vector3(0, 1.35, 0.001)),
+      );
+      controller!.stage.camera.lookAt(chestPos);
+    };
+    // A miss: aim at empty sky, nothing registered along the ray.
     controller!.stage.camera.position.copy(
-      chestPos.clone().add(new Vector3(2.5, 1.6, 2.5)),
+      chestPos.clone().add(new Vector3(0, 3, 0)),
     );
     controller!.stage.camera.lookAt(
-      chestPos.clone().add(new Vector3(0, 0.2, 0)),
+      chestPos.clone().add(new Vector3(0, 40, 0)),
     );
+    expect(controller!.clickAt({ x: 0, y: 0 })).toBeNull();
 
-    // A miss (top-left corner) triggers nothing.
-    expect(controller!.clickAt({ x: -0.95, y: 0.95 })).toBeNull();
-
+    aimAtChest();
     const hit = controller!.clickAt({ x: 0, y: 0 });
     expect(hit).toEqual({ egg: "geocache", opened: true });
     // The tick loop animates the lid open (wall-clock transition).
@@ -124,16 +134,45 @@ describe("createSceneController", () => {
     const lid = chest!.getObjectByName("geocache-lid");
     expect(lid!.rotation.x).toBeLessThan(-1.5);
     // Second aimed click closes it again.
-    controller!.stage.camera.position.copy(
-      chestPos.clone().add(new Vector3(2.5, 1.6, 2.5)),
-    );
-    controller!.stage.camera.lookAt(
-      chestPos.clone().add(new Vector3(0, 0.2, 0)),
-    );
+    aimAtChest();
     expect(controller!.clickAt({ x: 0, y: 0 })).toEqual({
       egg: "geocache",
       opened: false,
     });
+  });
+
+  it("clickAt triggers the castle ghost-restore when aimed at it (egg §2/№3)", () => {
+    const { controller } = makeController();
+    const castle = controller!.stage.world.getObjectByName("vignette-castle");
+    expect(castle).toBeDefined();
+    const ghostMat = () => {
+      let mat: { opacity: number } | undefined;
+      castle!.getObjectByName("castle-ghost")?.traverse((obj) => {
+        const m = obj as { isMesh?: boolean; material?: { opacity: number } };
+        if (m.isMesh && m.material) {
+          mat ??= m.material;
+        }
+      });
+      return mat!;
+    };
+    const built = ghostMat().opacity;
+
+    const castlePos = castle!.getWorldPosition(new Vector3());
+    controller!.stage.camera.position.copy(
+      castlePos.clone().add(new Vector3(0, 3, 14)),
+    );
+    controller!.stage.camera.lookAt(
+      castlePos.clone().add(new Vector3(0, 2.5, 0)),
+    );
+    const hit = controller!.clickAt({ x: 0, y: 0 });
+    expect(hit).toEqual({ egg: "ghost-restore" });
+    // Mid-effect the ghost has solidified above its built opacity…
+    controller!.tick(0);
+    controller!.tick(400);
+    expect(ghostMat().opacity).toBeGreaterThan(built + 0.2);
+    // …and after the full cycle it melts back to the built value.
+    controller!.tick(10_000);
+    expect(ghostMat().opacity).toBeCloseTo(built, 5);
   });
 
   it("renders on demand only once away from the hero (battery)", () => {

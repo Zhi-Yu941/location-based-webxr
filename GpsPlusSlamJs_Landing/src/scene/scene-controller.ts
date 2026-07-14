@@ -27,6 +27,12 @@ import {
 import { buildSatellites, updateSatellites } from "./satellites";
 import { pickEggTarget, type PointerNdc } from "./egg-picker";
 import { GEOCACHE_NAME, toggleGeocache, updateGeocache } from "./geocache";
+import { VIGNETTE_NODE } from "./use-case-vignettes";
+import {
+  initGhostRestore,
+  triggerGhostRestore,
+  updateGhostRestore,
+} from "./ghost-restore";
 import { buildClayWorld } from "./clay-world";
 import { buildDotPerson } from "./dot-person";
 import { buildMarkerPair } from "./markers";
@@ -121,9 +127,9 @@ export interface SceneControllerOptions {
  * Not exported — callers consume it structurally via `clickAt`'s
  * return type (knip keeps the export surface minimal). */
 interface EggClickResult {
-  readonly egg: "geocache";
+  readonly egg: "geocache" | "ghost-restore";
   /** Geocache: whether this click OPENED the chest (toast on open only). */
-  readonly opened: boolean;
+  readonly opened?: boolean;
 }
 
 export interface SceneController {
@@ -340,6 +346,13 @@ export function createSceneController(
   // Egg targets (§2 plumbing): resolved once — hit-testing is limited
   // to these registered objects, never the whole scene.
   const geocache = world.getObjectByName(GEOCACHE_NAME) ?? null;
+  const castle = world.getObjectByName(VIGNETTE_NODE.castle) ?? null;
+  if (castle) {
+    initGhostRestore(castle);
+  }
+  const eggTargets = [geocache, castle].filter(
+    (t): t is NonNullable<typeof t> => t !== null,
+  );
   let introStartedAt: number | null = null;
   // The camera pose the timelines produced, BEFORE the ambient hero drift
   // is layered on top (the drift is an additive offset, never baked in).
@@ -423,18 +436,23 @@ export function createSceneController(
   const controller: SceneController = {
     stage,
     clickAt(pointer: PointerNdc): EggClickResult | null {
-      if (!geocache) {
+      if (eggTargets.length === 0) {
         return null;
       }
       // Clicks are rare — refreshing matrices here keeps the pick
       // correct even when no frame rendered since the last scrub.
       stage.camera.updateMatrixWorld(true);
       world.updateWorldMatrix(true, true);
-      const hit = pickEggTarget(pointer, stage.camera, [geocache]);
-      if (hit === GEOCACHE_NAME) {
+      const hit = pickEggTarget(pointer, stage.camera, eggTargets);
+      if (hit === GEOCACHE_NAME && geocache) {
         const { opened } = toggleGeocache(geocache, lastTickMs ?? 0);
         dirty = true;
         return { egg: "geocache", opened };
+      }
+      if (hit === VIGNETTE_NODE.castle && castle) {
+        triggerGhostRestore(castle, lastTickMs ?? 0);
+        dirty = true;
+        return { egg: "ghost-restore" };
       }
       return null;
     },
@@ -508,6 +526,9 @@ export function createSceneController(
       }
       // Event-driven egg transitions (wall-clock, not scroll-driven).
       if (geocache && updateGeocache(geocache, nowMs)) {
+        dirty = true;
+      }
+      if (castle && updateGhostRestore(castle, nowMs)) {
         dirty = true;
       }
       if (dirty) {

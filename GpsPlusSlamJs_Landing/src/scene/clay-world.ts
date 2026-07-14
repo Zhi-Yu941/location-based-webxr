@@ -139,20 +139,21 @@ export const VIGNETTE_ANCHORS = {
     .setY(0),
 } as const;
 
-// Geocache chest anchor (easter-egg №1): on the castle vignette's disc
-// (radius 9 — offset stays well inside), pulled toward the world center
-// (the side the CTA arrival camera looks from) and biased away from the
-// campus like the camera itself.
+// Geocache chest anchor (easter-egg №1): near the world-center-facing
+// RIM of the castle vignette's disc (radius 9), pulled 7.6 units toward
+// the world center so it sits CLEAR of the castle's built footprint
+// (keep/towers span ~±3.5) — buried under a tower it was both invisible
+// and un-clickable — yet still on the disc and in the CTA arrival frame.
 const GEOCACHE_ANCHOR = VIGNETTE_ANCHORS.castle
   .clone()
-  .add(VIGNETTE_ANCHORS.castle.clone().setY(0).normalize().multiplyScalar(-5.2))
+  .add(VIGNETTE_ANCHORS.castle.clone().setY(0).normalize().multiplyScalar(-7.6))
   .add(
     VIGNETTE_ANCHORS.castle
       .clone()
       .sub(VIGNETTE_ANCHORS.campus)
       .setY(0)
       .normalize()
-      .multiplyScalar(2.2),
+      .multiplyScalar(1.6),
   )
   .setY(0);
 

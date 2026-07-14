@@ -60,21 +60,27 @@ try {
 
     for (const target of targets) {
       if (target.startsWith("ms:")) {
-        // Exact timeline position: invert main.ts's mapping — the story
-        // seeks to overallProgress = (scrollTop + viewH/2 - firstTop) /
-        // storyRange (see scroll-story.ts), so solve for scrollTop.
+        // Exact timeline position: invert scroll-story.ts's PIECEWISE
+        // mapping (round-13 follow-up) — storyProgress = (i + f) / N for
+        // the center line at fraction f of section i, so ms decomposes
+        // into a chapter index and an in-section fraction.
         const ms = Number(target.slice(3));
         await page.evaluate(
           ([wantedMs, durationMs]) => {
             const story = document.getElementById("story");
             const sections = [...story.querySelectorAll("section.chapter")];
-            const first = sections[0];
-            const last = sections[sections.length - 1];
-            const storyStart = first.offsetTop;
-            const storyRange = last.offsetTop + last.offsetHeight - storyStart;
             const p = Math.min(1, Math.max(0, wantedMs / durationMs));
+            const scaled = Math.min(
+              p * sections.length,
+              sections.length - 1e-9,
+            );
+            const index = Math.floor(scaled);
+            const fraction = scaled - index;
+            const active = sections[index];
             story.scrollTop =
-              storyStart + p * storyRange - story.clientHeight / 2;
+              active.offsetTop +
+              fraction * active.offsetHeight -
+              story.clientHeight / 2;
           },
           [ms, STORY_DURATION_MS],
         );

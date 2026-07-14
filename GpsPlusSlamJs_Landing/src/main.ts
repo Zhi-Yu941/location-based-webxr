@@ -268,7 +268,7 @@ function boot(): void {
       }
     }
     if (tier.mode === "scroll") {
-      scene?.setTargetProgress(state.overallProgress);
+      scene?.setTargetProgress(state.storyProgress);
     }
   };
 

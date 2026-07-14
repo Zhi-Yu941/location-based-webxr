@@ -4,9 +4,12 @@ import { computeScrollState, type SectionMetrics } from "./scroll-story";
 
 // Why this test matters: the scroll mapping runs on every scroll event with
 // arbitrary real-world metrics (fractional pixels, huge pages, tiny
-// viewports). The invariants below — outputs always in range and monotone in
-// scrollY — are exactly what the timeline scrubbing relies on; a violation
-// would surface as a visual glitch that is very hard to reproduce manually.
+// viewports). The invariants below — outputs always in range, monotone in
+// scrollY, continuous across section boundaries, and the PIECEWISE
+// definition itself (fraction f of section i ⇒ (i+f)/N, independent of the
+// section heights, i.e. of the viewport/layout) — are exactly what the
+// timeline scrubbing relies on; a violation would surface as a visual
+// glitch that is very hard to reproduce manually.
 
 /** Arbitrary list of 1..10 stacked sections with optional gaps. */
 const sectionsArb = fc
@@ -44,8 +47,8 @@ describe("computeScrollState properties", () => {
           expect(state.chapterIndex).toBeLessThan(sections.length);
           expect(state.chapterProgress).toBeGreaterThanOrEqual(0);
           expect(state.chapterProgress).toBeLessThanOrEqual(1);
-          expect(state.overallProgress).toBeGreaterThanOrEqual(0);
-          expect(state.overallProgress).toBeLessThanOrEqual(1);
+          expect(state.storyProgress).toBeGreaterThanOrEqual(0);
+          expect(state.storyProgress).toBeLessThanOrEqual(1);
         },
       ),
     );
@@ -64,9 +67,66 @@ describe("computeScrollState properties", () => {
           expect(after.chapterIndex).toBeGreaterThanOrEqual(
             before.chapterIndex,
           );
-          expect(after.overallProgress).toBeGreaterThanOrEqual(
-            before.overallProgress,
+          expect(after.storyProgress).toBeGreaterThanOrEqual(
+            before.storyProgress,
           );
+        },
+      ),
+    );
+  });
+
+  it("story progress is PIECEWISE: fraction f of section i maps to (i+f)/N regardless of section heights", () => {
+    // This is the round-13 follow-up's core promise: the pairing between
+    // visible copy (which section the center line is in) and the 3D
+    // timeline window is independent of how tall the sections are — and
+    // therefore independent of the viewport that determined those heights.
+    fc.assert(
+      fc.property(
+        sectionsArb,
+        viewportArb,
+        fc.nat(9),
+        // Bounded away from 0/1: reconstructing the center line via
+        // `top + f·h − vh/2` and back loses an ulp, which at the EXACT
+        // section edge flips the active index (the mapping VALUE is
+        // continuous there, so this is a sampling artifact, not a bug).
+        fc.double({ min: 0.001, max: 0.99, noNaN: true }),
+        (sections, vh, indexSeed, fraction) => {
+          const index = indexSeed % sections.length;
+          const section = sections[index];
+          if (section === undefined) {
+            return;
+          }
+          const centerLine = section.top + fraction * section.height;
+          const state = computeScrollState(centerLine - vh / 2, vh, sections);
+          expect(state.chapterIndex).toBe(index);
+          expect(state.storyProgress).toBeCloseTo(
+            (index + fraction) / sections.length,
+            6,
+          );
+        },
+      ),
+    );
+  });
+
+  it("story progress is continuous: a small scroll step never jumps it (no boundary cuts)", () => {
+    // Piecewise mapping must still be seamless at section boundaries and
+    // across gaps (which hold the value flat) — within a section the
+    // slope is 1/(height·N), so a δ step moves the story by at most
+    // δ/(minHeight·N).
+    fc.assert(
+      fc.property(
+        scrollArb,
+        fc.double({ min: 0, max: 1, noNaN: true }),
+        viewportArb,
+        sectionsArb,
+        (scrollY, delta, vh, sections) => {
+          const before = computeScrollState(scrollY, vh, sections);
+          const after = computeScrollState(scrollY + delta, vh, sections);
+          const minHeight = Math.min(...sections.map((s) => s.height));
+          const bound = delta / (minHeight * sections.length) + 1e-9;
+          expect(
+            after.storyProgress - before.storyProgress,
+          ).toBeLessThanOrEqual(bound);
         },
       ),
     );

@@ -8,10 +8,19 @@
  * margins) belong to the previous section with progress clamped at 1, so
  * the story never flickers back and forth at boundaries.
  *
+ * `storyProgress` is PIECEWISE per section (round-13 follow-up): the
+ * center line at fraction f of section i maps to `(i + f) / N`. Because
+ * every chapter owns exactly 1/N of the timeline no matter how tall its
+ * section rendered, the copy↔3D-beat pairing is viewport-independent —
+ * the previous linear mapping ran the 3D beats up to a chapter ahead of
+ * the copy on a landscape phone (the CTA section is far taller than the
+ * rest). The trade-off is accepted: taller sections scrub their chapter
+ * window slower.
+ *
  * All outputs are clamped: chapterIndex ∈ [0, sections.length-1],
- * chapterProgress and overallProgress ∈ [0, 1], and the mapping is
- * monotone in scrollY (pinned by property tests) — the 3D timeline scrub
- * relies on both.
+ * chapterProgress and storyProgress ∈ [0, 1], and the mapping is
+ * monotone AND continuous in scrollY (pinned by property tests) — the 3D
+ * timeline scrub relies on all of it.
  */
 
 export interface SectionMetrics {
@@ -26,14 +35,15 @@ export interface ChapterScrollState {
   readonly chapterIndex: number;
   /** Progress of the viewport-center line through that section, 0..1. */
   readonly chapterProgress: number;
-  /** Progress across the full story scroll range, 0..1. */
-  readonly overallProgress: number;
+  /** Piecewise story progress `(chapterIndex + chapterProgress) / N`,
+   * 0..1 — what the 3D timeline scrub consumes. */
+  readonly storyProgress: number;
 }
 
 const INERT_STATE: ChapterScrollState = {
   chapterIndex: 0,
   chapterProgress: 0,
-  overallProgress: 0,
+  storyProgress: 0,
 };
 
 function clamp01(value: number): number {
@@ -78,8 +88,7 @@ export function computeScrollState(
   const centerLine = safeScrollY + safeViewport / 2;
 
   const first = sections[0];
-  const last = sections[sections.length - 1];
-  if (first === undefined || last === undefined) {
+  if (first === undefined) {
     return INERT_STATE;
   }
 
@@ -88,11 +97,9 @@ export function computeScrollState(
   const chapterProgress =
     active.height > 0 ? clamp01((centerLine - active.top) / active.height) : 0;
 
-  const storyStart = first.top;
-  const storyEnd = last.top + last.height;
-  const storyRange = storyEnd - storyStart;
-  const overallProgress =
-    storyRange > 0 ? clamp01((centerLine - storyStart) / storyRange) : 0;
+  const storyProgress = clamp01(
+    (chapterIndex + chapterProgress) / sections.length,
+  );
 
-  return { chapterIndex, chapterProgress, overallProgress };
+  return { chapterIndex, chapterProgress, storyProgress };
 }

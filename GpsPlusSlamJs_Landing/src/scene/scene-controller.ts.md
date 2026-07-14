@@ -78,7 +78,7 @@ const scene = createSceneController({
 if (!scene) document.body.classList.add("no-webgl");
 scene?.start();
 window.addEventListener("scroll", () =>
-  scene?.setTargetProgress(overallProgress),
+  scene?.setTargetProgress(storyProgress),
 );
 ```
 

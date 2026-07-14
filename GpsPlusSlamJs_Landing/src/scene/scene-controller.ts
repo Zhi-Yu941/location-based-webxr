@@ -24,6 +24,7 @@ import {
   buildParticleField,
   updateParticles,
 } from "./particles";
+import { buildSatellites, updateSatellites } from "./satellites";
 import { buildClayWorld } from "./clay-world";
 import { buildDotPerson } from "./dot-person";
 import { buildMarkerPair } from "./markers";
@@ -229,9 +230,14 @@ export function createSceneController(
     tier.mode === "scroll" && tier.geometryDetail === "high"
       ? buildParticleField()
       : null;
+  // Permanent GPS satellites (easter-egg catalog №0): built on EVERY
+  // tier — reduced motion / low tier show them parked at the built
+  // t=0 pose; only the continuous loop below animates the orbits.
+  const satellites = buildSatellites();
   scene.add(
     world,
     sky,
+    satellites,
     stage.person,
     markers.raw,
     markers.fused,
@@ -454,11 +460,14 @@ export function createSceneController(
         advanceScrub(dt);
       }
       applyAmbientDrift(nowMs);
-      // Continuous particle animation (v3 F2), gated by tab visibility:
+      // Continuous ambient animation (v3 F2), gated by tab visibility:
       // a hidden tab burns no GPU, everything else renders every frame.
       // This consciously supersedes strict render-on-demand (sidecar).
+      // The satellites (№0) ride the same gate: on tiers without the
+      // particle loop they stay parked at their built pose.
       if (particles && pageVisible) {
         updateParticles(particles, nowMs);
+        updateSatellites(satellites, nowMs);
         dirty = true;
       }
       if (dirty) {

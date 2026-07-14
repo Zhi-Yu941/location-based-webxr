@@ -38,6 +38,7 @@ export const PALETTE_ROLES = [
   "tent",
   "ruin",
   "ghost",
+  "satellite",
 ] as const;
 
 export type PaletteRole = (typeof PALETTE_ROLES)[number];
@@ -133,6 +134,8 @@ const LIGHT: ScenePalette = {
     // Ghost = AR-blue family (the color-coding invariant: blue = AR
     // overlay content); the mesh itself is translucent (builder-set).
     ghost: { color: 0x60a5fa },
+    // Satellites (№0): blue family — tech content per the color coding.
+    satellite: { color: 0x5b7fd4 },
   },
 };
 
@@ -185,6 +188,9 @@ const DARK: ScenePalette = {
     tent: { color: 0x7a5f3c, emissiveIntensity: 0.12 },
     ruin: { color: 0x555562, emissiveIntensity: 0.12 },
     ghost: { color: 0x7fb2ff, emissiveIntensity: 0.7 },
+    // Emissive: at ~40 units up the night satellites must self-glow to
+    // read at all (same reasoning as the skyline floor).
+    satellite: { color: 0x7fa8ff, emissiveIntensity: 0.5 },
   },
 };
 
@@ -227,6 +233,7 @@ const NEON: ScenePalette = {
     tent: { color: 0x394a76, emissiveIntensity: 0.2 },
     ruin: { color: 0x232a48, emissiveIntensity: 0.12 },
     ghost: { color: 0x22d3ee, emissiveIntensity: 0.9 },
+    satellite: { color: 0x67e8f9, emissiveIntensity: 0.7 },
   },
 };
 
@@ -269,6 +276,7 @@ const DUSK: ScenePalette = {
     tent: { color: 0x9c6b4e, emissiveIntensity: 0.15 },
     ruin: { color: 0x5f4a7e, emissiveIntensity: 0.1 },
     ghost: { color: 0x93c5fd, emissiveIntensity: 0.6 },
+    satellite: { color: 0x8fb3ff, emissiveIntensity: 0.4 },
   },
 };
 
@@ -313,6 +321,7 @@ const MONO: ScenePalette = {
     tent: { color: 0xb8b8b0 },
     ruin: { color: 0xc4c4bd },
     ghost: { color: 0x2563eb },
+    satellite: { color: 0x2563eb },
   },
 };
 

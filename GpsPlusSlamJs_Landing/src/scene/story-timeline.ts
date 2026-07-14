@@ -306,19 +306,47 @@ export function buildStoryTimeline(
   // Aiming here keeps tower top + red pin centered ("mehr auf die Spitze
   // vom Turm"), not the whole-city average.
   const cityLook = SKYLINE_TOWER_POS.clone().setY(12);
-  const campusCamera = towardCenter(VIGNETTE_ANCHORS.campus, 10, 8.5);
-  // Far enough back that the castle rests in the BACKGROUND of the
-  // centered CTA copy ("kann im Hintergrund sichtbar bleiben"), not
-  // looming over it — and biased AWAY from the campus so the tent the
-  // journey just passed doesn't crowd the frame edge.
-  const awayFromCampus = VIGNETTE_ANCHORS.castle
+
+  // ── Round-14 R14-1/R14-4: the journey now looks where it is GOING.
+  // Until now the camp waypoint looked sideways AT the tents (the camera
+  // sat inward and aimed outward), so the camp read as a fly-BY and the
+  // castle only appeared late. The camp and castle framings are now built
+  // on the camp→castle TRAVEL AXIS: the camera sits just short of the
+  // camp on that axis and looks along it, past the tents, straight at the
+  // castle — one continuous run over the camp and into the arrival.
+  const travelAxis = VIGNETTE_ANCHORS.castle
     .clone()
     .sub(VIGNETTE_ANCHORS.campus)
     .setY(0)
     .normalize();
-  const castleCamera = towardCenter(VIGNETTE_ANCHORS.castle, 24, 7.5).add(
-    awayFromCampus.multiplyScalar(9),
-  );
+  /** Lateral direction from an anchor toward the world center (xz). */
+  const inwardFrom = (anchor: Vector3) =>
+    anchor.clone().setY(0).normalize().multiplyScalar(-1);
+
+  // Camp: 6 units short of the tents on the travel axis, a little inward
+  // for a 3/4 angle, looking 14 units PAST them — the tents fill the
+  // lower centre on approach and pass beneath during the flyover.
+  const campusCamera = VIGNETTE_ANCHORS.campus
+    .clone()
+    .sub(travelAxis.clone().multiplyScalar(6))
+    .add(inwardFrom(VIGNETTE_ANCHORS.campus).multiplyScalar(3))
+    .setY(8.5);
+  const campusLook = VIGNETTE_ANCHORS.campus
+    .clone()
+    .add(travelAxis.clone().multiplyScalar(14))
+    .setY(2.5);
+
+  // Castle: approached HEAD-ON from the camp side (20 short of it on the
+  // same axis, angled inward so the ruin's ghost face is toward us). The
+  // just-passed camp is now BEHIND the camera, so it cannot crowd the
+  // frame — which is what the old "bias away from the campus" offset
+  // existed to prevent. Far enough back that the castle rests in the CTA
+  // copy's BACKGROUND rather than looming over it.
+  const castleCamera = VIGNETTE_ANCHORS.castle
+    .clone()
+    .sub(travelAxis.clone().multiplyScalar(18))
+    .add(inwardFrom(VIGNETTE_ANCHORS.castle).multiplyScalar(11))
+    .setY(8);
 
   // The camera path as an explicit framing CHAIN: each move tweens from the
   // previous framing to its own, so scrubbing is continuous by construction
@@ -399,7 +427,7 @@ export function buildStoryTimeline(
     {
       at: 4950,
       camera: campusCamera,
-      look: VIGNETTE_ANCHORS.campus.clone().add(new Vector3(0, 1.2, 0)),
+      look: campusLook,
       walkT: 0.8,
       cameraDuration: 500,
       walkDuration: 500,

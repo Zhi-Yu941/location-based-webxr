@@ -225,6 +225,67 @@ describe("buildStoryTimeline", () => {
     }
   });
 
+  it("flies ALONG the travel direction over the camp and reaches the castle head-on (round-14 R14-1/R14-4)", () => {
+    // Round-14 device test: over the tents the camera "bleibt halt so
+    // seitlich" — it looked sideways AT the camp instead of along its own
+    // flight path, so the tents read as a fly-by rather than a fly-over
+    // and the castle appeared late. The journey must now look where it
+    // is GOING: at the camp the view direction aligns with the
+    // camp→castle travel axis, so the camera flies straight over the
+    // tents and on into the castle.
+    const timeline = buildStoryTimeline(stage, () => {});
+    const travel = VIGNETTE_ANCHORS.castle
+      .clone()
+      .sub(VIGNETTE_ANCHORS.campus)
+      .setY(0)
+      .normalize();
+
+    timeline.seek(5450); // over/at the camp
+    syncStage(stage);
+    const atCamp = stage.lookTarget
+      .clone()
+      .sub(stage.camera.position)
+      .setY(0)
+      .normalize();
+    expect(atCamp.dot(travel)).toBeGreaterThan(0.6);
+
+    // Still heading that way mid castle-approach (a straight run, not a
+    // sideways drift).
+    timeline.seek(5700);
+    syncStage(stage);
+    const toCastle = stage.lookTarget
+      .clone()
+      .sub(stage.camera.position)
+      .setY(0)
+      .normalize();
+    expect(toCastle.dot(travel)).toBeGreaterThan(0.6);
+  });
+
+  it("has the castle in frame EARLY on the approach, on a landscape phone (round-14 R14-4)", () => {
+    // The maintainer wants to "die Burg schon was früher sehen" and watch
+    // the ghost tower fade in while flying at it — so the castle must be
+    // inside the frustum well before the arrival settles.
+    const landscape = createStoryStage({
+      world: buildClayWorld("low"),
+      person: buildDotPerson(),
+      markers: buildMarkerPair(),
+      phone: buildPhoneFrame(),
+      camera: new PerspectiveCamera(55, 915 / 412),
+    });
+    const timeline = buildStoryTimeline(landscape, () => {});
+    timeline.seek(5700); // mid-approach, long before the 5980 arrival
+    syncStage(landscape);
+    landscape.camera.lookAt(landscape.lookTarget);
+    landscape.camera.updateMatrixWorld(true);
+    const ndc = VIGNETTE_ANCHORS.castle
+      .clone()
+      .setY(3)
+      .project(landscape.camera);
+    expect(Math.abs(ndc.x)).toBeLessThan(0.9);
+    expect(Math.abs(ndc.y)).toBeLessThan(0.9);
+    expect(ndc.z).toBeLessThan(1); // in front of the camera
+  });
+
   it("moves the camera between chapters when scrubbed", () => {
     const timeline = buildStoryTimeline(stage, () => {});
     timeline.seek(50);

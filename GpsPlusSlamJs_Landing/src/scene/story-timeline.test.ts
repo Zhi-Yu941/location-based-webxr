@@ -215,28 +215,27 @@ describe("buildStoryTimeline", () => {
       expect(part.scale.x).toBeLessThan(0.01);
     }
 
-    // Round-15: the arrows now pop while the camera is FLYING AT the
-    // tents — during the stretch between the two copy blocks — so the
-    // FIRST one is already visible by ~10 % into the gallery window
-    // ("während man bei 10 % ist … sollte schon der erste AR-Pfeil bei
-    // den Zelten sichtbar sein"). They must still be down before that
-    // approach begins.
+    // Round-14 R14-13 (portrait feedback): the arrows must NOT pop while
+    // the camera is still swinging toward the tents (the camp move is
+    // 4850→5150) — they start only AFTER it has arrived, so they are down
+    // through the whole approach.
     timeline.seek(4880);
     for (const arrow of arrows) {
       expect(arrow.scale.x).toBeLessThan(0.01);
     }
+    timeline.seek(5100); // still approaching the tents: nothing up yet
+    for (const arrow of arrows) {
+      expect(arrow.scale.x).toBeLessThan(0.01);
+    }
 
-    // Mid-run at the tents (they are at their best framing here, between
-    // the two copy blocks): the first arrows are already popping.
-    timeline.seek(5040);
+    // Just after the camp arrival (5150): the arrows pop in a quick,
+    // tight stagger so they all land at nearly the same moment.
+    timeline.seek(5240);
     const onRun = arrows.filter((a) => a.scale.x > 0.5).length;
     expect(onRun).toBeGreaterThan(0);
     expect(onRun).toBeLessThan(arrows.length); // …still staggering
 
-    timeline.seek(5100); // ~10 % into the gallery: arrows visibly up
-    expect(arrows.filter((a) => a.scale.x > 0.5).length).toBeGreaterThan(1);
-
-    timeline.seek(5400); // at the camp: every arrow stands
+    timeline.seek(5400); // settled at the camp: every arrow stands
     for (const arrow of arrows) {
       expect(arrow.scale.x).toBeGreaterThan(0.9);
     }

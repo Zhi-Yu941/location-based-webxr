@@ -651,12 +651,20 @@ export function buildStoryTimeline(
   // ist und jetzt auf die Burg zufliegt"). The two windows do not
   // overlap, and both complete by the castle arrival (~5980) so chapter
   // END states stay whole compositions (reduced motion shows those).
+  // Round-14 R14-13 (portrait feedback): the first arrow used to pop at
+  // 4940 — WHILE the camera was still swinging toward the tents (the camp
+  // move is 4850→5150), so it appeared before the camera had arrived.
+  // Delayed to just AFTER the camp arrival (5180) with a tighter,
+  // faster stagger, so the arrows appear once the tents are framed and
+  // all land at nearly the same moment ("etwas nach hinten verzögern und
+  // die Pfeile lieber schneller spawnen"). All up by ~5350, well before
+  // the castle swing at 5500.
   const campusArrows = world.getObjectByName(VIGNETTE_NODE.campusArrows);
   campusArrows?.children.forEach((arrow, index) => {
     timeline.add(
       arrow,
-      { scale: { from: 0.001, to: 1 }, duration: 110, ease: "outBack" },
-      4940 + index * 60,
+      { scale: { from: 0.001, to: 1 }, duration: 80, ease: "outBack" },
+      5180 + index * 30,
     );
   });
   const castleGhost = world.getObjectByName(VIGNETTE_NODE.ghost);

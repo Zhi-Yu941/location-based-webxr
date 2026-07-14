@@ -1,4 +1,11 @@
-import { ConeGeometry, SphereGeometry, type Group, type Vector3 } from "three";
+import {
+  ConeGeometry,
+  Mesh,
+  MeshBasicMaterial,
+  SphereGeometry,
+  type Group,
+  type Vector3,
+} from "three";
 import { clayMesh, namedGroup } from "./palette";
 
 /**
@@ -14,6 +21,9 @@ import { clayMesh, namedGroup } from "./palette";
 
 export const BIRD_NAME = "hidden-bird";
 export const BIRD_LINK = "https://x.com/csutil_com";
+/** Radius of the invisible tap proxy — the visible bird is only ~0.16
+ * across, far too small to tap on a phone (round-14 R14-3). */
+export const BIRD_HIT_RADIUS = 0.75;
 
 /** Build the perched bird at `anchor` (its feet). */
 export function buildBird(anchor: Vector3): Group {
@@ -39,7 +49,20 @@ export function buildBird(anchor: Vector3): Group {
   tail.position.set(0, 0.18, -0.22);
   tail.castShadow = false;
 
-  bird.add(body, head, beak, tail);
+  // Invisible tap proxy (round-14 R14-3): the bird was un-tappable on a
+  // phone — a few pixels of geometry. This larger sphere gives the
+  // raycast a generous target without changing the bird's look. Rendered
+  // (visible) but fully transparent so the raycaster still hits it; not
+  // palette-tagged, so the theme traversal leaves it alone.
+  const hit = new Mesh(
+    new SphereGeometry(BIRD_HIT_RADIUS, 6, 4),
+    new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
+  );
+  hit.position.y = 0.25;
+  hit.castShadow = false;
+  hit.receiveShadow = false;
+
+  bird.add(body, head, beak, tail, hit);
   bird.position.copy(anchor);
   return bird;
 }

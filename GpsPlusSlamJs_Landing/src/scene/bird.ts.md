@@ -20,6 +20,12 @@ tab.
   AR-coded role (`arrow`/`label`/`ghost`/`satellite`/`screen`/`phone`).
   (Raw hue can't be the check: the neon palette blue-tints ALL scenery
   by design, so the test guards the ROLE, not the channel values.)
+- **Invisible tap proxy (round-14 R14-3):** the visible bird is only
+  ~0.16 units across — un-tappable on a phone. A larger transparent
+  `SphereGeometry` (`BIRD_HIT_RADIUS`) rides along so the raycast has a
+  generous target; it's rendered-but-transparent (raycaster still hits
+  it) and carries no palette role. Test-pinned: a ray 0.45 units off the
+  bird center still returns the bird.
 - Deterministic; no RNG. Sits at its anchor (test-pinned).
 - The click opens the profile in `main.ts` (`window.open(BIRD_LINK,
 '_blank', 'noopener')`) — `scene-controller.clickAt` returns

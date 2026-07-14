@@ -5,8 +5,9 @@
  * per the color-coding invariant (no blue-bird pun).
  */
 import { describe, expect, it } from "vitest";
-import { Vector3, type Mesh } from "three";
-import { BIRD_LINK, BIRD_NAME, buildBird } from "./bird";
+import { PerspectiveCamera, Vector3, type Mesh } from "three";
+import { BIRD_HIT_RADIUS, BIRD_LINK, BIRD_NAME, buildBird } from "./bird";
+import { pickEggTarget } from "./egg-picker";
 
 // The AR/tech blue family — reserved for AR overlay content by the
 // color-coding invariant. The bird must use NONE of these (no blue-bird
@@ -56,6 +57,21 @@ describe("buildBird", () => {
         false,
       );
     }
+  });
+
+  it("has a tap proxy big enough to hit off-center on a phone (round-14 R14-3)", () => {
+    // The visible bird is only ~0.16 units across — a few pixels on a
+    // phone, so a real tap missed the geometry and nothing opened. A
+    // ray aimed 0.45 units to the SIDE of the bird (well outside the
+    // body) must still register the bird via its invisible hit proxy.
+    const bird = buildBird(new Vector3(0, 0, 0));
+    bird.updateWorldMatrix(true, true);
+    expect(BIRD_HIT_RADIUS).toBeGreaterThan(0.5);
+    const cam = new PerspectiveCamera(55, 1);
+    cam.position.set(0.45, 0.25, 4);
+    cam.lookAt(0.45, 0.25, 0); // center ray passes 0.45 beside the bird
+    cam.updateMatrixWorld(true);
+    expect(pickEggTarget({ x: 0, y: 0 }, cam, [bird])).toBe(BIRD_NAME);
   });
 
   it("is deterministic and sits at its anchor", () => {

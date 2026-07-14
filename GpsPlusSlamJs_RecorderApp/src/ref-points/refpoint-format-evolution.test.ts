@@ -375,7 +375,7 @@ describe('Ref Point Format Evolution (old vs new recording)', () => {
   // -------------------------------------------------------------------------
   describe('Positioning-in-3D contract', () => {
     /**
-     * The visualizer (`RefPointVisualizer.displayPriorRefPoints`) needs only
+     * The visualizer (`RefPointVisualizer.syncRefPoints`) needs only
      * `{ lat, lon, altitude? }` and a zero-reference. Both eras supply lat
      * and lon on every observation, so no H3-cell-center fallback is ever
      * needed to place the sphere in `scene` space via

@@ -6,7 +6,7 @@ Indexes full `RefPointDefinition` objects from the recording ZIPs in a folder,
 **grouped per scenario** (resolved from each ZIP's `session.json`) with
 observations merged/deduplicated per ref-point id. This single pass powers
 both folder-import flows of the 2026-07-05 plan (see
-`GpsPlusSlamJs_Docs/docs/2026-07-05-recorder-folder-import-indexing-progress-plan.md`):
+`GpsPlusSlamJs_Docs/docs/2026-07-05-0611-recorder-folder-import-indexing-progress-plan.md`):
 the **eager** full-folder pass at folder-pick time (D1) and the **lazy**
 scenario-change recovery safety net — both persisted by folder-manager's
 strict per-scenario gap-fill (D4a/D4b).

@@ -97,12 +97,6 @@ function migrateErasIfNeeded(
     return actions;
   }
 
-  if (version === 3) {
-    // Era 3: positions are raw WebXR (correct).
-    // GPS payloads use old `gpsPoint` field with derived fields — rename + strip.
-    return actions.map((action) => migrateGpsPointField(action));
-  }
-
   if (version === 2) {
     // Era 2: positions were converted to NUE at dispatch time.
     // Reverse them to raw WebXR so the reducer can apply webxrToNUE().
@@ -110,9 +104,12 @@ function migrateErasIfNeeded(
     return actions.map((action) => migrateGpsPointField(reverseEra2(action)));
   }
 
-  // Era 1 (no version or version < 2): positions are raw WebXR (correct).
-  // GPS payloads use old `gpsPoint` with ENU coordinates — rename + strip
-  // (coordinates are stripped so no ENU→NUE swap needed).
+  // Eras 1 and 3 (no version, version < 2, or version 3): positions are raw
+  // WebXR (correct); GPS payloads use the old `gpsPoint` field — rename +
+  // strip. Era 1 carries ENU coordinates but they are stripped anyway (no
+  // swap needed); era 3 carries derived fields the strip removes. The
+  // transformation is byte-identical for both, so they share this path (the
+  // former separate `version === 3` branch duplicated it — quality-review D-4).
   return actions.map((action) => migrateGpsPointField(action));
 }
 

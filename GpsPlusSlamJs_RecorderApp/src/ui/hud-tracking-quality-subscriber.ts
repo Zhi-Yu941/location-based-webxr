@@ -22,6 +22,7 @@ import {
 } from 'gps-plus-slam-app-framework/state/tracking-quality';
 import type { RecorderStore } from '../state/recorder-store';
 import type { StoreRef } from '../state/store-ref';
+import { followStore } from '../state/store-ref';
 
 export interface SubscribeHudToTrackingQualityOptions {
   readonly storeRef: StoreRef<RecorderStore>;
@@ -59,14 +60,6 @@ export function subscribeHudToTrackingQuality(
     });
   };
 
-  let detach = attach(storeRef.get());
-  const unsubscribeSwap = storeRef.subscribe((nextStore) => {
-    detach();
-    detach = attach(nextStore);
-  });
-
-  return () => {
-    detach();
-    unsubscribeSwap();
-  };
+  // Store-swap following via the shared helper (quality-review G-11).
+  return followStore(storeRef, attach);
 }

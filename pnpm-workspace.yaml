@@ -16,7 +16,7 @@ allowBuilds:
   esbuild: true
 
 # Supply-chain embargo (decided 2026-07-09, see the private repo's
-# GpsPlusSlamJs_Docs/docs/2026-07-09-pnpm11-upgrade-and-publish-via-pnpm-plan.md
+# GpsPlusSlamJs_Docs/docs/2026-07-09-2329-pnpm11-upgrade-and-publish-via-pnpm-plan.md
 # scope item 6): keep pnpm 11's default 24 h minimumReleaseAge for
 # third-party packages (written explicitly for self-documentation), but
 # exclude our own packages so the AppFramework's `gps-plus-slam-js: ^x.y.z`

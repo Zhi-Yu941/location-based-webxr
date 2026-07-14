@@ -20,25 +20,26 @@
   the prod-inert guarantee in [seams.ts.md](seams.ts.md).
 - **Key flow:**
   - `main()` probes `checkWebXRSupport` + `checkGeolocationPermission`; if not
-    fully supported, shows `capabilityMessage` (E1) and disables Start.
+    fully supported, shows `capabilityMessage` (E1, from the framework's
+    [ar/capability-checker](../../GpsPlusSlamJs_AppFramework/src/ar/capability-checker.ts.md)
+    with `contextLabel: "the persistent-anchor flow"`) and disables Start.
   - `startAr()` (user gesture): `createSlamAppStore({ NullStorageBackend })` →
-    `getSeams().setTrackingStore` **+ `getSeams().setTrackingCallbacks`** (BOTH
-    are required before
-    `initAR`: the framework's per-frame `updateTrackingState()` only dispatches
-    `poseReceived`/`poseLost` into the store when a store **and** a restart
-    callback are wired — wiring only the store leaves `tracking.phase` stuck at
-    `initializing`, which pins the tracking-quality report and the onboarding
-    guidance to "AR tracking lost" forever; the callback also dispatches
-    `odometryTrackingRestarted(payload)` so alignment survives origin resets.
-    Both go through the seam so the Tier 1 e2e suite can assert the wiring
-    actually happens — `placement-flow.spec.js` checks both calls fired during
-    boot) →
     `initAR` (with the camera/depth crash-surface flags
     `enableCameraAccess` / `enableDepthSensingFeature` /
-    `enableCameraTextureAcquisition` set to `false`, and `requestHitTest: true`
-    in the session-features arg so the cache-miss reticle works; this example
-    places 3D anchors under a screen-centre hit-test reticle and never reads the
-    camera image; `dom-overlay` / CSS3D stay on for the overlay UI) →
+    `enableCameraTextureAcquisition` set to `false`, `requestHitTest: true`
+    in the session-features arg so the cache-miss reticle works, and the
+    **`callbacks.tracking` group** — store + `onRestarted` arrive TOGETHER
+    since the framework's setter fold. Without the group the framework's
+    per-frame `updateTrackingState()` dispatches no `poseReceived`/`poseLost`,
+    leaving `tracking.phase` stuck at `initializing`, which pins the
+    tracking-quality report and the onboarding guidance to "AR tracking lost"
+    forever; the `onRestarted` callback dispatches
+    `odometryTrackingRestarted(payload)` so alignment survives origin resets.
+    `initAR` goes through the seam so the Tier 1 e2e suite can assert the
+    wiring actually happens — `placement-flow.spec.js` checks the group rode
+    into the boot `initAR` call. This example places 3D anchors under a
+    screen-centre hit-test reticle and never reads the camera image;
+    `dom-overlay` / CSS3D stay on for the overlay UI) →
     `startSession` (so the GPS coordinator
     feeds alignment) → `enableArWorldGroupAlignment({ store, arWorldGroup })`
     (lerps the alignment onto `arWorldGroup` so the camera + anchor ride it
@@ -62,8 +63,11 @@
     spawn → `PLACE_FAILED` (revert + error line) and `dispose()`s any partially
     created `anchor` so a retry can never accumulate overlapping markers.
   - `spawnAnchor()` builds `createGpsAnchor` with `getAlignmentMatrix` /
-    `getGpsZeroRef` bound to the live store, and `getCurrentGpsPoint` bound to
-    the marker's own **GPS-world (NUE) world pose** via `worldNueToGps`. Its
+    `getGpsZeroRef` bound to the live store; the bootstrap GPS source is the
+    framework anchor's **built-in object-pose sampler** (quality-review G-6 —
+    the hand-built `getCurrentGpsPoint`/`worldNueToGps` closure this app used
+    to carry is now the anchor default), sampling the marker's own
+    **GPS-world (NUE) world pose**. Its
     optional `{ worldPosition }` places the marker at the reticle hit point
     (world→`arWorldGroup`-local); `{ onBootstrapComplete }` is forwarded to the
     anchor so the cache-miss path can persist the committed median into `?show=`.
@@ -94,23 +98,25 @@
     the AR render loop automatically.
   - `lastGps` always carries a finite altitude (defaults to `0`) so the anchor
     seed is a well-formed `LatLongAlt`.
-  - **Cache-miss bootstrap source is the marker's own world pose**
-    (`getCurrentGpsPoint` → `worldNueToGps(marker.getWorldPosition(), zero)`),
+  - **Cache-miss bootstrap source is the marker's own world pose** (the
+    framework anchor's built-in object-pose sampler, quality-review G-6),
     matching the MinimalExample — the marker is positioned at the reticle hit
     point, so the anchor commits to the point the user aimed at, not the device.
     This works only because `enableArWorldGroupAlignment` makes the marker's
     world position GPS-world NUE. The persisted `?show=` is the **committed
     bootstrap median** (via `onBootstrapComplete`), so the shared link equals
     the anchor's committed reference by construction and stays correct across
-    re-bootstraps. (Cache-hit uses `skipBootstrap`, so its `getCurrentGpsPoint`
-    is never sampled and the URL GPS is the decoded one.)
+    re-bootstraps. (Cache-hit uses `skipBootstrap`, so the bootstrap sampler
+    never runs and the URL GPS is the decoded one.)
 - **Tests:** glue is verified manually via `pnpm dev` on an AR device. The
   decision logic it composes is unit-tested in the sibling modules
   ([setup-state-machine](setup-state-machine.ts.md),
   [placement-decision](placement-decision.ts.md),
   [url-anchor-state](url-anchor-state.ts.md),
   [guidance-view](guidance-view.ts.md), [placement-view](placement-view.ts.md),
-  [capability](capability.ts.md), [marker](marker.ts.md)). The reticle loop
+  [marker](marker.ts.md)) and in the framework
+  ([ar/capability-checker](../../GpsPlusSlamJs_AppFramework/src/ar/capability-checker.ts.md),
+  which replaced the app-local `capability.ts`). The reticle loop
   ([reticle-hit-test](reticle-hit-test.ts.md)) is device-only glue. The
   placement glue — including the reticle gate (place when a surface is present,
   hint when not) and the failure cleanup that prevents leaked / overlapping

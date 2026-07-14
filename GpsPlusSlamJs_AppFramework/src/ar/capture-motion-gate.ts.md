@@ -56,5 +56,5 @@
   window not calm.
 
 - **Related docs:**
-  `GpsPlusSlamJs_Docs/docs/2026-06-23-blurry-frame-motion-gating-plan.md`
+  `GpsPlusSlamJs_Docs/docs/2026-06-23-2105-blurry-frame-motion-gating-plan.md`
   (§4.2-4.4), `pose-motion.ts.md`, `image-capture.ts.md`.

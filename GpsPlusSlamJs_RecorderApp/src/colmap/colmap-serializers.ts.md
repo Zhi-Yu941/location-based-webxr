@@ -5,7 +5,7 @@
 Pure string builders for the three COLMAP `sparse/0/` model files. No I/O, no
 state — they take already-converted records and return file text. Part of the
 COLMAP/3DGS export
-([2026-06-13-colmap-export-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-colmap-export-plan.md)
+([2026-06-13-1205-colmap-export-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-1205-colmap-export-plan.md)
 §5, Iter 2).
 
 ## Public API

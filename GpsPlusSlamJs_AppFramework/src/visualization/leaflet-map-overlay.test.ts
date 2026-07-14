@@ -278,7 +278,7 @@ describe('LeafletMapOverlay', () => {
     // |h| below it crosses whenever tan(pitch) < d/|h|, so the achievable
     // guarantee is: no corner crosses at any camera yaw / heading-up yaw for
     // pitches ≥ the design pitch θ*. See the F1 spec in
-    // GpsPlusSlamJs_Docs/docs/2026-07-04-ar-clipping-planes-and-lifecycle-plan.md.
+    // GpsPlusSlamJs_Docs/docs/2026-07-04-1626-ar-clipping-planes-and-lifecycle-plan.md.
     it('defaults satisfy |zOff| + s/√2 + lag ≤ |h|·tan(θ*) for θ* = 51°', () => {
       // Follower position-lerp lag while walking (metres, conservative).
       const LAG_MARGIN_M = 0.5;

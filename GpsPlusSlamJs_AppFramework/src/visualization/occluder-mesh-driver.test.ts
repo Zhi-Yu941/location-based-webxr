@@ -490,7 +490,7 @@ describe('OccluderMeshDriver', () => {
   });
 
   // Mesh-time stats — the freshness instrumentation for the Phase-2 gate
-  // (2026-07-01-occluder-worker-and-chunked-remesh-plan.md §"Next step"): the
+  // (2026-07-01-0733-occluder-worker-and-chunked-remesh-plan.md §"Next step"): the
   // on-device walk reads the occluder's freshness latency off these numbers
   // instead of estimating it by feel, so each completed job must report its
   // wall-clock duration + input size. Failed jobs report nothing (they already

@@ -21,7 +21,6 @@ import {
   showRecordingControls,
   setStopButtonBusy,
   setPermissionsReady,
-  setFolderSelected,
   setSaveLocationSelected,
   setFolderImportExpanded,
   setFolderImportProgress,
@@ -320,7 +319,6 @@ describe('validateEnterButton', () => {
   it('shows permission hint when permissions not ready', () => {
     setupMinimalDOM();
     initUI(createMockCallbacks());
-    setFolderSelected(true); // Storage setup complete
     setSaveLocationSelected(true);
     setPermissionsReady(false);
 
@@ -343,7 +341,6 @@ describe('validateEnterButton', () => {
   it('enables button when a scenario is selected', () => {
     setupMinimalDOM();
     initUI(createMockCallbacks());
-    setFolderSelected(true); // Storage setup complete
     setSaveLocationSelected(true);
     setPermissionsReady(true); // Permissions must be ready for scenario checks
 
@@ -373,7 +370,6 @@ describe('validateEnterButton', () => {
   it('disables button when __new__ is selected without a name', () => {
     setupMinimalDOM();
     initUI(createMockCallbacks());
-    setFolderSelected(true); // Storage setup complete
     setSaveLocationSelected(true);
     setPermissionsReady(true); // Permissions must be ready for scenario checks
 
@@ -406,7 +402,6 @@ describe('validateEnterButton', () => {
   it('enables button when __new__ is selected with a name', () => {
     setupMinimalDOM();
     initUI(createMockCallbacks());
-    setFolderSelected(true); // Storage setup complete
     setSaveLocationSelected(true);
     setPermissionsReady(true); // Permissions must be ready for scenario checks
 
@@ -441,7 +436,6 @@ describe('validateEnterButton', () => {
   it('does not require a folder — Enter AR enables without a folder when save+permissions+scenario are ready', () => {
     setupMinimalDOM();
     initUI(createMockCallbacks());
-    setFolderSelected(false); // No folder opened
     setSaveLocationSelected(true); // Save location chosen (the real requirement)
     setPermissionsReady(true);
 
@@ -469,7 +463,6 @@ describe('validateEnterButton', () => {
   it('shows save location hint when save location not chosen', () => {
     setupMinimalDOM();
     initUI(createMockCallbacks());
-    setFolderSelected(false); // Folder is optional and irrelevant to the gate
     setSaveLocationSelected(false); // No save location
     setPermissionsReady(true);
 
@@ -488,7 +481,6 @@ describe('validateEnterButton', () => {
   it('shows scenario name hint when __new__ selected without name', () => {
     setupMinimalDOM();
     initUI(createMockCallbacks());
-    setFolderSelected(true); // Storage setup complete
     setSaveLocationSelected(true);
     setPermissionsReady(true); // Permissions must be ready for scenario name hint
 
@@ -523,7 +515,6 @@ describe('validateEnterButton', () => {
   it('hides hint when button is enabled', () => {
     setupMinimalDOM();
     initUI(createMockCallbacks());
-    setFolderSelected(true); // Storage setup complete
     setSaveLocationSelected(true);
     setPermissionsReady(true); // Permissions must be ready for button to enable
 
@@ -903,7 +894,6 @@ describe('populateScenarios', () => {
     initUI(createMockCallbacks());
 
     // Satisfy the other gating conditions so validateEnterButton can flip.
-    setFolderSelected(true);
     setSaveLocationSelected(true);
     setPermissionsReady(true);
 
@@ -2088,52 +2078,27 @@ describe('showSetupModal', () => {
 
 describe('resetUIForNewRecording', () => {
   // Why this test matters: On soft reset, save location must be cleared
-  // (new recording = new ZIP), but folder selection is kept if read handle persists.
-  it('clears saveLocationSelected but preserves folderSelected when keepFolder=true', async () => {
+  // (new recording = new ZIP). (The parallel write-only folderSelected flag
+  // was removed 2026-07-10, quality-review D-3 — keepFolder now only gates
+  // the folder-status text clearing.)
+  it('clears saveLocationSelected on soft reset regardless of keepFolder', async () => {
     vi.resetModules();
     setupMinimalDOM();
 
     const {
       initUI: freshInitUI,
-      setFolderSelected: freshSetFolder,
       setSaveLocationSelected: freshSetSave,
-      getFolderSelected: freshGetFolder,
       getSaveLocationSelected: freshGetSave,
       resetUIForNewRecording,
     } = await import('./hud.js');
     freshInitUI(createMockCallbacks());
 
-    freshSetFolder(true);
     freshSetSave(true);
-
     resetUIForNewRecording({ keepFolder: true });
-
-    expect(freshGetFolder()).toBe(true);
     expect(freshGetSave()).toBe(false);
-  });
 
-  // Why this test matters: If the read folder handle is no longer valid,
-  // both folder and save location must be reset.
-  it('clears both folderSelected and saveLocationSelected when keepFolder=false', async () => {
-    vi.resetModules();
-    setupMinimalDOM();
-
-    const {
-      initUI: freshInitUI,
-      setFolderSelected: freshSetFolder,
-      setSaveLocationSelected: freshSetSave,
-      getFolderSelected: freshGetFolder,
-      getSaveLocationSelected: freshGetSave,
-      resetUIForNewRecording,
-    } = await import('./hud.js');
-    freshInitUI(createMockCallbacks());
-
-    freshSetFolder(true);
     freshSetSave(true);
-
     resetUIForNewRecording({ keepFolder: false });
-
-    expect(freshGetFolder()).toBe(false);
     expect(freshGetSave()).toBe(false);
   });
 

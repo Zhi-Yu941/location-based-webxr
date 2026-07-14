@@ -82,7 +82,7 @@ export const DEFAULT_CAPTURE_CONFIG: ImageCaptureConfig = {
  * action by the RecorderApp's `handleImageCaptured`, which rebuilds the
  * payload field-by-field. A new field added here is therefore NOT persisted
  * until it is threaded through that handler — see
- * `2026-06-12-payload-rebuild-field-drop-audit.md` (F1/F2) and the forwarding
+ * `2026-06-12-1130-payload-rebuild-field-drop-audit.md` (F1/F2) and the forwarding
  * test in `main.occupancy-cubes-wiring.test.ts`.
  */
 export interface CapturedImage {
@@ -115,7 +115,7 @@ export interface CapturedImage {
  * A captured frame blob together with the pixel dimensions it was encoded at.
  * Returned by the optional `captureFrame` (blit) callback so the pose-invariant
  * image size can be persisted as first-class metadata (frame-tile aspect-ratio
- * fix, D1 of 2026-06-13-frame-tile-rendering-bugs-user-feedback.md). The
+ * fix, D1 of 2026-06-13-1311-frame-tile-rendering-bugs-user-feedback.md). The
  * dimensions are the blit render-target size — identical to the JPEG's own
  * width/height — so no decode is needed to learn the aspect ratio.
  */
@@ -182,7 +182,7 @@ export interface ImageCaptureCallbacks {
    * callback MUST settle its promise; if it rejects, or does not settle within
    * `captureTimeoutMs`, the manager fails open (saves the frame) so a hung
    * analyzer cannot deadlock the pipeline. See `image-quality.ts` and
-   * `GpsPlusSlamJs_Docs/docs/2026-06-24-image-quality-gate-plan.md`.
+   * `GpsPlusSlamJs_Docs/docs/2026-06-24-1057-image-quality-gate-plan.md`.
    */
   analyzeFrame?: (frame: CapturedFrame) => Promise<FrameQualityVerdict>;
 }

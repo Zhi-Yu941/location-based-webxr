@@ -21,7 +21,7 @@ opt OUT without a rebuild via `?coldStartOverride=0`. The value is passed to
   a field-validated default-on feature). Pass `?coldStartOverride=0` to disable —
   e.g. when collecting §6a field-calibration recordings so the captured compass
   behaviour is unmodified. See
-  [`GpsPlusSlamJs_Docs/docs/2026-06-26-stage0-field-collection-and-enablement.md`](../../../GpsPlusSlamJs_Docs/docs/2026-06-26-stage0-field-collection-and-enablement.md).
+  [`GpsPlusSlamJs_Docs/docs/2026-06-26-0701-stage0-field-collection-and-enablement.md`](../../../GpsPlusSlamJs_Docs/docs/2026-06-26-0701-stage0-field-collection-and-enablement.md).
 
 ## Examples
 

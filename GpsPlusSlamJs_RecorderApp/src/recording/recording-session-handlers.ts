@@ -16,12 +16,15 @@ import {
   createGpsPositionHandler,
   updateDeviceOrientation,
 } from 'gps-plus-slam-app-framework/state/gps-event-coordinator';
-import { startSession, endSession } from '../state/recorder-store';
+import {
+  startSession,
+  endSession,
+} from 'gps-plus-slam-app-framework/state/recording-slice';
 import type { RecorderStore } from '../state/recorder-store';
 import { wireStoreSubscribers } from 'gps-plus-slam-app-framework/state/store-subscribers';
-import { refPointEntriesToMarkerData } from '../ui/ref-point-map-markers';
 import { selectRefPointEntries } from '../state/ref-points-slice';
-import type { RecordingOptions } from 'gps-plus-slam-app-framework/state/recording-options';
+import { buildSessionSummary } from './build-session-summary';
+import type { RecordingOptions } from '../state/recording-options';
 import { formatTimestamp } from 'gps-plus-slam-app-framework/storage/file-system-utils';
 import {
   startSession as startStorageSession,
@@ -61,7 +64,6 @@ import {
   getCurrentArPose,
   startImageCapture,
   stopImageCapture,
-  setImageQualityAnalyzer,
   startDepthCapture,
   stopDepthCapture,
   getImageCaptureFrameCount,
@@ -91,10 +93,7 @@ import {
   setAbsCompassStatus,
   hideAbsCompass,
 } from '../ui/hud';
-import {
-  showSessionSummary,
-  type SessionSummaryData,
-} from '../ui/session-summary';
+import { showSessionSummary } from '../ui/session-summary';
 import { showConfirmDialog } from '../ui/confirm-dialog';
 import {
   enableBeforeUnloadWarning,
@@ -104,17 +103,13 @@ import {
 } from '../ui/navigation';
 import { gpsEventVisualizer } from 'gps-plus-slam-app-framework/visualization/gps-event-markers';
 import { refPointVisualizer } from '../visualization/ref-point-visualizer';
-import { computeFusedPath } from 'gps-plus-slam-app-framework/utils/fused-path';
 import {
   gpsPathToCoverageCells,
   H3_RESOLUTION,
 } from 'gps-plus-slam-app-framework/geo';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
 import type { LatLong, Matrix4 } from 'gps-plus-slam-app-framework/core';
-import {
-  calcGpsCoords,
-  magneticHeadingFromEnuQuat,
-} from 'gps-plus-slam-app-framework/core';
+import { magneticHeadingFromEnuQuat } from 'gps-plus-slam-app-framework/core';
 import type { LeafletMapOverlay } from 'gps-plus-slam-app-framework/visualization/leaflet-map-overlay';
 import type { MapData } from 'gps-plus-slam-app-framework/visualization/map-data';
 import { getBuildInfo } from '../utils/build-info';
@@ -177,9 +172,20 @@ export interface RecordingSessionDeps {
    * recording. Without this, the new store's `tracking.phase` stays at
    * `'initializing'` and the tracking-quality phase gate keeps the HUD
    * pinned to "AR LOST" for the entire recording (Finding #1,
-   * 2026-05-23 user feedback).
+   * 2026-05-23 user feedback). Main injects the framework's
+   * `rebindTrackingStore` — the one runtime mutation that survived the
+   * fold of the pre-init setters into initAR's callbacks struct.
    */
-  setTrackingStore: (store: RecorderStore) => void;
+  rebindTrackingStore: (store: RecorderStore) => void;
+  /**
+   * Swap the off-thread image-quality analyzer for the CURRENT recording
+   * (or clear it with `null`). Recordings start/stop within one AR session,
+   * so the per-recording Worker cannot be an initAR-time constant — main.ts
+   * passes initAR a stable wrapper delegating to the ref this setter writes.
+   */
+  setImageQualityAnalyzer: (
+    analyzer: ImageQualityClient['analyze'] | null
+  ) => void;
   /** Create a fresh store instance. */
   createNewStore: () => RecorderStore;
   /** Read the current recording options (owned by main.ts). */
@@ -402,7 +408,7 @@ export function createRecordingSessionHandlers(
     // now, every `poseReceived` dispatch flows into the orphaned store and
     // the new store's `tracking.phase` never leaves `'initializing'`, which
     // pins the tracking-quality HUD to "AR LOST" for the whole recording.
-    deps.setTrackingStore(store);
+    deps.rebindTrackingStore(store);
 
     // Generate session name from timestamp
     const now = new Date();
@@ -491,7 +497,7 @@ export function createRecordingSessionHandlers(
     // single config object, so a newly-added tunable reaches the sampler
     // without editing this seam. Re-listing fields here is the field-drop
     // hazard that left `resolutionDivisor` bolted on and the depth knobs dead
-    // (see 2026-06-12-payload-rebuild-field-drop-audit.md F3).
+    // (see 2026-06-12-1130-payload-rebuild-field-drop-audit.md F3).
     if (recordingOptions.images.enabled) {
       const { enabled: _imagesEnabled, ...imageConfig } =
         recordingOptions.images;
@@ -510,7 +516,7 @@ export function createRecordingSessionHandlers(
           imageQualityClient = createImageQualityAnalyzer(
             imageConfig.qualityFilter
           );
-          setImageQualityAnalyzer(imageQualityClient.analyze);
+          deps.setImageQualityAnalyzer(imageQualityClient.analyze);
           log.info('Image-quality gate enabled (off-thread blur/blackness)');
         } catch (err) {
           // The worker is constructed synchronously; on a locked-down
@@ -519,14 +525,14 @@ export function createRecordingSessionHandlers(
           // recording rather than aborting a session whose GPS/orientation
           // watches are already running.
           imageQualityClient = null;
-          setImageQualityAnalyzer(null);
+          deps.setImageQualityAnalyzer(null);
           log.warn(
             'Image-quality gate unavailable (worker init failed) — recording without it',
             err
           );
         }
       } else {
-        setImageQualityAnalyzer(null);
+        deps.setImageQualityAnalyzer(null);
       }
       startImageCapture(imageConfig);
       log.info(
@@ -634,7 +640,7 @@ export function createRecordingSessionHandlers(
     stopImageCapture();
     // Tear down the off-thread quality analyzer (worker) for this recording
     // and clear the injected callback so the next recording starts clean.
-    setImageQualityAnalyzer(null);
+    deps.setImageQualityAnalyzer(null);
     imageQualityClient?.dispose();
     imageQualityClient = null;
     hideFrameCount();
@@ -665,6 +671,18 @@ export function createRecordingSessionHandlers(
 
     // Get state before dispatch
     const store = deps.getStore();
+
+    // Drain the persistence middleware's async WriteQueue BEFORE anything
+    // reads this session's `actions/` (the final external sync and the OPFS
+    // zip export below) — an action dispatched moments before Stop could
+    // otherwise land after the export enumerated the directory and silently
+    // miss the zip (indoor-loop enablement follow-up §3.6b, 2026-07-12).
+    try {
+      await store.flushPendingActionWrites();
+    } catch (err) {
+      log.error('Failed to flush pending action writes:', err);
+    }
+
     const state = store.getState();
     const sessionMetadata = state.recording.sessionMetadata;
     const gpsEvents = state.gpsData?.gpsEvents;
@@ -793,72 +811,25 @@ export function createRecordingSessionHandlers(
     // Dispatch session end
     store.dispatch(endSession());
 
-    // Build summary data
-    const firstGps = gpsPositions.length > 0 ? gpsPositions[0] : null;
-    const lastGps =
-      gpsPositions.length > 0 ? gpsPositions[gpsPositions.length - 1] : null;
-
-    const odomPositions = gpsEvents?.odometryPositions ?? [];
-    let totalDistanceMeters = 0;
-    for (let i = 1; i < odomPositions.length; i++) {
-      const prev = odomPositions[i - 1]!;
-      const curr = odomPositions[i]!;
-      const dx = curr[0] - prev[0];
-      const dy = curr[1] - prev[1];
-      const dz = curr[2] - prev[2];
-      totalDistanceMeters += Math.sqrt(dx * dx + dy * dy + dz * dz);
-    }
-
-    // Convert alignment snapshot NUE positions to GPS coordinates (Issue #1)
-    const snapshotZeroRef = firstGps?.zeroRef ?? null;
-    const alignmentSnapshotPath = snapshotZeroRef
-      ? gpsEventVisualizer.getAlignmentSnapshotPositions().map((nuePos) => {
-          const gps = calcGpsCoords(snapshotZeroRef, nuePos);
-          return { lat: gps.lat, lng: gps.lon };
-        })
-      : [];
-
-    const summaryData: SessionSummaryData = {
-      duration: {
-        startTime: sessionMetadata?.startTime ?? endTime,
-        endTime,
-      },
-      gpsEventCount: gpsPositions.length,
-      refPointCount: refPoints.length,
+    // Build summary data (pure derivation — see build-session-summary.ts)
+    const summaryData = buildSessionSummary({
+      endTime,
+      startTime: sessionMetadata?.startTime,
       imageCount,
       depthSampleCount,
       errors,
-      firstGps: firstGps
-        ? { lat: firstGps.latitude, lng: firstGps.longitude }
-        : null,
-      lastGps: lastGps
-        ? { lat: lastGps.latitude, lng: lastGps.longitude }
-        : null,
-      totalDistanceMeters,
       failedWriteCount: state.recording.failedWriteCount,
-      rawGpsPath: gpsPositions.map((p) => ({
-        lat: p.latitude,
-        lng: p.longitude,
-        ...(typeof p.latLongAccuracy === 'number' && p.latLongAccuracy > 0
-          ? { accuracy: p.latLongAccuracy }
-          : {}),
-      })),
-      fusedPath: computeFusedPath({
-        odometryPositions: odomPositions,
-        alignmentMatrix: gpsEvents?.alignmentMatrix ?? null,
-        zeroRef: firstGps?.zeroRef ?? null,
-      }),
-      // Shared mapping with the live minimap wirer — both maps must plot
-      // identical coordinates/labels (2026-07-05 live-map feedback).
-      referencePointsForMap: refPointEntriesToMarkerData(refPoints),
-      zipSizeBytes: lastSyncResult?.blob?.size,
-      zipFileCount: lastSyncResult?.fileCount,
-      zipBlob: lastSyncResult?.blob,
+      gpsPositions,
+      odometryPositions: gpsEvents?.odometryPositions ?? [],
+      alignmentMatrix: gpsEvents?.alignmentMatrix ?? null,
+      alignmentSnapshotNuePositions:
+        gpsEventVisualizer.getAlignmentSnapshotPositions(),
+      refPoints,
+      syncResult: lastSyncResult,
       zipFilename: lastSyncResult
         ? (getSaveFileName() ?? generateSessionFilename())
         : undefined,
-      alignmentSnapshotPath,
-    };
+    });
 
     // Clean up sync result reference
     lastSyncResult = null;

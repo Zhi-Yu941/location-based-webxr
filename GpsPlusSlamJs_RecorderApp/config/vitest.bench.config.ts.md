@@ -28,7 +28,7 @@ pnpm bench:watch     # interactive watch mode
 ## Related
 
 - [vitest.config.ts.md](vitest.config.ts.md) — main test config
-- `GpsPlusSlamJs_Docs/docs/2026-07-09-bench-infra-plan.md` — the plan this harness implements
+- `GpsPlusSlamJs_Docs/docs/2026-07-09-0936-bench-infra-plan.md` — the plan this harness implements
 
 ## Tests
 

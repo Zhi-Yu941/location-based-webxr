@@ -1,6 +1,6 @@
 /**
  * Test seam (DEV-only) — see
- * GpsPlusSlamJs_Docs/docs/2026-06-01-anchor-starter-e2e-test-plan.md §5 (Option A).
+ * GpsPlusSlamJs_Docs/docs/2026-06-01-0447-anchor-starter-e2e-test-plan.md §5 (Option A).
  *
  * The starter is glue-only: `main.ts` imports the AR/GPS framework functions
  * and calls them inside `startAr()` / `main()`. In a desktop Playwright browser
@@ -26,8 +26,6 @@ import {
   endARSession,
   getArWorldGroup,
   getCamera,
-  setTrackingStore,
-  setTrackingCallbacks,
 } from "gps-plus-slam-app-framework/ar/webxr-session";
 import {
   startGpsWatch,
@@ -50,20 +48,19 @@ import { startReticleHitTest } from "./reticle-hit-test.js";
 export interface AnchorStarterSeams {
   checkWebXRSupport: typeof checkWebXRSupport;
   checkGeolocationPermission: typeof checkGeolocationPermission;
+  /**
+   * Since the framework's pre-init setter fold, the tracking store + restart
+   * callback ride into `initAR` as its `callbacks.tracking` group (they arrive
+   * TOGETHER — without the group the framework's per-frame
+   * `updateTrackingState()` never dispatches `poseReceived`/`poseLost`,
+   * leaving `tracking.phase` stuck at `initializing` and the onboarding
+   * guidance pinned to "AR tracking lost"). The e2e fake asserts the group is
+   * present on the `initAR` call it intercepts.
+   */
   initAR: typeof initAR;
   endARSession: typeof endARSession;
   getArWorldGroup: typeof getArWorldGroup;
   getCamera: typeof getCamera;
-  /**
-   * Inject the tracking store + register the tracking-restart callback. Both
-   * MUST be wired before `initAR` or the framework's per-frame
-   * `updateTrackingState()` never dispatches `poseReceived`/`poseLost`, leaving
-   * `tracking.phase` stuck at `initializing` and the onboarding guidance pinned
-   * to "AR tracking lost". Exposed through the seam (rather than imported
-   * directly) so the e2e suite can assert the wiring actually happens.
-   */
-  setTrackingStore: typeof setTrackingStore;
-  setTrackingCallbacks: typeof setTrackingCallbacks;
   startGpsWatch: typeof startGpsWatch;
   startOrientationWatch: typeof startOrientationWatch;
   requestDeviceOrientationPermission: typeof requestDeviceOrientationPermission;
@@ -90,8 +87,6 @@ export const realSeams: AnchorStarterSeams = {
   endARSession,
   getArWorldGroup,
   getCamera,
-  setTrackingStore,
-  setTrackingCallbacks,
   startGpsWatch,
   startOrientationWatch,
   requestDeviceOrientationPermission,

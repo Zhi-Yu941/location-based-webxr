@@ -4,7 +4,7 @@
 
 Pure mapping from a depth point's normalized view coordinates onto a camera-frame RGBA readback buffer — the color half of the RGB voxel coloring (occupancy-grid port plan Iter 8). No THREE/DOM dependency.
 
-Plan: `GpsPlusSlamJs_Docs/docs/2026-06-11-depth-occupancy-grid-port-plan.md` §4 Iter 8 / §5.
+Plan: `GpsPlusSlamJs_Docs/docs/2026-06-11-2134-depth-occupancy-grid-port-plan.md` §4 Iter 8 / §5.
 
 ## Public API
 

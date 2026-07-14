@@ -7,7 +7,7 @@
  * stays in each app's `main.ts`; only the browser-free decision and the
  * user-facing message live here so they can be unit-tested without a browser.
  *
- * See `2026-06-03-threejs-arbutton-minimal-ar-example-user-feedback.md` §6.4.
+ * See `2026-06-03-0553-threejs-arbutton-minimal-ar-example-user-feedback.md` §6.4.
  */
 
 /** The two capabilities every GPS+AR demo requires to run. */

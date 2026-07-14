@@ -19,9 +19,10 @@
  * via `onError`).
  */
 
-import type { DepthSample } from '../state/recorder-store';
+import type { DepthSample } from 'gps-plus-slam-app-framework/types/ar-types';
 import type { RecorderStore } from '../state/recorder-store';
 import type { StoreRef } from '../state/store-ref';
+import { followStore } from '../state/store-ref';
 import type { ViewerPose } from './occupancy-cubes-visualizer';
 
 /** Default minimum delay between two visualizer refreshes. */
@@ -294,9 +295,8 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
     });
   };
 
-  let detach = attach(storeRef.get());
-  const unsubscribeSwap = storeRef.subscribe((nextStore) => {
-    detach();
+  /** Swap-only reset: the new session starts its grid/curve/pose from t0. */
+  const resetForNewStore = (): void => {
     cancelPendingRefresh();
     lastRefreshTime = -Infinity;
     // New session logs its cells-over-time curve from t0 again.
@@ -326,13 +326,23 @@ export function wireOccupancyGridSubscribers<TGrid extends OccupancyGridSink>(
         reportError(err);
       }
     }
-    detach = attach(nextStore);
+  };
+
+  // Store-swap following via the shared helper (quality-review G-11).
+  // `firstAttach` keeps the reset swap-only — exactly the old semantics
+  // (the initial attachment must not clear a grid it did not populate).
+  let firstAttach = true;
+  const stopFollowing = followStore(storeRef, (nextStore) => {
+    if (!firstAttach) {
+      resetForNewStore();
+    }
+    firstAttach = false;
+    return attach(nextStore);
   });
 
   return () => {
     disposed = true;
     cancelPendingRefresh();
-    detach();
-    unsubscribeSwap();
+    stopFollowing();
   };
 }

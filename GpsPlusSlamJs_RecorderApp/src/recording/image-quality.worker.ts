@@ -17,7 +17,7 @@
 
 import {
   rgbaToGrayscale,
-  sharpnessScore,
+  blurMetricScorer,
   meanLuminance,
   ImageQualityGate,
   DEFAULT_QUALITY_FILTER,
@@ -86,7 +86,14 @@ async function handleAnalyze(id: number, blob: Blob): Promise<void> {
     }
     const lum = meanLuminance(decoded.data);
     const gray = rgbaToGrayscale(decoded.data);
-    const sharp = sharpnessScore(gray, decoded.width, decoded.height);
+    // Metric selection is resolved by the framework's tested mapping —
+    // undefined/unknown ids (pre-toggle persisted configs) score with the
+    // original variance-of-Laplacian. See the 2026-07-12 blur-metric plan.
+    const sharp = blurMetricScorer(config.blurMetric)(
+      gray,
+      decoded.width,
+      decoded.height
+    );
     const verdict = gate.evaluate(sharp, lum, config);
     ctx.postMessage({
       type: 'verdict',

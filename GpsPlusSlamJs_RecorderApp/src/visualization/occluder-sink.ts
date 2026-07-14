@@ -25,7 +25,7 @@
  */
 
 import type { OccupancyGrid } from 'gps-plus-slam-app-framework/ar/occupancy-grid';
-import type { OccupancyOptions } from 'gps-plus-slam-app-framework/state/recording-options';
+import type { OccupancyOptions } from '../state/recording-options';
 import { OcclusionMesh } from 'gps-plus-slam-app-framework/visualization';
 import type { Object3D } from 'three';
 import { createOccluderMeshWorker } from './occluder-mesh-worker-client';

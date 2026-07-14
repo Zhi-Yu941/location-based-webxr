@@ -4,7 +4,7 @@ import type { AnchorStarterSeams } from "./seams.js";
 
 /**
  * Prod-inert guarantee for the DEV-only `window.__anchorStarterSeams` override
- * (see GpsPlusSlamJs_Docs/docs/2026-06-01-anchor-starter-e2e-test-plan.md §5/§8).
+ * (see GpsPlusSlamJs_Docs/docs/2026-06-01-0447-anchor-starter-e2e-test-plan.md §5/§8).
  *
  * Why this test matters: the seam exists solely so the Playwright e2e suite can
  * inject AR/GPS fakes. It must NEVER swap behaviour for real users. The guard is
@@ -31,8 +31,6 @@ vi.mock("gps-plus-slam-app-framework/ar/webxr-session", () => ({
   endARSession: () => Promise.resolve(),
   getArWorldGroup: () => null,
   getCamera: () => null,
-  setTrackingStore: () => undefined,
-  setTrackingCallbacks: () => undefined,
 }));
 vi.mock("gps-plus-slam-app-framework/ar/xr-frame-loop", () => ({
   registerXrFrameUpdate: () => () => undefined,

@@ -25,6 +25,11 @@ vi.mock('gps-plus-slam-app-framework/ar/replay-scene', () => ({
   initReplayScene: vi.fn(() => ({
     scene: { name: 'mock-scene' },
     arWorldGroup: { name: 'mock-arWorldGroup' },
+    arpose: {
+      name: 'mock-arpose',
+      position: { fromArray: vi.fn() },
+      quaternion: { fromArray: vi.fn() },
+    },
     camera: { name: 'mock-camera' },
     renderer: { name: 'mock-renderer' },
   })),
@@ -86,12 +91,17 @@ vi.mock('gps-plus-slam-app-framework/visualization/gps-event-markers', () => ({
     setZeroRef: vi.fn(),
     addGpsEvent: vi.fn(),
     clearAll: vi.fn(),
+    setSceneSource: vi.fn(),
   },
 }));
 
 vi.mock('gps-plus-slam-app-framework/ar/webxr-session', () => ({
-  getArPose: vi.fn(),
   nuePositionToWebXR: vi.fn((pos: readonly number[]) => pos),
+  nueQuaternionToWebXR: vi.fn((rot: readonly number[]) => rot),
+  // Live-session getters: the REAL ref-point-visualizer module (not mocked
+  // here) captures getScene as its default scene source at import time.
+  getScene: vi.fn(() => null),
+  getArWorldGroup: vi.fn(() => null),
 }));
 
 // F3.5c — mock the frame-tile wiring so replay-mode tests don't need a real
@@ -142,7 +152,7 @@ const { mockReplayRecordingOptions } = vi.hoisted(() => ({
     visualization: { statsOverlay: false },
   },
 }));
-vi.mock('gps-plus-slam-app-framework/state/recording-options', () => ({
+vi.mock('../state/recording-options', () => ({
   loadRecordingOptions: vi.fn(() => mockReplayRecordingOptions),
 }));
 vi.mock('../ui/stats-overlay', () => ({
@@ -174,6 +184,8 @@ import {
   initReplayScene,
   disposeReplayScene,
 } from 'gps-plus-slam-app-framework/ar/replay-scene';
+import { gpsEventVisualizer } from 'gps-plus-slam-app-framework/visualization/gps-event-markers';
+import { refPointVisualizer } from '../visualization/ref-point-visualizer';
 
 // --- Helpers ---
 
@@ -310,6 +322,42 @@ describe('replay-mode', () => {
     await startReplayMode(fakeZipData, config);
 
     expect(initReplayScene).toHaveBeenCalledWith(container);
+  });
+
+  it('points the scene-reading visualizers at the replay scene (surface-reduction step 2)', async () => {
+    // Why: replay no longer injects its scene into the webxr-session
+    // singleton (setScene/setArWorldGroup were deleted). The singleton
+    // visualizers must instead be pointed at the replay scene explicitly,
+    // or replayed GPS events / ref points would have no scene to land in.
+    const refSpy = vi.spyOn(refPointVisualizer, 'setSceneSource');
+    const config = makeConfig();
+    await startReplayMode(fakeZipData, config);
+
+    const initResult = vi.mocked(initReplayScene).mock.results[0]!;
+    if (initResult.type !== 'return') {
+      throw new Error('initReplayScene did not return');
+    }
+    const replayScene = initResult.value;
+
+    const gpsSource = vi.mocked(gpsEventVisualizer.setSceneSource).mock
+      .calls[0]![0]!;
+    expect(gpsSource.getScene()).toBe(replayScene.scene);
+    expect(gpsSource.getArWorldGroup()).toBe(replayScene.arWorldGroup);
+
+    const refSource = refSpy.mock.calls[0]![0]!;
+    expect(refSource()).toBe(replayScene.scene);
+  });
+
+  it('dispose restores the live-session scene sources', async () => {
+    // Why: leaving the visualizers pointed at a disposed replay scene would
+    // strand markers of a later LIVE AR session in a dead scene graph.
+    const refSpy = vi.spyOn(refPointVisualizer, 'setSceneSource');
+    const controller = await startReplayMode(fakeZipData, makeConfig());
+
+    controller.dispose();
+
+    expect(gpsEventVisualizer.setSceneSource).toHaveBeenLastCalledWith(null);
+    expect(refSpy).toHaveBeenLastCalledWith(null);
   });
 
   // --- Perf stats overlay (2026-07-03 long-session fps plan, Step 0) ---

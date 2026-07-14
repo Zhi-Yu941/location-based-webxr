@@ -756,8 +756,9 @@ describe('EMA-smoothed convergence (Finding 4)', () => {
   });
 
   it('blends prior smoothed value with the new raw value via alpha', () => {
-    // Prior smoothed = 0.0, alpha = 0.3, raw convergence = 1.0 →
-    // smoothed = 0.0 + 0.3 * (1.0 - 0.0) = 0.3.
+    // Prior smoothed = 0.0, default alpha = 0.25 (re-tuned with E-1 — the EMA
+    // advances per observation now), raw convergence = 1.0 →
+    // smoothed = 0.0 + 0.25 * (1.0 - 0.0) = 0.25.
     const root = buildRootState({
       alignmentMatrix: IDENTITY,
       gpsPositions: [gps(0, 0, 0, 2)],
@@ -767,7 +768,10 @@ describe('EMA-smoothed convergence (Finding 4)', () => {
       smoothedConvergence: 0,
     });
     const report = computeTrackingQualityReport(root as never);
-    expect(report.subScores.convergence).toBeCloseTo(0.3, 5);
+    expect(report.subScores.convergence).toBeCloseTo(
+      DEFAULT_TRACKING_QUALITY_OPTIONS.convergenceEmaAlpha,
+      5
+    );
   });
 
   it('respects custom alpha option', () => {
@@ -1108,6 +1112,53 @@ describe('createTrackingQualityListenerMiddleware', () => {
     // With the dispatch gate quantising sub-threshold changes, none of
     // these jitter frames should produce a fresh report reference.
     expect(reportRefChanges).toBe(0);
+  });
+
+  // Why this test matters: E-1 (2026-07-10 quality review) skips the
+  // per-frame report recompute when the tracking phase is unchanged. The
+  // skip must NOT swallow the first pose frame after a reset — the HUD
+  // would otherwise show no report until the next GPS event (~1 s).
+  it('recomputes the report on the first pose frame after a session reset', () => {
+    const store = makeListenerStore(snapshotGpsAfter(null, [], []));
+    store.dispatch(
+      poseReceived({
+        pose: DEFAULT_POSE,
+        sensorOrientation: DEFAULT_ORIENTATION,
+      })
+    );
+    expect(selectTrackingQuality(store.getState())).not.toBeNull();
+
+    store.dispatch({ type: 'tracking/resetTracking' });
+    expect(selectTrackingQuality(store.getState())).toBeNull();
+
+    // Same phase as before the reset — the phase-skip must still recompute
+    // because no report exists yet.
+    store.dispatch(
+      poseReceived({
+        pose: DEFAULT_POSE,
+        sensorOrientation: DEFAULT_ORIENTATION,
+      })
+    );
+    expect(selectTrackingQuality(store.getState())).not.toBeNull();
+  });
+
+  // Why this test matters: the phase transition IS the report input pose
+  // actions carry (E-1) — losing tracking must still reach the report as
+  // 'ar-lost' immediately, not wait for the next GPS event.
+  it('still updates the report on a phase transition (poseLost)', () => {
+    const store = makeListenerStore(snapshotGpsAfter(null, [], []));
+    store.dispatch(
+      poseReceived({
+        pose: DEFAULT_POSE,
+        sensorOrientation: DEFAULT_ORIENTATION,
+      })
+    );
+    const before = selectTrackingQuality(store.getState());
+    expect(before?.state).not.toBe('ar-lost');
+
+    store.dispatch(poseLost());
+    const after = selectTrackingQuality(store.getState());
+    expect(after?.state).toBe('ar-lost');
   });
 });
 

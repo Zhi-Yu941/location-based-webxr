@@ -16,7 +16,9 @@ axis + cube. Geo-less: never casts a GPS vote.
   `solvePose` (defaults to `solveQrPose` + a pure-JS `PlanarPnpSquare`; inject a
   canned pose in tests), `onStatus`/`now`/ scheduler tuning.
 - `DemoSolvePose = (input: Omit<SolveQrPoseInput,'solver'>) => QrPoseSolution | null`.
-- `DepthContext = { unprojector, depthAt(sx,sy), cameraPose, projectionMatrix }`.
+- `DepthContext extends QrSizeDepthContext` (the framework's shared
+  `{ unprojector, depthAt(sx,sy) }` measurer context, which the seams already
+  build via `createQrSizeDepthContext`) `+ { cameraPose, projectionMatrix }`.
   `projectionMatrix` is the detector frame's view projection — PnP intrinsics come
   from `intrinsicsFromProjection(projectionMatrix, image.width, image.height)`.
 
@@ -48,7 +50,7 @@ intrinsics, cameraPose })`. Rotation no longer inherits per-corner depth noise.
   outlier-rejected pose), else the raw frame pose. `recordDetection` runs first,
   so the window already includes the current frame. The ring keeps the RAW poses —
   the filtered pose is never written back. See
-  [2026-06-16-followup-qr-pose-stabilization-sliding-window.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-16-followup-qr-pose-stabilization-sliding-window.md).
+  [2026-06-16-0858-qr-pose-stabilization-sliding-window-followup.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-16-0858-qr-pose-stabilization-sliding-window-followup.md).
 - Fully injected → unit-testable without WebXR / camera / depth.
 
 ## Tests
@@ -64,7 +66,7 @@ recording; `resolveStablePose` overrides the rendered pose; `reset` → idle.
 
 This controller deliberately parallels the framework's `createQrTrackingController`
 (both: detect → solve pose → emit → status machine → scheduler). The audit
-(`2026-06-17-qr-size-accuracy-and-thin-demo-plan.md`, WS-D) confirmed that **every
+(`2026-06-17-1020-qr-size-accuracy-and-thin-demo-plan.md`, WS-D) confirmed that **every
 non-trivial piece is already framework code** — `createDetectionScheduler`,
 `createQrSizeMeasurer`, `solveQrPose` + `PlanarPnpSquare`, `intrinsicsFromProjection`,
 `validateQuad`. What remains here is **pure wiring** plus one demo-specific policy:
@@ -79,11 +81,11 @@ D-X**: make the framework controller level-optional + add a size-from-depth hook
 then delete this file) is the right end state, but it is **deferred until the
 Recorder's live-QR path exists** — generalising shared, well-tested code for a
 single consumer is premature; the second consumer should drive the abstraction. See
-the follow-up `2026-06-17-followup-qr-size-thin-demo-next-steps.md` (D-X).
+the follow-up `2026-06-17-1204-qr-size-thin-demo-next-steps-followup.md` (D-X).
 
 ## Related
 
-- The PnP backend: [planar-pnp.ts.md](../../GpsPlusSlamJs_AppFramework/src/ar/planar-pnp.ts.md)
-  and the seam [qr-pose.ts.md](../../GpsPlusSlamJs_AppFramework/src/ar/qr-pose.ts.md)
+- The PnP backend: [planar-pnp.ts.md](../../GpsPlusSlamJs_AppFramework/src/ar/qr/planar-pnp.ts.md)
+  and the seam [qr-pose.ts.md](../../GpsPlusSlamJs_AppFramework/src/ar/qr/qr-pose.ts.md)
   (`solveQrPose`).
-- The size stage: [qr-size-measurer.ts.md](../../GpsPlusSlamJs_AppFramework/src/ar/qr-size-measurer.ts.md).
+- The size stage: [qr-size-measurer.ts.md](../../GpsPlusSlamJs_AppFramework/src/ar/qr/qr-size-measurer.ts.md).

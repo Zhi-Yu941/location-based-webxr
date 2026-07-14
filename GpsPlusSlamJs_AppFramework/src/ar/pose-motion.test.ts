@@ -6,7 +6,7 @@
  * angular velocity being computed as a true geodesic rate (rad/s) and being
  * double-cover safe — the single most common quaternion bug. The dt<=0 guards
  * pin that a degenerate frame delta can never produce Infinity/NaN and flip the
- * gate. See 2026-06-23-blurry-frame-motion-gating-plan.md §4.1.
+ * gate. See 2026-06-23-2105-blurry-frame-motion-gating-plan.md §4.1.
  */
 
 import { describe, it, expect } from 'vitest';

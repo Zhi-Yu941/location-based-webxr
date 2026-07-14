@@ -7,15 +7,17 @@
  * with a fake worker); {@link createImageQualityAnalyzer} is the thin device seam
  * that spawns the real module worker (Vite-bundled, not unit-tested).
  *
- * The returned `analyze` is injected into the framework via
- * `setImageQualityAnalyzer`, which forwards it to `ImageCaptureManager` as its
- * `analyzeFrame` callback. Fail-open is the rule throughout: any worker error or
+ * The returned `analyze` is injected via the recording-session-handlers'
+ * `setImageQualityAnalyzer` dep (main.ts stores it behind the stable
+ * `imageCapture.qualityAnalyzer` wrapper passed to initAR), which forwards it
+ * to `ImageCaptureManager` as its `analyzeFrame` callback. Fail-open is the
+ * rule throughout: any worker error or
  * disposal resolves pending verdicts as `accept: true`, so a flaky worker can
  * never lose a recording interval (the manager also has its own safety timeout).
  *
  * @see ./image-quality-protocol.ts
  * @see ./image-quality.worker.ts
- * @see GpsPlusSlamJs_Docs/docs/2026-06-24-image-quality-gate-plan.md §3, §8
+ * @see GpsPlusSlamJs_Docs/docs/2026-06-24-1057-image-quality-gate-plan.md §3, §8
  */
 
 import type {
@@ -39,7 +41,7 @@ export interface WorkerLike {
   onerror: ((event: unknown) => void) | null;
 }
 
-/** The injectable analyzer handed to `setImageQualityAnalyzer`. */
+/** The injectable analyzer handed to the `setImageQualityAnalyzer` dep. */
 export interface ImageQualityClient {
   /** Analyze one encoded frame; resolves with the verdict (fail-open). */
   analyze: (frame: CapturedFrame) => Promise<FrameQualityVerdict>;

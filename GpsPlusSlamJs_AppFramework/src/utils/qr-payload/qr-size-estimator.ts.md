@@ -3,7 +3,7 @@
 ## Purpose
 
 Pure QR footprint estimator — the _metric_ of the QR payload-compression
-benchmark (`gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-05-qr-payload-compression-benchmark-plan.md`,
+benchmark (`gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-05-0611-qr-payload-compression-benchmark-plan.md`,
 §3): given a payload string and an error-correction level, it computes the
 QR bit-stream size after **optimal mode segmentation**, the minimum QR
 version (1–25) that holds it, and the module width. Character count is the

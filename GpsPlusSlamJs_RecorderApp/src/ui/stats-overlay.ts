@@ -1,7 +1,7 @@
 /**
  * Stats.js performance overlay — FPS / frame-ms / MB panels rendered
  * side-by-side for the long-session fps investigation (Step 0 of
- * `GpsPlusSlamJs_Docs/docs/2026-07-03-long-session-fps-and-voxel-grid-scaling-plan.md`).
+ * `GpsPlusSlamJs_Docs/docs/2026-07-03-1344-long-session-fps-and-voxel-grid-scaling-plan.md`).
  *
  * mrdoob's Stats.js (bundled with three as `three/addons/libs/stats.module.js`,
  * no extra dependency) shows ONE panel at a time and cycles on tap — unusable

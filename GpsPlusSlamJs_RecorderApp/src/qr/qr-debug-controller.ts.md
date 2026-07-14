@@ -4,7 +4,7 @@
 
 The WS-5 store-driven consumer: turns recorded RAW QR detections into the live +
 replay debug axis+cube. Called on every store change, it renders — per marker —
-the shared [`createQrDebugView`](../../../GpsPlusSlamJs_AppFramework/src/ar/qr-debug-view.ts)
+the shared [`createQrDebugView`](../../../GpsPlusSlamJs_AppFramework/src/ar/qr/qr-debug-view.ts)
 under `arWorldGroup` at the **derived** best-effort pose+size
 (`selectDerivedQrPlacement`), and owns the as-of [depth resolver](qr-depth-resolver.ts).
 
@@ -38,7 +38,7 @@ maintainer's re-test goal, visualised).
   persistent `createIncrementalQrPlacement` that folds only NEW observations per
   marker (O(1)/detection) and memoizes when nothing new arrived — NOT
   `selectDerivedQrPlacement` (O(history) per store action), which ramped the
-  recorder framerate down on device. See [open topic D](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-18-followup-recorder-live-qr-perf-degradation.md).
+  recorder framerate down on device. See [open topic D](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-18-0048-recorder-live-qr-perf-degradation-followup.md).
 - **No self-subscription:** the controller never subscribes; `main.ts` calls
   `update()` from its existing store subscription (live) and replay drives the
   same store, so one wiring covers both.

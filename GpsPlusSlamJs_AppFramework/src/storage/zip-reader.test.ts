@@ -708,7 +708,7 @@ describe('ZipSource lazy Reader input', () => {
   // GpsPlusSlamJs_Investigation reads 100+ recording zips (2.4 GB) from disk,
   // and loading whole archives into memory to validate a few KB of JSON
   // breached its 60 s regression budget (see that repo's
-  // docs/2026-07-09-regression-gate-budget-breach-followup.md). The helpers
+  // docs/2026-07-09-1944-regression-gate-budget-breach-followup.md). The helpers
   // therefore accept any zip.js Reader (ranged, lazy) in addition to
   // Uint8Array. These tests prove the Reader path is result-equivalent to
   // the Uint8Array path, that lazy getText works after the helper returned,

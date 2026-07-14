@@ -15,7 +15,7 @@
  *     semantics — the 2026-06-27 field bug), and
  *   - nothing fires when no opt-in was requested.
  *
- * See GpsPlusSlamJs_Docs/docs/2026-06-28-subscriber-dispatch-persistence-ordering-plan.md
+ * See GpsPlusSlamJs_Docs/docs/2026-06-28-0751-subscriber-dispatch-persistence-ordering-plan.md
  */
 import { describe, it, expect } from 'vitest';
 import {

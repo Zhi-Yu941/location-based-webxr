@@ -1052,6 +1052,27 @@ No errors</pre
                   >Skip blurry/black frames (image)</span
                 >
               </label>
+              <!-- Blur metric (2026-07-12 toggle plan): which sharpness score -->
+              <!-- the gate's relative rule runs on. VoL is the shipped        -->
+              <!-- default; the FFT energy ratio won "sharp vs degraded" in    -->
+              <!-- the offline benchmark and is exposed for on-device A/B.     -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs text-gray-400">
+                  <span>Blur metric</span>
+                </div>
+                <select
+                  id="images-blur-metric"
+                  aria-label="Blur metric"
+                  class="w-full bg-gray-600 text-sm text-gray-200 rounded-lg p-1 cursor-pointer"
+                >
+                  <option value="variance-of-laplacian">
+                    Variance of Laplacian (default)
+                  </option>
+                  <option value="high-frequency-energy-ratio">
+                    High-frequency energy (experimental)
+                  </option>
+                </select>
+              </div>
               <!-- Image-quality thresholds (for on-device field tuning). Blur is -->
               <!-- relative (fraction of the recent sharpness median); blackness  -->
               <!-- is an absolute 0–255 luma cutoff (0 = off). Higher blur =       -->

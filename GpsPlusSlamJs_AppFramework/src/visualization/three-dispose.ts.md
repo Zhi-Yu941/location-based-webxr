@@ -50,9 +50,7 @@ export function disposeMeshArray(
 
 - `gps-compass-cubes.ts` — `dispose()` via `disposeObject3D(group)`
 - `gps-event-markers.ts` — `clearAll()` via `disposeMeshArray()`
-- `reference-points.ts` — `clearPriorRefPoints()` and `clearCurrentRefPoints()` via `disposeMeshArray()`
-- `map-overlay.ts` — `dispose()` via `disposeObject3D(mesh)`
-- `camera-blit-capture.ts` — `dispose()` via `disposeObject3D(quad)`
+- `../ar/camera-blit-capture.ts` — `dispose()` via `disposeObject3D(quad)`
 
 ## Tests
 

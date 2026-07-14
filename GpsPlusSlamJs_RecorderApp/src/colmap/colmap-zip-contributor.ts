@@ -4,7 +4,7 @@
  * Recorder-side {@link ZipExportContributor} that derives a COLMAP `sparse/0/`
  * model from the LIVE recording state and writes it into the exported ZIP
  * (export plan Iter 3,
- * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-colmap-export-plan.md).
+ * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-1205-colmap-export-plan.md).
  *
  * It owns the `sparse/` subdir and writes `0/cameras.txt`, `0/images.txt`,
  * `0/points3D.txt`. The images themselves already sit in the ZIP's `images/`
@@ -81,7 +81,7 @@ export interface ColmapZipContributorDeps {
    * carving can never clear (no ray traverses occluded space). Omitted →
    * floor 1 (unfiltered/legacy) so callers that predate the setting are
    * unchanged. See
-   * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-22-occupancy-grid-behind-surface-noise-plan.md.
+   * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-22-2146-occupancy-grid-behind-surface-noise-plan.md.
    */
   getMinConfidence?: () => number;
 }

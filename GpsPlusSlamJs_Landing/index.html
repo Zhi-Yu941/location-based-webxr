@@ -680,6 +680,14 @@
         font-size: 0.85rem;
         line-height: 1.4;
       }
+      /* Flagship demo (round-14 R14-17): the Recorder App is the fullest
+         example — a faint accent tint + slightly stronger border mark it
+         as special without breaking the card grid. */
+      .demo-card-flagship {
+        border-color: rgb(239 68 68 / 40%);
+        background:
+          linear-gradient(rgb(239 68 68 / 7%), rgb(239 68 68 / 7%)), var(--card);
+      }
 
       /* Desktop→phone QR handoff (v2 B2); kept after .demo-card svg for
          the no-descending-specificity lint order. */
@@ -1091,6 +1099,10 @@ world.add(marker);               <span class="c">// marker: any three.js Object3
           <!-- Demo apps open new tabs too (round-10 R10-1, reversing the
                round-9 same-tab call): every outbound click keeps the
                landing alive in the background. -->
+          <!-- Order (round-14 R14-18): two demos first (Anchor Starter,
+               QR-Tracking), then the two "App" examples (Minimal Example
+               App, Recorder App). Anchor Starter stays first — the demo
+               we most want people to open. -->
           <div class="demo-grid">
             <a
               class="demo-card"
@@ -1108,28 +1120,9 @@ world.add(marker);               <span class="c">// marker: any three.js Object3
               <span>
                 <strong>Anchor Starter Demo</strong>
                 <small
-                  >Place a GPS anchor, reload, and watch it re-localise at the
-                  exact physical spot.</small
-                >
-              </span>
-            </a>
-            <a
-              class="demo-card"
-              href="/minimal/"
-              target="_blank"
-              rel="noopener"
-            >
-              <svg viewBox="0 0 34 34" aria-hidden="true">
-                <path d="M17 4l11 6v13l-11 6-11-6V10z" fill="#8b8b95" />
-                <path d="M17 4l11 6-11 6-11-6z" fill="#b9b9c2" />
-                <path d="M17 16v13l-11-6V10z" fill="#6e6e78" />
-              </svg>
-              <span>
-                <strong>Minimal Example</strong>
-                <small
-                  >The smallest three.js + GPS+AR starting point: tap to place a
-                  GPS anchor next to a naive floater and watch the
-                  difference.</small
+                  >Place a GPS anchor, generate a link to it, and when the link
+                  is loaded it re-places the anchor at the exact same physical
+                  spot.</small
                 >
               </span>
             </a>
@@ -1153,13 +1146,33 @@ world.add(marker);               <span class="c">// marker: any three.js Object3
                 <strong>QR-Tracking Demo</strong>
                 <small
                   >Point at any printed QR code: it measures the code's real
-                  size from the depth map and glues a 3D axis + cube to it — no
-                  GPS needed.</small
+                  size from the depth map and glues a 3D axis + cube to
+                  it.</small
                 >
               </span>
             </a>
             <a
               class="demo-card"
+              href="/minimal/"
+              target="_blank"
+              rel="noopener"
+            >
+              <svg viewBox="0 0 34 34" aria-hidden="true">
+                <path d="M17 4l11 6v13l-11 6-11-6V10z" fill="#8b8b95" />
+                <path d="M17 4l11 6-11 6-11-6z" fill="#b9b9c2" />
+                <path d="M17 16v13l-11-6V10z" fill="#6e6e78" />
+              </svg>
+              <span>
+                <strong>Minimal Example App</strong>
+                <small
+                  >Tap to place anchors with one part floating in GPS space and
+                  one part fixed in AR space — showing the regular alignment
+                  drift.</small
+                >
+              </span>
+            </a>
+            <a
+              class="demo-card demo-card-flagship"
               href="/recorder/"
               target="_blank"
               rel="noopener"
@@ -1176,11 +1189,12 @@ world.add(marker);               <span class="c">// marker: any three.js Object3
                 <circle cx="17" cy="17" r="5.5" fill="#ef4444" />
               </svg>
               <span>
-                <strong>Recorder</strong>
+                <strong>Recorder App</strong>
                 <small
-                  >The full app to evaluate tracking accuracy: capture AR + GPS
-                  sessions on a phone, replay and inspect alignment on a
-                  desktop.</small
+                  >Record and replay user sessions from a real phone. Use them
+                  to simulate user behavior while developing, or view the
+                  captured content — images, point clouds, even reconstructed
+                  Gaussian splats.</small
                 >
               </span>
             </a>

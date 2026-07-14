@@ -325,13 +325,62 @@ const MONO: ScenePalette = {
   },
 };
 
-// The five palettes. Sky blocks (v3 F3) are consumed by sky-dome.ts.
+// TERMINAL (easter-egg catalog №4, the hidden 6th palette): near-black
+// world with phosphor-green everything EXCEPT the coding colors (amber
+// GPS, red anchors, blue AR, teal user) — a retro CRT. Unlocked by
+// rapid palette cycling (see secret-palette.ts); never in the normal
+// cycle.
+const PHOSPHOR = 0x33ff66;
+const TERMINAL: ScenePalette = {
+  background: 0x030904,
+  fog: { color: 0x030904, near: 40, far: 90 },
+  hemisphere: { sky: 0x0c3d1c, ground: 0x03150a, intensity: 1.15 },
+  directional: { color: 0x3dff77, intensity: 1.0 },
+  sky: {
+    zenith: 0x020703,
+    horizon: 0x08160c,
+    accents: "star-grid",
+    accentColor: PHOSPHOR,
+  },
+  particles: { color: PHOSPHOR, style: "dust" },
+  roles: {
+    ground: { color: 0x0a1c10 },
+    path: { color: 0x112c1a },
+    hill: { color: 0x0d2414 },
+    foliage: { color: 0x123a20 },
+    trunk: { color: 0x1a3a24 },
+    rock: { color: 0x142c1c },
+    sign: { color: 0x1a3a24 },
+    signPanel: { color: PHOSPHOR, emissiveIntensity: 0.4 },
+    statue: { color: 0x1c4028 },
+    person: { color: 0x2dd4bf, emissiveIntensity: 0.7 },
+    markerRaw: { color: 0xfacc15, emissiveIntensity: 0.8 },
+    markerFused: { color: ACCENT, emissiveIntensity: 1.0 },
+    snapRing: { color: ACCENT, emissiveIntensity: 1.0 },
+    qrModule: { color: 0xfbbf24, emissiveIntensity: 0.7 },
+    poi: { color: ACCENT, emissiveIntensity: 0.9 },
+    phone: { color: 0x0a1c10 },
+    screen: { color: 0x1c4028, emissiveIntensity: 0.6 },
+    arrow: { color: 0x60a5fa, emissiveIntensity: 0.9 },
+    label: { color: 0x93b4ff, emissiveIntensity: 0.8 },
+    skyline: { color: 0x0f2a18, emissiveIntensity: 0.35 },
+    grass: { color: 0x123a20 },
+    tent: { color: 0x1c4028, emissiveIntensity: 0.3 },
+    ruin: { color: 0x184026, emissiveIntensity: 0.3 },
+    ghost: { color: 0x60a5fa, emissiveIntensity: 0.9 },
+    satellite: { color: PHOSPHOR, emissiveIntensity: 0.7 },
+  },
+};
+
+// The five cycle palettes + the hidden terminal. Sky blocks (v3 F3) are
+// consumed by sky-dome.ts.
 const PALETTES: Readonly<Record<Theme, ScenePalette>> = {
   light: LIGHT,
   dark: DARK,
   neon: NEON,
   dusk: DUSK,
   mono: MONO,
+  terminal: TERMINAL,
 };
 
 export function getPalette(theme: Theme): ScenePalette {

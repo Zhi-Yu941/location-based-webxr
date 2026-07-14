@@ -26,9 +26,11 @@ import {
 import { CHAPTERS, sectionElementId } from "./chapters";
 import { heroVeilOpacity } from "./hero-veil";
 import { computeScrollState, type SectionMetrics } from "./scroll-story";
-import { createThemeController, type Theme } from "./theme";
+import { createThemeController, SECRET_THEME_ID, type Theme } from "./theme";
+import { createSecretUnlock } from "./secret-palette";
 import { showEggToast } from "./egg-toast";
 import { isGenuineClick } from "./scene/egg-picker";
+import { printConsoleEgg } from "./console-egg";
 import { decideQualityTier } from "./capability";
 import {
   createSceneController,
@@ -173,6 +175,10 @@ function wireEggClicks(scroller: HTMLElement, scene: SceneController): void {
 }
 
 function boot(): void {
+  // Console easter egg (catalog №5): a wry line for devtools-openers
+  // (the console.info call is encapsulated in console-egg.ts).
+  printConsoleEgg();
+
   // Fire-and-forget (round-8 Z6): upgrade the CTA's device claim on
   // immersive-ar-capable devices; everyone else keeps the honest static
   // default already in the HTML.
@@ -256,13 +262,26 @@ function boot(): void {
       `Color palette: ${theme} — click to switch`,
     );
   };
+  const secretUnlock = createSecretUnlock({
+    storage: safeLocalStorage(),
+    now: () => performance.now(),
+  });
   const themeController = createThemeController({
     storage: safeLocalStorage(),
     prefersLight: () =>
       window.matchMedia("(prefers-color-scheme: light)").matches,
     applyTheme,
+    isSecretUnlocked: () => secretUnlock.isUnlocked(),
   });
-  toggleButton?.addEventListener("click", () => themeController.cycle());
+  toggleButton?.addEventListener("click", () => {
+    // Secret palette (catalog №4): rapid cycling unlocks `terminal` and
+    // jumps straight to it; otherwise a normal cycle step.
+    if (secretUnlock.registerCycle()) {
+      themeController.set(SECRET_THEME_ID);
+    } else {
+      themeController.cycle();
+    }
+  });
 
   // Chapter dot rail (v3 F6): filled at boot, active dot follows the
   // scroll state machine, click = scroll to the chapter (same scroller

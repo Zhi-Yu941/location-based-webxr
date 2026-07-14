@@ -40,7 +40,7 @@
       // stays the source of truth after boot.
       (function () {
         try {
-          var valid = ["light", "dark", "neon", "dusk", "mono"];
+          var valid = ["light", "dark", "neon", "dusk", "mono", "terminal"];
           var stored = localStorage.getItem("gps-landing-theme");
           var theme =
             valid.indexOf(stored) >= 0
@@ -160,6 +160,28 @@
         --veil: #f5f5f2;
 
         color-scheme: light;
+      }
+      /* TERMINAL (hidden 6th palette, easter-egg №4): retro CRT chrome —
+         near-black with phosphor-green text. Reached only after the
+         rapid-cycle unlock; the 3D palette matches (scene/palette.ts). */
+      html[data-theme="terminal"] {
+        --bg: #030904;
+        --text: #3f6;
+        --muted: #2aa64a;
+        --hl-raw: #facc15;
+        --hl-code: #fbbf24;
+        --hl-kw: #60a5fa;
+        --hl-lit: #3f6;
+        --panel: rgb(8 22 12 / 70%);
+        --panel-border: rgb(51 255 102 / 22%);
+        --panel-border-hi: rgb(51 255 102 / 50%);
+        --card: #08160c;
+        --card-border: #164026;
+        --card-hover: #0d2414;
+        --link: #60a5fa;
+        --veil: #030904;
+
+        color-scheme: dark;
       }
       * {
         box-sizing: border-box;

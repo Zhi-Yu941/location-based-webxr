@@ -15,10 +15,19 @@
  * swallowed — the visual cycle must keep working without persistence.
  */
 
-/** Cycle order of the palette button. */
+/** Cycle order of the palette button (the five curated palettes). */
 export const THEME_IDS = ["light", "dark", "neon", "dusk", "mono"] as const;
 
-export type Theme = (typeof THEME_IDS)[number];
+/** The hidden 6th palette (easter-egg catalog №4): a valid persisted +
+ * applyable theme that stays OUT of the normal cycle until unlocked by
+ * rapid cycling (see `secret-palette.ts`). */
+export const SECRET_THEME_ID = "terminal";
+
+/** Every valid theme id (cycle palettes + the hidden terminal) — the set
+ * `resolveInitialTheme` and the index.html FOUC guard accept. */
+export const ALL_THEME_IDS = [...THEME_IDS, SECRET_THEME_ID] as const;
+
+export type Theme = (typeof ALL_THEME_IDS)[number];
 
 export const THEME_STORAGE_KEY = "gps-landing-theme";
 
@@ -31,18 +40,24 @@ export interface ThemeEnvironment {
   readonly prefersLight: () => boolean;
   /** Receives every palette change, including the initial resolution. */
   readonly applyTheme: (theme: Theme) => void;
+  /** Whether the hidden terminal palette is unlocked (catalog №4); when
+   * true it joins the cycle. Defaults to always-locked. */
+  readonly isSecretUnlocked?: () => boolean;
 }
 
 export interface ThemeController {
   readonly theme: Theme;
   /** Advances to the next palette, applies + persists it, returns it. */
   cycle(): Theme;
+  /** Apply + persist a specific valid palette (e.g. jumping straight to
+   * the terminal palette the moment it unlocks). */
+  set(theme: Theme): Theme;
 }
 
 function isThemeId(value: unknown): value is Theme {
   return (
     typeof value === "string" &&
-    (THEME_IDS as readonly string[]).includes(value)
+    (ALL_THEME_IDS as readonly string[]).includes(value)
   );
 }
 
@@ -80,13 +95,25 @@ export function createThemeController(env: ThemeEnvironment): ThemeController {
   );
   env.applyTheme(theme);
 
+  const cycleOrder = (): readonly Theme[] =>
+    env.isSecretUnlocked?.() ? [...THEME_IDS, SECRET_THEME_ID] : THEME_IDS;
+
   return {
     get theme() {
       return theme;
     },
     cycle() {
-      const index = THEME_IDS.indexOf(theme);
-      theme = THEME_IDS[(index + 1) % THEME_IDS.length] ?? "dark";
+      const order = cycleOrder();
+      // If the current palette isn't in the (possibly shrunk) order,
+      // start the cycle from its beginning.
+      const index = order.indexOf(theme);
+      theme = order[(index + 1) % order.length] ?? "dark";
+      env.applyTheme(theme);
+      persistTheme(env.storage, theme);
+      return theme;
+    },
+    set(next: Theme) {
+      theme = next;
       env.applyTheme(theme);
       persistTheme(env.storage, theme);
       return theme;

@@ -13,6 +13,11 @@ palette.
 ## Public API
 
 - `THEME_IDS` — the cycle order: `light, dark, neon, dusk, mono`.
+- `SECRET_THEME_ID` (`"terminal"`) + `ALL_THEME_IDS` — the hidden 6th
+  palette (easter-egg catalog №4) is a VALID theme (persistable,
+  applyable, FOUC-guard-accepted) but stays OUT of the cycle until
+  `env.isSecretUnlocked()` returns true, at which point it joins the
+  cycle after `mono`. Unlock logic lives in `secret-palette.ts`.
 - `resolveInitialTheme(stored, prefersLight) → Theme` — pure resolution
   rule: any valid stored id wins; anything else (null, garbage) falls
   back to the OS preference (light/dark).
@@ -20,7 +25,10 @@ palette.
   - `env.storage: ThemeStorage | null` — narrowed localStorage seam.
   - `env.prefersLight: () => boolean` — matchMedia seam.
   - `env.applyTheme(theme)` — called once at creation and on every cycle.
-  - Controller: `theme` (current value), `cycle() → Theme`.
+  - `env.isSecretUnlocked?()` — when true, `terminal` joins the cycle.
+  - Controller: `theme` (current value), `cycle() → Theme`, `set(theme)
+→ Theme` (jump straight to any valid palette + persist — used to
+    switch to `terminal` the moment it unlocks).
 - `THEME_STORAGE_KEY` (`"gps-landing-theme"`), `Theme`, `ThemeEnvironment`,
   `ThemeController`. (The narrow `ThemeStorage` seam type is module-private —
   `env.storage` is typed structurally.)

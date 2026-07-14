@@ -103,6 +103,51 @@ describe("createThemeController", () => {
     expect(withoutStorage.cycle()).toBe("neon");
   });
 
+  it("keeps the hidden terminal palette OUT of the cycle until unlocked (catalog №4)", () => {
+    const applyTheme = vi.fn();
+    let unlocked = false;
+    const controller = createThemeController({
+      storage: makeStorage({ [THEME_STORAGE_KEY]: "mono" }),
+      prefersLight: () => false,
+      applyTheme,
+      isSecretUnlocked: () => unlocked,
+    });
+    // Locked: mono wraps back to light, never terminal.
+    expect(controller.cycle()).toBe("light");
+
+    // Unlocked: terminal joins the cycle after mono.
+    unlocked = true;
+    controller.set("mono");
+    expect(controller.cycle()).toBe("terminal");
+    expect(controller.cycle()).toBe("light"); // wraps past terminal
+  });
+
+  it("set() jumps straight to a valid palette and persists it", () => {
+    const storage = makeStorage();
+    const applyTheme = vi.fn();
+    const controller = createThemeController({
+      storage,
+      prefersLight: () => false,
+      applyTheme,
+    });
+    expect(controller.set("terminal")).toBe("terminal");
+    expect(controller.theme).toBe("terminal");
+    expect(applyTheme).toHaveBeenLastCalledWith("terminal");
+    expect(storage.setItem).toHaveBeenLastCalledWith(
+      THEME_STORAGE_KEY,
+      "terminal",
+    );
+  });
+
+  it("resolves a persisted terminal palette on boot (FOUC-guard parity)", () => {
+    const controller = createThemeController({
+      storage: makeStorage({ [THEME_STORAGE_KEY]: "terminal" }),
+      prefersLight: () => true,
+      applyTheme: () => {},
+    });
+    expect(controller.theme).toBe("terminal");
+  });
+
   it("survives a getItem that throws by falling back to the OS preference", () => {
     const brokenStorage = {
       getItem: () => {

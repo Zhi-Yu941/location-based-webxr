@@ -140,7 +140,7 @@ describe('buildMapData', () => {
     // pose whenever an alignment exists; indoors the raw fix freezes while the
     // fused (cyan) path keeps moving. Default chain: explicit (incl. null) →
     // last fusedPath point → last raw fix → null. See
-    // gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-06-recorder-live-map-user-dot-fused-pose-user-feedback.md.
+    // gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-06-1526-recorder-live-map-user-dot-fused-pose-user-feedback.md.
     it('defaults to the LAST fused-path point when the fused path is non-empty', () => {
       const data = buildMapData({
         rawGpsPath: RAW,

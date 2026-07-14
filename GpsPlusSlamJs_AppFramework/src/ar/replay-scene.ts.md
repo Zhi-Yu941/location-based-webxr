@@ -2,25 +2,25 @@
 
 ## Purpose
 
-Sets up a standard Three.js rendering environment for desktop replay mode (no WebXR). Creates the scene hierarchy with the `arpose` intermediate node, registers scene objects, and provides orbit + FPS camera controls for inspecting replayed GPS data.
+Sets up a standard Three.js rendering environment for desktop replay mode (no WebXR). Creates the scene hierarchy with the `arpose` intermediate node, OWNS the resulting scene objects (exposed via the init return value / `getReplayState()` — never injected into `webxr-session.ts`), and provides orbit + FPS camera controls for inspecting replayed GPS data.
 
 ## Public API
 
-| Symbol                 | Signature                                                               | Description                                    |
-| ---------------------- | ----------------------------------------------------------------------- | ---------------------------------------------- |
-| `initReplayScene()`    | `(container: HTMLElement) => { scene, arWorldGroup, camera, renderer }` | Initialize scene, renderer, controls, rAF loop |
-| `disposeReplayScene()` | `() => void`                                                            | Clean up all resources (idempotent)            |
-| `getReplayState()`     | `() => ReplaySceneState \| null`                                        | Internal state for testing/introspection       |
-| `updateOrbitTarget()`  | `(position: THREE.Vector3) => void`                                     | Set orbit center + translate camera to follow  |
-| `getCameraMode()`      | `() => 'orbit' \| 'fps'`                                                | Current camera mode                            |
-| `toggleCameraMode()`   | `() => void`                                                            | Switch between orbit and FPS modes             |
+| Symbol                 | Signature                                                                       | Description                                    |
+| ---------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `initReplayScene()`    | `(container: HTMLElement) => { scene, arWorldGroup, arpose, camera, renderer }` | Initialize scene, renderer, controls, rAF loop |
+| `disposeReplayScene()` | `() => void`                                                                    | Clean up all resources (idempotent)            |
+| `getReplayState()`     | `() => ReplaySceneState \| null`                                                | Internal state for testing/introspection       |
+| `updateOrbitTarget()`  | `(position: THREE.Vector3) => void`                                             | Set orbit center + translate camera to follow  |
+| `getCameraMode()`      | `() => 'orbit' \| 'fps'`                                                        | Current camera mode                            |
+| `toggleCameraMode()`   | `() => void`                                                                    | Switch between orbit and FPS modes             |
 
 ## Types
 
-| Type               | Description                                                                     |
-| ------------------ | ------------------------------------------------------------------------------- |
-| `CameraMode`       | `'orbit' \| 'fps'`                                                              |
-| `ReplaySceneState` | Internal aggregate: scene, arWorldGroup, camera, renderer, controls, rAFId, etc |
+| Type               | Description                                                                             |
+| ------------------ | --------------------------------------------------------------------------------------- |
+| `CameraMode`       | `'orbit' \| 'fps'`                                                                      |
+| `ReplaySceneState` | Internal aggregate: scene, arWorldGroup, arpose, camera, renderer, controls, rAFId, etc |
 
 ## Invariants & Assumptions
 
@@ -32,7 +32,7 @@ Sets up a standard Three.js rendering environment for desktop replay mode (no We
   target to preserve the viewing relationship. OrbitControls.update() does NOT auto-move the camera when
   the target moves (it recomputes offset = camera.position - target, which is a no-op without user input).
   Without explicit camera translation, the camera would sit still while the trajectory moves away.
-- **Scene registration (Risk R1):** After creating the hierarchy, `initReplayScene()` calls `setScene()`, `setArWorldGroup()`, `setArPose()`, `setCamera()` from `webxr-session.ts` so that existing visualizers and store subscribers work without modification.
+- **Scene ownership (surface-reduction step 2, replaces the Risk R1 injection):** `initReplayScene()` keeps its own `scene`/`arWorldGroup`/`arpose`/`camera` references and never writes into `webxr-session.ts` — the live getters (`getScene()` etc.) stay `null` during replay. Replay consumers read the init return value / `getReplayState()`, and the replay orchestrator points scene-reading visualizers at these references explicitly (e.g. `gpsEventVisualizer.setSceneSource(...)`). The historical `setScene`/`setArWorldGroup`/`setCamera`/`setArPose`/`getArPose` exports were deleted.
 - **No WebXR:** Renderer has `xr.enabled === false`. Uses `requestAnimationFrame` loop, not WebXR's `setAnimationLoop`.
 - **Idempotent dispose:** `disposeReplayScene()` can be called multiple times safely. Clears all module state and DOM references.
 - **Single instance:** Only one replay scene can be active. Calling `initReplayScene()` while one exists throws.
@@ -97,7 +97,7 @@ disposeReplayScene();
 ## Tests
 
 - [replay-scene.test.ts](replay-scene.test.ts) — 60 tests covering:
-  - **3a (core):** camera reparented to scene root (Issue 5), scene registration (R1), renderer config, canvas insertion, sizing, rAF loop, lighting, arWorldGroup parent, double-init guard, dispose cleanup (canvas removal, module state, rAF cancel, renderer disposal), idempotent dispose
+  - **3a (core):** camera reparented to scene root (Issue 5), scene ownership (webxr-session live getters stay null — the R1 injection is gone), arpose exposed via return value/state, renderer config, canvas insertion, sizing, rAF loop, lighting, arWorldGroup parent, double-init guard, dispose cleanup (canvas removal, module state, rAF cancel, renderer disposal), idempotent dispose
   - **3b (orbit):** default mode, updateOrbitTarget sets center, updateOrbitTarget translates camera to follow trajectory, incremental deltas across multiple calls, safe before init
   - **3c (FPS toggle):** orbit→fps, fps→orbit, safe before init, default mode before init, dispose cleans both, tabindex save/restore (single + multi round-trip, pre-existing values, dispose-from-FPS, dispose-without-FPS)
   - **Issue 5:** arpose remains in hierarchy after reparent, camera world position unaffected by arpose changes, camera starts elevated
@@ -108,5 +108,7 @@ disposeReplayScene();
 
 ## References
 
-- [docs/2026-02-19-replay-mode.md](../../../GpsPlusSlamJs_Docs/docs/2026-02-19-replay-mode.md) — Issue 4 (scene setup), Issue 5 (camera controls), Risk R1, R5
-- [webxr-session.ts](webxr-session.ts) — `createSceneHierarchy()`, `setScene/setArWorldGroup/setCamera`
+- [docs/2026-02-19-replay-mode.md](../../../GpsPlusSlamJs_Docs/docs/2026-02-19-replay-mode.md) — Issue 4 (scene setup), Issue 5 (camera controls), Risk R1 (historical: the R1 setter injection described there was removed by the 2026-07-11 surface-reduction plan, step 2), R5
+- [docs/2026-07-11-1641-webxr-session-surface-reduction-plan.md](../../../GpsPlusSlamJs_Docs/docs/2026-07-11-1641-webxr-session-surface-reduction-plan.md) — step 2: replay owns its scene
+- [webxr-session.ts](webxr-session.ts) — `createSceneHierarchy()` (the only remaining dependency)
+- [gps-event-markers.ts](../visualization/gps-event-markers.ts) — `setSceneSource()` (how scene-reading visualizers are pointed at the replay scene)

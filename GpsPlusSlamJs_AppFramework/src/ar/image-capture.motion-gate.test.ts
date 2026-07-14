@@ -6,7 +6,7 @@
  * a due capture while moving and fire on the first genuinely-calm frame, that
  * the never-calm safety fallback eventually fires, that disabling the filter
  * restores legacy interval capture, and that a glitch frame is not grabbed.
- * See 2026-06-23-blurry-frame-motion-gating-plan.md §4.3-4.5, §6.
+ * See 2026-06-23-2105-blurry-frame-motion-gating-plan.md §4.3-4.5, §6.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

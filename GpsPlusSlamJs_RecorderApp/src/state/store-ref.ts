@@ -7,7 +7,7 @@
  * recording (or switches into replay). Any subscriber that captured the
  * boot-time `store` reference in a closure keeps reading the stale store
  * after the swap. The previous F1 fix re-pointed the producer
- * (`setTrackingStore(newStore)`); this module is the consumer-side
+ * (`rebindTrackingStore(newStore)`); this module is the consumer-side
  * analogue: an emitter that fires whenever the active store identity
  * changes, so subscribers can re-attach to the new store instead of
  * silently regressing.
@@ -27,6 +27,33 @@ export interface StoreRef<T> {
    * returns the new value. Returns an unsubscribe function.
    */
   subscribe(listener: (value: T) => void): () => void;
+}
+
+/**
+ * Attach a resource to the CURRENT store and re-attach on every store swap
+ * (quality-review G-11 — five recorder wirers hand-rolled this identical
+ * dance and one copy had already drifted; the F1 feedback doc records this
+ * exact stale-store bug class).
+ *
+ * `attach(store)` wires against the given store and returns its detach.
+ * Swap-specific resets (clearing a visualizer, resetting throttle counters)
+ * belong at the START of `attach` — they are no-ops on the initial
+ * attachment and run exactly once per swap after the previous detach.
+ * The returned disposer detaches the current attachment and stops following.
+ */
+export function followStore<T>(
+  storeRef: StoreRef<T>,
+  attach: (store: T) => () => void
+): () => void {
+  let detach = attach(storeRef.get());
+  const unsubscribeSwap = storeRef.subscribe((nextStore) => {
+    detach();
+    detach = attach(nextStore);
+  });
+  return () => {
+    detach();
+    unsubscribeSwap();
+  };
 }
 
 export function createStoreRef<T>(initial: T): StoreRef<T> {

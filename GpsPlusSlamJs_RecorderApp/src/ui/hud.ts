@@ -33,8 +33,9 @@ let callbacks: UICallbacks | null = null;
 // Track permission status for Enter AR button validation
 let permissionsReady = false;
 
-// Track storage status for Enter AR button validation (Issue 1a-fix)
-let folderSelected = false;
+// Track storage status for Enter AR button validation (Issue 1a-fix).
+// (The parallel `folderSelected` flag was removed 2026-07-10, quality-review
+// D-3 — it was write-only production state; only a test read it.)
 let saveLocationSelected = false;
 
 // Cached references to required UI elements, set during initUI()
@@ -47,6 +48,90 @@ let cachedElements: {
   btnNewRefPoint: HTMLElement;
   recordingIndicator: HTMLElement;
 } | null = null;
+
+/**
+ * Show the new-scenario section with its fade-in transition and focus the
+ * name input. Shared helper (quality-review D-5 — the show/hide pair used to
+ * be copied across the scenario change handler and `populateScenarios` and
+ * had already drifted: the `populateScenarios` hide copy lost the transition
+ * handling).
+ */
+function showNewScenarioSection(): void {
+  const section = document.getElementById('new-scenario-section');
+  const nameInput = document.getElementById(
+    'new-scenario-name'
+  ) as HTMLInputElement | null;
+  // Show with transition: remove hidden, then add opacity.
+  section?.classList.remove('hidden');
+  // Use requestAnimationFrame to ensure transition triggers after display change
+  requestAnimationFrame(() => {
+    section?.classList.remove('opacity-0');
+    section?.classList.add('opacity-100');
+  });
+  // Auto-focus the input to guide user to next action
+  nameInput?.focus();
+}
+
+/**
+ * Hide the new-scenario section, honoring the fade-out transition when one
+ * applies (reduced motion / jsdom / 0s duration hide immediately, keeping
+ * the element properly hidden from assistive tech). The deferred `hidden`
+ * add re-checks the select so rapid toggles back to "__new__" are not
+ * clobbered.
+ */
+function hideNewScenarioSection(scenarioSelect: HTMLSelectElement): void {
+  const section = document.getElementById('new-scenario-section');
+  // Hide with transition: remove opacity first
+  section?.classList.remove('opacity-100');
+  section?.classList.add('opacity-0');
+
+  // Check if transitions are expected to run.
+  // Use optional chaining for matchMedia (not available in jsdom without polyfill).
+  const prefersReducedMotion =
+    window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
+  const transitionDuration = section
+    ? getComputedStyle(section).transitionDuration
+    : '0s';
+  // Treat empty string (jsdom) or '0s' as no transition
+  const hasTransition =
+    !prefersReducedMotion &&
+    transitionDuration !== '0s' &&
+    transitionDuration !== '';
+
+  if (hasTransition) {
+    // Add hidden after transition completes to avoid visual glitches.
+    // Use a timeout fallback in case transitionend never fires (browser bug,
+    // rapid DOM changes, etc.). The fallback duration is slightly longer than
+    // the CSS transition (300ms + 50ms buffer).
+    const fallbackTimeoutMs = 350;
+    const timeoutId = setTimeout(() => {
+      if (scenarioSelect.value !== '__new__') {
+        section?.classList.add('hidden');
+      }
+    }, fallbackTimeoutMs);
+
+    // Note on cleanup: { once: true } auto-removes the listener after firing,
+    // preventing accumulation. The element is never removed from the DOM (only
+    // hidden via CSS), so no explicit cleanup is needed. The inner conditional
+    // handles rapid toggles—if user switches back to "__new__" before transition
+    // ends, we skip adding 'hidden'.
+    section?.addEventListener(
+      'transitionend',
+      () => {
+        clearTimeout(timeoutId);
+        if (scenarioSelect.value !== '__new__') {
+          section?.classList.add('hidden');
+        }
+      },
+      { once: true }
+    );
+  } else {
+    // No transition expected (reduced motion or 0s duration) — hide immediately.
+    if (scenarioSelect.value !== '__new__') {
+      section?.classList.add('hidden');
+    }
+  }
+}
 
 /**
  * Initialize UI event listeners
@@ -150,75 +235,14 @@ export function initUI(cbs: UICallbacks): void {
     void callbacks?.onRequestPermissions();
   });
 
-  // Scenario dropdown logic
+  // Scenario dropdown logic — show/hide via the shared helpers (quality-review
+  // D-5: the section toggling used to be copied across this handler and
+  // populateScenarios and had already drifted).
   scenarioSelect.addEventListener('change', () => {
-    const newScenarioSection = document.getElementById('new-scenario-section');
-    const newScenarioNameInput = document.getElementById(
-      'new-scenario-name'
-    ) as HTMLInputElement | null;
     if (scenarioSelect.value === '__new__') {
-      // Show with transition: remove hidden, then add opacity
-      newScenarioSection?.classList.remove('hidden');
-      // Use requestAnimationFrame to ensure transition triggers after display change
-      requestAnimationFrame(() => {
-        newScenarioSection?.classList.remove('opacity-0');
-        newScenarioSection?.classList.add('opacity-100');
-      });
-      // Auto-focus the input to guide user to next action
-      newScenarioNameInput?.focus();
+      showNewScenarioSection();
     } else {
-      // Hide with transition: remove opacity first
-      newScenarioSection?.classList.remove('opacity-100');
-      newScenarioSection?.classList.add('opacity-0');
-
-      // Check if transitions are expected to run.
-      // Use optional chaining for matchMedia (not available in jsdom without polyfill).
-      const prefersReducedMotion =
-        window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ??
-        false;
-      const transitionDuration = newScenarioSection
-        ? getComputedStyle(newScenarioSection).transitionDuration
-        : '0s';
-      // Treat empty string (jsdom) or '0s' as no transition
-      const hasTransition =
-        !prefersReducedMotion &&
-        transitionDuration !== '0s' &&
-        transitionDuration !== '';
-
-      if (hasTransition) {
-        // Add hidden after transition completes to avoid visual glitches.
-        // Use a timeout fallback in case transitionend never fires (browser bug,
-        // rapid DOM changes, etc.). The fallback duration is slightly longer than
-        // the CSS transition (300ms + 50ms buffer).
-        const fallbackTimeoutMs = 350;
-        const timeoutId = setTimeout(() => {
-          if (scenarioSelect.value !== '__new__') {
-            newScenarioSection?.classList.add('hidden');
-          }
-        }, fallbackTimeoutMs);
-
-        // Note on cleanup: { once: true } auto-removes the listener after firing,
-        // preventing accumulation. The element is never removed from the DOM (only
-        // hidden via CSS), so no explicit cleanup is needed. The inner conditional
-        // handles rapid toggles—if user switches back to "__new__" before transition
-        // ends, we skip adding 'hidden'.
-        newScenarioSection?.addEventListener(
-          'transitionend',
-          () => {
-            clearTimeout(timeoutId);
-            if (scenarioSelect.value !== '__new__') {
-              newScenarioSection?.classList.add('hidden');
-            }
-          },
-          { once: true }
-        );
-      } else {
-        // No transition expected (reduced motion or 0s duration) — hide immediately.
-        // This ensures the element is properly hidden from assistive tech.
-        if (scenarioSelect.value !== '__new__') {
-          newScenarioSection?.classList.add('hidden');
-        }
-      }
+      hideNewScenarioSection(scenarioSelect);
 
       // Notify main.ts about scenario change
       if (scenarioSelect.value) {
@@ -671,9 +695,8 @@ export function resetUIForNewRecording(options: ResetUIOptions): void {
     saveStatus.textContent = '';
   }
 
-  // Conditionally clear folder selection
+  // Conditionally clear the folder status display
   if (!options.keepFolder) {
-    folderSelected = false;
     const folderStatus = document.getElementById('folder-status');
     if (folderStatus) {
       folderStatus.textContent = '';
@@ -934,27 +957,16 @@ export function populateScenarios(scenarios: string[]): void {
     // Programmatic value change doesn't fire 'change' event, so we need to
     // manually notify main.ts to sync currentScenarioName
     callbacks?.onScenarioChange(scenarios[0]!);
-    // Hide new scenario section since an existing scenario is selected
-    const newScenarioSection = document.getElementById('new-scenario-section');
-    newScenarioSection?.classList.add('hidden');
-    newScenarioSection?.classList.remove('opacity-100');
-    newScenarioSection?.classList.add('opacity-0');
+    // Hide new scenario section since an existing scenario is selected —
+    // through the shared helper (quality-review D-5: this copy had drifted
+    // and lost the fade-out transition handling).
+    hideNewScenarioSection(scenarioSelect);
   } else {
     // No existing scenarios - the only option is "__new__"
     // Browser auto-selects it but doesn't fire change event, so we need to
     // manually show the new scenario input section and focus it
     scenarioSelect.value = '__new__';
-    const newScenarioSection = document.getElementById('new-scenario-section');
-    const newScenarioNameInput = document.getElementById(
-      'new-scenario-name'
-    ) as HTMLInputElement | null;
-    newScenarioSection?.classList.remove('hidden');
-    // Use requestAnimationFrame to ensure transition triggers after display change
-    requestAnimationFrame(() => {
-      newScenarioSection?.classList.remove('opacity-0');
-      newScenarioSection?.classList.add('opacity-100');
-    });
-    newScenarioNameInput?.focus();
+    showNewScenarioSection();
   }
 
   validateEnterButton();
@@ -1154,15 +1166,6 @@ export function setPermissionsReady(ready: boolean): void {
 }
 
 /**
- * Set the folderSelected flag.
- * Called after user successfully selects a folder for reading.
- * @internal
- */
-export function setFolderSelected(selected: boolean): void {
-  folderSelected = selected;
-}
-
-/**
  * Expand or collapse the optional "Import previous recordings" folder section,
  * and optionally show a one-line hint above the folder button.
  *
@@ -1282,15 +1285,6 @@ export function setFolderImportProgress(
     folderImportProgressHideTimer = null;
     hide();
   }, FOLDER_IMPORT_PROGRESS_LINGER_MS);
-}
-
-/**
- * Get the current folderSelected state.
- * Used for testing.
- * @internal
- */
-export function getFolderSelected(): boolean {
-  return folderSelected;
 }
 
 /**

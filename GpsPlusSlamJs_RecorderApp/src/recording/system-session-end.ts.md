@@ -10,8 +10,8 @@ recording still running, stale history) into a clean, explained exit.
 ## Public API
 
 - `createSystemSessionEndHandler(deps)` → `(info: SessionEndInfo) => Promise<void>`
-  - The returned function is registered with the framework's
-    `setSessionEndCallback` (in `main.ts`, during `handleEnterAR`). It returns
+  - The returned function is passed to the framework via `initAR`'s
+    `callbacks.onSessionEnd` (in `main.ts`, during `handleEnterAR`). It returns
     a promise **only so tests can await it** — the framework treats it as
     fire-and-forget and every rejection is handled internally.
 - `SystemSessionEndDeps` — injected collaborators, all thin wrappers over
@@ -40,21 +40,23 @@ recording still running, stale history) into a clean, explained exit.
 - Screen `ar` → `replaceScreen('setup')` + setup UI + informational toast.
 - Screens `setup`/`summary` → no-op (nothing AR-bound left to clean up).
 - Re-registration: the framework clears the callback on every session end
-  (`resetWebXRState()`), so `main.ts` registers it on **each** Enter AR.
+  (`resetWebXRState()`), so `main.ts` re-passes it via the `initAR` callbacks
+  struct on **each** Enter AR.
 
 ## Examples
 
 ```typescript
-setSessionEndCallback(
-  createSystemSessionEndHandler({
-    getCurrentScreen,
-    stopRecording: () => recordingSessionHandlers.handleStopRecording(),
-    replaceScreen: replaceScreenState,
-    showSetupUi: showSetupModal,
-    showToast: (message) => showToast(message),
-    showError,
-  })
-);
+const handler = createSystemSessionEndHandler({
+  getCurrentScreen,
+  stopRecording: () => recordingSessionHandlers.handleStopRecording(),
+  replaceScreen: replaceScreenState,
+  showSetupUi: showSetupModal,
+  showToast: (message) => showToast(message),
+  showError,
+});
+await initAR(container, isolationOptions, sessionFeatures, {
+  onSessionEnd: (info) => void handler(info),
+});
 ```
 
 ## Tests
@@ -64,9 +66,9 @@ setSessionEndCallback(
   lying success toast, user not stranded).
 - On-device gate (physical Android): back gesture mid-recording → camera-app
   exit + summary + toast + recording present; tracked in
-  `GpsPlusSlamJs_Docs/docs/2026-07-04-ar-clipping-planes-and-lifecycle-plan.md`.
+  `GpsPlusSlamJs_Docs/docs/2026-07-04-1626-ar-clipping-planes-and-lifecycle-plan.md`.
 
 ## Related docs
 
-- [2026-07-04-ar-clipping-planes-and-lifecycle-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-04-ar-clipping-planes-and-lifecycle-plan.md) (F3)
+- [2026-07-04-1626-ar-clipping-planes-and-lifecycle-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-04-1626-ar-clipping-planes-and-lifecycle-plan.md) (F3)
 - [2026-02-15-lifecycle-orphans.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-02-15-lifecycle-orphans.md) §1

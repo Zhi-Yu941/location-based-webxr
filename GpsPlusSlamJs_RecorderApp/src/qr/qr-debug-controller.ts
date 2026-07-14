@@ -28,7 +28,7 @@
  * rendering, or PnP numerics (those are covered by the framework tests).
  *
  * @see qr-depth-resolver.ts — the as-of depth join this drives.
- * @see gps-plus-slam-app-framework/ar/qr-debug-view — the rendered axis+cube.
+ * @see gps-plus-slam-app-framework/ar/qr/qr-debug-view — the rendered axis+cube.
  */
 
 import type { Object3D } from 'three';
@@ -38,15 +38,15 @@ import type { Object3D } from 'three';
 import {
   createQrDebugView,
   type QrDebugView,
-} from 'gps-plus-slam-app-framework/ar/qr-debug-view';
-import { PlanarPnpSquare } from 'gps-plus-slam-app-framework/ar/planar-pnp';
+} from 'gps-plus-slam-app-framework/ar/qr/qr-debug-view';
+import { PlanarPnpSquare } from 'gps-plus-slam-app-framework/ar/qr/planar-pnp';
 import {
   createIncrementalQrPlacement,
   type DeriveQrPoseDeps,
   type IncrementalQrPlacement,
   type RawQrObservation,
-} from 'gps-plus-slam-app-framework/ar/qr-derived-pose';
-import type { SolvePnpSquare } from 'gps-plus-slam-app-framework/ar/qr-pose';
+} from 'gps-plus-slam-app-framework/ar/qr/qr-derived-pose';
+import type { SolvePnpSquare } from 'gps-plus-slam-app-framework/ar/qr/qr-pose';
 import {
   selectQrRawObservations,
   type QrDetectedState,
@@ -120,6 +120,28 @@ export function createQrDebugController(
   const views = new Map<string, QrDebugView>();
   let lastSample: DepthSample | null = null;
 
+  // F-8 (2026-07-10 quality review): `selectQrRawObservations` rebuilds an
+  // O(history) array per marker per rAF tick. The qrDetected slice is
+  // immutable-append, so a marker's `detections` reference is a sound cache
+  // key — reuse the mapped observations while it is unchanged.
+  const observationCache = new Map<
+    string,
+    { detections: unknown; observations: ReturnType<typeof selectObservations> }
+  >();
+  function selectObservationsCached(
+    state: ReturnType<QrDebugControllerDeps['getState']>,
+    text: string
+  ): ReturnType<typeof selectObservations> {
+    const detections = state.qrDetected.markers[text]?.detections;
+    const cached = observationCache.get(text);
+    if (cached && cached.detections === detections) {
+      return cached.observations;
+    }
+    const observations = selectObservations(state, text);
+    observationCache.set(text, { detections, observations });
+    return observations;
+  }
+
   function update(): void {
     const state = deps.getState();
 
@@ -135,11 +157,14 @@ export function createQrDebugController(
     //    and clear that marker's accumulated derive state so a re-appearance starts
     //    fresh (and the measurer doesn't retain stale size for a reused payload).
     const markers = state.qrDetected.markers;
-    for (const text of [...views.keys()]) {
+    // Map iterators tolerate deletion during iteration, so no spread copy is
+    // needed per tick (F-8 nit).
+    for (const text of views.keys()) {
       if (!(text in markers)) {
         views.get(text)!.dispose();
         views.delete(text);
         deriver.reset(text);
+        observationCache.delete(text);
       }
     }
 
@@ -149,7 +174,10 @@ export function createQrDebugController(
     const parent = deps.getArWorldGroup();
     if (!parent) return;
     for (const text of Object.keys(markers)) {
-      const placement = deriver.update(text, selectObservations(state, text));
+      const placement = deriver.update(
+        text,
+        selectObservationsCached(state, text)
+      );
       // Not sizeable yet (or PnP-rejected) → render nothing; a prior view keeps
       // its last pose (persistence) rather than being cleared on a transient miss.
       if (!placement) continue;
@@ -167,6 +195,7 @@ export function createQrDebugController(
     dispose(): void {
       for (const view of views.values()) view.dispose();
       views.clear();
+      observationCache.clear();
       resolver.reset();
       lastSample = null;
     },

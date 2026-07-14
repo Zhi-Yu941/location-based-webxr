@@ -30,7 +30,7 @@ Factory function that creates a folder manager instance with injected dependenci
 Dependencies injected from `main.ts`:
 
 - **Cross-module state:** `getIsReplayMode`, `setReplayZipScenariosCache`
-- **UI callbacks:** `showError`, `updateStatus`, `populateScenarios`, `setFolderSelected`, `setSaveLocationSelected`, `setFolderImportExpanded`, `validateEnterButton`, `listScenariosFromFolder`, `extractScenarioNamesFromZips`, `discoverScenariosFromZipMetadata`, `populateReplayScenarios`, `updateFolderStatus`, `updateSaveStatus`
+- **UI callbacks:** `showError`, `updateStatus`, `populateScenarios`, `setSaveLocationSelected`, `setFolderImportExpanded`, `validateEnterButton`, `listScenariosFromFolder`, `extractScenarioNamesFromZips`, `discoverScenariosFromZipMetadata`, `populateReplayScenarios`, `updateFolderStatus`, `updateSaveStatus` (the write-only `setFolderSelected` was removed end-to-end in quality-review D-3)
 - **Indexing pass callbacks (D2/D3, 2026-07-05):** `onIndexingProgress?({done,total})` — one event per ZIP (plus an initial `{0,total}`), drives the folder-import progress bar; `onIndexingSettled?(outcome)` — terminal `success | error | aborted` outcome (drives the bar's durable end state and the completion toast; the success variant carries `refPointsWritten`, `zipFilesScanned`, `zipFilesTotal`, `errors`)
 
 (The former optional `mapOverlay` dep was removed in the 2026-07-05 live-map feedback round: its `addPriorMarkers` call always ran before the lazily created AR minimap existed. The minimap now renders ref points from the store via `ui/ref-point-map-markers.ts`, fed by the `setImportedRefPointEntries` dispatch below.)
@@ -60,7 +60,6 @@ const folderManager = createFolderManager({
   showError,
   updateStatus,
   populateScenarios,
-  setFolderSelected,
   setSaveLocationSelected,
   validateEnterButton,
   listScenariosFromFolder,

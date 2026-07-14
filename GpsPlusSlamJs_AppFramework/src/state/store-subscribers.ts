@@ -176,10 +176,35 @@ export function wireStoreSubscribers(
    * fused-dot feedback, Slice B), or `null` when there is no overlay or it
    * has no `render` (the minimal `setGpsPosition`-only dep shape).
    */
+  // E-6 (2026-07-10 quality review): one `recordGpsEvent` dispatch changes
+  // BOTH the alignment matrix and the GPS positions, so the two change-gated
+  // subscriptions below each called rebuildMap — 2× O(full history) per GPS
+  // event. Memoize on the input references (immutable store slices + the
+  // snapshot count this module owns); the second same-dispatch call becomes a
+  // cache hit that still returns the MapData the centering logic needs.
+  let lastGpsPositionsRef: unknown = null;
+  let lastOdomPositionsRef: unknown = null;
+  let lastMatrixRef: unknown = null;
+  let lastZeroRef: unknown = null;
+  let lastSnapshotCount = -1;
+  let lastMapData: MapData | null = null;
+
   function rebuildMap(): MapData | null {
     if (!deps.mapOverlay?.render) return null;
     const state = store.getState();
     const gpsPositions = selectGpsPositions(state);
+    const odometryPositions = selectOdometryPositions(state);
+    const alignmentMatrix = selectAlignmentMatrix(state);
+    const zeroRef = selectZeroReference(state);
+    if (
+      gpsPositions === lastGpsPositionsRef &&
+      odometryPositions === lastOdomPositionsRef &&
+      alignmentMatrix === lastMatrixRef &&
+      zeroRef === lastZeroRef &&
+      alignmentSnapshotGps.length === lastSnapshotCount
+    ) {
+      return lastMapData;
+    }
     const rawGpsPath = gpsPositions.map((p) => ({
       lat: p.latitude,
       lng: p.longitude,
@@ -187,12 +212,18 @@ export function wireStoreSubscribers(
     }));
     const data = buildMapData({
       rawGpsPath,
-      odometryPositions: selectOdometryPositions(state),
+      odometryPositions,
       odometryRotations: selectOdometryRotations(state),
-      alignmentMatrix: selectAlignmentMatrix(state),
-      zeroRef: selectZeroReference(state),
+      alignmentMatrix,
+      zeroRef,
       alignmentSnapshots: alignmentSnapshotGps,
     });
+    lastGpsPositionsRef = gpsPositions;
+    lastOdomPositionsRef = odometryPositions;
+    lastMatrixRef = alignmentMatrix;
+    lastZeroRef = zeroRef;
+    lastSnapshotCount = alignmentSnapshotGps.length;
+    lastMapData = data;
     // `render` is a consumer-supplied boundary (e.g. a Leaflet redraw that
     // can fail transiently on a disposed container). A throw here must not
     // escape the store listener — it would skip the follow-up centering AND

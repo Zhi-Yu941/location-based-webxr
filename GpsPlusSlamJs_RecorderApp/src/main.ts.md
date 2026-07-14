@@ -22,7 +22,18 @@ This module is the entry point that runs on page load. It also exports the follo
 2. **Initialize UI** - Wires up button callbacks to handler functions
 3. **Initialize Session Summary** - Wires up summary panel callbacks
 4. **Handle folder selection** - Calls `initStorage()`, populates scenario dropdown
-5. **Handle Enter AR** - Calls `initAR()` to start WebXR session
+5. **Handle Enter AR** - Builds ONE `ArSessionCallbacks` struct (depth,
+   optional cameraFrame, tracking {store + onRestarted/onLost/onRecovered},
+   imageCapture incl. a stable `qualityAnalyzer` wrapper, the per-frame
+   `onFrame` tick, `onSessionEnd`) and passes it as `initAR()`'s 4th argument
+   (the framework's pre-init setters were folded into `initAR` — surface
+   reduction step 1). The closures read module-level `let`s at fire time, so
+   resources created after init (and per-recording swaps) are picked up.
+   Mid-session mutations go through two narrow seams: the framework's
+   `rebindTrackingStore` (store swap per recording) and main's
+   `activeImageQualityAnalyzer` ref (per-recording quality-gate Worker behind
+   the stable `qualityAnalyzer` wrapper; fail-open `{ accept: true }` while
+   null).
 6. **Handle recording controls** - Start/stop recording, mark reference points
 7. **Handle stop recording** - Collects summary data and shows Session Summary panel
 
@@ -36,34 +47,37 @@ This module is the entry point that runs on page load. It also exports the follo
   always distinguish between unique reference points (`refPointDefs.length`) and
   total observations (`flattenRefPointsToMarks(refPointDefs).length`). Use format:
   `"N ref points (M observations)"` to avoid confusion.
-- **Best-effort AR scene layers**: the frame-tile visualizer (F3.5d) and the
-  occupancy-grid cubes (2026-06-11 depth occupancy-grid port plan, Iter 5) are
-  each wired after `initAR` inside their own `try/catch` — a failure logs a
-  warning and recording continues without that layer. Both are torn down in
-  `resetMainState()` (unsubscribe + dispose; the occupancy grid itself is a
-  plain in-memory structure dropped with its reference). **They are also
-  disposed on re-entry**: `handleEnterAR` runs again on every "back to setup →
-  Enter AR" cycle and `onBackToSetup` performs no teardown, so each block first
-  disposes-and-nulls its prior subscriber + visualizer before constructing new
-  ones — otherwise the orphaned `storeRef` swap-listener (registered by
-  `wireOccupancyGridSubscribers`) and the previous visualizer's GPU resources
-  would leak (same leak class the tracking-quality subscription guards inline).
-  The cube visualizer
-  is parented under `arWorldGroup` (NOT the scene root): the grid's cells are
-  raw-WebXR coordinates that must ride the alignment matrix like the camera
-  (port plan Iter 7 reparenting fix).
+- **AR-session resource lifecycle — `arSessionScope`**
+  ([utils/ar-session-scope.ts](utils/ar-session-scope.ts.md), 2026-07-11
+  lifecycle-scope plan): every AR-session-scoped resource (visualizers,
+  subscriptions, frame-loop handles, the lazily created map overlay) registers
+  its teardown in the module-level `arSessionScope` at its creation site.
+  `handleEnterAR` starts with `arSessionScope.dispose()` (the re-enter guard:
+  `handleEnterAR` runs again on every "back to setup → Enter AR" cycle and
+  `onBackToSetup` performs no teardown) and `resetMainState()` is
+  `arSessionScope.dispose()` plus the app-lifetime resets. Disposal runs in
+  reverse creation order — per block, subscriptions unwind before the
+  visualizers they feed. Gated layers (stats overlay, compass cubes, frame
+  tiles, live occluder, loop-closure capture, QR recording) go through
+  `arSessionScope.wire(name, enabled, factory)`, which also owns the
+  best-effort try/catch: a wiring failure logs a warning and recording
+  continues without that layer. The occupancy-grid block is wired with
+  `enabled: true` (the grid always exists for COLMAP export; only the cube
+  mesh is gated). The cube visualizer is parented under `arWorldGroup` (NOT
+  the scene root): the grid's cells are raw-WebXR coordinates that must ride
+  the alignment matrix like the camera (port plan Iter 7 reparenting fix).
 - **Live QR recording + debug viz** (opt-in, `recording-options.qr.enabled`;
-  recorder live-QR WS-2/WS-5). When enabled, `handleEnterAR` registers the
-  camera-frame callback **before** `initAR` (`setCameraFrameCallback`, forwarding
-  frames to the producer held in `qrProducer`) and, after AR init inside its own
+  recorder live-QR WS-2/WS-5). When enabled, `handleEnterAR` includes the
+  camera-frame group in the `ArSessionCallbacks` struct passed to `initAR`
+  (`callbacks.cameraFrame.onFrame` forwards frames to the producer held in
+  `qrProducer`) and, after AR init inside its own
   best-effort `try/catch`, calls `wireQrRecording` (under `arWorldGroup`) to build
-  the thin RAW producer + the WS-5 debug axis+cube subscriber. Torn down in
-  `resetMainState()` and disposed-first on re-entry (same leak-guard pattern as
-  the occupancy/frame-tile layers). See
+  the thin RAW producer + the WS-5 debug axis+cube subscriber (teardown
+  registered in `arSessionScope` like the occupancy/frame-tile layers). See
   [qr/wire-qr-recording.ts.md](qr/wire-qr-recording.ts.md). Disabled by default,
   so an existing recording is byte-for-byte unaffected.
 - **Live debug-overlay toggles** (`recording-options.visualization.*`, Finding B
-  of the [2026-06-14 follow-up](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-14-followup-frame-tile-legacy-aspect-and-live-toggle.md)):
+  of the [2026-06-14 follow-up](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-14-0012-frame-tile-legacy-aspect-and-live-toggle-followup.md)):
   `handleEnterAR` reads the four toggles ONCE at Enter-AR (toggling mid-session
   applies on the next Enter-AR; replay is never gated). Each uses the mechanism
   that fits its consumer:
@@ -82,14 +96,31 @@ This module is the entry point that runs on page load. It also exports the follo
     wirer gets a no-op visualizer sink so the grid still folds in every depth
     sample without allocating GPU geometry.
   - **statsOverlay** (default OFF — Step 0 of the
-    [2026-07-03 long-session fps plan](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-03-long-session-fps-and-voxel-grid-scaling-plan.md)) —
+    [2026-07-03 long-session fps plan](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-03-1344-long-session-fps-and-voxel-grid-scaling-plan.md)) —
     mounts the Stats.js FPS/ms/MB panel row
     ([ui/stats-overlay.ts](ui/stats-overlay.ts.md)) into the `#app` dom-overlay
-    root and advances it from the `setFrameCallback` tick. Teardown is
-    unconditional at Enter-AR (panels never stack) and in `resetMainState` (no
-    frozen panels on the setup screen). The occupancy wirer additionally gets
+    root and advances it from the initAR `callbacks.onFrame` tick. Teardown runs via
+    `arSessionScope` on re-enter (panels never stack) and in `resetMainState`
+    (no frozen panels on the setup screen). The occupancy wirer additionally gets
     `onGridSize` telemetry (one `[OccupancyGrid] <n> cells` log per ~30 s) so a
     log export correlates grid growth with the fps trend.
+
+- **Map-centric recording browser (Step 4C) lives in
+  [ui/map-browser-launcher.ts](ui/map-browser-launcher.ts.md)** (extracted from
+  main.ts 2026-07-11): main.ts only wires `launchMapBrowser` into the
+  folder-manager's `onReplayFolderScanned` dep — injecting
+  `startReplayForEntry` from the replay handlers as the launcher's single
+  composition-root dependency — and injects `ensureMapBrowserRoot` into the
+  Playwright e2e hooks. The browser is **app-lifetime** state (replay/setup
+  screen), so it is intentionally NOT registered in `arSessionScope`; its
+  teardown is driven by its own UI paths inside the launcher module.
+
+- **Playwright hooks live in [test-utils/e2e-hooks.ts](test-utils/e2e-hooks.md)**:
+  main.ts only triggers `installE2eTestHooks` through a dynamic import guarded
+  by `import.meta.env.DEV && !VITEST`, so the fixture scaffolding never
+  reaches production bundles or the unit-test module graph. The
+  `window.testHooks` key set is pinned against `REQUIRED_TEST_HOOKS` in
+  `playwright-tests/test-helpers.js`.
 
 ## Examples
 

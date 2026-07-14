@@ -67,11 +67,14 @@ export {
 export { GpsEventVisualizer, gpsEventVisualizer } from './gps-event-markers.js';
 
 // --- occlusion-mesh (persistent depth-only occluder of the occupancy grid) ---
-export { type OcclusionMeshOptions, OcclusionMesh } from './occlusion-mesh.js';
+export {
+  type OcclusionMeshOptions,
+  type OccluderDebugStyle,
+  OCCLUDER_DEBUG_STYLES,
+  OcclusionMesh,
+} from './occlusion-mesh.js';
 
 // --- leaflet-map-overlay ---
-// NOTE: DEFAULT_ZOOM and DEFAULT_HEIGHT_OFFSET also exist in map-overlay;
-// import directly from the specific module if you need the leaflet variants.
 export {
   DEFAULT_LEAFLET_MAP_SIZE_PX,
   DEFAULT_WORLD_SIZE,
@@ -107,18 +110,6 @@ export {
   MAP_PATH_POLYLINE_OPACITY,
   drawMapData,
 } from './map-overlay-draw.js';
-
-// --- map-overlay ---
-export {
-  DEFAULT_ZOOM,
-  DEFAULT_MAP_SIZE,
-  DEFAULT_HEIGHT_OFFSET,
-  type TextureLoaderInterface,
-  type MapOverlayOptions,
-  latLonToTileXY,
-  tileXYToLatLon,
-  MapOverlay,
-} from './map-overlay.js';
 
 // --- three-dispose ---
 export {

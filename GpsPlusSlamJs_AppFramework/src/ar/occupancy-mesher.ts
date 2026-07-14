@@ -16,7 +16,7 @@
  * `THREE.BufferGeometry` (and the output is transferable to a Web Worker).
  * Greedy quad/box merging is a separate follow-on optimisation.
  *
- * Design notes (see 2026-06-13-occupancy-mesh-options-plan.md, option B):
+ * Design notes (see 2026-06-13-0004-occupancy-mesh-options-plan.md, option B):
  * - Vertices are NOT shared between faces (4 verts/face). Simpler and keeps
  *   per-face winding trivially correct; the occluder/collider don't need a
  *   welded vertex buffer. A closed voxel surface is still watertight (every
@@ -89,14 +89,9 @@ export type MeshMode = 'per-face' | 'greedy' | 'smooth' | 'corner-fit';
 /** Options for {@link meshOccupiedCells}. */
 export interface MeshOccupiedCellsOptions {
   /**
-   * @deprecated Prefer {@link MeshOccupiedCellsOptions.mode}. Back-compat shim:
-   * when `mode` is unset, `greedy:true` → `'greedy'`, otherwise `'per-face'`.
-   * Kept so existing callers/tests keep working unchanged.
-   */
-  readonly greedy?: boolean;
-  /**
-   * The mesher strategy. Takes precedence over {@link greedy}. Default resolves
-   * via the `greedy` shim above (so omitting both ⇒ `'per-face'`).
+   * The mesher strategy. Default `'per-face'`. (The deprecated boolean
+   * `greedy` shim was removed 2026-07-10, quality-review C-3 — it had zero
+   * production callers; use `{ mode: 'greedy' }`.)
    *
    * Note: every mode still returns one `aabbs` box per cell (a 3-D greedy box
    * merge for fewer colliders is a separate follow-on — see the plan §3E).
@@ -120,12 +115,9 @@ export interface MeshOccupiedCellsOptions {
   readonly getCellPoint?: (cell: GridCell) => Vector3 | null;
 }
 
-/** Resolve the effective mesher mode from the (possibly legacy) options. */
+/** Resolve the effective mesher mode from the options. */
 function resolveMode(options: MeshOccupiedCellsOptions | undefined): MeshMode {
-  if (options?.mode) {
-    return options.mode;
-  }
-  return options?.greedy ? 'greedy' : 'per-face';
+  return options?.mode ?? 'per-face';
 }
 
 /** A coordinate-axis index into a {@link GridCell} / position triple. */
@@ -434,7 +426,7 @@ function buildCulled(
  * (locally indistinguishable from a thin floor's intentionally-flat edges).
  * 0.25 was rejected as too close to imperceptibly-non-zero; 1.0 discards the
  * measured centroid exactly where data is sparsest. See
- * 2026-07-01-followup-smooth-mesher-single-corner-degeneracy.md.
+ * 2026-07-01-1455-smooth-mesher-single-corner-degeneracy-followup.md.
  */
 const SINGLE_CORNER_NUDGE_K = 0.5;
 

@@ -590,7 +590,7 @@ describe('Screen Navigation (Phase 2)', () => {
     // time it arrives, modalStatePushed is already false, so the handler used
     // to fall through to the screen branch and open the "Stop recording?"
     // confirm on every ref-point confirm (F4 in
-    // docs/2026-07-04-ar-clipping-planes-and-lifecycle-user-feedback.md).
+    // docs/2026-07-04-1626-ar-clipping-planes-and-lifecycle-user-feedback.md).
     // popModalState() must arm a one-shot guard that swallows exactly that
     // self-induced popstate — and nothing else.
 

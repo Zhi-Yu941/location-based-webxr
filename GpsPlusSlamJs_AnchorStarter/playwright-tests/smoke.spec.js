@@ -4,7 +4,7 @@ import { test, expect } from "@playwright/test";
  * Tier 0 smoke + capability-gate e2e for the persistent-anchor starter.
  *
  * Why this suite matters (see
- * GpsPlusSlamJs_Docs/docs/2026-06-01-anchor-starter-e2e-test-plan.md §6 Tier 0):
+ * GpsPlusSlamJs_Docs/docs/2026-06-01-0447-anchor-starter-e2e-test-plan.md §6 Tier 0):
  * The only honest contract that e2e — and nothing else — can prove for a
  * desktop visitor is the E1 capability gate: a browser without WebXR
  * (Playwright Chromium has no `navigator.xr`) must show a clear, non-empty

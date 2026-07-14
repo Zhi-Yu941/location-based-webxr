@@ -2,7 +2,7 @@
  * Occluder mesh driver — main-thread orchestration for the Web Worker offload.
  *
  * Drives {@link packMeshRequest} / {@link runMeshRequest} (see
- * `2026-07-01-occluder-worker-and-chunked-remesh-plan.md`): the occluder wiring
+ * `2026-07-01-0733-occluder-worker-and-chunked-remesh-plan.md`): the occluder wiring
  * calls {@link OccluderMeshDriver.request} on each refresh with the occupied-cell
  * snapshot; the driver packs it, posts it to a worker, and invokes a callback
  * with the meshed geometry when it returns — so the expensive mesh runs

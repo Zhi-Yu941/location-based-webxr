@@ -168,7 +168,7 @@ export interface SlamAppStoreOptions<
    * override on. **For Stage-A/§6a field-calibration recordings, turn this OFF**
    * (recorder settings) so the captured compass behaviour is unmodified.
    *
-   * @see GpsPlusSlamJs_Docs/docs/2026-06-26-stage0-field-collection-and-enablement.md
+   * @see GpsPlusSlamJs_Docs/docs/2026-06-26-0701-stage0-field-collection-and-enablement.md
    */
   enableCompassColdStartOverride?: boolean;
 
@@ -220,6 +220,14 @@ export interface SlamAppStore<
   writeFrame: (blob: Blob, index: number) => Promise<void>;
   /** Persist session metadata (`session.json`) via the configured backend. */
   writeSessionMetadata: (metadata: OpfsSessionMetadata) => Promise<void>;
+  /**
+   * Resolves once every action write queued by the persistence middleware
+   * has settled. The stop flow MUST await this before anything reads the
+   * session's `actions/` (final sync, ZIP export) — the write queue is
+   * async, so an action dispatched moments before Stop could otherwise
+   * land after the export enumerated the directory and miss the zip.
+   */
+  flushPendingActionWrites: () => Promise<void>;
 }
 
 /**
@@ -296,7 +304,7 @@ export function createSlamAppStore<
   // after the trigger unwinds, so the opt-in is a top-level dispatch persisted
   // AFTER setZeroPos — correct replay order by construction, no `queueMicrotask`
   // / re-entrancy guard to hand-maintain. See `slam-app-store-listener.ts` and
-  // GpsPlusSlamJs_Docs/docs/2026-06-28-subscriber-dispatch-persistence-ordering-plan.md.
+  // GpsPlusSlamJs_Docs/docs/2026-06-28-0751-subscriber-dispatch-persistence-ordering-plan.md.
   const compassOptIns: CompassOptIn[] = [];
   if (enableCompassColdStartOverride) {
     compassOptIns.push({
@@ -327,25 +335,37 @@ export function createSlamAppStore<
     );
   }
 
+  // Created outside configureStore so its `flushPendingWrites` drain hook
+  // can be exposed on the returned store (the stop flow awaits it before
+  // reading `actions/`).
+  const persistenceMiddleware = createPersistenceMiddleware({
+    storageBackend,
+    onWriteFailure,
+    persistedPrefixes: [
+      ...BUILTIN_PERSISTED_PREFIXES,
+      ...(persistedExtraPrefixes ?? []),
+    ],
+  });
+
   const store = configureStore({
     reducer,
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({
-        serializableCheck: enableDevChecks,
-        immutableCheck: enableDevChecks,
+        // E-7 (2026-07-10 quality review): both dev checks deep-walk on every
+        // dispatch, and `tracking/poseReceived` dispatches at 60–90 Hz — so
+        // the per-frame action (serializable) and the per-frame slice
+        // (immutable) are excluded specifically. Everything else stays fully
+        // checked in dev builds; RTK strips both checks from production
+        // builds entirely, so this is a dev-experience fix, not a prod one.
+        serializableCheck: enableDevChecks
+          ? { ignoredActions: ['tracking/poseReceived'] }
+          : false,
+        immutableCheck: enableDevChecks
+          ? { ignoredPaths: ['tracking'] }
+          : false,
       })
         .prepend(...prependedListeners)
-        .concat(
-          createPersistenceMiddleware({
-            storageBackend,
-            onWriteFailure,
-            persistedPrefixes: [
-              ...BUILTIN_PERSISTED_PREFIXES,
-              ...(persistedExtraPrefixes ?? []),
-            ],
-          }),
-          ...(extraMiddleware ?? [])
-        ),
+        .concat(persistenceMiddleware, ...(extraMiddleware ?? [])),
     devTools: {
       actionSanitizer: sanitizeForDevTools,
       stateSanitizer: sanitizeForDevTools,
@@ -360,5 +380,6 @@ export function createSlamAppStore<
       storageBackend.writeFrame(blob, index),
     writeSessionMetadata: (metadata: OpfsSessionMetadata) =>
       storageBackend.writeSessionMetadata(metadata),
+    flushPendingActionWrites: () => persistenceMiddleware.flushPendingWrites(),
   };
 }

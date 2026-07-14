@@ -20,7 +20,7 @@
  * Sign: the *magnitude* and *axis* of the rotation are pinned by
  * `heading-up-rotation.test.ts`; the *perceived* turn direction was
  * device-verified correct with `YAW_SIGN = -1` (2026-06-29, see
- * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-29-heading-up-minimap-rotation-plan.md).
+ * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-29-0752-heading-up-minimap-rotation-plan.md).
  * `YAW_SIGN` remains the one place to flip if a future frame/convention change
  * ever inverts it.
  */

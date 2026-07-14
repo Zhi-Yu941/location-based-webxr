@@ -2,7 +2,7 @@
  * `buildQrLaunchUrl` — turn (app base URL, asset "map to load" URL) into
  * the launch URL that yields the SPARSEST printable QR code, applying every
  * strategy the 2026-07-05 payload benchmark validated
- * (gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-05-qr-payload-compression-benchmark-results.md):
+ * (gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-05-2027-qr-payload-compression-benchmark-results.md):
  *
  * - `raw` — `<base>/?qr=<url>` (minimally escaped); the universal baseline.
  * - `dictionary` — `<base>/?qr=~<A4 blob>`; the `~` marker makes dispatch

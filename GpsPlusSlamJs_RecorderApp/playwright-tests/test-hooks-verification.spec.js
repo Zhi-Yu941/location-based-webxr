@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
 import {
   fakeWebXRSupport,
+  REQUIRED_TEST_HOOKS,
   setPermissionsReady,
   setStorageReady,
+  TEST_HOOKS_TIMEOUT_MS,
   waitForTestHooks,
 } from './test-helpers.js';
 
@@ -18,21 +20,23 @@ import {
  * See docs/2026-01-23-e2e-test-problems.md for background.
  */
 
-test.beforeEach(async ({ page }) => {
-  // Fake WebXR so app stays in recording mode (Playwright has no WebXR)
-  await fakeWebXRSupport(page);
-  await page.goto('/');
-  await page.locator('#setup-modal').waitFor({ state: 'visible' });
-  await waitForTestHooks(page);
-  // D6 item 3: scenario/session controls are in a collapsed <details>; open it
-  // so the dropdown + new-scenario name input are actionable in these tests.
-  await page.evaluate(() => {
-    const section = document.getElementById('scenario-section');
-    if (section) section.open = true;
-  });
-});
-
 test.describe('Test Hooks Match Real Behavior', () => {
+  // Scoped to this describe (NOT file-level): the 'Hook coverage guard'
+  // describe below must not inherit waitForTestHooks — see its comment.
+  test.beforeEach(async ({ page }) => {
+    // Fake WebXR so app stays in recording mode (Playwright has no WebXR)
+    await fakeWebXRSupport(page);
+    await page.goto('/');
+    await page.locator('#setup-modal').waitFor({ state: 'visible' });
+    await waitForTestHooks(page);
+    // D6 item 3: scenario/session controls are in a collapsed <details>; open it
+    // so the dropdown + new-scenario name input are actionable in these tests.
+    await page.evaluate(() => {
+      const section = document.getElementById('scenario-section');
+      if (section) section.open = true;
+    });
+  });
+
   test('populateScenarios via testHook matches expected DOM state', async ({
     page,
   }) => {
@@ -207,75 +211,54 @@ test.describe('Test Hooks Match Real Behavior', () => {
     // Should be enabled now
     await expect(enterBtn).toBeEnabled();
   });
+});
 
-  test('all exposed testHooks are waited for in waitForTestHooks', async ({
+test.describe('Hook coverage guard', () => {
+  // Why this describe exists AND must not use waitForTestHooks: this guard
+  // verifies REQUIRED_TEST_HOOKS itself, so gating it behind the very wait it
+  // guards makes it unreachable — a hook removed from the app hangs
+  // waitForTestHooks in beforeEach (30 s × every spec) before the guard can
+  // report. Exactly that happened when quality-review D-3 removed
+  // setFolderSelected (88/204 specs down, 2026-07-11). The app assigns
+  // window.testHooks as ONE object literal at module evaluation, so waiting
+  // for the object to exist is enough — its key set is complete and stable.
+  test.beforeEach(async ({ page }) => {
+    await fakeWebXRSupport(page);
+    await page.goto('/');
+    await page.locator('#setup-modal').waitFor({ state: 'visible' });
+    await page.waitForFunction(() => !!window.testHooks, {
+      timeout: TEST_HOOKS_TIMEOUT_MS,
+    });
+  });
+
+  test('REQUIRED_TEST_HOOKS matches the exposed window.testHooks surface', async ({
     page,
   }) => {
-    // Why this test matters: If new hooks are added to window.testHooks in main.ts
-    // but not included in waitForTestHooks(), tests using those hooks may become flaky.
-    // This test ensures the wait condition covers all exposed hooks.
+    // Why this test matters: waitForTestHooks derives from REQUIRED_TEST_HOOKS
+    // (single source of truth in test-helpers.js). A hook added to main.ts but
+    // not to the list makes specs using it flaky; a hook removed from main.ts
+    // but not from the list hangs every waitForTestHooks caller. This guard
+    // turns both drifts into ONE fast, precisely-worded failure.
     const exposedHooks = await page.evaluate(() =>
       Object.keys(window.testHooks)
     );
 
-    // These are the hooks we wait for in waitForTestHooks - must match all exposed hooks
-    const expectedHooks = [
-      'populateScenarios',
-      'showRecordingControls',
-      'hideRecordingControls',
-      'showSessionSummary',
-      'updateGpsInfo',
-      'updateArInfo',
-      'validateEnterButton',
-      'updatePermissionStatus',
-      'setPermissionsReady',
-      // Log panel hooks (Issue #5)
-      'showLogPanel',
-      'hideLogPanel',
-      'toggleLogPanel',
-      'logInfo',
-      'logWarn',
-      'logError',
-      // GPS event visualizer hooks
-      'getGpsEventVisualizerCounts',
-      'setGpsEventVisualizerZeroRef',
-      'clearGpsEventVisualizer',
-      // GPS accuracy ellipsoid hooks (§3c)
-      'addGpsEventForTest',
-      'getRawGpsMarkerWorldSizes',
-      // Tracking quality indicator hook (F1)
-      'updateTrackingQuality',
-      // Mandatory storage selection hooks (Task 1a-fix)
-      'setFolderSelected',
-      'setSaveLocationSelected',
-      // Optional folder-import collapse hook (D5)
-      'setFolderImportExpanded',
-      // Folder-import indexing progress bar (D2, 2026-07-05)
-      'setFolderImportProgress',
-      // Map-centric recording browser (Step 4B)
-      'mountMapBrowser',
-      // Progressive map-browser streaming (Slice A)
-      'mountMapBrowserEmpty',
-      'streamMapBrowserRecording',
-      // Coverage backfill CTA (Slice B / B1)
-      'mountMapBrowserBackfill',
-    ];
-
-    // Verify no hook is missing from our wait condition
     for (const hook of exposedHooks) {
       expect(
-        expectedHooks,
-        `Hook '${hook}' is exposed but not waited for in waitForTestHooks(). ` +
-          `Add it to both waitForTestHooks() and expectedHooks in this test.`
+        REQUIRED_TEST_HOOKS,
+        `Hook '${hook}' is exposed but missing from REQUIRED_TEST_HOOKS ` +
+          `(test-helpers.js) — waitForTestHooks would not wait for it, making ` +
+          `specs that use it flaky. Add it to the list.`
       ).toContain(hook);
     }
 
-    // Verify we're not waiting for hooks that don't exist
-    for (const hook of expectedHooks) {
+    for (const hook of REQUIRED_TEST_HOOKS) {
       expect(
         exposedHooks,
-        `Hook '${hook}' is in expectedHooks but not exposed by window.testHooks. ` +
-          `Remove it from waitForTestHooks() and expectedHooks.`
+        `Hook '${hook}' is in REQUIRED_TEST_HOOKS but not exposed by ` +
+          `window.testHooks — waitForTestHooks hangs EVERY spec in beforeEach ` +
+          `until this is fixed. Remove it from the list (or restore the hook ` +
+          `in main.ts).`
       ).toContain(hook);
     }
   });

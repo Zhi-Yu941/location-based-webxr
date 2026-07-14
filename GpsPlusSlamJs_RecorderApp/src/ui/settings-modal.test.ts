@@ -26,7 +26,7 @@ import {
 import {
   loadRecordingOptions,
   DEFAULT_RECORDING_OPTIONS,
-} from 'gps-plus-slam-app-framework/state/recording-options';
+} from '../state/recording-options';
 
 const { mockGetBuildInfo } = vi.hoisted(() => ({
   mockGetBuildInfo: vi.fn(() => ({
@@ -923,7 +923,7 @@ describe('settings-modal', () => {
       expect(linear).not.toBeNull();
       // Defaults from DEFAULT_MOTION_FILTER (0.6 rad/s, 2.5 m/s — the linear
       // threshold was raised 0.5 → 2.5 on 2026-07-02 to stop deferring walking;
-      // see 2026-07-02-image-capture-rate-motion-gate-finding.md).
+      // see 2026-07-02-0117-image-capture-rate-motion-gate-finding.md).
       expect(parseFloat(angular!.value)).toBeCloseTo(0.6, 6);
       expect(parseFloat(linear!.value)).toBeCloseTo(2.5, 6);
     });
@@ -1095,6 +1095,66 @@ describe('settings-modal', () => {
       imagesEnabled.dispatchEvent(new Event('change'));
       expect(blur.disabled).toBe(true);
       expect(luma.disabled).toBe(true);
+    });
+
+    // Why these tests matter: the blur-metric select (2026-07-12 toggle plan)
+    // is the only UI to A/B the FFT metric on device; it must round-trip
+    // through persisted options and follow the same disabled rules as the
+    // other quality-gate controls, or a dead/mislabeled control would fake a
+    // field test that never ran.
+    it('exposes the blur-metric select with both metrics, default first', () => {
+      const select = document.getElementById(
+        'images-blur-metric'
+      ) as HTMLSelectElement | null;
+      expect(select).not.toBeNull();
+      expect(select!.value).toBe('variance-of-laplacian');
+      expect([...select!.options].map((o) => o.value)).toEqual([
+        'variance-of-laplacian',
+        'high-frequency-energy-ratio',
+      ]);
+    });
+
+    it('persists an edited blur metric through save/load (gate on)', () => {
+      const qualityFilter = document.getElementById(
+        'images-quality-filter'
+      ) as HTMLInputElement;
+      const select = document.getElementById(
+        'images-blur-metric'
+      ) as HTMLSelectElement;
+
+      qualityFilter.checked = true;
+      qualityFilter.dispatchEvent(new Event('change'));
+      select.value = 'high-frequency-energy-ratio';
+      select.dispatchEvent(new Event('change'));
+
+      document.getElementById('btn-settings-save')?.click();
+
+      const saved = loadRecordingOptions().images.qualityFilter;
+      expect(saved.enabled).toBe(true);
+      expect(saved.blurMetric).toBe('high-frequency-energy-ratio');
+    });
+
+    it('disables the blur-metric select when the gate (or capture) is off', () => {
+      const imagesEnabled = document.getElementById(
+        'images-enabled'
+      ) as HTMLInputElement;
+      const qualityFilter = document.getElementById(
+        'images-quality-filter'
+      ) as HTMLInputElement;
+      const select = document.getElementById(
+        'images-blur-metric'
+      ) as HTMLSelectElement;
+
+      // Gate off (the default) → select disabled.
+      expect(select.disabled).toBe(true);
+
+      qualityFilter.checked = true;
+      qualityFilter.dispatchEvent(new Event('change'));
+      expect(select.disabled).toBe(false);
+
+      imagesEnabled.checked = false;
+      imagesEnabled.dispatchEvent(new Event('change'));
+      expect(select.disabled).toBe(true);
     });
   });
 
@@ -1443,6 +1503,50 @@ describe('settings-modal', () => {
       slider.dispatchEvent(new Event('input'));
 
       expect(valueDisplay?.textContent).toBe('4.0s');
+    });
+
+    it('shows sub-second image intervals in ms (splat-scan cadence)', () => {
+      // Why this test matters: IMAGE_CONSTRAINTS.intervalMs.min dropped to
+      // 250 ms (2026-07-10 splat-orbit finding) and `(250/1000).toFixed(1)`
+      // would render a misleading "0.3s" — sub-second values must show exact
+      // milliseconds (mirroring the QR interval display).
+      const slider = document.getElementById(
+        'images-interval'
+      ) as HTMLInputElement;
+      const valueDisplay = document.getElementById('images-interval-value');
+
+      slider.value = '250';
+      slider.dispatchEvent(new Event('input'));
+
+      expect(valueDisplay?.textContent).toBe('250 ms');
+    });
+
+    it('shows quarter-second image intervals ≥1s with exact decimals', () => {
+      // Why this test matters: IMAGE_CONSTRAINTS.intervalMs.step is 250 ms,
+      // so 1250/1750 are reachable slider values — `toFixed(1)` would render
+      // them as a misleading "1.3s"/"1.8s" (PR #178 review). Quarter-second
+      // values must show two decimals while half-second multiples keep the
+      // clean one-decimal form.
+      const slider = document.getElementById(
+        'images-interval'
+      ) as HTMLInputElement;
+      const valueDisplay = document.getElementById('images-interval-value');
+
+      slider.value = '1250';
+      slider.dispatchEvent(new Event('input'));
+      expect(valueDisplay?.textContent).toBe('1.25s');
+
+      slider.value = '1750';
+      slider.dispatchEvent(new Event('input'));
+      expect(valueDisplay?.textContent).toBe('1.75s');
+
+      slider.value = '1500';
+      slider.dispatchEvent(new Event('input'));
+      expect(valueDisplay?.textContent).toBe('1.5s');
+
+      slider.value = '1000';
+      slider.dispatchEvent(new Event('input'));
+      expect(valueDisplay?.textContent).toBe('1.0s');
     });
 
     it('updates images quality value display', () => {

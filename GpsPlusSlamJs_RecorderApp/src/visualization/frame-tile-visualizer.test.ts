@@ -8,7 +8,7 @@
  * live in `wireFrameTileSubscribers` (F3.4).
  *
  * Coordinate frame (2026-06-13 fix,
- * [2026-06-12-followup-frame-tile-visualizer-frame-check.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-12-followup-frame-tile-visualizer-frame-check.md)):
+ * [2026-06-12-1628-frame-tile-visualizer-frame-check-followup.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-12-1628-frame-tile-visualizer-frame-check-followup.md)):
  * `selectFrameTilesInWebXR` emits **raw WebXR** poses, so the
  * visualizer hangs tiles off a `WEBXR_TO_NUE` basis node under the
  * AR-space node (arWorldGroup) — the camera's `alignment × WEBXR_TO_NUE`
@@ -164,7 +164,7 @@ describe('FrameTileVisualizer', () => {
     expect(mesh.scale.toArray()).toEqual([0.5, 0.5, 0.5]);
   });
 
-  // Why (Finding 1 / D1 of 2026-06-13-frame-tile-rendering-bugs-user-feedback.md):
+  // Why (Finding 1 / D1 of 2026-06-13-1311-frame-tile-rendering-bugs-user-feedback.md):
   // the raw JPEGs are captured at the camera aspect ratio (non-square), but
   // tiles were rendered on a hardcoded square plane, stretching the texture.
   // With persisted width/height the tile must be scaled non-uniformly so its

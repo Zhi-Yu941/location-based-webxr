@@ -19,10 +19,15 @@ const entryFiles = [
 
   // ar/
   'src/ar/index.ts',
+  'src/ar/ar-crash-isolation.ts',
   'src/ar/bresenham3d.ts',
   'src/ar/camera-blit-capture.ts',
   'src/ar/capability-checker.ts',
   'src/ar/capture-failure-tracker.ts',
+  // Motion-filter config types + defaults — deep-imported by the recorder's
+  // recording-options catalog (G-1 move); the `./ar/*` exports wildcard
+  // advertises this subpath, so it must be built per-file.
+  'src/ar/capture-motion-gate.ts',
   'src/ar/chromium-camera-access-workaround.ts',
   'src/ar/depth-grid-lookup.ts',
   'src/ar/depth-sampler.ts',
@@ -44,18 +49,6 @@ const entryFiles = [
   // recorder's image-quality.worker.ts (NOT via the `/ar` barrel). The `./ar/*`
   // exports wildcard advertises this subpath, so it must be built per-file.
   'src/ar/image-quality.ts',
-  // QR detection + derive-on-read + debug viz — deep-imported by the recorder's
-  // live-QR modules (NOT via the `/ar` barrel, which eagerly pulls
-  // permission-checker into partially-mocked wiring tests). The `./ar/*` exports
-  // wildcard already advertises these subpaths, so they must be built per-file.
-  'src/ar/planar-pnp.ts',
-  'src/ar/qr-debug-view.ts',
-  'src/ar/qr-derived-pose.ts',
-  'src/ar/qr-detection-controller.ts',
-  'src/ar/qr-frontend.ts',
-  'src/ar/qr-pose.ts',
-  'src/ar/qr-size-depth-context.ts',
-  'src/ar/qr-size-measurer.ts',
   'src/ar/replay-scene.ts',
   'src/ar/scene-node-names.ts',
   'src/ar/webxr-nue-basis.ts',
@@ -63,6 +56,22 @@ const entryFiles = [
   'src/ar/xr-camera-texture.ts',
   'src/ar/xr-error-handler.ts',
   'src/ar/xr-frame-loop.ts',
+
+  // ar/qr/ (QR cluster — sub-barrel + per-file entries)
+  'src/ar/qr/index.ts',
+  // QR detection + derive-on-read + debug viz — deep-imported by the recorder's
+  // live-QR modules (NOT via the `/ar` barrel, which eagerly pulls
+  // permission-checker into partially-mocked wiring tests). The `./ar/*` exports
+  // wildcard matches multi-segment subpaths, so `./ar/qr/<file>` is already
+  // advertised and each must be built per-file.
+  'src/ar/qr/planar-pnp.ts',
+  'src/ar/qr/qr-debug-view.ts',
+  'src/ar/qr/qr-derived-pose.ts',
+  'src/ar/qr/qr-detection-controller.ts',
+  'src/ar/qr/qr-frontend.ts',
+  'src/ar/qr/qr-pose.ts',
+  'src/ar/qr/qr-size-depth-context.ts',
+  'src/ar/qr/qr-size-measurer.ts',
 
   // core/ (curated re-export of gps-plus-slam-js for app consumers)
   'src/core/index.ts',
@@ -95,7 +104,6 @@ const entryFiles = [
   // Deep-imported by the recorder's qr-debug-controller (selectDerivedQrPlacement)
   // — same barrel-avoidance rationale as the ar/qr-* entries above.
   'src/state/qr-detected-slice.ts',
-  'src/state/recording-options.ts',
   'src/state/recording-replayer.ts',
   'src/state/replay-engine.ts',
   'src/state/store-subscribers.ts',
@@ -150,7 +158,6 @@ const entryFiles = [
   'src/visualization/leaflet-map-overlay.ts',
   'src/visualization/lerp-utils.ts',
   'src/visualization/map-data.ts',
-  'src/visualization/map-overlay.ts',
   'src/visualization/map-overlay-draw.ts',
   'src/visualization/three-dispose.ts',
   'src/visualization/vis-colors.ts',

@@ -55,6 +55,29 @@ const RAW_GPS_FIXED_OPACITY = 0.3;
 const RAW_GPS_ACCURACY_OPACITY = 0.13;
 
 /**
+ * Where the visualizer resolves its scene graph from.
+ *
+ * By default markers are parented into the LIVE AR session's scene
+ * (`webxr-session.ts` getters). Non-live consumers (desktop replay, offline
+ * e2e fixtures) point the visualizer at their own scene via
+ * {@link GpsEventVisualizer.setSceneSource} instead of injecting their scene
+ * into the webxr-session singleton (the deleted replay-mode "Risk R1" setters
+ * — see the 2026-07-11 webxr-session surface-reduction plan, step 2).
+ *
+ * Both functions may return `null` (e.g. before `initAR()`); the visualizer
+ * then warns and skips the affected marker, exactly as before.
+ */
+export interface GpsMarkerSceneSource {
+  /** Scene root — parents raw-GPS (yellow) and snapshot (red) markers. */
+  getScene: () => THREE.Scene | null;
+  /** AR world group — parents fused (cyan) markers so they ride the alignment. */
+  getArWorldGroup: () => THREE.Group | null;
+}
+
+/** Default source: the live AR session's scene graph. */
+const LIVE_SCENE_SOURCE: GpsMarkerSceneSource = { getScene, getArWorldGroup };
+
+/**
  * Optional GPS-accuracy hints used by {@link GpsEventVisualizer.addGpsEvent}
  * to render the raw-GPS marker as a non-uniform-scaled ellipsoid.
  *
@@ -120,6 +143,24 @@ export class GpsEventVisualizer {
   private markersVisible = true;
 
   /**
+   * Scene graph the markers are parented into. Defaults to the live AR
+   * session ({@link LIVE_SCENE_SOURCE}); replay / offline consumers override
+   * it via {@link setSceneSource}. Not reset by {@link clearAll} — the owner
+   * of the non-live scene (e.g. replay-mode's dispose) restores the default.
+   */
+  private sceneSource: GpsMarkerSceneSource = LIVE_SCENE_SOURCE;
+
+  /**
+   * Point the visualizer at a non-live scene graph (desktop replay, offline
+   * e2e fixture). Pass `null` to restore the live-session default. The caller
+   * that overrides the source is responsible for restoring it when its scene
+   * is disposed, so a later live AR session parents markers correctly again.
+   */
+  setSceneSource(source: GpsMarkerSceneSource | null): void {
+    this.sceneSource = source ?? LIVE_SCENE_SOURCE;
+  }
+
+  /**
    * Set the GPS zero reference (origin for coordinate conversion).
    * Must be called before adding GPS events.
    *
@@ -159,7 +200,7 @@ export class GpsEventVisualizer {
       return;
     }
 
-    const scene = getScene();
+    const scene = this.sceneSource.getScene();
     if (!scene) {
       log.warn('Scene not available');
       return;
@@ -199,7 +240,7 @@ export class GpsEventVisualizer {
 
     // Create fused marker (cyan) at raw odom position — added to arWorldGroup
     // Scene-graph propagation: world pos = arWorldGroup.matrix × odomPos
-    const arWorldGroup = getArWorldGroup();
+    const arWorldGroup = this.sceneSource.getArWorldGroup();
     if (!arWorldGroup) {
       log.warn('arWorldGroup not available, skipping fused marker');
       return;
@@ -225,7 +266,7 @@ export class GpsEventVisualizer {
    * Added to scene root (GPS world space), not arWorldGroup.
    */
   addAlignmentSnapshot(nuePosition: Vector3): void {
-    const scene = getScene();
+    const scene = this.sceneSource.getScene();
     if (!scene) {
       log.warn('Scene not available for alignment snapshot');
       return;
@@ -301,8 +342,8 @@ export class GpsEventVisualizer {
    * Clear all markers from the scene and reset state.
    */
   clearAll(): void {
-    const scene = getScene();
-    const arWorldGroup = getArWorldGroup();
+    const scene = this.sceneSource.getScene();
+    const arWorldGroup = this.sceneSource.getArWorldGroup();
 
     disposeMeshArray(this.rawGpsMarkers, scene);
     disposeMeshArray(this.fusedMarkers, arWorldGroup);

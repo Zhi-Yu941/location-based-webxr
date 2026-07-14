@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Wraps mrdoob's Stats.js (bundled with three as `three/addons/libs/stats.module.js`) into a side-by-side FPS / frame-ms / MB panel row for the long-session fps investigation — Step 0 of [2026-07-03-long-session-fps-and-voxel-grid-scaling-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-03-long-session-fps-and-voxel-grid-scaling-plan.md). Stock Stats.js shows one panel and cycles on tap, which is unusable mid-walk in AR, so one Stats instance is mounted per panel (2026-07-03 interview decision).
+Wraps mrdoob's Stats.js (bundled with three as `three/addons/libs/stats.module.js`) into a side-by-side FPS / frame-ms / MB panel row for the long-session fps investigation — Step 0 of [2026-07-03-1344-long-session-fps-and-voxel-grid-scaling-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-03-1344-long-session-fps-and-voxel-grid-scaling-plan.md). Stock Stats.js shows one panel and cycles on tap, which is unusable mid-walk in AR, so one Stats instance is mounted per panel (2026-07-03 interview decision).
 
 ## Public API
 
@@ -21,7 +21,7 @@ Wraps mrdoob's Stats.js (bundled with three as `three/addons/libs/stats.module.j
 
 - The overlay is a read-only instrument: `pointer-events: none` so it never swallows touches meant for the HUD sharing the dom-overlay layer; panels sit top-right because the HUD owns the top-left.
 - Each Stats instance's `position:fixed` inline style is overridden to `relative` so the flex row can lay them out.
-- Callers own lifecycle and cadence: live AR calls `update()` from the `setFrameCallback` tick in `main.ts` and disposes on re-enter + `resetMainState`; replay drives it from its own rAF loop in `replay-mode.ts` and disposes with the controller. A leaked handle would stack duplicate panels across sessions.
+- Callers own lifecycle and cadence: live AR calls `update()` from the initAR `callbacks.onFrame` tick in `main.ts` and disposes on re-enter + `resetMainState`; replay drives it from its own rAF loop in `replay-mode.ts` and disposes with the controller. A leaked handle would stack duplicate panels across sessions.
 - MB numbers come from `performance.memory` — coarse, Chrome-only; a trend indicator, not a measurement (plan §Risks).
 
 ## Examples

@@ -18,9 +18,12 @@ thin `createRecorderStore` that calls this factory with its own extras.
 
 - `createSlamAppStore<ExtraReducers>(options)` — returns a `SlamAppStore`.
 - `SlamAppStore<ExtraReducers>` — opaque store with `getState` / `dispatch` /
-  `subscribe` / `writeFrame` / `writeSessionMetadata`.
+  `subscribe` / `writeFrame` / `writeSessionMetadata` /
+  `flushPendingActionWrites` (drains the persistence middleware's async
+  WriteQueue — the stop flow MUST await it before reading the session's
+  `actions/` for the final sync / ZIP export, 2026-07-12).
 - `SlamAppStoreOptions<ExtraReducers>` — `{ storageBackend, extraReducers?, extraMiddleware?, persistedExtraPrefixes?, onWriteFailure?, enableDevChecks?, licenseKey?, trackingQualityOptions?, enableCompassColdStartOverride? }`.
-  - `enableCompassColdStartOverride` (**default `true`** — Phase-4 Stage-0 is a field-validated, default-on feature) — a prepended listener middleware ([`slam-app-store-listener.ts`](slam-app-store-listener.ts)) dispatches the library's `setColdStartOverrideEnabled(true)` the first time `gpsData` becomes non-null (right after the first `setZeroPos`, since the flag lives on that slice and can't be set before it exists). Enables the cold-start compass override (orients the world immediately at cold start, hands back to GPS once the yaw is observable). Pass `false` to opt out (the recorder surfaces this as a settings toggle). The library's `DefaultAlignmentConfig` stays OFF, so historical recordings replay unchanged; default-on lives here as a recorded `gpsData` action — a recording made with it on replays with the override on, so collect §6a field-calibration recordings with this OFF. See [`GpsPlusSlamJs_Docs/docs/2026-06-26-stage0-field-collection-and-enablement.md`](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-26-stage0-field-collection-and-enablement.md). The two sibling flags `enableCompassRotationPrior` and `enableCompassWebXRConsistency` stay **default OFF** (field-gated) and behave identically for their respective `gpsData` flags when enabled.
+  - `enableCompassColdStartOverride` (**default `true`** — Phase-4 Stage-0 is a field-validated, default-on feature) — a prepended listener middleware ([`slam-app-store-listener.ts`](slam-app-store-listener.ts)) dispatches the library's `setColdStartOverrideEnabled(true)` the first time `gpsData` becomes non-null (right after the first `setZeroPos`, since the flag lives on that slice and can't be set before it exists). Enables the cold-start compass override (orients the world immediately at cold start, hands back to GPS once the yaw is observable). Pass `false` to opt out (the recorder surfaces this as a settings toggle). The library's `DefaultAlignmentConfig` stays OFF, so historical recordings replay unchanged; default-on lives here as a recorded `gpsData` action — a recording made with it on replays with the override on, so collect §6a field-calibration recordings with this OFF. See [`GpsPlusSlamJs_Docs/docs/2026-06-26-0701-stage0-field-collection-and-enablement.md`](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-26-0701-stage0-field-collection-and-enablement.md). The two sibling flags `enableCompassRotationPrior` and `enableCompassWebXRConsistency` stay **default OFF** (field-gated) and behave identically for their respective `gpsData` flags when enabled.
 - `SlamAppRootState` — base state shape (no extras).
 - `SlamAppCombinedState<ExtraReducers>` — base state plus typed extras.
 - `SlamAppMiddleware` — middleware signature accepted by `extraMiddleware`.
@@ -75,7 +78,7 @@ thin `createRecorderStore` that calls this factory with its own extras.
   least one opt-in is requested (zero per-action overhead otherwise). Consumers
   asserting the flag after `setZeroPos` must `await` the async effect first (see
   the tests). See
-  [`GpsPlusSlamJs_Docs/docs/2026-06-28-subscriber-dispatch-persistence-ordering-plan.md`](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-28-subscriber-dispatch-persistence-ordering-plan.md).
+  [`GpsPlusSlamJs_Docs/docs/2026-06-28-0751-subscriber-dispatch-persistence-ordering-plan.md`](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-28-0751-subscriber-dispatch-persistence-ordering-plan.md).
 - The factory does **not** know about routing, ref-points, or scenarios. Any
   app needing those plugs them in via `extraReducers`.
 
@@ -119,4 +122,5 @@ Covered by [create-slam-app-store.test.ts](create-slam-app-store.test.ts):
 - `extraReducers` mount under their slice keys and accept their actions.
 - `extraMiddleware` runs alongside the persistence middleware.
 - `writeFrame` / `writeSessionMetadata` route through the supplied backend.
+- `flushPendingActionWrites` routes to the persistence middleware's `flushPendingWrites` (resolves when every queued action write settled; immediate when idle; never hangs on rejected writes).
 - Empty / invalid license keys throw at construction.

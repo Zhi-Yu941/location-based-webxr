@@ -20,12 +20,30 @@ import {
   type RecordingOptions,
   type OccluderMeshMode,
   type OccluderDebugStyle,
-} from 'gps-plus-slam-app-framework/state/recording-options';
+} from '../state/recording-options';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
+import {
+  BLUR_METRIC_IDS,
+  type BlurMetricId,
+} from 'gps-plus-slam-app-framework/ar/image-quality';
 import { getBuildInfo } from '../utils/build-info';
 import { showConfirmDialog } from './confirm-dialog';
 
 const log = createLogger('SettingsModal');
+
+/**
+ * Image-interval display: sub-second values (possible since the 250 ms
+ * IMAGE_CONSTRAINTS minimum, 2026-07-10 splat-orbit finding) show exact
+ * milliseconds — `(250/1000).toFixed(1)` would render a misleading "0.3s".
+ * Values ≥1s use just enough decimals for the 250 ms slider step: one for
+ * half-second multiples ("1.5s", "2.0s"), two otherwise ("1.25s", "1.75s") —
+ * `toFixed(1)` alone would round 1250 to a misleading "1.3s" (PR #178 review).
+ */
+function formatImageInterval(ms: number): string {
+  if (ms < 1000) return `${ms} ms`;
+  const decimals = ms % 500 === 0 ? 1 : 2;
+  return `${(ms / 1000).toFixed(decimals)}s`;
+}
 
 // --- State ---
 
@@ -56,6 +74,7 @@ let imagesResolutionDivisorSlider: HTMLInputElement | null = null;
 let imagesResolutionDivisorValue: HTMLElement | null = null;
 let imagesMotionFilterCheckbox: HTMLInputElement | null = null;
 let imagesQualityFilterCheckbox: HTMLInputElement | null = null;
+let imagesBlurMetricSelect: HTMLSelectElement | null = null;
 let imagesBlurThresholdSlider: HTMLInputElement | null = null;
 let imagesBlurThresholdValue: HTMLElement | null = null;
 let imagesMinLuminanceSlider: HTMLInputElement | null = null;
@@ -167,6 +186,9 @@ export function initSettingsModal(
   imagesQualityFilterCheckbox = document.getElementById(
     'images-quality-filter'
   ) as HTMLInputElement;
+  imagesBlurMetricSelect = document.getElementById(
+    'images-blur-metric'
+  ) as HTMLSelectElement;
   imagesBlurThresholdSlider = document.getElementById(
     'images-blur-threshold'
   ) as HTMLInputElement;
@@ -321,7 +343,7 @@ export function initSettingsModal(
     if (workingOptions && imagesIntervalSlider && imagesIntervalValue) {
       const value = parseInt(imagesIntervalSlider.value, 10);
       workingOptions.images.intervalMs = value;
-      imagesIntervalValue.textContent = `${(value / 1000).toFixed(1)}s`;
+      imagesIntervalValue.textContent = formatImageInterval(value);
     }
   });
 
@@ -527,6 +549,20 @@ export function initSettingsModal(
       const value = parseFloat(imagesMinLuminanceSlider.value);
       workingOptions.images.qualityFilter.minMeanLuminance = value;
       imagesMinLuminanceValue.textContent = formatMinLuminance(value);
+    }
+  });
+
+  imagesBlurMetricSelect?.addEventListener('change', () => {
+    if (workingOptions && imagesBlurMetricSelect) {
+      // Membership-check rather than trusting the DOM value — save-time
+      // validation would catch it too, but never let an invalid id sit in
+      // the working copy.
+      const value = imagesBlurMetricSelect.value as BlurMetricId;
+      workingOptions.images.qualityFilter.blurMetric = BLUR_METRIC_IDS.includes(
+        value
+      )
+        ? value
+        : 'variance-of-laplacian';
     }
   });
 
@@ -807,7 +843,9 @@ function populateForm(options: RecordingOptions): void {
     imagesIntervalSlider.value = String(options.images.intervalMs);
   }
   if (imagesIntervalValue) {
-    imagesIntervalValue.textContent = `${(options.images.intervalMs / 1000).toFixed(1)}s`;
+    imagesIntervalValue.textContent = formatImageInterval(
+      options.images.intervalMs
+    );
   }
   if (imagesQualitySlider) {
     imagesQualitySlider.min = String(IMAGE_CONSTRAINTS.quality.min);
@@ -912,6 +950,11 @@ function populateForm(options: RecordingOptions): void {
     imagesMinLuminanceValue.textContent = formatMinLuminance(
       options.images.qualityFilter.minMeanLuminance
     );
+  }
+  if (imagesBlurMetricSelect) {
+    // Persisted pre-toggle options may lack blurMetric — render the default.
+    imagesBlurMetricSelect.value =
+      options.images.qualityFilter.blurMetric ?? 'variance-of-laplacian';
   }
 
   if (arDomOverlayEnabledCheckbox) {
@@ -1162,7 +1205,8 @@ function updateImageControlsState(): void {
   if (imagesMaxLinearSlider) {
     imagesMaxLinearSlider.disabled = !motionEnabled;
   }
-  // The quality threshold sliders require BOTH capture and the quality gate on.
+  // The quality threshold sliders (and the metric select) require BOTH
+  // capture and the quality gate on.
   const qualityEnabled =
     enabled && (imagesQualityFilterCheckbox?.checked ?? false);
   if (imagesBlurThresholdSlider) {
@@ -1170,6 +1214,9 @@ function updateImageControlsState(): void {
   }
   if (imagesMinLuminanceSlider) {
     imagesMinLuminanceSlider.disabled = !qualityEnabled;
+  }
+  if (imagesBlurMetricSelect) {
+    imagesBlurMetricSelect.disabled = !qualityEnabled;
   }
 }
 

@@ -8,7 +8,7 @@
  * inheriting a framework-owned button DOM (unlike three.js' `ARButton`).
  *
  * Why a seam and not a button: per the plan
- * (`2026-06-03-threejs-arbutton-minimal-ar-example-user-feedback.md` §4 / §6.5),
+ * (`2026-06-03-0553-threejs-arbutton-minimal-ar-example-user-feedback.md` §4 / §6.5),
  * the permission/enter-AR *sequence* is the reusable core; the button DOM, toast
  * surface and copy are app-specific UX and stay app-local.
  *
@@ -24,7 +24,7 @@
  * excludes.
  */
 
-import type { ArCrashIsolationOptions } from '../state/recording-options';
+import type { ArCrashIsolationOptions } from './ar-crash-isolation';
 import type { GpsPosition, RawDeviceOrientation } from '../sensors/gps';
 import {
   requestGeolocationPermission as defaultRequestGeolocationPermission,
@@ -42,6 +42,7 @@ import {
   initAR as defaultInitAR,
   endARSession as defaultEndARSession,
   isWebXRSupported as defaultIsWebXRSupported,
+  type ArSessionCallbacks,
   type SessionFeatureOptions,
 } from './webxr-session';
 import { createLogger } from '../utils/logger';
@@ -90,6 +91,11 @@ export interface EnableGpsArConfig {
   requestHitTest?: boolean;
   /** Crash-isolation diagnostic flags forwarded verbatim to `initAR`. */
   isolationOptions?: Partial<ArCrashIsolationOptions>;
+  /**
+   * Per-session AR callbacks (tracking store, depth, image capture, …)
+   * forwarded verbatim to `initAR` — see {@link ArSessionCallbacks}.
+   */
+  callbacks?: ArSessionCallbacks;
   /** Receives every GPS fix from the started watch. */
   onGpsPosition?: (position: GpsPosition) => void;
   /** Receives every device-orientation sample from the started watch. */
@@ -119,7 +125,8 @@ export interface EnableGpsArDeps {
   initAR: (
     container: HTMLElement,
     isolationOptions?: Partial<ArCrashIsolationOptions>,
-    sessionFeatures?: SessionFeatureOptions
+    sessionFeatures?: SessionFeatureOptions,
+    callbacks?: ArSessionCallbacks
   ) => Promise<void>;
   stopGpsWatch: () => void;
   stopOrientationWatch: () => void;
@@ -292,9 +299,14 @@ export function createEnableGpsArController(
       // active watches if initAR rejects — and the retry from the `error` state
       // would start duplicates. Gating the start calls behind the resolved
       // initAR keeps watcher count bounded to one set per running session.
-      await resolved.initAR(config.container, config.isolationOptions, {
-        requestHitTest: config.requestHitTest,
-      });
+      await resolved.initAR(
+        config.container,
+        config.isolationOptions,
+        {
+          requestHitTest: config.requestHitTest,
+        },
+        config.callbacks
+      );
       sessionStarted = true;
 
       // --- Sensor watches ---

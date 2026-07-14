@@ -8,7 +8,7 @@
  *
  * @see ./image-quality-client.ts
  * @see ./image-quality.worker.ts
- * @see GpsPlusSlamJs_Docs/docs/2026-06-24-image-quality-gate-plan.md §3
+ * @see GpsPlusSlamJs_Docs/docs/2026-06-24-1057-image-quality-gate-plan.md §3
  */
 
 import type { QualityFilterConfig } from 'gps-plus-slam-app-framework/ar/image-quality';

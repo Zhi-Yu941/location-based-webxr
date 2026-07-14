@@ -122,6 +122,61 @@ describe('createRefPointsZipContributor', () => {
     expect(parsed.observations[0].sessionId).toBe(sessionName);
   });
 
+  /**
+   * Why this test matters (indoor-loop enablement follow-up, 2026-07-12):
+   * the loop-recording protocol re-marks the same corner on every pass, so
+   * one session legitimately holds SEVERAL observations of one id. The
+   * session filter must keep them ALL — a `find`-style first-match (or an
+   * accidental dedupe) would silently halve the within-recording
+   * re-observation ground truth in every exported zip.
+   */
+  it('includes ALL same-session observations of one ref point (within-recording re-marks)', async () => {
+    // Three marks of the same corner in THIS session (loop passes,
+    // ≥10 s apart), plus one from another session that must be filtered.
+    await saveRefPointObservation(
+      scenarioHandle,
+      '8b1f1a5c2e3d4f9',
+      'Corner A1',
+      makeObservation(sessionName, 1_000)
+    );
+    await saveRefPointObservation(
+      scenarioHandle,
+      '8b1f1a5c2e3d4f9',
+      'Corner A1',
+      makeObservation(sessionName, 16_000)
+    );
+    await saveRefPointObservation(
+      scenarioHandle,
+      '8b1f1a5c2e3d4f9',
+      'Corner A1',
+      makeObservation(sessionName, 31_000)
+    );
+    await saveRefPointObservation(
+      scenarioHandle,
+      '8b1f1a5c2e3d4f9',
+      'Corner A1',
+      makeObservation('recording-2026-04-12_09-00-00utc', 99_000)
+    );
+
+    const contributor = createRefPointsZipContributor(
+      scenarioHandle,
+      sessionName
+    );
+    const count = await contributor.contribute(addFile);
+
+    expect(count).toBe(1);
+    const parsed = JSON.parse(
+      await (written.get('8b1f1a5c2e3d4f9.json') as Blob).text()
+    ) as RefPointDefinition;
+    expect(parsed.observations).toHaveLength(3);
+    expect(parsed.observations.map((o) => o.timestamp)).toEqual([
+      1_000, 16_000, 31_000,
+    ]);
+    for (const o of parsed.observations) {
+      expect(o.sessionId).toBe(sessionName);
+    }
+  });
+
   it('excludes ref points with zero observations in this session', async () => {
     await saveRefPointObservation(
       scenarioHandle,

@@ -220,9 +220,33 @@ describe('createEnableGpsArController — enable() success path', () => {
 
     await controller.enable({ container, requestHitTest: true });
 
-    expect(deps.initAR).toHaveBeenCalledWith(container, undefined, {
-      requestHitTest: true,
-    });
+    expect(deps.initAR).toHaveBeenCalledWith(
+      container,
+      undefined,
+      {
+        requestHitTest: true,
+      },
+      undefined
+    );
+  });
+
+  // Why this test matters: since the pre-init setter fold (surface-reduction
+  // step 1) the ONLY way a controller-driven app can wire tracking/depth/etc.
+  // is the `callbacks` option — it must reach initAR verbatim.
+  it('forwards the per-session AR callbacks to initAR', async () => {
+    const deps = makeDeps();
+    const controller = createEnableGpsArController(deps);
+    const container = fakeContainer();
+    const callbacks = { onFrame: vi.fn() };
+
+    await controller.enable({ container, callbacks });
+
+    expect(deps.initAR).toHaveBeenCalledWith(
+      container,
+      undefined,
+      { requestHitTest: undefined },
+      callbacks
+    );
   });
 
   it('probes depth only when requestDepth is opted in', async () => {

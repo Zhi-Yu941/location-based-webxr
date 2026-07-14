@@ -51,7 +51,7 @@ This project follows TDD by default:
 
 ### Sidecar Documentation
 
-Every code file that implements behavior must have a colocated `*.md` sidecar file. Keep them short but useful:
+Every **production** code file that implements behavior must have a colocated `*.md` sidecar file. Test files (`*.test.*`, `*.spec.*`) are exempt — tests self-document through their names and "why this test matters" comments, so do not create sidecars for them. Keep sidecars short but useful:
 
 - **Purpose** — one-line summary.
 - **Public API** — exported symbols, inputs/outputs, error modes.

@@ -79,4 +79,4 @@ No automated tests — this is a manual, on-device reproducer (a real Android
 device with the target Chrome build and AR support is required; desktop/CI
 cannot enter `immersive-ar`). Verification is the on-device crash/no-crash
 observation logged in
-`GpsPlusSlamJs_Docs/docs/2026-06-04-camera-access-crash-regression-chrome-148.md`.
+`GpsPlusSlamJs_Docs/docs/2026-06-04-0458-camera-access-crash-regression-chrome-148.md`.

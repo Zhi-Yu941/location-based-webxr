@@ -3,7 +3,7 @@
  *
  * Pure math turning the recorder's persisted WebXR data into the conventions
  * COLMAP's `sparse/0/` text files expect (occupancy/COLMAP export plan Iter 1,
- * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-colmap-export-plan.md §2.3).
+ * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-1205-colmap-export-plan.md §2.3).
  * No THREE scene graph, no DOM, no Redux — mirrors the discipline of
  * `depth-unprojection.ts` / `frame-conversions.ts` (one tested seam owning the
  * axis/sign conventions).
@@ -71,7 +71,7 @@ const WEBXR_TO_COLMAP_CAM = new THREE.Matrix4().makeScale(1, -1, -1);
  * camera extrinsics here and to exported points via {@link webxrToColmapWorldPoint},
  * so cameras and points stay registered (a surface point still projects to the
  * pixel its camera saw). See follow-up Item B:
- * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-colmap-export-followup-plan.md.
+ * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-2203-colmap-export-followup-plan.md.
  */
 const WEBXR_TO_COLMAP_WORLD = new THREE.Matrix4().makeScale(1, -1, -1);
 

@@ -5,7 +5,7 @@
  * {@link OccupancyGrid} instance for the current AR session, so consumers other
  * than the cube visualizer can read it without threading a one-off reference
  * through their wiring (COLMAP/3DGS export plan Iter 2.5,
- * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-colmap-export-plan.md Q2).
+ * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-1205-colmap-export-plan.md Q2).
  *
  * The grid itself stays a plain in-memory class owned by `main.ts` (it is
  * derived state fed from `recordDepthSample`, deliberately NOT Redux — see the

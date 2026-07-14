@@ -2,7 +2,7 @@
  * AR-scoped wiring for BOTH ref-point views (3D spheres + live-map markers).
  *
  * Round-3 feedback (2026-07-05,
- * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-05-recorder-ar-ready-ref-point-views-user-feedback.md):
+ * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-05-2349-recorder-ar-ready-ref-point-views-user-feedback.md):
  * these view subscribers used to be owned by the RECORDING session, so in
  * the AR_READY phase (after Enter AR, before the first recording) the Redux
  * store filled with imported ref points and no view reacted. Ownership now
@@ -19,6 +19,7 @@
  */
 
 import type { StoreRef } from '../state/store-ref';
+import { followStore } from '../state/store-ref';
 import type { RecorderStore } from '../state/recorder-store';
 import type { Map as LeafletMap } from 'leaflet';
 import type { RefPointVisualizer } from '../visualization/ref-point-visualizer';
@@ -53,20 +54,14 @@ export function wireRefPointViews(
   storeRef: StoreRef<RecorderStore>,
   deps: RefPointViewWiringDeps
 ): RefPointViewWiring {
-  let unsubscribe3d: (() => void) | null = null;
   let mapMarkers: ReturnType<typeof wireRefPointMapMarkers> | null = null;
 
-  const teardownPair = (): void => {
-    unsubscribe3d?.();
-    unsubscribe3d = null;
-    mapMarkers?.unsubscribe();
-    mapMarkers = null;
-  };
-
-  const wirePair = (store: RecorderStore): void => {
-    teardownPair();
-    unsubscribe3d = wireRefPointSubscribers(store, deps.visualizer);
-    mapMarkers = wireRefPointMapMarkers(store, {
+  // Store-swap following via the shared helper (quality-review G-11): the
+  // attach wires both views against the given store and returns the pair
+  // teardown the helper invokes before every re-attach and on dispose.
+  const stopFollowing = followStore(storeRef, (store: RecorderStore) => {
+    const unsubscribe3d = wireRefPointSubscribers(store, deps.visualizer);
+    const markers = wireRefPointMapMarkers(store, {
       getMap: deps.getMap,
       // Lazy session start from the CURRENT store: before a session starts
       // everything classifies prior/green; the startSession dispatch (or the
@@ -78,16 +73,16 @@ export function wireRefPointViews(
       // F5-A (2026-06-05): in-AR map markers are enlarged for readability.
       dotSizePx: 20,
     });
-  };
-
-  wirePair(storeRef.get());
-  const unsubscribeSwap = storeRef.subscribe((store) => wirePair(store));
+    mapMarkers = markers;
+    return () => {
+      unsubscribe3d();
+      markers.unsubscribe();
+      mapMarkers = null;
+    };
+  });
 
   return {
     refreshMapMarkers: () => mapMarkers?.refresh(),
-    unsubscribe: () => {
-      unsubscribeSwap();
-      teardownPair();
-    },
+    unsubscribe: stopFollowing,
   };
 }

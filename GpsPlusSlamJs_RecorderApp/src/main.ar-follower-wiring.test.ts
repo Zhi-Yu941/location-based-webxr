@@ -27,12 +27,7 @@ const { mockCreateCameraFollower, mockFollower, mockCreateGpsCompassCubes } =
     };
   });
 
-const {
-  mockGetArWorldGroup,
-  mockGetScene,
-  mockGetCamera,
-  mockSetFrameCallback,
-} = vi.hoisted(() => {
+const { mockGetArWorldGroup, mockGetScene, mockGetCamera } = vi.hoisted(() => {
   const mockArWorldGroup = { name: 'ar-world' };
   const mockScene = { name: 'scene' };
   const mockCamera = { name: 'camera' };
@@ -40,7 +35,6 @@ const {
     mockGetArWorldGroup: vi.fn().mockReturnValue(mockArWorldGroup),
     mockGetScene: vi.fn().mockReturnValue(mockScene),
     mockGetCamera: vi.fn().mockReturnValue(mockCamera),
-    mockSetFrameCallback: vi.fn(),
   };
 });
 
@@ -73,18 +67,11 @@ vi.mock('gps-plus-slam-app-framework/ar/webxr-session', () => ({
   isWebXRSupported: vi.fn().mockResolvedValue(true),
   getCurrentArPose: vi.fn().mockReturnValue(null),
   applyAlignmentMatrix: vi.fn(),
-  setImageCaptureCallback: vi.fn(),
   startImageCapture: vi.fn(),
   stopImageCapture: vi.fn(),
-  setDepthCaptureCallback: vi.fn(),
   startDepthCapture: vi.fn(),
   stopDepthCapture: vi.fn(),
-  setFrameCallback: mockSetFrameCallback,
-  setTrackingLostCallback: vi.fn(),
-  setTrackingCallbacks: vi.fn(),
-  setTrackingRecoveredCallback: vi.fn(),
-  setTrackingStore: vi.fn(),
-  setSessionEndCallback: vi.fn(),
+  rebindTrackingStore: vi.fn(),
   getScene: mockGetScene,
   getCamera: mockGetCamera,
   getArWorldGroup: mockGetArWorldGroup,
@@ -131,7 +118,6 @@ vi.mock('./ui/hud', () => ({
   validateEnterButton: vi.fn(),
   updatePermissionStatus: vi.fn(),
   setPermissionsReady: vi.fn(),
-  setFolderSelected: vi.fn(),
   setSaveLocationSelected: vi.fn(),
   setFolderImportExpanded: vi.fn(),
   setFolderImportProgress: vi.fn(),
@@ -274,7 +260,7 @@ vi.mock('gps-plus-slam-app-framework/state/gps-event-coordinator', () => ({
   extractOdomPosition: vi.fn().mockReturnValue([0, 0, 0]),
   extractOdomRotation: vi.fn().mockReturnValue([0, 0, 0, 1]),
 }));
-vi.mock('gps-plus-slam-app-framework/state/recording-options', () => ({
+vi.mock('./state/recording-options', () => ({
   loadRecordingOptions: vi.fn().mockReturnValue({
     qr: { enabled: false, intervalMs: 125, captureSize: 1024 },
     images: { enabled: false, intervalMs: 1000, quality: 0.8 },
@@ -324,16 +310,6 @@ vi.mock('gps-plus-slam-app-framework/visualization/reference-points', () => ({
 }));
 vi.mock('gps-plus-slam-app-framework/visualization/gps-event-markers', () => ({
   gpsEventVisualizer: { setVisible: vi.fn(), clearAll: vi.fn() },
-}));
-vi.mock('gps-plus-slam-app-framework/visualization/map-overlay', () => ({
-  MapOverlay: vi.fn().mockImplementation(() => ({
-    isVisible: vi.fn().mockReturnValue(false),
-    toggle: vi.fn(),
-    updatePosition: vi.fn(),
-    setGpsPosition: vi.fn(),
-    getGpsPosition: vi.fn().mockReturnValue(null),
-    dispose: vi.fn(),
-  })),
 }));
 vi.mock(
   'gps-plus-slam-app-framework/visualization/leaflet-map-overlay',
@@ -463,13 +439,15 @@ describe('Issue 8: CameraFollower wiring in live AR', () => {
   it('frame callback updates the CameraFollower', async () => {
     await handleEnterARForTesting();
 
-    // setFrameCallback should have been called with a function
-    expect(mockSetFrameCallback).toHaveBeenCalledTimes(1);
-    const frameCallback = mockSetFrameCallback.mock.calls[0][0];
+    // Since the setter fold, the per-frame tick rides into initAR's
+    // callbacks struct as `onFrame`.
+    const { initAR } =
+      await import('gps-plus-slam-app-framework/ar/webxr-session');
+    const frameCallback = vi.mocked(initAR).mock.calls[0]?.[3]?.onFrame;
     expect(typeof frameCallback).toBe('function');
 
     // Invoke the callback — it should call follower.update()
-    (frameCallback as () => void)();
+    frameCallback!();
 
     expect(mockFollower.update).toHaveBeenCalledTimes(1);
     // Should pass camera and a positive dt (no arWorldGroup needed)

@@ -172,40 +172,57 @@ export async function checkWebXRSupport(): Promise<PermissionStatus> {
 }
 
 /**
- * Check geolocation permission status without triggering a prompt.
- * Uses the Permissions API if available, otherwise returns unknown state.
+ * Shared Permissions-API status checker (quality-review C-2): probe-free
+ * query with the standard supported/granted/denied/prompt mapping. The two
+ * former copies (geolocation/camera) differed only in the API guard and the
+ * user-facing strings.
  */
-export async function checkGeolocationPermission(): Promise<PermissionStatus> {
-  if (!navigator.geolocation) {
+async function checkPermissionViaQuery(options: {
+  readonly name: PermissionName;
+  /** Result of the feature-specific API-availability guard. */
+  readonly apiAvailable: boolean;
+  readonly unsupportedError: string;
+  readonly deniedError: string;
+}): Promise<PermissionStatus> {
+  if (!options.apiAvailable) {
     return {
       supported: false,
       granted: null,
-      error: 'Geolocation API not available in this browser.',
+      error: options.unsupportedError,
     };
   }
 
   // Try Permissions API first (doesn't trigger prompt)
   if (navigator.permissions) {
     try {
-      const result = await navigator.permissions.query({ name: 'geolocation' });
+      const result = await navigator.permissions.query({ name: options.name });
       if (result.state === 'granted') {
         return { supported: true, granted: true };
       } else if (result.state === 'denied') {
-        return {
-          supported: true,
-          granted: false,
-          error: 'Location access denied. Please enable in browser settings.',
-        };
+        return { supported: true, granted: false, error: options.deniedError };
       }
       // 'prompt' state - permission not yet requested
       return { supported: true, granted: null };
     } catch {
-      // Permissions API query failed, continue to probe method
+      // Permissions API query failed, continue to the unknown fallback
     }
   }
 
-  // Fallback: geolocation is supported but we don't know permission state
+  // Fallback: the feature is supported but we don't know permission state
   return { supported: true, granted: null };
+}
+
+/**
+ * Check geolocation permission status without triggering a prompt.
+ * Uses the Permissions API if available, otherwise returns unknown state.
+ */
+export async function checkGeolocationPermission(): Promise<PermissionStatus> {
+  return checkPermissionViaQuery({
+    name: 'geolocation',
+    apiAvailable: !!navigator.geolocation,
+    unsupportedError: 'Geolocation API not available in this browser.',
+    deniedError: 'Location access denied. Please enable in browser settings.',
+  });
 }
 
 /**
@@ -268,38 +285,13 @@ export async function requestGeolocationPermission(
  * Uses the Permissions API if available.
  */
 export async function checkCameraPermission(): Promise<PermissionStatus> {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    return {
-      supported: false,
-      granted: null,
-      error: 'Camera API not available. Use HTTPS and a modern browser.',
-    };
-  }
-
-  // Try Permissions API first (doesn't trigger prompt)
-  if (navigator.permissions) {
-    try {
-      const result = await navigator.permissions.query({
-        name: 'camera',
-      });
-      if (result.state === 'granted') {
-        return { supported: true, granted: true };
-      } else if (result.state === 'denied') {
-        return {
-          supported: true,
-          granted: false,
-          error: 'Camera access denied. Please enable in browser settings.',
-        };
-      }
-      // 'prompt' state - permission not yet requested
-      return { supported: true, granted: null };
-    } catch {
-      // Permissions API query failed for camera, continue
-    }
-  }
-
-  // Fallback: camera is supported but we don't know permission state
-  return { supported: true, granted: null };
+  return checkPermissionViaQuery({
+    name: 'camera',
+    apiAvailable: !!navigator.mediaDevices?.getUserMedia,
+    unsupportedError:
+      'Camera API not available. Use HTTPS and a modern browser.',
+    deniedError: 'Camera access denied. Please enable in browser settings.',
+  });
 }
 
 /**
@@ -350,32 +342,48 @@ export async function requestCameraPermission(): Promise<PermissionStatus> {
 }
 
 /**
+ * DeviceOrientationEvent availability + iOS 13+ permission-API probe
+ * (quality-review C-2 — this preamble used to be duplicated between the
+ * check and request paths). `available: false` ⇒ no orientation support at
+ * all; `requestPermission: null` ⇒ orientation works without a permission.
+ * The returned function is bound to `DeviceOrientationEvent` (it is a static
+ * method — an unbound call would lose `this`).
+ */
+function getIosOrientationPermissionApi():
+  | { available: false }
+  | { available: true; requestPermission: (() => Promise<string>) | null } {
+  if (typeof DeviceOrientationEvent === 'undefined') {
+    return { available: false };
+  }
+  const withPermission = DeviceOrientationEvent as unknown as {
+    requestPermission?: () => Promise<string>;
+  };
+  return {
+    available: true,
+    requestPermission:
+      typeof withPermission.requestPermission === 'function'
+        ? withPermission.requestPermission.bind(DeviceOrientationEvent)
+        : null,
+  };
+}
+
+/**
  * Check device orientation permission status.
  * On iOS 13+, this requires explicit permission request.
  */
 export function checkOrientationPermission(): Promise<PermissionStatus> {
-  // Check if DeviceOrientationEvent is available
-  if (typeof DeviceOrientationEvent === 'undefined') {
+  const api = getIosOrientationPermissionApi();
+  if (!api.available) {
     return Promise.resolve({
       supported: false,
       granted: null,
       error: 'Device orientation not supported.',
     });
   }
-
-  // Check for iOS-specific permission API
-  const DeviceOrientationEventWithPermission =
-    DeviceOrientationEvent as unknown as {
-      requestPermission?: () => Promise<string>;
-    };
-
-  if (
-    typeof DeviceOrientationEventWithPermission.requestPermission === 'function'
-  ) {
+  if (api.requestPermission) {
     // iOS 13+ - permission API exists but we can't check without prompting
     return Promise.resolve({ supported: true, granted: null });
   }
-
   // Non-iOS or older iOS - orientation is available without permission
   return Promise.resolve({ supported: true, granted: true });
 }
@@ -385,8 +393,8 @@ export function checkOrientationPermission(): Promise<PermissionStatus> {
  * On other platforms, this is a no-op that returns granted.
  */
 export async function requestOrientationPermission(): Promise<PermissionStatus> {
-  // Check if DeviceOrientationEvent is available
-  if (typeof DeviceOrientationEvent === 'undefined') {
+  const api = getIosOrientationPermissionApi();
+  if (!api.available) {
     return {
       supported: false,
       granted: null,
@@ -394,18 +402,9 @@ export async function requestOrientationPermission(): Promise<PermissionStatus> 
     };
   }
 
-  // Check for iOS-specific permission API
-  const DeviceOrientationEventWithPermission =
-    DeviceOrientationEvent as unknown as {
-      requestPermission?: () => Promise<string>;
-    };
-
-  if (
-    typeof DeviceOrientationEventWithPermission.requestPermission === 'function'
-  ) {
+  if (api.requestPermission) {
     try {
-      const permission =
-        await DeviceOrientationEventWithPermission.requestPermission();
+      const permission = await api.requestPermission();
       if (permission === 'granted') {
         log.info('Orientation permission granted');
         return { supported: true, granted: true };
@@ -444,26 +443,39 @@ export async function checkAllPermissions(): Promise<PermissionCheckResult> {
   // File system check is synchronous (just checks state)
   const fileSystem = checkFileSystemPermission();
 
-  // Mandatory permissions: WebXR, Geolocation, Camera, FileSystem
-  // All must be supported and granted (or at least not denied)
-  const allMandatoryReady =
-    webxr.supported &&
-    webxr.granted === true &&
-    geolocation.supported &&
-    geolocation.granted === true &&
-    camera.supported &&
-    camera.granted === true &&
-    fileSystem.supported &&
-    fileSystem.granted === true;
-
   return {
     webxr,
     geolocation,
     camera,
     orientation,
     fileSystem,
-    allMandatoryReady,
+    allMandatoryReady: computeAllMandatoryReady({
+      webxr,
+      geolocation,
+      camera,
+      fileSystem,
+    }),
   };
+}
+
+/**
+ * The mandatory-set gate, written once (quality-review C-2 — the 8-clause
+ * boolean used to be spelled out twice and could drift): WebXR, Geolocation,
+ * Camera and FileSystem must all be supported AND granted. Orientation is
+ * deliberately not part of the mandatory set.
+ */
+function computeAllMandatoryReady(
+  result: Pick<
+    PermissionCheckResult,
+    'webxr' | 'geolocation' | 'camera' | 'fileSystem'
+  >
+): boolean {
+  return [
+    result.webxr,
+    result.geolocation,
+    result.camera,
+    result.fileSystem,
+  ].every((p) => p.supported && p.granted === true);
 }
 
 /**
@@ -639,15 +651,7 @@ export async function requestAllPermissions(): Promise<PermissionCheckResult> {
   result.fileSystem = checkFileSystemPermission();
 
   // Recalculate allMandatoryReady (including file system)
-  result.allMandatoryReady =
-    result.webxr.supported &&
-    result.webxr.granted === true &&
-    result.geolocation.supported &&
-    result.geolocation.granted === true &&
-    result.camera.supported &&
-    result.camera.granted === true &&
-    result.fileSystem.supported &&
-    result.fileSystem.granted === true;
+  result.allMandatoryReady = computeAllMandatoryReady(result);
 
   return result;
 }

@@ -34,7 +34,7 @@ import {
   type RgbaImage,
   type QrDetection,
   type Pose,
-  type DepthUnprojector,
+  type QrSizeDepthContext,
   type QrSizeEstimate,
   type QrSizeMeasurer,
   type QrDetectionEvent,
@@ -49,12 +49,13 @@ export type DemoSolvePose = (
   input: Omit<SolveQrPoseInput, "solver">,
 ) => QrPoseSolution | null;
 
-/** Everything device-specific the controller needs to read one frame's depth. */
-export interface DepthContext {
-  /** Unprojector for the current depth sample (`createDepthUnprojector`). */
-  unprojector: DepthUnprojector;
-  /** Depth (m) at a normalized screen point, or `null` if unavailable there. */
-  depthAt: (screenX: number, screenY: number) => number | null;
+/**
+ * Everything device-specific the controller needs to read one frame's depth:
+ * the shared framework size-measurer context (unprojector + depthAt — the demo's
+ * seams already build it via `createQrSizeDepthContext`) plus the two per-frame
+ * fields only the PnP solve needs.
+ */
+export interface DepthContext extends QrSizeDepthContext {
   /** Camera pose in raw-WebXR/odom space (for the camera-relative pose). */
   cameraPose: Pose;
   /**

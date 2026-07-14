@@ -44,5 +44,5 @@
   (non-negativity, frame-invariance, inverse-dt scaling).
 
 - **Related docs:**
-  `GpsPlusSlamJs_Docs/docs/2026-06-23-blurry-frame-motion-gating-plan.md` (§4.1),
+  `GpsPlusSlamJs_Docs/docs/2026-06-23-2105-blurry-frame-motion-gating-plan.md` (§4.1),
   `utils/geodesic-angle.ts.md`.

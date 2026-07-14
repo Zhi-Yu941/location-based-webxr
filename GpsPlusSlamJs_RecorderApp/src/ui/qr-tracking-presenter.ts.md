@@ -5,7 +5,7 @@
 Maps the framework `QrTrackingController`'s async status callbacks onto the
 HUD's `updateStatus` / `showError` channels, so the off-by-default QR-tracking
 demonstrator obeys the "UI feedback for async actions" rule. Phase 6c of the
-[QR-code detection & tracking plan](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-qr-code-detection-tracking-plan.md).
+[QR-code detection & tracking plan](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-0806-qr-code-detection-tracking-plan.md).
 
 ## Public API
 

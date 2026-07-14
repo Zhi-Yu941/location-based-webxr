@@ -17,8 +17,6 @@ interface PlaceButtonView {
   readonly visible: boolean;
   readonly label: string;
   readonly disabled: boolean;
-  /** In-progress (spinner) state while the save is in flight. */
-  readonly busy: boolean;
 }
 
 export interface PlacementView {
@@ -41,7 +39,6 @@ const HIDDEN_BUTTON: PlaceButtonView = {
   visible: false,
   label: "Place anchor",
   disabled: true,
-  busy: false,
 };
 
 function buttonFor(state: SetupState): PlaceButtonView {
@@ -53,12 +50,11 @@ function buttonFor(state: SetupState): PlaceButtonView {
         visible: true,
         label: "Place anchor",
         disabled: false,
-        busy: false,
       };
     case "saving":
-      return { visible: true, label: "Saving…", disabled: true, busy: true };
+      return { visible: true, label: "Saving…", disabled: true };
     case "saved":
-      return { visible: true, label: "Saved ✓", disabled: true, busy: false };
+      return { visible: true, label: "Saved ✓", disabled: true };
     default:
       return HIDDEN_BUTTON;
   }

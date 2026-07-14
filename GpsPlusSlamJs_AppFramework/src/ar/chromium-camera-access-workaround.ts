@@ -9,7 +9,7 @@
  * added — i.e. it is not specific to this app's session setup. See:
  *
  *   - GpsPlusSlamJs_Docs/docs/2026-04-22-camera-access-reproducer-plan.md
- *   - GpsPlusSlamJs_Docs/docs/2026-06-04-camera-access-crash-regression-chrome-148.md
+ *   - GpsPlusSlamJs_Docs/docs/2026-06-04-0458-camera-access-crash-regression-chrome-148.md
  *   - https://github.com/mrdoob/three.js/issues/33404
  *   - https://issues.chromium.org/issues/507508099 (root-cause, marked Fixed)
  *

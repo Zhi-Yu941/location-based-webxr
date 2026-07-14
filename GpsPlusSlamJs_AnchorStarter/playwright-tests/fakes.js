@@ -4,7 +4,7 @@ import { expect } from "@playwright/test";
  * Tier 1 e2e fakes for the persistent-anchor starter.
  *
  * Why this file exists (see
- * GpsPlusSlamJs_Docs/docs/2026-06-01-anchor-starter-e2e-test-plan.md §5–§6):
+ * GpsPlusSlamJs_Docs/docs/2026-06-01-0447-anchor-starter-e2e-test-plan.md §5–§6):
  * Playwright Chromium has no WebXR and no real GPS, so the *application flow*
  * (boot → guidance → soft-gated placement → `?show=` round-trip → copy-link)
  * cannot be exercised against real sensors. Instead of mocking individual
@@ -82,12 +82,13 @@ export async function installAnchorStarterFakes(page, options = {}) {
       trackingReport: cfg.trackingReport,
       /**
        * Tracking-wiring observation (regression guard for the
-       * "guidance stuck on AR tracking lost" bug). The framework only forwards
-       * per-frame poses into the store when BOTH `setTrackingStore` AND
-       * `setTrackingCallbacks` are wired before `initAR`; if `main.ts` drops
-       * either call the guidance silently freezes. These flags let a spec
-       * assert both calls happened during boot. `addInitScript` re-runs per
-       * navigation, so they reset on reload.
+       * "guidance stuck on AR tracking lost" bug). Since the framework's
+       * setter fold, the store and the restart callback arrive TOGETHER as
+       * `initAR`'s `callbacks.tracking` group; if `main.ts` drops the group
+       * (or either field) the per-frame pose flow silently no-ops and the
+       * guidance freezes. The fake `initAR` records what arrived so a spec
+       * can assert both fields were passed during boot. `addInitScript`
+       * re-runs per navigation, so they reset on reload.
        */
       trackingStoreWired: false,
       trackingCallbacksWired: false,
@@ -140,7 +141,14 @@ export async function installAnchorStarterFakes(page, options = {}) {
         Promise.resolve({ supported: true, granted: true }),
       checkGeolocationPermission: () =>
         Promise.resolve({ supported: true, granted: true }),
-      initAR: () => Promise.resolve(),
+      initAR: (_container, _isolation, _features, callbacks) => {
+        // Record the tracking group so the wiring spec can assert the store
+        // and the restart callback both rode into initAR (setter-fold API).
+        control.trackingStoreWired = Boolean(callbacks?.tracking?.store);
+        control.trackingCallbacksWired =
+          typeof callbacks?.tracking?.onRestarted === "function";
+        return Promise.resolve();
+      },
       endARSession: () => {
         control.endARSessionCalls++;
         return Promise.resolve();
@@ -159,12 +167,6 @@ export async function installAnchorStarterFakes(page, options = {}) {
         worldToLocal: (v) => v,
       }),
       getCamera: () => ({}),
-      setTrackingStore: () => {
-        control.trackingStoreWired = true;
-      },
-      setTrackingCallbacks: () => {
-        control.trackingCallbacksWired = true;
-      },
       startGpsWatch: (onPosition) => {
         control.gpsCallback = onPosition;
       },

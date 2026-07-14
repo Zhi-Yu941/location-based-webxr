@@ -8,7 +8,7 @@
  * the NEXT frame fills the slot (no full-interval wait, no frame-index gap), the
  * never-good fallback eventually saves regardless, a hung analyzer fails open
  * (no deadlock), and the gate composes with the motion gate. See
- * 2026-06-24-image-quality-gate-plan.md §6, §9.
+ * 2026-06-24-1057-image-quality-gate-plan.md §6, §9.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';

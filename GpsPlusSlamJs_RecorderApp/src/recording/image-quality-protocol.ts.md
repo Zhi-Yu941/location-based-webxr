@@ -17,8 +17,10 @@
 - **Invariants & assumptions:**
   - `config` is the framework's `QualityFilterConfig` (deep-imported). `enabled`
     is irrelevant inside the worker (the worker is only spawned when the gate is
-    on); the worker reads `blurRelativeThreshold` + `minMeanLuminance`. `maxWaitMs`
-    is enforced by the manager, not the worker.
+    on); the worker reads `blurRelativeThreshold` + `minMeanLuminance` +
+    `blurMetric` (resolved via the framework's `blurMetricScorer`; missing ⇒
+    variance-of-Laplacian — 2026-07-12 toggle plan). `maxWaitMs` is enforced by
+    the manager, not the worker.
   - `id` is a per-client monotonic counter; the client matches verdicts to
     pending analyses by it.
 
@@ -26,4 +28,4 @@
   builds/consumes these messages against a fake worker).
 
 - **Related docs:** `image-quality-client.ts.md`, `image-quality.worker.ts.md`,
-  `GpsPlusSlamJs_Docs/docs/2026-06-24-image-quality-gate-plan.md`.
+  `GpsPlusSlamJs_Docs/docs/2026-06-24-1057-image-quality-gate-plan.md`.

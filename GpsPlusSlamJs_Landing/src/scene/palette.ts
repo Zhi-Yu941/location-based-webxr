@@ -126,7 +126,10 @@ const LIGHT: ScenePalette = {
     phone: { color: 0x2a2a30 },
     screen: { color: 0xffffff },
     arrow: { color: 0x3b82f6 },
-    label: { color: 0x2563eb },
+    // Round-14 R14-6: the AR "hinted text" label bars use a distinct
+    // VIOLET (story/label content) so they read differently from the
+    // blue navigation arrows; the copy word "stories" fades to match.
+    label: { color: 0x7c3aed },
     skyline: { color: 0xbdbab2 },
     grass: { color: 0x94b984 },
     tent: { color: 0xcfa15e },
@@ -180,7 +183,7 @@ const DARK: ScenePalette = {
     phone: { color: 0x3b5b9e, emissiveIntensity: 0.35 },
     screen: { color: 0x2c3550, emissiveIntensity: 0.5 },
     arrow: { color: 0x60a5fa, emissiveIntensity: 0.7 },
-    label: { color: 0x93b4ff, emissiveIntensity: 0.7 },
+    label: { color: 0xc084fc, emissiveIntensity: 0.7 },
     // Emissive floor keeps the horizon city visible through the fog at
     // ~48 units (round-4 V3).
     skyline: { color: 0x4b4b60, emissiveIntensity: 0.18 },
@@ -227,7 +230,7 @@ const NEON: ScenePalette = {
     phone: { color: 0x0c0f1c },
     screen: { color: 0x3b4a8a, emissiveIntensity: 0.6 },
     arrow: { color: 0x22d3ee, emissiveIntensity: 0.9 },
-    label: { color: 0x67e8f9, emissiveIntensity: 0.8 },
+    label: { color: 0xe879f9, emissiveIntensity: 0.8 },
     skyline: { color: 0x0f1326, emissiveIntensity: 0.15 },
     grass: { color: 0x0f3336 },
     tent: { color: 0x394a76, emissiveIntensity: 0.2 },
@@ -270,7 +273,7 @@ const DUSK: ScenePalette = {
     phone: { color: 0x241833 },
     screen: { color: 0x8a5fa8, emissiveIntensity: 0.4 },
     arrow: { color: 0x60a5fa, emissiveIntensity: 0.6 },
-    label: { color: 0x93c5fd, emissiveIntensity: 0.6 },
+    label: { color: 0xd8b4fe, emissiveIntensity: 0.6 },
     skyline: { color: 0x3a2a55, emissiveIntensity: 0.1 },
     grass: { color: 0x29635e },
     tent: { color: 0x9c6b4e, emissiveIntensity: 0.15 },
@@ -315,7 +318,7 @@ const MONO: ScenePalette = {
     phone: { color: 0x2a2a28 },
     screen: { color: 0xffffff },
     arrow: { color: 0x2563eb },
-    label: { color: 0x1d4ed8 },
+    label: { color: 0x6d28d9 },
     skyline: { color: 0xb5b5ae },
     grass: { color: 0xacaca4 },
     tent: { color: 0xb8b8b0 },
@@ -362,7 +365,7 @@ const TERMINAL: ScenePalette = {
     phone: { color: 0x0a1c10 },
     screen: { color: 0x1c4028, emissiveIntensity: 0.6 },
     arrow: { color: 0x60a5fa, emissiveIntensity: 0.9 },
-    label: { color: 0x93b4ff, emissiveIntensity: 0.8 },
+    label: { color: 0xc084fc, emissiveIntensity: 0.8 },
     skyline: { color: 0x0f2a18, emissiveIntensity: 0.35 },
     grass: { color: 0x123a20 },
     tent: { color: 0x1c4028, emissiveIntensity: 0.3 },

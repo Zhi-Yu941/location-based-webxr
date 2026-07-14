@@ -68,6 +68,7 @@
         --hl-code: #fbbf24;
         --hl-kw: #93c5fd;
         --hl-lit: #86efac;
+        --hl-ar: #60a5fa;
         --panel: rgb(19 19 23 / 62%);
         --panel-border: rgb(255 255 255 / 10%);
         --panel-border-hi: rgb(255 255 255 / 30%);
@@ -89,6 +90,7 @@
         --hl-code: #b45309;
         --hl-kw: #1d4ed8;
         --hl-lit: #15803d;
+        --hl-ar: #3b82f6;
         --panel: rgb(255 255 255 / 66%);
         --panel-border: rgb(0 0 0 / 8%);
         --panel-border-hi: rgb(0 0 0 / 20%);
@@ -108,6 +110,7 @@
         --hl-code: #fbbf24;
         --hl-kw: #67e8f9;
         --hl-lit: #86efac;
+        --hl-ar: #22d3ee;
         --panel: rgb(10 12 28 / 62%);
         --panel-border: rgb(120 140 255 / 18%);
         --panel-border-hi: rgb(120 240 255 / 50%);
@@ -129,6 +132,7 @@
         --hl-code: #fbbf24;
         --hl-kw: #93c5fd;
         --hl-lit: #a7f3d0;
+        --hl-ar: #60a5fa;
         --panel: rgb(42 26 62 / 62%);
         --panel-border: rgb(255 176 138 / 18%);
         --panel-border-hi: rgb(255 176 138 / 50%);
@@ -150,6 +154,7 @@
         --hl-code: #b45309;
         --hl-kw: #1d4ed8;
         --hl-lit: #15803d;
+        --hl-ar: #2563eb;
         --panel: rgb(255 255 255 / 66%);
         --panel-border: rgb(0 0 0 / 10%);
         --panel-border-hi: rgb(0 0 0 / 24%);
@@ -172,6 +177,7 @@
         --hl-code: #fbbf24;
         --hl-kw: #60a5fa;
         --hl-lit: #3f6;
+        --hl-ar: #60a5fa;
         --panel: rgb(8 22 12 / 70%);
         --panel-border: rgb(51 255 102 / 22%);
         --panel-border-hi: rgb(51 255 102 / 50%);
@@ -512,6 +518,12 @@
       .hl-fused {
         color: var(--accent);
       }
+      /* AR-overlay blue (round-14 R14-5/7/8): words tied to the blue AR
+         content on screen — the flown-in phone frame, the tent-path
+         arrows, the castle ghost. Matches the 3D `arrow` role per palette. */
+      .hl-ar {
+        color: var(--hl-ar);
+      }
 
       /* Round-14 R14-4: in the scrolling COPY blocks (not the hero, not
          the snippet) the color-coded words fade from plain text color to
@@ -540,6 +552,14 @@
         color: color-mix(
           in srgb,
           var(--accent) calc(var(--hl-strength) * 100%),
+          var(--text)
+        );
+      }
+      .copy .hl-ar {
+        /* stylelint-disable-next-line csstree/validator -- color-mix is valid CSS; the bundled css-tree grammar predates it (false positive). */
+        color: color-mix(
+          in srgb,
+          var(--hl-ar) calc(var(--hl-strength) * 100%),
           var(--text)
         );
       }
@@ -1068,8 +1088,9 @@ world.add(marker);               <span class="c">// marker: any three.js Object3
         <div class="copy">
           <h2>This is what your users see.</h2>
           <p>
-            Their own phone — or any WebXR-capable device — becomes the window.
-            No download: arrows, labels and stories laid over the real world.
+            Their <span class="hl-ar">own phone</span> — or any WebXR-capable
+            device — becomes the window. No download: arrows, labels and stories
+            laid over the real world.
           </p>
         </div>
       </section>
@@ -1099,11 +1120,17 @@ world.add(marker);               <span class="c">// marker: any three.js Object3
             <li>
               Guided tours &amp; city walks with content at the real spots
             </li>
-            <li>Campus, venue &amp; trade-fair navigation</li>
-            <li>Architecture previews &amp; historic buildings at 1:1 scale</li>
             <li>
-              Make the invisible visible: what's hidden behind walls or long
-              gone, shown on site
+              Campus, venue &amp; trade-fair
+              <span class="hl-ar">navigation</span>
+            </li>
+            <li>
+              Architecture previews &amp;
+              <span class="hl-ar">historic buildings</span> at 1:1 scale
+            </li>
+            <li>
+              Make the invisible visible: what's hidden behind walls or
+              <span class="hl-ar">long gone</span>, shown on site
             </li>
             <li>
               Reality capture: GPS-anchored 3D scans &amp; Gaussian splats

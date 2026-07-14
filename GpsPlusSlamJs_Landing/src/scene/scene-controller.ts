@@ -26,6 +26,7 @@ import {
 } from "./particles";
 import { buildSatellites, updateSatellites } from "./satellites";
 import { buildShootingStar, updateShootingStar } from "./shooting-stars";
+import { buildHeroPeeker, createHeroIdleBeat } from "./hero-idle";
 import { pickEggTarget, type PointerNdc } from "./egg-picker";
 import { GEOCACHE_NAME, toggleGeocache, updateGeocache } from "./geocache";
 import { VIGNETTE_NODE } from "./use-case-vignettes";
@@ -263,6 +264,12 @@ export function createSceneController(
   // Shooting stars (easter-egg №7): dark palettes only; built always,
   // gated per-theme + by the continuous loop below.
   const shootingStar = buildShootingStar();
+  // Hero idle beat (easter-egg №6): a second dot-person peeks from behind
+  // a hero-side bush after 60 s idle at the hero. Scroll mode only.
+  const heroPeeker = tier.mode === "scroll" ? buildHeroPeeker() : null;
+  const heroIdleBeat = heroPeeker
+    ? createHeroIdleBeat(heroPeeker.group, heroPeeker.peeker)
+    : null;
   scene.add(
     world,
     sky,
@@ -276,6 +283,9 @@ export function createSceneController(
   );
   if (particles) {
     scene.add(particles);
+  }
+  if (heroPeeker) {
+    scene.add(heroPeeker.group);
   }
   scene.add(hemisphere, directional);
 
@@ -556,6 +566,15 @@ export function createSceneController(
       }
       if (castle && updateGhostRestore(castle, nowMs)) {
         dirty = true;
+      }
+      // Hero idle beat (№6): only "idle at hero" while the intro is done,
+      // the tab is visible, and the scrub rests at the top (progress ≈ 0).
+      if (heroIdleBeat) {
+        const idleAtHero =
+          introStartedAt === null && pageVisible && displayedProgress < 0.01;
+        if (heroIdleBeat.update(nowMs, idleAtHero)) {
+          dirty = true;
+        }
       }
       // Parkour hop: an additive offset layered on the freshly placed
       // walk pose. syncStage runs each active frame (and once more when

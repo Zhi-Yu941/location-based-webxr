@@ -90,7 +90,10 @@ describe("buildStoryTimeline", () => {
     // deliberately untouched — round-15 called that part "super so".
     timeline.seek(4800);
     syncStage(stage);
-    expect(stage.camera.position.distanceTo(SKYLINE_CENTER)).toBeLessThan(32);
+    // Portrait follow-up: the camera stays FARTHER back now (park + tower
+    // both in frame instead of a hard tower zoom), so the "at the city"
+    // bound is looser than the old 32.
+    expect(stage.camera.position.distanceTo(SKYLINE_CENTER)).toBeLessThan(42);
 
     timeline.seek(5150); // already at the tents, very early in the gallery
     syncStage(stage);
@@ -176,9 +179,10 @@ describe("buildStoryTimeline", () => {
       expect(ndc.z, `pin behind camera at ${t}`).toBeLessThan(1);
     }
 
-    // And the look target is the TOWER's upper section, not the city
-    // average at ground-ish height — asserted inside the (round-15,
-    // deliberately brief) tower hold, before the swing to the tents.
+    // The look target sits ON the tower (x/z), at a MID height — portrait
+    // follow-up: lowered from the tower top (y18) so the tower rises into
+    // the upper frame and the park shows below; still well above the
+    // ground-average city height, and the pin stays in frame (above).
     timeline.seek(4800);
     syncStage(stage);
     expect(
@@ -187,7 +191,8 @@ describe("buildStoryTimeline", () => {
         stage.lookTarget.z - SKYLINE_TOWER_POS.z,
       ),
     ).toBeLessThan(2);
-    expect(stage.lookTarget.y).toBeGreaterThan(10);
+    expect(stage.lookTarget.y).toBeGreaterThan(5);
+    expect(stage.lookTarget.y).toBeLessThan(14);
   });
 
   it("pops the campus arrows one by one over the camp and spawns the castle ghost on approach (round-13 R13-4)", () => {

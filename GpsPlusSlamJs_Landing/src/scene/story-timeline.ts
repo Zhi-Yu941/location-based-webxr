@@ -305,17 +305,17 @@ export function buildStoryTimeline(
     .sub(SKYLINE_CENTER)
     .setY(0)
     .normalize();
-  const citySweepCamera = towardCenter(SKYLINE_CENTER, 28, 13).add(
+  // Portrait follow-up: the city moment used to ZOOM hard onto the tower
+  // (28 back, aiming at the tower top y18 — the tower filled the frame
+  // and the park below it was off-screen). The maintainer wants to STAY
+  // FARTHER BACK so both the park (bottom edge) AND the tower + red pin
+  // fit in the portrait frame. Pulled back (28→33, height 13→15) and the
+  // look dropped low (y18→8) so the tower rises into the upper frame and
+  // the ground/park sits below — less zoom, more context.
+  const citySweepCamera = towardCenter(SKYLINE_CENTER, 33, 15).add(
     campusward.clone().multiplyScalar(-16),
   );
-  // The tower's upper section: bulb at ~12.4, spike to ~15.2, pin above.
-  // Aiming here keeps tower top + red pin centered ("mehr auf die Spitze
-  // vom Turm"), not the whole-city average.
-  // Round-15: raised 12 → 15 (the pin itself sits at ~16). Aiming lower
-  // pushed the tower TOP — and its red pin — into the upper frame, where
-  // the works-anywhere copy still sits while it scrolls away; centring
-  // the look nearer the pin drops it clear of that copy.
-  const cityLook = SKYLINE_TOWER_POS.clone().setY(18);
+  const cityLook = SKYLINE_TOWER_POS.clone().setY(8);
 
   // ── Round-14 R14-1/R14-4: the journey now looks where it is GOING.
   // Until now the camp waypoint looked sideways AT the tents (the camera

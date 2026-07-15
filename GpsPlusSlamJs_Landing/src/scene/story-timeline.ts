@@ -672,17 +672,22 @@ export function buildStoryTimeline(
   // as the camera turns to the city — "danach kann das Portal auch wieder
   // verschwinden, wenn man auf den Colonius guckt". Scale pop; the rings
   // swirl continuously (updatePortalSpin in the render loop).
+  // Round-14 follow-up: it opened too early (already full-open while the
+  // works-anywhere copy was only entering). Delayed so it EXPANDS as that
+  // box becomes a big part of the screen ("erst auftauchen, wenn der
+  // Textblock zu einem Großteil im Bild ist"), then closes as the camera
+  // turns to the city.
   const portal = world.getObjectByName(PORTAL_NAME);
   if (portal) {
     timeline.add(
       portal,
       { scale: { from: 0.001, to: 1 }, duration: 380, ease: "outCubic" },
-      3820,
+      4200,
     );
     timeline.add(
       portal,
       { scale: { from: 1, to: 0.001 }, duration: 320, ease: "inCubic" },
-      4480,
+      4820,
     );
   }
 

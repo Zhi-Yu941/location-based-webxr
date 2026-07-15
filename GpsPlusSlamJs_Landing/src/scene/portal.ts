@@ -54,6 +54,9 @@ export function buildForestPortal(anchor: Vector3, faceToward: Vector3): Group {
     ring.name = `${RING_NAME}-${i}`;
     ring.userData.paletteRole = "portal";
     ring.userData.spin = i === 0 ? 1 : -1.6; // counter-rotating speeds
+    // The INNER ring pulses permanently (round-14 follow-up) — a
+    // clock-driven breathing scale, independent of scroll.
+    ring.userData.pulse = i === 1;
     ring.castShadow = false;
     portal.add(ring);
   }
@@ -68,8 +71,9 @@ export function buildForestPortal(anchor: Vector3, faceToward: Vector3): Group {
 }
 
 /**
- * Advance the ring swirl to the given clock time. Pure in `timeMs`. Safe
- * to call every frame (a closed/scale-0 portal just spins invisibly).
+ * Advance the ring swirl + inner-ring pulse to the given clock time.
+ * Pure in `timeMs` (a permanent animation, independent of scroll). Safe
+ * to call every frame (a closed/scale-0 portal just animates invisibly).
  */
 export function updatePortalSpin(portal: Object3D, timeMs: number): void {
   const t = timeMs / 1000;
@@ -77,6 +81,10 @@ export function updatePortalSpin(portal: Object3D, timeMs: number): void {
     const spin = child.userData.spin as number | undefined;
     if (spin !== undefined) {
       child.rotation.z = t * spin * 0.6;
+    }
+    if (child.userData.pulse === true) {
+      // Breathing scale on the inner ring — always playing.
+      child.scale.setScalar(1 + Math.sin(t * 2.6) * 0.14);
     }
   }
 }

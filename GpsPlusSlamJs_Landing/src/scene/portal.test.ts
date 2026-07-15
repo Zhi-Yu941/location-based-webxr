@@ -81,4 +81,20 @@ describe("updatePortalSpin", () => {
       Math.sign(rings[1]!.rotation.z),
     );
   });
+
+  it("pulses the inner ring permanently within a gentle band", () => {
+    const p = buildForestPortal(ANCHOR, FACE);
+    const inner = p.children.find((c) => c.userData.pulse === true);
+    expect(inner).toBeDefined();
+    updatePortalSpin(p, 0);
+    const s0 = inner!.scale.x;
+    updatePortalSpin(p, 600); // ~near the sine peak → clearly different
+    expect(Math.abs(inner!.scale.x - s0)).toBeGreaterThan(0.05);
+    // Always breathing, never a wild swing.
+    for (let t = 0; t <= 4000; t += 100) {
+      updatePortalSpin(p, t);
+      expect(inner!.scale.x).toBeGreaterThan(0.8);
+      expect(inner!.scale.x).toBeLessThan(1.2);
+    }
+  });
 });

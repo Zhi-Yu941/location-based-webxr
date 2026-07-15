@@ -400,17 +400,17 @@ describe("buildStoryTimeline", () => {
     const portal = stage.world.getObjectByName("forest-portal");
     expect(portal).toBeDefined();
 
-    timeline.seek(3600); // before the works-anywhere moment: closed
+    timeline.seek(3900); // works-anywhere copy only entering: still closed
     expect(portal!.scale.x).toBeLessThan(0.01);
 
-    timeline.seek(4250); // far out, forest in frame: portal open
+    timeline.seek(4650); // box a big part of the screen: portal open
     expect(portal!.scale.x).toBeGreaterThan(0.9);
 
-    timeline.seek(4950); // camera has turned to the city: closed again
+    timeline.seek(5200); // camera has turned to the city: closed again
     expect(portal!.scale.x).toBeLessThan(0.01);
 
     // Scrub back re-closes it (explicit {from,to} contract).
-    timeline.seek(3600);
+    timeline.seek(3900);
     expect(portal!.scale.x).toBeLessThan(0.01);
   });
 

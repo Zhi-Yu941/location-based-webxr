@@ -1,23 +1,210 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0"
-    />
-    <title>GPS+SLAM — Location-Based WebXR Framework</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Location-based WebXR — install-free AR in the mobile browser</title>
     <meta
       name="description"
-      content="Build location-based AR experiences on the web. An Apache-2.0 framework plus a reference recorder app, fusing GPS with WebXR odometry for sub-meter, install-free AR in the mobile browser."
+      content="Build location-based AR experiences on the web. An Apache-2.0 framework plus demo apps, fusing GPS with WebXR odometry for install-free AR in the mobile browser — one URL, no app."
     />
+    <!-- Social cards (v2 B7). og:url/og:image MUST be absolute — they
+         hardcode the production origin (gps.csutil.com, base "/" in
+         scripts/build-site.mjs). The image is a curated `pnpm run shoot`
+         capture of the fusion chapter (dark), checked in statically at
+         public/og-card.png; regenerate + recommit when the scene or copy
+         changes materially. Verify with a card validator after deploy. -->
+    <meta
+      property="og:title"
+      content="Location-based WebXR — install-free AR in the mobile browser"
+    />
+    <meta
+      property="og:description"
+      content="GPS alone is too inaccurate for AR — so we fused it with WebXR tracking. Fully offline, no cloud positioning service. One URL, no app."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://gps.csutil.com/" />
+    <meta property="og:image" content="https://gps.csutil.com/og-card.png" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="800" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://gps.csutil.com/og-card.png" />
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='%23ef4444'/%3E%3Ccircle cx='50' cy='50' r='15' fill='%23fff'/%3E%3C/svg%3E"
       type="image/svg+xml"
     />
+    <script>
+      // FOUC guard: apply the persisted (or OS-preferred) theme before first
+      // paint. src/theme.ts re-derives the same value with the same rules and
+      // stays the source of truth after boot.
+      (function () {
+        try {
+          var valid = ["light", "dark", "neon", "dusk", "mono", "terminal"];
+          var stored = localStorage.getItem("gps-landing-theme");
+          var theme =
+            valid.indexOf(stored) >= 0
+              ? stored
+              : window.matchMedia &&
+                  window.matchMedia("(prefers-color-scheme: light)").matches
+                ? "light"
+                : "dark";
+          document.documentElement.dataset.theme = theme;
+        } catch (_e) {
+          /* keep the html default */
+        }
+      })();
+    </script>
     <style>
       :root {
+        --accent: #ef4444;
+        --accent-hover: #dc2626;
+      }
+      html[data-theme="dark"] {
+        --bg: #0b0b0d;
+        --text: #e7e7ea;
+        --muted: #b6b6bd;
+        --hl-raw: #facc15;
+        --hl-code: #fbbf24;
+        --hl-kw: #93c5fd;
+        --hl-lit: #86efac;
+        --hl-ar: #60a5fa;
+        --hl-story: #c084fc;
+        --hl-portal: #38bdf8;
+        --hl-parkour: #4ade80;
+        --panel: rgb(19 19 23 / 62%);
+        --panel-border: rgb(255 255 255 / 10%);
+        --panel-border-hi: rgb(255 255 255 / 30%);
+        --hl-glow-raw: 0 0 18px rgb(250 204 21 / 35%);
+        --hl-glow-fused: 0 0 18px rgb(239 68 68 / 45%);
+        --card: #1b1b20;
+        --card-border: #34343c;
+        --card-hover: #24242b;
+        --link: #9db8ff;
+        --veil: #0b0b0d;
+
+        color-scheme: dark;
+      }
+      html[data-theme="light"] {
+        --bg: #f2f1ed;
+        --text: #1b1b20;
+        --muted: #5a5a63;
+        --hl-raw: #a16207;
+        --hl-code: #b45309;
+        --hl-kw: #1d4ed8;
+        --hl-lit: #15803d;
+        --hl-ar: #3b82f6;
+        --hl-story: #7c3aed;
+        --hl-portal: #0ea5e9;
+        --hl-parkour: #16a34a;
+        --panel: rgb(255 255 255 / 66%);
+        --panel-border: rgb(0 0 0 / 8%);
+        --panel-border-hi: rgb(0 0 0 / 20%);
+        --card: #fff;
+        --card-border: #ddd9d2;
+        --card-hover: #f6f4f0;
+        --link: #2954cc;
+        --veil: #f2f1ed;
+
+        color-scheme: light;
+      }
+      html[data-theme="neon"] {
+        --bg: #05060e;
+        --text: #e6ebff;
+        --muted: #9aa5d9;
+        --hl-raw: #facc15;
+        --hl-code: #fbbf24;
+        --hl-kw: #67e8f9;
+        --hl-lit: #86efac;
+        --hl-ar: #22d3ee;
+        --hl-story: #e879f9;
+        --hl-portal: #22d3ee;
+        --hl-parkour: #4ade80;
+        --panel: rgb(10 12 28 / 62%);
+        --panel-border: rgb(120 140 255 / 18%);
+        --panel-border-hi: rgb(120 240 255 / 50%);
+        --hl-glow-raw: 0 0 18px rgb(250 204 21 / 40%);
+        --hl-glow-fused: 0 0 20px rgb(239 68 68 / 55%);
+        --card: #10142a;
+        --card-border: #2b3050;
+        --card-hover: #181d38;
+        --link: #67e8f9;
+        --veil: #05060e;
+
+        color-scheme: dark;
+      }
+      html[data-theme="dusk"] {
+        --bg: #2a1a3e;
+        --text: #ffeadd;
+        --muted: #d9b8a8;
+        --hl-raw: #fcd34d;
+        --hl-code: #fbbf24;
+        --hl-kw: #93c5fd;
+        --hl-lit: #a7f3d0;
+        --hl-ar: #60a5fa;
+        --hl-story: #d8b4fe;
+        --hl-portal: #38bdf8;
+        --hl-parkour: #34d399;
+        --panel: rgb(42 26 62 / 62%);
+        --panel-border: rgb(255 176 138 / 18%);
+        --panel-border-hi: rgb(255 176 138 / 50%);
+        --hl-glow-raw: 0 0 18px rgb(252 211 77 / 40%);
+        --hl-glow-fused: 0 0 20px rgb(239 68 68 / 50%);
+        --card: #3a2a55;
+        --card-border: #5d4680;
+        --card-hover: #47356a;
+        --link: #93c5fd;
+        --veil: #2a1a3e;
+
+        color-scheme: dark;
+      }
+      html[data-theme="mono"] {
+        --bg: #f5f5f2;
+        --text: #1a1a18;
+        --muted: #5f5f5a;
+        --hl-raw: #a16207;
+        --hl-code: #b45309;
+        --hl-kw: #1d4ed8;
+        --hl-lit: #15803d;
+        --hl-ar: #2563eb;
+        --hl-story: #6d28d9;
+        --hl-portal: #0284c7;
+        --hl-parkour: #15803d;
+        --panel: rgb(255 255 255 / 66%);
+        --panel-border: rgb(0 0 0 / 10%);
+        --panel-border-hi: rgb(0 0 0 / 24%);
+        --card: #fff;
+        --card-border: #d5d5cf;
+        --card-hover: #efefe9;
+        --link: #2563eb;
+        --veil: #f5f5f2;
+
+        color-scheme: light;
+      }
+      /* TERMINAL (hidden 6th palette, easter-egg №4): retro CRT chrome —
+         near-black with phosphor-green text. Reached only after the
+         rapid-cycle unlock; the 3D palette matches (scene/palette.ts). */
+      html[data-theme="terminal"] {
+        --bg: #030904;
+        --text: #3f6;
+        --muted: #2aa64a;
+        --hl-raw: #facc15;
+        --hl-code: #fbbf24;
+        --hl-kw: #60a5fa;
+        --hl-lit: #3f6;
+        --hl-ar: #60a5fa;
+        --hl-story: #c084fc;
+        --hl-portal: #38bdf8;
+        --hl-parkour: #4ade80;
+        --panel: rgb(8 22 12 / 70%);
+        --panel-border: rgb(51 255 102 / 22%);
+        --panel-border-hi: rgb(51 255 102 / 50%);
+        --card: #08160c;
+        --card-border: #164026;
+        --card-hover: #0d2414;
+        --link: #60a5fa;
+        --veil: #030904;
+
         color-scheme: dark;
       }
       * {
@@ -27,101 +214,733 @@
       body {
         margin: 0;
         padding: 0;
-        background: #0b0b0d;
-        color: #e7e7ea;
+        height: 100%;
+        /* The DOCUMENT never scrolls — <main> is the scroller (below).
+           This keeps the mobile browser bar stationary and prevents the
+           URL-bar collapse/expand viewport resizes that would remap
+           scroll progress mid-gesture (round-1 feedback F1b/F3). */
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
         font-family:
           system-ui,
           -apple-system,
-          Segoe UI,
+          "Segoe UI",
           Roboto,
           sans-serif;
         line-height: 1.55;
       }
+
+      /* Fixed 3D stage behind the scrolling copy. Sized to the LARGE
+         viewport (100lvh): if the mobile browser bar does collapse, the
+         canvas is already painted behind it — no black band (round-2 R2). */
+      #scene-root {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        /* stylelint-disable-next-line csstree/validator -- lvh is a valid viewport unit; the bundled css-tree grammar predates it (false positive). */
+        height: 100lvh;
+        z-index: 0;
+      }
+      #scene-root canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      body.no-webgl #scene-root {
+        display: none;
+      }
+
+      /* The "normal landing page first" veil (round-2 R4): a gradient that
+         hides most of the 3D world at the top; src/hero-veil.ts drives its
+         opacity from scroll progress (back and forth, no latch). */
+      #hero-veil {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        /* stylelint-disable-next-line csstree/validator -- lvh is a valid viewport unit; the bundled css-tree grammar predates it (false positive). */
+        height: 100lvh;
+        z-index: 1;
+        pointer-events: none;
+        background: linear-gradient(
+          to bottom,
+          var(--veil) 0%,
+          var(--veil) 32%,
+          transparent 80%
+        );
+      }
+      body.no-webgl #hero-veil {
+        display: none;
+      }
+
+      /* On small screens (mobile portrait AND landscape) the hero copy
+         fills most of the viewport — extend the veil so the panel-less
+         hero text always sits on a calm backdrop; only the bottom edge
+         hints the 3D world until scrolling lifts the veil. */
+      @media (width <= 600px), (height <= 500px) {
+        #hero-veil {
+          /* Round-14 R14-2: fade a touch earlier (72%→62%) and reach
+             transparent before the very bottom (100%→96%) so a bit more
+             of the 3D world peeks through low on the hero — a nudge to
+             scroll. */
+          background: linear-gradient(
+            to bottom,
+            var(--veil) 0%,
+            var(--veil) 62%,
+            transparent 96%
+          );
+        }
+      }
+
+      .top-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 3;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 18px;
+        pointer-events: none;
+      }
+      .brand {
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        font-size: 0.95rem;
+        color: var(--muted);
+      }
+      #theme-toggle {
+        pointer-events: auto;
+        border: 1px solid var(--card-border);
+        background: var(--panel);
+        color: var(--text);
+        border-radius: 999px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        cursor: pointer;
+      }
+      #theme-toggle:hover {
+        background: var(--card-hover);
+      }
+
       main {
-        max-width: 760px;
-        margin: 0 auto;
-        padding: 48px 20px 64px;
+        /* The page's one and only scroller (see html/body overflow note).
+           bottom: -1px makes it 1px TALLER than the viewport on purpose:
+           Android Chrome promotes an EXACTLY viewport-filling scroller to
+           the "implicit root scroller", which re-attaches the URL-bar
+           show/hide heuristics (the round-2 R2 bar sliding + scene jumps).
+           Off-by-one defeats the promotion so the bar stays put. */
+        position: fixed;
+        inset: 0 0 -1px;
+        overflow-y: auto;
+        z-index: 2;
       }
-      header {
-        text-align: center;
-        margin-bottom: 36px;
+      .chapter {
+        min-height: 130vh;
+        display: flex;
+        align-items: center;
+        padding: 8vh 20px;
       }
-      h1 {
-        font-size: clamp(1.9rem, 5vw, 2.6rem);
+      .chapter:first-of-type {
+        min-height: 100vh;
+      }
+      .copy {
+        max-width: 460px;
+        /* Round-14 R14-4 default: full highlight color unless the scroll
+           driver lowers it (no-JS / reduced-motion stay full-color). */
+        --hl-strength: 1;
+        /* Gradient border (v3 F5): translucent panel fill over a border-
+           box gradient — the border stays visible through the glass. */
+        background:
+          linear-gradient(var(--panel), var(--panel)) padding-box,
+          linear-gradient(
+              160deg,
+              var(--panel-border-hi),
+              var(--panel-border) 55%
+            )
+            border-box;
+        border: 1px solid transparent;
+        border-radius: 16px;
+        padding: 26px 28px;
+        backdrop-filter: blur(12px) saturate(150%);
+        margin-left: 6vw;
+        opacity: 0.55;
+        /* Entrance (v3 F5): soft rise+fade instead of the bare opacity
+           toggle. The panel stays VISIBLE at all times (opacity floor +
+           small offset), so e2e visibility checks are unaffected. */
+        transform: translateY(14px);
+        transition:
+          opacity 0.35s ease,
+          transform 0.45s ease;
+      }
+      body.no-webgl .copy {
+        backdrop-filter: none;
+        opacity: 1;
+        transform: none;
+      }
+      .chapter.active .copy {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .chapter:nth-of-type(even) .copy {
+        margin-left: auto;
+        margin-right: 6vw;
+      }
+
+      /* Phone LANDSCAPE (round-16): give the 3D world room beside the copy.
+         At the full 460px the panel owns ~60% of a 915px-wide landscape
+         frame, which swallows whatever the camera frames near the centre —
+         and the journey's tent camp has to be centred (round-16: "look more
+         on the center of the tents") for portrait to work at all. Camera
+         work cannot satisfy both: landscape's panel obstructs a SIDE while
+         portrait's obstructs the vertical MIDDLE. Narrowing the panel here
+         is the fix that lets ONE camera framing serve both orientations. */
+      @media (orientation: landscape) and (height <= 560px) {
+        .copy {
+          max-width: 340px;
+          font-size: 0.94rem;
+        }
+        .chapter:nth-of-type(even) .copy {
+          margin-right: 3vw;
+        }
+      }
+      .copy h1 {
+        /* stylelint-disable-next-line csstree/validator -- clamp() is valid CSS; the bundled css-tree grammar rejects math functions (false positive). */
+        font-size: clamp(2rem, 6vw, 3rem);
         margin: 0 0 12px;
         letter-spacing: -0.02em;
+        line-height: 1.15;
       }
-      .tagline {
-        font-size: 1.1rem;
-        color: #b6b6bd;
-        margin: 0 auto;
-        max-width: 620px;
+      .copy h2 {
+        /* stylelint-disable-next-line csstree/validator -- clamp() is valid CSS; the bundled css-tree grammar rejects math functions (false positive). */
+        font-size: clamp(1.4rem, 4vw, 1.9rem);
+        margin: 0 0 10px;
+        letter-spacing: -0.01em;
+        line-height: 1.2;
       }
-      .actions {
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-        margin: 36px 0;
-      }
-      .btn {
-        display: block;
-        text-decoration: none;
-        text-align: center;
-        padding: 16px 20px;
-        border-radius: 12px;
+      .copy p {
+        margin: 0;
+        color: var(--muted);
         font-size: 1.05rem;
+      }
+      .copy ul {
+        margin: 10px 0 0;
+        padding-left: 1.2em;
+        color: var(--muted);
+        font-size: 0.98rem;
+      }
+      .copy li {
+        margin: 4px 0;
+      }
+      .scroll-hint {
+        margin-top: 18px;
+        font-size: 0.9rem;
+        color: var(--accent);
         font-weight: 600;
-        border: 1px solid transparent;
-        transition:
-          background 0.15s ease,
-          border-color 0.15s ease;
+      }
+
+      /* Hero: a normal-looking landing page (no glass panel). Round-14
+         R14-1: raised from 30vh — on a portrait phone the block sat so
+         low its last line ("Scroll to walk in") hit the bottom edge with
+         a big empty gap above the H1; 15vh reclaims most of that gap
+         while still leaving breathing room over the headline. */
+      .chapter.hero {
+        display: block;
+        min-height: 112vh;
+        padding-top: 15vh;
+      }
+      .hero-content {
+        max-width: 760px;
+        margin-left: 8vw;
+        padding-right: 20px;
+      }
+      .hero-content h1 {
+        /* stylelint-disable-next-line csstree/validator -- clamp() is valid CSS; the bundled css-tree grammar rejects math functions (false positive). */
+        font-size: clamp(2.1rem, 6.5vw, 3.4rem);
+        margin: 0 0 16px;
+        letter-spacing: -0.02em;
+        line-height: 1.12;
+      }
+      .hero-sub {
+        margin: 0 0 20px;
+        max-width: 620px;
+        color: var(--muted);
+        font-size: 1.12rem;
+      }
+      .hero-points {
+        list-style: none;
+        margin: 0 0 26px;
+        padding: 0;
+      }
+      .hero-points li {
+        margin: 7px 0;
+        padding-left: 1.1em;
+        position: relative;
+        color: var(--text);
+        font-size: 1.02rem;
+      }
+      .hero-points li::before {
+        content: "—";
+        position: absolute;
+        left: 0;
+        color: var(--muted);
+      }
+      .hero-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 22px;
+        align-items: center;
+        margin: 0;
+      }
+      .hero-links .scroll-hint {
+        margin-top: 0;
+      }
+      #jump-demos {
+        color: var(--link);
+        text-decoration: none;
+        font-size: 0.95rem;
+        font-weight: 600;
+      }
+      #jump-demos:hover {
+        text-decoration: underline;
+      }
+
+      /* Subtle full-page grain (v3 F5): a tiny tiled SVG noise, fixed
+         over everything, pointer-transparent. Kills banding in the big
+         soft gradients without reading as dirt. */
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 6;
+        pointer-events: none;
+        opacity: 0.035;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      }
+
+      /* Copy highlights color-matched to the 3D elements they describe
+         (round-1 feedback): raw-GPS rings + QR modules = amber family,
+         fused anchor = brand red. */
+      .hl-raw {
+        color: var(--hl-raw);
+      }
+      .hl-code {
+        color: var(--hl-code);
+      }
+      .hl-fused {
+        color: var(--accent);
+      }
+      /* AR-overlay blue (round-14 R14-5/7/8): words tied to the blue AR
+         content on screen — the flown-in phone frame, the tent-path
+         arrows, the castle ghost. Matches the 3D `arrow` role per palette. */
+      .hl-ar {
+        color: var(--hl-ar);
+      }
+      /* AR label/story violet (round-14 R14-6): the "hinted text" label
+         bars in the 3D scene use a distinct violet (not the arrow blue);
+         the copy word "stories" fades to match. */
+      .hl-story {
+        color: var(--hl-story);
+      }
+      /* Forest portal cyan (round-14 R14-10): the word "magic portal"
+         fades to the portal's distinct cyan as it opens in the forest. */
+      .hl-portal {
+        color: var(--hl-portal);
+      }
+      /* Parkour green (round-14 R14-12): the word "jump-and-run parkour"
+         fades to the green of the park's parkour-course blocks. */
+      .hl-parkour {
+        color: var(--hl-parkour);
+      }
+
+      /* Round-14 R14-4: in the scrolling COPY blocks (not the hero, not
+         the snippet) the color-coded words fade from plain text color to
+         their target as the block rises toward the top — scroll-color.ts
+         writes --hl-strength (0 low on screen → 1 in the top band) per
+         .copy (default 1 = full color, so no-JS / reduced-motion keep the
+         current look). Placed here so specificity stays ascending. */
+      .copy .hl-raw {
+        /* stylelint-disable-next-line csstree/validator -- color-mix is valid CSS; the bundled css-tree grammar predates it (false positive). */
+        color: color-mix(
+          in srgb,
+          var(--hl-raw) calc(var(--hl-strength) * 100%),
+          var(--text)
+        );
+      }
+      .copy .hl-code {
+        /* stylelint-disable-next-line csstree/validator -- color-mix is valid CSS; the bundled css-tree grammar predates it (false positive). */
+        color: color-mix(
+          in srgb,
+          var(--hl-code) calc(var(--hl-strength) * 100%),
+          var(--text)
+        );
+      }
+      .copy .hl-fused {
+        /* stylelint-disable-next-line csstree/validator -- color-mix is valid CSS; the bundled css-tree grammar predates it (false positive). */
+        color: color-mix(
+          in srgb,
+          var(--accent) calc(var(--hl-strength) * 100%),
+          var(--text)
+        );
+      }
+      .copy .hl-ar {
+        /* stylelint-disable-next-line csstree/validator -- color-mix is valid CSS; the bundled css-tree grammar predates it (false positive). */
+        color: color-mix(
+          in srgb,
+          var(--hl-ar) calc(var(--hl-strength) * 100%),
+          var(--text)
+        );
+      }
+      .copy .hl-story {
+        /* stylelint-disable-next-line csstree/validator -- color-mix is valid CSS; the bundled css-tree grammar predates it (false positive). */
+        color: color-mix(
+          in srgb,
+          var(--hl-story) calc(var(--hl-strength) * 100%),
+          var(--text)
+        );
+      }
+      .copy .hl-portal {
+        /* stylelint-disable-next-line csstree/validator -- color-mix is valid CSS; the bundled css-tree grammar predates it (false positive). */
+        color: color-mix(
+          in srgb,
+          var(--hl-portal) calc(var(--hl-strength) * 100%),
+          var(--text)
+        );
+      }
+      .copy .hl-parkour {
+        /* stylelint-disable-next-line csstree/validator -- color-mix is valid CSS; the bundled css-tree grammar predates it (false positive). */
+        color: color-mix(
+          in srgb,
+          var(--hl-parkour) calc(var(--hl-strength) * 100%),
+          var(--text)
+        );
+      }
+
+      /* Faint hero text glows (v3 F5): defined only where the dark
+         palettes set the --hl-glow-* vars; light palettes fall back to
+         none. Echoes the 3D bloom on the same color-coded elements. */
+      .hero-content h1 .hl-raw {
+        text-shadow: var(--hl-glow-raw, none);
+      }
+      .hero-content h1 .hl-fused {
+        text-shadow: var(--hl-glow-fused, none);
+      }
+      /* Snippet-only token colors (v2 B3): keywords + literals get their
+         own per-palette vars; API color-coding reuses the page invariant
+         (createGpsAnchor = fused red, GPS coordinates = raw amber). */
+      .hl-kw {
+        color: var(--hl-kw);
+      }
+      .hl-lit {
+        color: var(--hl-lit);
+      }
+
+      /* Hero code snippet (v2 B3/B9): the real Framework-Minimal API
+         sequence, hand-highlighted — no highlighter dependency. */
+      .hero-snippet {
+        margin: 0 0 26px;
+        max-width: 660px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 12px;
+        padding: 14px 18px;
+        backdrop-filter: blur(10px);
+        overflow-x: auto;
+      }
+      .hero-snippet pre {
+        margin: 10px 0 0;
+        font-family: ui-monospace, SFMono-Regular, Consolas, Menlo, monospace;
+        font-size: 0.8rem;
+        line-height: 1.6;
+        color: var(--text);
+      }
+      .hero-snippet .c {
+        color: var(--muted);
+      }
+
+      /* Short desktop viewports: with the snippet in place, the default
+         30vh hero offset would push the scroll hint below the fold —
+         start the hero higher so the affordance stays visible. */
+      @media (width > 720px) and (height <= 860px) {
+        .chapter.hero {
+          padding-top: 18vh;
+        }
+      }
+
+      /* CTA chapter: centered, no side panel offset. */
+      #chapter-cta {
+        display: block;
+        padding-top: 14vh;
+      }
+      #chapter-cta .copy {
+        margin: 0 auto;
+        max-width: 720px;
+        text-align: center;
       }
       .btn-primary {
-        background: #ef4444;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 18px;
+        text-decoration: none;
+        background: var(--accent);
         color: #fff;
+        font-weight: 600;
+        font-size: 1.05rem;
+        padding: 14px 26px;
+        border-radius: 12px;
+        transition:
+          background 0.15s ease,
+          transform 0.15s ease,
+          box-shadow 0.15s ease;
+      }
+      .btn-primary svg {
+        width: 18px;
+        height: 18px;
+        fill: currentcolor;
       }
       .btn-primary:hover {
-        background: #dc2626;
+        background: var(--accent-hover);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 18px rgb(239 68 68 / 30%);
       }
-      .btn-secondary {
-        background: #1b1b20;
-        color: #e7e7ea;
-        border-color: #34343c;
+      .btn-primary:active {
+        transform: translateY(0) scale(0.98);
+        box-shadow: none;
       }
-      .btn-secondary:hover {
-        background: #24242b;
-        border-color: #44444e;
+      .demos {
+        max-width: 720px;
+        margin: 26px auto 0;
       }
-      .btn small {
+      .demos h3 {
+        text-align: center;
+        font-size: 1rem;
+        color: var(--muted);
+        margin: 0 0 14px;
+        font-weight: 600;
+      }
+      .demo-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      @media (width >= 720px) {
+        .demo-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      /* Demo cards must LOOK clickable (round-2 R17): elevation, press
+         states and a trailing chevron distinguish them from the blurred
+         copy panels. */
+      .demo-card {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        text-decoration: none;
+        background: var(--card);
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        padding: 14px 16px;
+        color: var(--text);
+        box-shadow: 0 2px 10px rgb(0 0 0 / 14%);
+        transition:
+          transform 0.12s ease,
+          border-color 0.12s ease,
+          background 0.12s ease;
+      }
+      .demo-card::after {
+        content: "›";
+        margin-left: auto;
+        align-self: center;
+        color: var(--accent);
+        font-size: 1.6rem;
+        line-height: 1;
+        transition: transform 0.15s ease;
+      }
+      .demo-card:hover {
+        background: var(--card-hover);
+        border-color: var(--accent);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgb(0 0 0 / 22%);
+      }
+      .demo-card:hover::after {
+        transform: translateX(3px);
+      }
+      .demo-card:active {
+        transform: translateY(0) scale(0.99);
+      }
+      .demo-card svg {
+        flex: 0 0 auto;
+        width: 34px;
+        height: 34px;
+        margin-top: 2px;
+      }
+      .demo-card strong {
         display: block;
-        font-weight: 400;
+        font-size: 1rem;
+        margin-bottom: 2px;
+      }
+      .demo-card small {
+        color: var(--muted);
         font-size: 0.85rem;
-        color: #cfcfd6;
-        margin-top: 4px;
+        line-height: 1.4;
       }
-      .btn-secondary small {
-        color: #9a9aa3;
+      /* Flagship demo (round-14 R14-17): the Recorder App is the fullest
+         example — a faint accent tint + slightly stronger border mark it
+         as special without breaking the card grid. */
+      .demo-card-flagship {
+        border-color: rgb(239 68 68 / 40%);
+        background:
+          linear-gradient(rgb(239 68 68 / 7%), rgb(239 68 68 / 7%)), var(--card);
       }
-      section {
-        margin-top: 32px;
+
+      /* Desktop→phone QR handoff (v2 B2); kept after .demo-card svg for
+         the no-descending-specificity lint order. */
+      #qr-handoff {
+        margin: 20px auto 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
       }
-      h2 {
-        font-size: 1.15rem;
-        margin: 0 0 10px;
-        color: #f2f2f5;
+      #qr-handoff[hidden] {
+        display: none;
       }
-      ul {
+      #qr-handoff svg {
+        width: 132px;
+        height: 132px;
+        /* White backing plate keeps the code scannable on dark palettes
+           (the padding doubles as extra quiet zone). */
+        background: #fff;
+        padding: 8px;
+        border-radius: 10px;
+      }
+      .qr-caption {
         margin: 0;
-        padding-left: 1.2em;
+        color: var(--muted);
+        font-size: 0.85rem;
+        font-weight: 600;
       }
-      li {
-        margin: 6px 0;
-        color: #c4c4cc;
+
+      /* Easter-egg toast (catalog №1): the eggs' only feedback channel —
+         a transient status pill above the page chrome, voiced like the
+         .qr-caption. Created lazily by egg-toast.ts; .visible drives the
+         fade so CSS owns the motion. */
+      #egg-toast {
+        position: fixed;
+        left: 50%;
+        bottom: 26px;
+        transform: translate(-50%, 8px);
+        z-index: 30;
+        padding: 10px 18px;
+        border-radius: 999px;
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        backdrop-filter: blur(10px);
+        color: var(--text);
+        font-size: 0.85rem;
+        font-weight: 600;
+        opacity: 0;
+        pointer-events: none;
+        transition:
+          opacity 0.35s ease,
+          transform 0.35s ease;
       }
+      #egg-toast.visible {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+
+      /* Compact FAQ accordions (v2 B6): native <details>, card-styled to
+         match the demo grid. */
+      .faq {
+        max-width: 720px;
+        margin: 34px auto 0;
+      }
+      .faq h3 {
+        text-align: center;
+        font-size: 1rem;
+        color: var(--muted);
+        margin: 0 0 14px;
+        font-weight: 600;
+      }
+      .faq details {
+        background: var(--card);
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        padding: 12px 16px;
+        margin: 0 0 10px;
+      }
+      .faq summary {
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.98rem;
+      }
+      /* Round-9 R9-5: the hero snippet is a <details> expander —
+         collapsed by default (phones keep their fold), opened at boot on
+         desktop. Plain summary rules sit BEFORE the :hover ones for the
+         no-descending-specificity lint order. */
+      .hero-snippet summary {
+        cursor: pointer;
+        font-family: ui-monospace, SFMono-Regular, Consolas, Menlo, monospace;
+        font-size: 0.8rem;
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .faq summary:hover {
+        color: var(--accent);
+      }
+      .hero-snippet summary:hover {
+        color: var(--text);
+      }
+      .faq p {
+        margin: 10px 0 2px;
+        color: var(--muted);
+        font-size: 0.95rem;
+        line-height: 1.5;
+      }
+      /* License FAQ (round-14 R14-21): looks like a collapsed FAQ row but
+         is an anchor that OPENS the repo LICENSE in a new tab instead of
+         expanding. It must be VISUALLY IDENTICAL to the <summary> rows
+         (portrait feedback: it must not stand out) — so it takes the same
+         --text color, NOT the --link blue. (The old `.faq a { color:
+         var(--link) }` rule was dropped; it only ever matched this link
+         and made it stand out.) */
+      .faq-link {
+        display: block;
+        background: var(--card);
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        padding: 12px 16px;
+        margin: 0 0 10px;
+        font-weight: 600;
+        font-size: 0.98rem;
+        color: var(--text);
+        text-decoration: none;
+      }
+      .faq-link::before {
+        content: "▸ ";
+      }
+      .faq-link:hover {
+        color: var(--accent);
+        border-color: var(--accent);
+      }
+
       .links {
-        margin-top: 40px;
-        padding-top: 24px;
-        border-top: 1px solid #26262c;
+        max-width: 720px;
+        margin: 34px auto 0;
+        padding-top: 20px;
+        /* Terminal spacing of the story: the removed license footer used to
+           carry the page's closing 48px (round-3 F-drop). */
+        padding-bottom: 48px;
+        border-top: 1px solid var(--card-border);
         display: flex;
         flex-wrap: wrap;
         gap: 18px;
@@ -129,122 +948,478 @@
         font-size: 0.95rem;
       }
       .links a {
-        color: #9db8ff;
+        color: var(--link);
         text-decoration: none;
       }
       .links a:hover {
         text-decoration: underline;
       }
-      footer {
-        margin-top: 40px;
-        text-align: center;
-        font-size: 0.82rem;
-        color: #7a7a83;
+
+      /* Chapter progress dots (v3 F6): fixed rail on the right edge;
+         active dot = accent. On phones the rail shrinks and hugs the
+         edge tighter (checked by screenshot). */
+      #chapter-dots {
+        position: fixed;
+        right: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 3;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
       }
-      code {
-        background: #1b1b20;
-        padding: 1px 6px;
-        border-radius: 5px;
-        font-size: 0.9em;
+      #chapter-dots:empty {
+        display: none;
+      }
+      #chapter-dots button {
+        width: 11px;
+        height: 11px;
+        padding: 0;
+        border-radius: 50%;
+        border: 1px solid var(--panel-border-hi);
+        background: var(--panel);
+        cursor: pointer;
+        transition:
+          background 0.2s ease,
+          transform 0.2s ease;
+      }
+      #chapter-dots button:hover {
+        transform: scale(1.3);
+      }
+      #chapter-dots button.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        transform: scale(1.25);
+      }
+
+      @media (width <= 600px) {
+        #chapter-dots {
+          right: 5px;
+          gap: 8px;
+        }
+        #chapter-dots button {
+          width: 8px;
+          height: 8px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .scroll-hint {
+          animation: none;
+        }
+
+        #chapter-dots button,
+        #chapter-dots button:hover,
+        #chapter-dots button.active {
+          transition: none;
+          transform: none;
+        }
+
+        /* v3 F5: entrance + micro-interaction motion off; static
+           compositions stay complete (opacity change only). */
+        .copy {
+          transform: none;
+          transition: opacity 0.35s ease;
+        }
+        .btn-primary,
+        .demo-card,
+        .demo-card::after {
+          transition: none;
+        }
+        .btn-primary:hover,
+        .demo-card:hover,
+        .demo-card:hover::after {
+          transform: none;
+        }
       }
     </style>
   </head>
   <body>
-    <main>
-      <header>
-        <h1>GPS+SLAM — Location-Based WebXR</h1>
-        <p class="tagline">
-          Build location-based Augmented Reality experiences that run in the
-          mobile browser — no app install. An Apache-2.0 framework fuses GPS
-          with WebXR odometry so content can sit on a specific spot on a path,
-          a wall, or the ground, with accuracy beyond raw GPS.
-        </p>
-      </header>
+    <div id="scene-root" aria-hidden="true"></div>
+    <div id="hero-veil" aria-hidden="true"></div>
 
-      <div class="actions">
-        <a class="btn btn-primary" href="/starter/">
-          Anchor Starter Demo
-          <small
-            >Place a GPS anchor, reload, and watch it re-localise at the exact
-            physical spot.</small
-          >
-        </a>
-        <a class="btn btn-secondary" href="/minimal/">
-          Minimal Example
-          <small
-            >The smallest three.js + GPS+AR starting point: tap to place a GPS
-            anchor next to a naive floater and watch the difference.</small
-          >
-        </a>
-        <a class="btn btn-secondary" href="/qr-demo/">
-          QR-Tracking Demo
-          <small
-            >Point at any printed QR code: it measures the code's real size from
-            the depth map and glues a 3D axis + cube to it — no GPS needed.</small
-          >
-        </a>
-        <a class="btn btn-secondary" href="/recorder/">
-          Recorder
-          <small
-            >The full app to evaluate tracking accuracy: capture AR + GPS
-            sessions on a phone, replay and inspect alignment on a
-            desktop.</small
-          >
-        </a>
-      </div>
+    <header class="top-bar">
+      <span class="brand">Location-based WebXR</span>
+      <button id="theme-toggle" type="button" aria-label="Switch color palette">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <path
+            d="M12 3a9 9 0 1 0 0 18h1.6a2.3 2.3 0 0 0 1.7-3.9c-.9-1-.2-2.6 1.2-2.6H19a3 3 0 0 0 3-3c0-4.7-4.5-8.5-10-8.5z"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.7"
+          />
+          <circle cx="7.5" cy="10.5" r="1.3" fill="currentColor" />
+          <circle cx="12" cy="7.5" r="1.3" fill="currentColor" />
+          <circle cx="16.5" cy="10.5" r="1.3" fill="currentColor" />
+        </svg>
+      </button>
+    </header>
 
-      <section>
-        <h2>Why GPS+SLAM?</h2>
-        <ul>
-          <li>
-            <strong>Accuracy beyond raw GPS:</strong> fuses GPS with the
-            device's AR odometry, so alignment gets more stable as the user
-            walks — visible drift drops well below raw GPS.
-          </li>
-          <li>
-            <strong>Just a URL, no app install:</strong> the whole experience
-            runs in the mobile browser through WebXR.
-          </li>
-          <li>
-            <strong>Fully offline alignment:</strong> localises from the
-            device's own GPS, camera tracking, and motion sensors — no VPS
-            provider or network scan of the place required.
-          </li>
-          <li>
-            <strong>Anchors for shareable content:</strong> tie objects to a
-            GPS coordinate for replay, persistence, and sharing.
-          </li>
-        </ul>
+    <!-- Chapter progress dots (v3 F6): ships empty, src/chapter-dots.ts
+         fills it at boot (progressive enhancement — harmless without
+         JS). Labels from chapters.ts become the aria-labels. -->
+    <nav id="chapter-dots" aria-label="Story chapters"></nav>
+
+    <main id="story">
+      <section class="chapter hero" id="chapter-hero" data-chapter="hero">
+        <div class="hero-content">
+          <h1>
+            <span class="hl-raw">GPS alone</span> is too inaccurate for AR.
+            <span class="hl-fused">So we fused it.</span>
+          </h1>
+          <p class="hero-sub">
+            The result: 3D content that sticks to real places and gets more
+            precise the longer the user walks. One URL, no app, fully offline.
+          </p>
+          <ul class="hero-points">
+            <li>
+              Walk around your content —
+              <span class="hl-fused">WebXR anchors</span> hold, nothing floats
+            </li>
+            <!-- Deliberately NOT color-coded (round-6 X1): no QR code is on
+                 screen yet at the hero — the amber span appears only where
+                 the sign is actually visible (QR chapter). -->
+            <li>Any ordinary QR code = door + instant position fix</li>
+            <li>Real 6DoF in the browser: Android + Chrome today</li>
+          </ul>
+          <!-- v2 B3/B9 "Framework-Minimal" snippet. Every symbol is the
+               REAL published API, verified against
+               GpsPlusSlamJs_MinimalExample/src/main.ts (store L213,
+               alignment L307-310, createGpsAnchor options L271-280) and
+               GpsPlusSlamJs_AppFramework/src/visualization/gps-anchor.ts
+               (GpsAnchorOptions L36-77). Update this block if that API
+               changes. -->
+          <!-- Round-9 R9-5: a <details> expander — ships COLLAPSED (safe
+               phone fold, no-JS floor); src/hero-snippet.ts opens it at
+               boot on desktop-class viewports. -->
+          <details
+            class="hero-snippet"
+            id="hero-snippet"
+            aria-label="Code example: a GPS anchor in a few lines"
+          >
+            <summary>// the code — a GPS anchor in ~5 lines</summary>
+            <pre><span class="c">// the whole flow — gps-plus-slam-app-framework</span>
+<span class="hl-kw">const</span> store = createSlamAppStore({ storageBackend: <span class="hl-kw">new</span> NullStorageBackend() });
+<span class="hl-kw">await</span> initAR(container);         <span class="c">// one tap → 6DoF AR in the browser</span>
+<span class="hl-kw">const</span> world = getArWorldGroup()!;
+world.add(marker);               <span class="c">// marker: any three.js Object3D</span>
+<span class="hl-fused">createGpsAnchor</span>({ object3D: marker, arWorldGroup: world, camera: getCamera()!,
+  gpsPoint: { lat: <span class="hl-raw">48.137</span>, lon: <span class="hl-raw">11.575</span> },  <span class="c">// ← your real-world spot</span>
+  getAlignmentMatrix: () => selectAlignmentMatrix(store.getState()),
+  getGpsZeroRef: () => selectZeroReference(store.getState()) });</pre>
+          </details>
+          <p class="hero-links">
+            <span class="scroll-hint">Scroll to walk in ↓</span>
+            <a id="jump-demos" href="#chapter-cta">Jump to the demos →</a>
+          </p>
+        </div>
       </section>
 
-      <section>
-        <h2>What you can build</h2>
-        <ul>
-          <li>Outdoor AR navigation with GPS-anchored arrows and waypoints.</li>
-          <li>Persistent 3D content dropped at lat/lon that stays put.</li>
-          <li>AR tour guides, museum trails, and location-based games.</li>
-          <li>Field-data capture tools for GPS, AR poses, frames, and depth.</li>
-        </ul>
+      <section class="chapter" id="chapter-qr" data-chapter="qr">
+        <div class="copy">
+          <h2>
+            Any ordinary <span class="hl-code">QR code</span> does two jobs.
+          </h2>
+          <p>
+            One scan jumps straight into AR, no install — and pins the user to
+            the <span class="hl-fused">exact spot</span> they're standing on,
+            before GPS has even warmed up.
+          </p>
+        </div>
       </section>
 
-      <div class="links">
-        <a href="https://github.com/cs-util-com/location-based-webxr"
-          >GitHub repository</a
-        >
-        <a href="https://github.com/cs-util-com/location-based-webxr#readme"
-          >Documentation</a
-        >
-        <a href="https://www.npmjs.com/package/gps-plus-slam-app-framework"
-          >npm: gps-plus-slam-app-framework</a
-        >
-      </div>
+      <section class="chapter" id="chapter-fusion" data-chapter="fusion">
+        <div class="copy">
+          <h2>
+            <span class="hl-raw">Raw GPS</span> scatters by meters.
+            <span class="hl-fused">Fusion</span> holds still.
+          </h2>
+          <p>
+            Every <span class="hl-raw">GPS reading</span> is an uncertainty
+            circle around a different center. Averaging them nails the spot —
+            and <span class="hl-fused">fusion</span> with WebXR tracking keeps
+            it nailed while the user moves.
+          </p>
+        </div>
+      </section>
 
-      <footer>
-        Open-source framework under Apache-2.0. The
-        <code>gps-plus-slam-js</code> alignment core is closed-source with a
-        free community license bundled in, so you can start building right
-        away.
-      </footer>
+      <section class="chapter" id="chapter-dive" data-chapter="dive">
+        <div class="copy">
+          <h2>This is what your users see.</h2>
+          <p>
+            Their <span class="hl-ar">own phone</span> — or any WebXR-capable
+            device — becomes the window. No download: arrows, labels and
+            <span class="hl-story">stories</span> laid over the real world.
+          </p>
+        </div>
+      </section>
+
+      <section class="chapter" id="chapter-anywhere" data-chapter="anywhere">
+        <div class="copy">
+          <h2>Works anywhere. Fully offline.</h2>
+          <p>
+            No cloud mapping, no scanning vans, no pre-scanned city centers —
+            and no cloud positioning service that can be priced up or sunset. If
+            the user can stand there, a story can live there. Dream up the
+            real-world AR experience you always wanted to build: a forest with a
+            <span class="hl-portal">magic portal</span> that only opens at dawn,
+            a plaza your users capture in 3D to take home, a park with your
+            <span class="hl-parkour">jump-and-run parkour</span>.
+          </p>
+        </div>
+      </section>
+
+      <section class="chapter" id="chapter-gallery" data-chapter="gallery">
+        <div class="copy">
+          <h2>What will you build?</h2>
+          <p>
+            Anything that needs precise global positioning, runs offline, and
+            places 3D content in the physical world:
+          </p>
+          <ul>
+            <li>
+              Guided tours &amp; city walks with content at the real spots
+            </li>
+            <li>
+              Campus, venue &amp; trade-fair
+              <span class="hl-ar">navigation</span>
+            </li>
+            <li>
+              Architecture previews &amp;
+              <span class="hl-ar">historic buildings</span> at 1:1 scale
+            </li>
+            <li>
+              Make the invisible visible: what's hidden behind walls or
+              <span class="hl-ar">long gone</span>, shown on site
+            </li>
+            <li>
+              Reality capture: GPS-anchored 3D scans &amp; Gaussian splats
+            </li>
+            <li>Safety training &amp; emergency drills on location</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="chapter" id="chapter-cta" data-chapter="cta">
+        <div class="copy">
+          <h2>The code is on GitHub.</h2>
+          <p>
+            <!-- Static default = universally TRUE (round-8 Z6); ar-support.ts
+                 upgrades it to "run on your phone right now" only on devices
+                 that really support immersive-ar WebXR. -->
+            <span id="cta-device-claim"
+              >The demos below run on Android phones with Chrome</span
+            >
+            — same engine, same repo. No signup — everything you need comes
+            included. Clone it, run it, bring your favorite place to life.
+          </p>
+          <!-- ONE primary CTA (round-9 R9-4): the GitHub mark moved INTO
+               the button and the duplicate "Open source on GitHub" badge
+               was removed. target=_blank: the landing must stay open in
+               the background. -->
+          <a
+            class="btn-primary"
+            href="https://github.com/cs-util-com/location-based-webxr"
+            target="_blank"
+            rel="noopener"
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path
+                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"
+              />
+            </svg>
+            Fork &amp; start building
+          </a>
+          <!-- Desktop→phone handoff (v2 B2): stays hidden unless
+               src/qr-handoff.ts decides this is a desktop-class viewport
+               without immersive-ar. The QR encodes the LIVE URL
+               (location.href) so preview origins stay correct. -->
+          <div id="qr-handoff" hidden></div>
+        </div>
+
+        <div class="demos">
+          <h3>Or try the live demos</h3>
+          <!-- Demo apps open new tabs too (round-10 R10-1, reversing the
+               round-9 same-tab call): every outbound click keeps the
+               landing alive in the background. -->
+          <!-- Order (round-14 R14-18): two demos first (Anchor Starter,
+               QR-Tracking), then the two "App" examples (Minimal Example
+               App, Recorder App). Anchor Starter stays first — the demo
+               we most want people to open. -->
+          <div class="demo-grid">
+            <a
+              class="demo-card"
+              href="/starter/"
+              target="_blank"
+              rel="noopener"
+            >
+              <svg viewBox="0 0 34 34" aria-hidden="true">
+                <path
+                  d="M17 3c-5 0-9 4-9 9 0 6.6 9 16 9 16s9-9.4 9-16c0-5-4-9-9-9z"
+                  fill="#ef4444"
+                />
+                <circle cx="17" cy="12" r="3.6" fill="#fff" />
+              </svg>
+              <span>
+                <strong>Anchor Starter Demo</strong>
+                <small
+                  >Place a GPS anchor, generate a link to it, and when the link
+                  is loaded it re-places the anchor at the exact same physical
+                  spot.</small
+                >
+              </span>
+            </a>
+            <a
+              class="demo-card"
+              href="/qr-demo/"
+              target="_blank"
+              rel="noopener"
+            >
+              <svg viewBox="0 0 34 34" aria-hidden="true">
+                <rect x="4" y="4" width="11" height="11" fill="#8b8b95" />
+                <rect x="7" y="7" width="5" height="5" fill="#fff" />
+                <rect x="19" y="4" width="11" height="11" fill="#8b8b95" />
+                <rect x="22" y="7" width="5" height="5" fill="#fff" />
+                <rect x="4" y="19" width="11" height="11" fill="#8b8b95" />
+                <rect x="7" y="22" width="5" height="5" fill="#fff" />
+                <rect x="19" y="19" width="5" height="5" fill="#ef4444" />
+                <rect x="25" y="25" width="5" height="5" fill="#ef4444" />
+              </svg>
+              <span>
+                <strong>QR-Tracking Demo</strong>
+                <small
+                  >Point at any printed QR code: it measures the code's real
+                  size from the depth map and glues a 3D axis + cube to
+                  it.</small
+                >
+              </span>
+            </a>
+            <a
+              class="demo-card"
+              href="/minimal/"
+              target="_blank"
+              rel="noopener"
+            >
+              <svg viewBox="0 0 34 34" aria-hidden="true">
+                <path d="M17 4l11 6v13l-11 6-11-6V10z" fill="#8b8b95" />
+                <path d="M17 4l11 6-11 6-11-6z" fill="#b9b9c2" />
+                <path d="M17 16v13l-11-6V10z" fill="#6e6e78" />
+              </svg>
+              <span>
+                <strong>Minimal Example App</strong>
+                <small
+                  >Tap to place anchors with one part floating in GPS space and
+                  one part fixed in AR space — showing the regular alignment
+                  drift.</small
+                >
+              </span>
+            </a>
+            <a
+              class="demo-card demo-card-flagship"
+              href="/recorder/"
+              target="_blank"
+              rel="noopener"
+            >
+              <svg viewBox="0 0 34 34" aria-hidden="true">
+                <circle
+                  cx="17"
+                  cy="17"
+                  r="12"
+                  fill="none"
+                  stroke="#8b8b95"
+                  stroke-width="3"
+                />
+                <circle cx="17" cy="17" r="5.5" fill="#ef4444" />
+              </svg>
+              <span>
+                <strong>Recorder App</strong>
+                <small
+                  >Record and replay user sessions from a real phone. Use them
+                  to simulate user behavior while developing, or view the
+                  captured content — images, point clouds, even reconstructed
+                  Gaussian splats.</small
+                >
+              </span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Compact FAQ (v2 B6): native <details>, no JS. Round-14
+             reworked the wording; the license row (R14-21) is now a LINK
+             that opens the repo LICENSE in a new tab rather than an
+             expander, so there is no license prose to keep in sync. The
+             accuracy answer stays qualitative (no numeric accuracy
+             classes on the page). -->
+        <div class="faq">
+          <h3>Common questions</h3>
+          <details>
+            <summary>Which devices are supported?</summary>
+            <p>
+              Android phones support full 6-DoF tracking on Chrome today —
+              that's why the framework currently works there and not on iOS. It
+              targets standard WebXR, so any headset that fully supports that
+              standard (including 6-DoF SLAM tracking) will work as well.
+            </p>
+          </details>
+          <details>
+            <summary>How accurate is the positioning?</summary>
+            <p>
+              Raw GPS is meters off; fusion averages it down. Try the demo apps
+              to see whether it works for your use case — and use QR codes for
+              extremely accurate, instant anchoring.
+            </p>
+          </details>
+          <a
+            class="faq-link"
+            href="https://github.com/cs-util-com/location-based-webxr/blob/main/LICENSE"
+            target="_blank"
+            rel="noopener"
+            >What's the license?</a
+          >
+          <details>
+            <summary>Does it need a server or an internet connection?</summary>
+            <p>
+              No. The GPS+WebXR alignment runs entirely on the device — there is
+              no cloud positioning service involved. The page and content are
+              static files you can host anywhere.
+            </p>
+          </details>
+          <details>
+            <summary>How do I start building?</summary>
+            <p>
+              Clone the repo and run the demo apps to learn the basics. The
+              Minimal Example App is a good starting point, and the Recorder App
+              is the most complex example — you can also use it to record
+              realistic user input for your test-driven development.
+            </p>
+          </details>
+        </div>
+
+        <div class="links">
+          <!-- External links open new tabs (round-9 R9-4): the landing
+               stays open in the background. -->
+          <a
+            href="https://github.com/cs-util-com/location-based-webxr"
+            target="_blank"
+            rel="noopener"
+            >GitHub repository</a
+          >
+          <a
+            href="https://github.com/cs-util-com/location-based-webxr#readme"
+            target="_blank"
+            rel="noopener"
+            >Documentation</a
+          >
+          <a
+            href="https://www.npmjs.com/package/gps-plus-slam-app-framework"
+            target="_blank"
+            rel="noopener"
+            >npm: gps-plus-slam-app-framework</a
+          >
+        </div>
+      </section>
     </main>
+
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

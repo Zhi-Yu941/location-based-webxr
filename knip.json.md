@@ -73,6 +73,10 @@ entirely after confirming they were only transitively pulled in.
   `@carlosjeurissen/stylelint-csstree-validator`) are ignored because
   knip cannot trace them through the stylelint config, mirroring the
   RecorderApp treatment.
+- **GpsPlusSlamJs_Landing** — same shape as the AnchorStarter: Vite
+  plugin auto-detects `src/main.ts` from `index.html`; explicit entries
+  for the stylelint config and `playwright-tests/**` (the e2e smoke
+  suite); the three stylelint tooling packages ignored.
 
 ## Tests
 

@@ -3,15 +3,18 @@
 /**
  * build-site.mjs — orchestrates the multi-app subpath deployment.
  *
- * Builds the framework once, then builds the RecorderApp under base `/recorder/`,
- * the AnchorStarter under base `/starter/`, the MinimalExample under base
- * `/minimal/`, and the QrTrackingDemo under base `/qr-demo/` into a single
- * combined output directory (`dist-site/`), and copies the static landing page
- * to the root. The resulting tree is what Cloudflare serves from
+ * Builds the Landing app FIRST at base `/` into the `dist-site/` root (it
+ * must come first: a Vite build into the shared root after the apps would
+ * risk clobbering their subdirs), then builds the framework once, then the
+ * RecorderApp under base `/recorder/`, the AnchorStarter under base
+ * `/starter/`, the MinimalExample under base `/minimal/`, and the
+ * QrTrackingDemo under base `/qr-demo/` into the same combined output
+ * directory. The resulting tree is what Cloudflare serves from
  * `gps.csutil.com`:
  *
  *   dist-site/
- *     index.html        ← landing page (root)
+ *     index.html        ← Landing app (Vite build, base=/)
+ *     assets/           ← Landing bundle
  *     recorder/         ← RecorderApp, base=/recorder/
  *     starter/          ← AnchorStarter, base=/starter/
  *     minimal/          ← MinimalExample, base=/minimal/
@@ -20,19 +23,24 @@
  * `base` and `outDir` are passed as build-time CLI flags so the committed app
  * vite configs stay at their `/` + `dist` defaults (dev/USB-debugging unchanged).
  *
- * After each app build it asserts the emitted HTML contains no root-absolute
- * (`/...`) URL outside the app's own base — this is the executable guard for
- * plan Steps 1-3 (so a future runtime-absolute URL that Vite cannot rewrite
- * fails the deploy instead of 404-ing in production).
+ * After each subpath app build it asserts the emitted HTML contains no
+ * root-absolute (`/...`) URL outside the app's own base — this is the
+ * executable guard for plan Steps 1-3 (so a future runtime-absolute URL that
+ * Vite cannot rewrite fails the deploy instead of 404-ing in production).
+ * That guard is vacuous for the landing app (every root-absolute URL starts
+ * with its base `/`), so the landing gets its own guards instead: all four
+ * demo links must be present in the built HTML (the "demos remain
+ * launchable" requirement) and every local asset URL it references must
+ * exist in the tree.
  *
- * See: GpsPlusSlamJs_Docs/docs/2026-06-01-multi-app-subpath-deployment-plan.md
+ * See: GpsPlusSlamJs_Docs/docs/2026-06-01-0424-multi-app-subpath-deployment-plan.md
+ * and GpsPlusSlamJs_Docs/docs/2026-07-12-2046-landing-page-3d-scroll-redesign-plan.md
  */
 
 import { execFileSync } from 'node:child_process';
 import {
   rmSync,
   mkdirSync,
-  cpSync,
   existsSync,
   readFileSync,
   readdirSync,
@@ -102,6 +110,44 @@ function assertNoBareAbsoluteUrlsInDir(dir, base) {
   }
 }
 
+/**
+ * Landing-specific guards (the bare-URL assertion is vacuous at base `/`):
+ * the built landing HTML must still link all four demo apps, and every
+ * local (root-absolute, non-demo) href/src it references must exist as a
+ * file in dist-site — a missing bundle asset would otherwise 404 silently.
+ *
+ * @param {string} htmlPath absolute path to the built landing index.html
+ */
+function assertLandingHtml(htmlPath) {
+  const html = readFileSync(htmlPath, 'utf-8');
+  const requiredDemoLinks = ['/starter/', '/minimal/', '/qr-demo/', '/recorder/'];
+  const missingLinks = requiredDemoLinks.filter(
+    (link) => !html.includes(`href="${link}"`)
+  );
+  if (missingLinks.length > 0) {
+    throw new Error(
+      `Landing ${htmlPath} lost demo link(s): ${missingLinks.join(', ')}. ` +
+        `All four demo apps must stay launchable from the landing page.`
+    );
+  }
+  const attrRe = /(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+  const missingAssets = [];
+  let match;
+  while ((match = attrRe.exec(html)) !== null) {
+    const url = match[1] ?? match[2] ?? '';
+    if (!url.startsWith('/') || url.startsWith('//')) continue;
+    if (requiredDemoLinks.includes(url)) continue;
+    const assetPath = join(distSite, url.replace(/^\//, '').split('?')[0] ?? '');
+    if (!existsSync(assetPath)) missingAssets.push(url);
+  }
+  if (missingAssets.length > 0) {
+    throw new Error(
+      `Landing ${htmlPath} references missing asset file(s): ` +
+        `${[...new Set(missingAssets)].join(', ')}.`
+    );
+  }
+}
+
 /** Assert the combined deploy tree matches the documented target layout. */
 function assertSiteTree() {
   const required = [
@@ -123,6 +169,23 @@ function assertSiteTree() {
 console.log('• Cleaning dist-site/');
 rmSync(distSite, { recursive: true, force: true });
 mkdirSync(distSite, { recursive: true });
+
+// The landing app builds FIRST, straight into the dist-site ROOT. Order is
+// load-bearing: building into the shared root after the subpath apps would
+// risk wiping their subdirs (e.g. via --emptyOutDir). The just-cleaned root
+// is empty, so no --emptyOutDir is needed here.
+console.log('• Building Landing (base=/)');
+run('pnpm', ['--filter', 'gps-plus-slam-landing', 'run', 'typecheck']);
+run('pnpm', [
+  '--filter',
+  'gps-plus-slam-landing',
+  'exec',
+  'vite',
+  'build',
+  '--base=/',
+  '--outDir',
+  distSite,
+]);
 
 console.log('• Building framework (once)');
 run('pnpm', ['run', 'build:framework']);
@@ -189,11 +252,7 @@ run('pnpm', [
 ]);
 assertNoBareAbsoluteUrlsInDir(join(distSite, 'qr-demo'), '/qr-demo/');
 
-console.log('• Copying landing page to dist-site/index.html');
-cpSync(
-  join(repoRoot, 'GpsPlusSlamJs_Landing', 'index.html'),
-  join(distSite, 'index.html')
-);
+assertLandingHtml(join(distSite, 'index.html'));
 
 assertSiteTree();
 console.log('✓ dist-site/ built and verified');

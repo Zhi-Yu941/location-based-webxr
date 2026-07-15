@@ -178,6 +178,85 @@ importers:
         specifier: ^4.1.6
         version: 4.1.6(@types/node@25.7.0)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.12(@types/node@25.7.0)(jiti@2.7.0)(yaml@2.9.0))
 
+  GpsPlusSlamJs_Landing:
+    dependencies:
+      animejs:
+        specifier: ^4.5.0
+        version: 4.5.0(@types/three@0.184.1)(three@0.184.0)
+      postprocessing:
+        specifier: ^6.39.2
+        version: 6.39.2(three@0.184.0)
+      three:
+        specifier: ^0.184.0
+        version: 0.184.0
+      uqr:
+        specifier: ^0.1.3
+        version: 0.1.3
+    devDependencies:
+      '@carlosjeurissen/stylelint-csstree-validator':
+        specifier: ^3.3.1
+        version: 3.3.1(typescript@6.0.3)
+      '@eslint/js':
+        specifier: ^10.0.1
+        version: 10.0.1(eslint@10.3.0(jiti@2.7.0))
+      '@playwright/test':
+        specifier: ^1.60.0
+        version: 1.60.0
+      '@types/node':
+        specifier: ^25.7.0
+        version: 25.7.0
+      '@types/three':
+        specifier: ^0.184.1
+        version: 0.184.1
+      '@vitest/eslint-plugin':
+        specifier: ^1.6.17
+        version: 1.6.17(@typescript-eslint/eslint-plugin@8.59.3(@typescript-eslint/parser@8.59.3(eslint@10.3.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.3.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.3.0(jiti@2.7.0))(typescript@6.0.3)(vitest@4.1.6)
+      dependency-cruiser:
+        specifier: ^17.4.0
+        version: 17.4.0
+      dpdm:
+        specifier: ^4.2.0
+        version: 4.2.0
+      eslint:
+        specifier: ^10.3.0
+        version: 10.3.0(jiti@2.7.0)
+      eslint-config-prettier:
+        specifier: ^10.1.8
+        version: 10.1.8(eslint@10.3.0(jiti@2.7.0))
+      fast-check:
+        specifier: ^4.8.0
+        version: 4.8.0
+      globals:
+        specifier: ^17.6.0
+        version: 17.6.0
+      jscpd:
+        specifier: ^4.1.1
+        version: 4.1.1
+      postcss-html:
+        specifier: ^1.8.1
+        version: 1.8.1
+      prettier:
+        specifier: ^3.8.3
+        version: 3.8.3
+      stylelint:
+        specifier: ^17.11.0
+        version: 17.11.0(typescript@6.0.3)
+      stylelint-config-standard:
+        specifier: ^40.0.0
+        version: 40.0.0(stylelint@17.11.0(typescript@6.0.3))
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8.59.3
+        version: 8.59.3(eslint@10.3.0(jiti@2.7.0))(typescript@6.0.3)
+      vite:
+        specifier: ^8.0.12
+        version: 8.0.12(@types/node@25.7.0)(jiti@2.7.0)(yaml@2.9.0)
+      vitest:
+        specifier: ^4.1.6
+        version: 4.1.6(@types/node@25.7.0)(@vitest/coverage-v8@4.1.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.12(@types/node@25.7.0)(jiti@2.7.0)(yaml@2.9.0))
+
   GpsPlusSlamJs_MinimalExample:
     dependencies:
       gps-plus-slam-app-framework:
@@ -1611,6 +1690,17 @@ packages:
   ajv@8.20.0:
     resolution: {integrity: sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==}
 
+  animejs@4.5.0:
+    resolution: {integrity: sha512-NQimYX+lz8WaXonGS9zVVoviCIAjONeJayxacUditaivYLqyXgGjFKjuyl0aUUhFKm5MriX9ty1TGovNzoJQWA==}
+    peerDependencies:
+      '@types/three': '>=0.150.0'
+      three: '>=0.150.0'
+    peerDependenciesMeta:
+      '@types/three':
+        optional: true
+      three:
+        optional: true
+
   ansi-regex@5.0.1:
     resolution: {integrity: sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==}
     engines: {node: '>=8'}
@@ -2827,6 +2917,11 @@ packages:
     resolution: {integrity: sha512-SoSL4+OSEtR99LHFZQiJLkT59C5B1amGO1NzTwj7TT1qCUgUO6hxOvzkOYxD+vMrXBM3XJIKzokoERdqQq/Zmg==}
     engines: {node: ^10 || ^12 || >=14}
 
+  postprocessing@6.39.2:
+    resolution: {integrity: sha512-AxPY+xFyVOsz+8bbHSyQBoOK4AUqSQspTXXIsNcKhmGJRm/afHRAwZ8bKC02AeSPII0PW6lbCN84SgAoWFsKKA==}
+    peerDependencies:
+      three: '>= 0.168.0 < 0.186.0'
+
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
     engines: {node: '>= 0.8.0'}
@@ -3335,6 +3430,9 @@ packages:
     hasBin: true
     peerDependencies:
       browserslist: '>= 4.21.0'
+
+  uqr@0.1.3:
+    resolution: {integrity: sha512-0rjE8iEJe4YmT9TOhwsZtqCMRLc5DXZUI2UEYUUg63ikBkqqE5EYWaI0etFe/5KUcmcYwLih2RND1kq+hrUJXA==}
 
   uri-js@4.4.1:
     resolution: {integrity: sha512-7rKUyy33Q1yc98pQ1DAmLtwX109F7TIfWlW1Ydo8Wl1ii1SeHieeh0HHfPeL2fMXK6z0s8ecKs9frCuLJvndBg==}
@@ -4623,6 +4721,11 @@ snapshots:
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
 
+  animejs@4.5.0(@types/three@0.184.1)(three@0.184.0):
+    optionalDependencies:
+      '@types/three': 0.184.1
+      three: 0.184.0
+
   ansi-regex@5.0.1: {}
 
   ansi-regex@6.2.2: {}
@@ -5833,6 +5936,10 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
+  postprocessing@6.39.2(three@0.184.0):
+    dependencies:
+      three: 0.184.0
+
   prelude-ls@1.2.1: {}
 
   prettier@3.8.3: {}
@@ -6407,6 +6514,8 @@ snapshots:
       browserslist: 4.28.2
       escalade: 3.2.0
       picocolors: 1.1.1
+
+  uqr@0.1.3: {}
 
   uri-js@4.4.1:
     dependencies:

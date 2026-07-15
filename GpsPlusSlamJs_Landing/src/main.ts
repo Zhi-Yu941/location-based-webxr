@@ -372,6 +372,11 @@ function boot(): void {
   // scroll-driven re-renders still happen. Re-sync on pageshow so the
   // state self-heals.
   window.addEventListener("pageshow", syncPageVisible);
+  // Boot-hidden (opened in a background tab): no visibilitychange ever
+  // fires, so the controller's `pageVisible` default (true) would leave
+  // the continuous particle loop rendering invisibly. Seed the flag from
+  // the current state once, up front.
+  syncPageVisible();
 
   let introRunning = false;
   if (scene && tier.mode === "scroll") {

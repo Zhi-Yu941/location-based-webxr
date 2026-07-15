@@ -151,6 +151,13 @@ const entryFiles = [
   'src/visualization/gps-compass-cubes.ts',
   'src/visualization/gps-event-markers.ts',
   'src/visualization/occlusion-mesh.ts',
+  // Instanced debug-cube visualizer of the occupancy grid — promoted from the
+  // recorder (2026-07-15 replay-harness Part A) so every consumer gets both
+  // mesh styles. Deep-imported by the recorder (main.ts / replay-mode.ts) and
+  // the PhysicsDemo via the `./visualization/*` wildcard, so it must be a
+  // per-file dist entry (a missing entry breaks Vite resolution at runtime —
+  // see 2026-04-29-recorder-e2e-import-resolution-failure.md).
+  'src/visualization/occupancy-cubes-visualizer.ts',
   // Main-thread driver for the occluder Web Worker offload — deep-imported by
   // the recorder's worker client, so it must be a dist entry.
   'src/visualization/occluder-mesh-driver.ts',

@@ -22,8 +22,8 @@ import {
   OccupancyCubesVisualizer,
   type OccupancyGridSource,
 } from './occupancy-cubes-visualizer';
-import type { GridCell } from 'gps-plus-slam-app-framework/ar';
-import { WEBXR_TO_NUE } from 'gps-plus-slam-app-framework/ar/webxr-nue-basis';
+import type { GridCell } from '../ar/bresenham3d';
+import { WEBXR_TO_NUE } from '../ar/webxr-nue-basis';
 
 function makeGridSource(
   cells: GridCell[],

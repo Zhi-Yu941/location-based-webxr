@@ -147,7 +147,7 @@ import { decodeFrameTexture } from './visualization/frame-texture-decoder';
 import { wireFrameTileSubscribers } from './visualization/wire-frame-tile-subscribers';
 import { FrameBlobCache } from './visualization/frame-blob-cache';
 import { OccupancyGrid } from 'gps-plus-slam-app-framework/ar/occupancy-grid';
-import { OccupancyCubesVisualizer } from './visualization/occupancy-cubes-visualizer';
+import { OccupancyCubesVisualizer } from 'gps-plus-slam-app-framework/visualization/occupancy-cubes-visualizer';
 import {
   createOccluderSink,
   type OccluderSink,

@@ -28,11 +28,12 @@
  */
 
 import * as THREE from 'three';
-import type { GridCell } from 'gps-plus-slam-app-framework/ar';
-// Deep subpath on purpose: the /ar barrel eagerly evaluates enable-gps-ar's
-// module-level deps, which breaks tests that partially mock webxr-session /
-// permission-checker; webxr-nue-basis depends only on three.
-import { WEBXR_TO_NUE } from 'gps-plus-slam-app-framework/ar/webxr-nue-basis';
+// Deep module imports (not the ../ar barrel): the barrel eagerly evaluates
+// enable-gps-ar's module-level deps, which breaks tests that partially mock
+// webxr-session / permission-checker. bresenham3d and webxr-nue-basis depend
+// only on three (mirrors occlusion-mesh.ts, the sibling occupancy visualizer).
+import type { GridCell } from '../ar/bresenham3d.js';
+import { WEBXR_TO_NUE } from '../ar/webxr-nue-basis.js';
 
 /** The read surface of the framework's `OccupancyGrid` this class draws. */
 export interface OccupancyGridSource {

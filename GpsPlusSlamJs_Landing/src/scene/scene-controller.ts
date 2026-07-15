@@ -27,6 +27,7 @@ import {
 import { buildSatellites, updateSatellites } from "./satellites";
 import { buildShootingStar, updateShootingStar } from "./shooting-stars";
 import { buildHeroPeeker, createHeroIdleBeat } from "./hero-idle";
+import { PORTAL_NAME, updatePortalSpin } from "./portal";
 import { pickEggTarget, type PointerNdc } from "./egg-picker";
 import { GEOCACHE_NAME, toggleGeocache, updateGeocache } from "./geocache";
 import { VIGNETTE_NODE } from "./use-case-vignettes";
@@ -272,6 +273,9 @@ export function createSceneController(
   // Shooting stars (easter-egg №7): dark palettes only; built always,
   // gated per-theme + by the continuous loop below.
   const shootingStar = buildShootingStar();
+  // Forest portal (round-14 R14-10): the story timeline opens/closes it;
+  // the render loop swirls its rings while it's open.
+  const portal = world.getObjectByName(PORTAL_NAME) ?? null;
   // Hero idle beat (easter-egg №6): a second dot-person peeks from behind
   // a hero-side bush after 60 s idle at the hero. Scroll mode only.
   const heroPeeker = tier.mode === "scroll" ? buildHeroPeeker() : null;
@@ -577,6 +581,9 @@ export function createSceneController(
         // The meteor is mid-streak only ~1.2s per 30–60s; it rides the
         // particle loop's dirty flag while a streak is crossing.
         updateShootingStar(shootingStar, nowMs, darkSky);
+        if (portal) {
+          updatePortalSpin(portal, nowMs);
+        }
         dirty = true;
       }
       // Event-driven egg transitions (wall-clock, not scroll-driven).

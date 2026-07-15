@@ -11,6 +11,7 @@ import {
   type MeshStandardMaterial,
 } from "three";
 import { buildBird } from "./bird";
+import { buildForestPortal } from "./portal";
 import { buildGeocache } from "./geocache";
 import { clayMesh, namedGroup } from "./palette";
 import { buildPin } from "./markers";
@@ -162,6 +163,16 @@ const GEOCACHE_ANCHOR = VIGNETTE_ANCHORS.castle
 // panel (panel top ≈ 2.55), a touch to one side — small and in frame
 // during the QR chapter, easy to miss.
 const BIRD_ANCHOR = WORLD_ANCHORS.sign.clone().add(new Vector3(0.25, 2.55, 0));
+
+// Forest portal anchor (round-14 R14-10): a floating gateway between the
+// world and the tents, in the outer-tree band near the campus — pulled
+// ~15 units back toward the world center from the campus and lifted so
+// it hovers between the trees. It faces the world center (the far-out
+// works-anywhere camera looks from there).
+const PORTAL_ANCHOR = VIGNETTE_ANCHORS.campus
+  .clone()
+  .add(VIGNETTE_ANCHORS.campus.clone().setY(0).normalize().multiplyScalar(-15))
+  .setY(2.8);
 
 /** Deterministic LCG (numerical recipes constants) — NOT crypto, just art. */
 function createRng(seed: number): () => number {
@@ -573,6 +584,10 @@ export function buildClayWorld(detail: "high" | "low"): Group {
     // Hidden bird (easter-egg №10): perched atop the QR sign, in frame
     // during the QR chapter — small and easy to miss (fully hidden).
     buildBird(BIRD_ANCHOR),
+    // Forest magic portal (round-14 R14-10): opens while the
+    // works-anywhere copy is on screen; primed closed here, the story
+    // timeline pops it open + shut and the render loop swirls its rings.
+    buildForestPortal(PORTAL_ANCHOR, new Vector3(0, PORTAL_ANCHOR.y, 0)),
     // World-detail layer (v3 F7, curb removed in round-9): instanced
     // grass + contact shadows.
     buildGrass(detail, createPathCurve(), Object.values(WORLD_ANCHORS)),

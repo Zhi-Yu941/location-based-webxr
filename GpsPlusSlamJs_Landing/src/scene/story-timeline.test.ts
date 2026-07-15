@@ -400,6 +400,25 @@ describe("buildStoryTimeline", () => {
     expect(ndc.z).toBeLessThan(1); // in front of the camera
   });
 
+  it("opens the forest portal while far out and closes it before the city (round-14 R14-10)", () => {
+    const timeline = buildStoryTimeline(stage, () => {});
+    const portal = stage.world.getObjectByName("forest-portal");
+    expect(portal).toBeDefined();
+
+    timeline.seek(3600); // before the works-anywhere moment: closed
+    expect(portal!.scale.x).toBeLessThan(0.01);
+
+    timeline.seek(4250); // far out, forest in frame: portal open
+    expect(portal!.scale.x).toBeGreaterThan(0.9);
+
+    timeline.seek(4950); // camera has turned to the city: closed again
+    expect(portal!.scale.x).toBeLessThan(0.01);
+
+    // Scrub back re-closes it (explicit {from,to} contract).
+    timeline.seek(3600);
+    expect(portal!.scale.x).toBeLessThan(0.01);
+  });
+
   it("moves the camera between chapters when scrubbed", () => {
     const timeline = buildStoryTimeline(stage, () => {});
     timeline.seek(50);

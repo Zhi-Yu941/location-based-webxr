@@ -39,6 +39,7 @@ export const PALETTE_ROLES = [
   "ruin",
   "ghost",
   "satellite",
+  "portal",
 ] as const;
 
 export type PaletteRole = (typeof PALETTE_ROLES)[number];
@@ -139,6 +140,8 @@ const LIGHT: ScenePalette = {
     ghost: { color: 0x60a5fa },
     // Satellites (№0): blue family — tech content per the color coding.
     satellite: { color: 0x5b7fd4 },
+    // Forest portal (round-14 R14-10): a distinct cyan "magic" blue.
+    portal: { color: 0x0ea5e9 },
   },
 };
 
@@ -194,6 +197,7 @@ const DARK: ScenePalette = {
     // Emissive: at ~40 units up the night satellites must self-glow to
     // read at all (same reasoning as the skyline floor).
     satellite: { color: 0x7fa8ff, emissiveIntensity: 0.5 },
+    portal: { color: 0x38bdf8, emissiveIntensity: 0.8 },
   },
 };
 
@@ -237,6 +241,7 @@ const NEON: ScenePalette = {
     ruin: { color: 0x232a48, emissiveIntensity: 0.12 },
     ghost: { color: 0x22d3ee, emissiveIntensity: 0.9 },
     satellite: { color: 0x67e8f9, emissiveIntensity: 0.7 },
+    portal: { color: 0x22d3ee, emissiveIntensity: 0.9 },
   },
 };
 
@@ -280,6 +285,7 @@ const DUSK: ScenePalette = {
     ruin: { color: 0x5f4a7e, emissiveIntensity: 0.1 },
     ghost: { color: 0x93c5fd, emissiveIntensity: 0.6 },
     satellite: { color: 0x8fb3ff, emissiveIntensity: 0.4 },
+    portal: { color: 0x38bdf8, emissiveIntensity: 0.7 },
   },
 };
 
@@ -325,6 +331,7 @@ const MONO: ScenePalette = {
     ruin: { color: 0xc4c4bd },
     ghost: { color: 0x2563eb },
     satellite: { color: 0x2563eb },
+    portal: { color: 0x0284c7 },
   },
 };
 
@@ -372,6 +379,7 @@ const TERMINAL: ScenePalette = {
     ruin: { color: 0x184026, emissiveIntensity: 0.3 },
     ghost: { color: 0x60a5fa, emissiveIntensity: 0.9 },
     satellite: { color: PHOSPHOR, emissiveIntensity: 0.7 },
+    portal: { color: 0x38bdf8, emissiveIntensity: 0.9 },
   },
 };
 

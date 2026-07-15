@@ -13,6 +13,7 @@ import {
 } from "./clay-world";
 import type { MarkerPair } from "./markers";
 import { VIGNETTE_NODE } from "./use-case-vignettes";
+import { PORTAL_NAME } from "./portal";
 
 /**
  * The scroll-scrubbed story timeline: one anime.js timeline covering all
@@ -659,6 +660,25 @@ export function buildStoryTimeline(
   // all land at nearly the same moment ("etwas nach hinten verzögern und
   // die Pfeile lieber schneller spawnen"). All up by ~5350, well before
   // the castle swing at 5500.
+  // Forest magic portal (round-14 R14-10): opens during the far-out
+  // works-anywhere moment (the forest + tents are in frame) and closes
+  // as the camera turns to the city — "danach kann das Portal auch wieder
+  // verschwinden, wenn man auf den Colonius guckt". Scale pop; the rings
+  // swirl continuously (updatePortalSpin in the render loop).
+  const portal = world.getObjectByName(PORTAL_NAME);
+  if (portal) {
+    timeline.add(
+      portal,
+      { scale: { from: 0.001, to: 1 }, duration: 380, ease: "outCubic" },
+      3820,
+    );
+    timeline.add(
+      portal,
+      { scale: { from: 1, to: 0.001 }, duration: 320, ease: "inCubic" },
+      4480,
+    );
+  }
+
   const campusArrows = world.getObjectByName(VIGNETTE_NODE.campusArrows);
   campusArrows?.children.forEach((arrow, index) => {
     timeline.add(

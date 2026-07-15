@@ -74,7 +74,7 @@ User-configurable recording options for controlling high-frequency data streams 
   images: { enabled: true, intervalMs: 2000, quality: 0.7, resolutionDivisor: 1,
             motionFilter: { enabled: true, maxAngularVelocity: 0.6, maxLinearVelocity: 2.5, maxWaitMs: 4000 },
             qualityFilter: { enabled: false, blurRelativeThreshold: 0.5, minMeanLuminance: 10, maxWaitMs: 4000 } },
-  occupancy: { cellSizeM: 0.15, minConfidence: 3, persistentOcclusion: true, liveOcclusion: false, occluderDebugStyle: 'off', occluderMeshMode: 'smooth' },
+  occupancy: { cellSizeM: 0.18, minConfidence: 2, persistentOcclusion: true, liveOcclusion: false, occluderDebugStyle: 'off', occluderMeshMode: 'smooth' },
   frameTileDisplay: { divisor: 2, maxTiles: 100 },
   visualization: { frameTiles: true, occupancyCubes: true, gpsAlignmentMarkers: true, compassCubes: true, headingUpMap: true, statsOverlay: false },
   qr: { enabled: false, intervalMs: 125, captureSize: 1024 },
@@ -91,10 +91,10 @@ builds up **as fast as possible** (param-sweep on a real recording — see
 
 - `depth.intervalMs` **500** — the minimum cadence (2 samples/s), so points arrive fastest.
 - `depth.gridSize` **32** — the previous slider max (1024 points/sample); more observations per sample confirm cells fastest. **The slider max was raised to 64** (4096 points/sample) for on-device experimentation with even higher densities — measure the per-sample depth-readback cost before adopting a value above 32.
-- `occupancy.minConfidence` **3** — the key "time-to-mesh" lever: a cell needs this many observations before it is rendered, so it is ≈ the _dwell time_ before a surface meshes (≈1.5 s at 500 ms sampling, vs 2.5 s at 5). 3 is the **fastest noise floor that still suppresses the behind-surface phantoms** the filter exists for (it was 5 in the 2026-06-30 robustness pass; lowered here for speed).
-- `occupancy.cellSizeM` **0.15** — kept; balances detail against area-coverage speed (coarser covers area faster but blockier, and the surface-hugging meshers like the resolution).
+- `occupancy.minConfidence` **2** — the key "time-to-mesh" lever: a cell needs this many observations before it is rendered, so it is ≈ the _dwell time_ before a surface meshes (≈1 s at 500 ms sampling). Lowered from 3 in the 2026-07-15 device tuning for even faster first-surface; 1 = unfiltered/legacy. Now the framework `DEFAULT_OCCUPANCY_MIN_OBSERVATIONS`, shared with the PhysicsDemo.
+- `occupancy.cellSizeM` **0.18** — raised from 0.15 in the 2026-07-15 device tuning: coarser 18 cm voxels build the mesh/physics up faster (fewer, larger cells confirm sooner). Now the framework `DEFAULT_OCCUPANCY_CELL_SIZE_M`, shared with the PhysicsDemo.
 
-Earlier passes: intervalMs/gridSize/minConfidence were first re-tuned in the [2026-06-30 session](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-30-0656-occluder-tuning-and-mesh-smoothness-user-feedback.md) (F1: 1000→500 / 16→24 / 3→5). The 2026-07-01 sweep then reversed the memory/robustness hedges (24→32, 5→3) once the goal became fastest reconstruction.
+Earlier passes: intervalMs/gridSize/minConfidence were first re-tuned in the [2026-06-30 session](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-30-0656-occluder-tuning-and-mesh-smoothness-user-feedback.md) (F1: 1000→500 / 16→24 / 3→5). The 2026-07-01 sweep then reversed the memory/robustness hedges (24→32, 5→3). The [2026-07-15 device tuning](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-15-1640-occupancy-fast-reconstruction-defaults-plan.md) then moved cellSize 0.15→0.18 and minConfidence 3→2 (and hoisted both to framework constants so the PhysicsDemo shares them).
 
 > **Not synced:** the library-level `DEFAULT_CONFIG` in [`ar/depth-sampler.ts`](../../../GpsPlusSlamJs_AppFramework/src/ar/depth-sampler.ts) intentionally keeps `intervalMs: 1000 / gridSize: 16`. That is the fallback for consumers that supply no config (MinimalExample / AnchorStarter); the re-tune is a recorder-specific decision sourced from `DEFAULT_RECORDING_OPTIONS`, so bumping the library default would silently re-tune unrelated apps.
 

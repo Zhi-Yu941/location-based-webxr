@@ -100,7 +100,7 @@ test("renders the 3D canvas, or engages the static-DOM floor cleanly", async ({
       // No WebGL right now: canvas layer hidden, copy fully readable —
       // that IS correct behavior, not a bug.
       await expect(page.locator("#scene-root")).toBeHidden({ timeout: 500 });
-      await expect(page.locator("#chapter-hero .copy")).toBeVisible({
+      await expect(page.locator("#chapter-hero .hero-content")).toBeVisible({
         timeout: 500,
       });
     } else {

@@ -32,6 +32,24 @@ describe("createHeroIdleBeat", () => {
     expect(peeker.position.y).toBeGreaterThan(0);
   });
 
+  it("flags a render on the frame that parks the peeker (final state must flush)", () => {
+    // Regression: the completion branch called park() (group.visible=false)
+    // but returned false. The controller uses this return value as its
+    // dirty flag (`if (beat.update(...)) dirty = true`). On a non-particle
+    // tier — where nothing else forces a render every frame — a `false`
+    // here would skip the one render that hides the peeker, leaving it
+    // visible until the next unrelated dirty event. Every peeker-mutating
+    // frame (including the parking one) must request a render.
+    const { group, peeker } = buildHeroPeeker();
+    const beat = createHeroIdleBeat(group, peeker);
+    beat.update(0, true);
+    expect(beat.update(HERO_IDLE_MS, true)).toBe(true); // fires the peek
+    // Jump past the peek so this single frame runs the completion branch.
+    const parkingFrame = beat.update(HERO_IDLE_MS + 6000, true);
+    expect(group.visible).toBe(false); // peeker parked
+    expect(parkingFrame).toBe(true); // …and the park is flagged for render
+  });
+
   it("resets the wait when the visitor scrolls away before the threshold", () => {
     const { group, peeker } = buildHeroPeeker();
     const beat = createHeroIdleBeat(group, peeker);

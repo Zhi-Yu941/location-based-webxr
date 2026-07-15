@@ -118,7 +118,11 @@ export function createHeroIdleBeat(
         if (elapsed >= PEEK_MS) {
           state.peekStartMs = null;
           park();
-          return false;
+          // park() hid the peeker — that visibility change is a render-
+          // worthy state mutation, so flag a render (the controller uses
+          // this return as its dirty flag). Returning false here would let
+          // an on-demand tier skip the frame that hides the peeker.
+          return true;
         }
         peeker.position.y = HIDDEN_Y + (PEEK_Y - HIDDEN_Y) * peekLift(elapsed);
         return true;

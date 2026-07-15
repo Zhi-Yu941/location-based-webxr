@@ -14,7 +14,10 @@ a separate little character.
   the hidden `peeker` sub-group parked below ground) at a hero-side
   anchor.
 - `createHeroIdleBeat(group, peeker): HeroIdleBeat` — `update(nowMs,
-idleActive)` fed each frame; returns true while the peek animates.
+idleActive)` fed each frame; returns true while the peek animates,
+  INCLUDING the final frame that parks the peeker (that `visible=false`
+  change is render-worthy — the controller reads the return as its dirty
+  flag, so an on-demand tier would otherwise skip hiding the peeker).
 - `HERO_IDLE_MS` (60000). (The group name is module-private.)
 
 ## Invariants & assumptions

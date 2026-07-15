@@ -21,7 +21,8 @@ alongside it when Rapier physics lands.
   the initial state immediately.
   - `targets`: `{ cubes: CubeTarget | null, occlusionMesh: OcclusionTarget | null }`
     — structural (`setVisible` / `setDebugStyle`); `null` when occupancy is off.
-  - `options`: `{ visible=true, style='cubes', detailedStyle='wireframe' }`.
+  - `options`: `{ visible=true, style='detailed', detailedStyle='depth-shaded-wireframe' }`
+    — the default look matches the RecorderApp (combined shaded shell + wireframe).
 - **`MeshViewController`** — `setVisible(bool)`, `setStyle('cubes'|'detailed')`,
   `getVisible()`, `getStyle()`.
 

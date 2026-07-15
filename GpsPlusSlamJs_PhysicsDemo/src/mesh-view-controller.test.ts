@@ -20,11 +20,23 @@ function targets() {
 }
 
 describe("createMeshViewController", () => {
-  it("applies the initial state on construction (cubes visible, occluder hidden)", () => {
+  it("defaults to the detailed combined shader with the occluder visible", () => {
+    // Default look matches the RecorderApp: Detailed + depth-shaded-wireframe.
     const t = targets();
     const c = createMeshViewController(t);
     expect(c.getVisible()).toBe(true);
-    expect(c.getStyle()).toBe("cubes");
+    expect(c.getStyle()).toBe("detailed");
+    expect(t.cubes.setVisible).toHaveBeenLastCalledWith(false);
+    expect(t.occlusionMesh.setDebugStyle).toHaveBeenLastCalledWith(
+      "depth-shaded-wireframe",
+    );
+    expect(t.occlusionMesh.setVisible).toHaveBeenLastCalledWith(true);
+  });
+
+  it("shows cubes with the occluder hidden when switched to cubes", () => {
+    const t = targets();
+    const c = createMeshViewController(t);
+    c.setStyle("cubes");
     expect(t.cubes.setVisible).toHaveBeenLastCalledWith(true);
     expect(t.occlusionMesh.setDebugStyle).toHaveBeenLastCalledWith("off");
     // The occluder is HIDDEN in cubes view so it does not occlude the cubes.

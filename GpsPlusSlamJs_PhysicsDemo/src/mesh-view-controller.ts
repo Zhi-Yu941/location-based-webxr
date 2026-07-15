@@ -40,9 +40,13 @@ export interface MeshViewTargets {
 export interface MeshViewOptions {
   /** Whether the mesh is shown at all. Default `true`. */
   readonly visible?: boolean;
-  /** Initial style. Default `'cubes'` (the robust first-paint choice). */
+  /** Initial style. Default `'detailed'` (matches the RecorderApp's default look). */
   readonly style?: MeshStyle;
-  /** Which occluder debug skin represents "detailed". Default `'wireframe'`. */
+  /**
+   * Which occluder debug skin represents "detailed". Default
+   * `'depth-shaded-wireframe'` — the combined shader (semi-transparent shaded
+   * shell + wireframe lines), the same rich look the RecorderApp uses.
+   */
   readonly detailedStyle?: OccluderDebugStyle;
 }
 
@@ -64,9 +68,9 @@ export function createMeshViewController(
   options: MeshViewOptions = {},
 ): MeshViewController {
   let visible = options.visible ?? true;
-  let style: MeshStyle = options.style ?? "cubes";
+  let style: MeshStyle = options.style ?? "detailed";
   const detailedStyle: OccluderDebugStyle =
-    options.detailedStyle ?? "wireframe";
+    options.detailedStyle ?? "depth-shaded-wireframe";
 
   const apply = (): void => {
     const showCubes = visible && style === "cubes";

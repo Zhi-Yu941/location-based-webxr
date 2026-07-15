@@ -36,7 +36,7 @@ function requireEl<T extends HTMLElement = HTMLElement>(id: string): T {
   return el as T;
 }
 
-async function main(): Promise<void> {
+function main(): void {
   const app = requireEl("app");
   const modeScreen = requireEl("mode-screen");
   const capabilityMessage = requireEl("capability-message");
@@ -57,8 +57,10 @@ async function main(): Promise<void> {
   // Live AR: on a WebXR-capable device, "Start AR" launches a genuine AR physics
   // session (device-only — verified via `pnpm dev` on a phone). The play/pause +
   // speed row is replay-only, so it is hidden in AR; the mesh + physics controls
-  // are shared.
-  if (await detectArSupport()) {
+  // are shared. Detection is fire-and-forget so the replay listeners below wire
+  // synchronously (a blocking await here would leave the file input briefly dead).
+  void detectArSupport().then((supported) => {
+    if (!supported) return;
     startArButton.hidden = false;
     startArButton.addEventListener("click", () => {
       startArButton.disabled = true;
@@ -87,7 +89,7 @@ async function main(): Promise<void> {
         }),
       );
     });
-  }
+  });
 
   let controller: ReplaySessionController | null = null;
   let playing = false;
@@ -205,4 +207,4 @@ async function main(): Promise<void> {
   speedInput.addEventListener("input", applySpeed);
 }
 
-void main();
+main();

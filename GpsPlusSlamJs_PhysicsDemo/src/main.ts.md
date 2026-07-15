@@ -11,8 +11,9 @@ lives in the tested `mode-detection` / `replay-launch` modules; this file is glu
 ## Behaviour
 
 - On load, `detectArSupport()` reveals the "Start AR" button only on a
-  WebXR-capable device (live AR physics is a later iteration; the button shows a
-  capability message for now). The desktop-replay path is always available.
+  WebXR-capable device; clicking it inits Rapier then calls `startArMode`
+  (`ar-mode.ts`) for a genuine live-AR physics session (the play/pause/speed row is
+  hidden in AR — it is replay-only). The desktop-replay path is always available.
 - Selecting a recording moves the UI through the async-feedback states:
   `#capability-message` → "Loading recording…" (input disabled) → on success the
   mode screen hides and `#replay-panel` appears with a status + play/pause + speed;

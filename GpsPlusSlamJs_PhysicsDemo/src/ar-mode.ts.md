@@ -1,0 +1,44 @@
+# ar-mode.ts
+
+## Purpose
+
+The live-AR mode — a genuine on-device AR physics session (the other half of the
+demo; the desktop-replay path lives in `main.ts`). Balls bounce off the room the
+device reconstructs live, spawned where a screen-centre WebXR hit-test reticle sits
+when the user taps.
+
+## Public API
+
+- **`startArMode(deps): Promise<() => void>`** — starts a WebXR session and returns
+  a disposer that ends it. `deps`: `{ container, dropButton, clearButton, statsEl,
+meshVisibleInput, meshStyleSelect, onError, onStarted? }`.
+
+## Behaviour / wiring
+
+- Creates a framework store (`createSlamAppStore` + `NullStorageBackend`), then
+  `initAR(container, {}, { requestHitTest, requestDepthOcclusion }, { tracking:
+{store}, depth: { onCaptured → dispatch recordDepthSample } })`.
+- `startDepthCapture()` + `createOccupancyView(arWorldGroup, store)` reconstruct the
+  room from the live depth stream (same occupancy stack as replay).
+- `createPhysicsRuntime(arWorldGroup, occlusionMesh)` runs the physics; it is
+  stepped every XR frame via `registerXrFrameUpdate` (`performance.now()` drives the
+  collider-rebuild throttle).
+- A `createReticleMesh` reticle is driven by `frame.getHitTestResults` each frame
+  (mirrors the sibling apps' `reticle-hit-test.ts`); `session`'s `select` (tap) —
+  and the Drop-ball button — spawn a ball at the reticle's world position.
+- The mesh-view controller (Cubes/Detailed) is shared with the replay path.
+
+## Invariants & assumptions
+
+- **Device-only glue.** Playwright Chromium has no `navigator.xr`, so this file is
+  NOT exercised by e2e; it is verified manually via `pnpm dev` on an Android phone
+  (repo norm for WebXR glue). Its tested building blocks are `occupancy-view`,
+  `physics-runtime`, and `mesh-view-controller`.
+- `initAR` is a singleton (one session); the disposer calls `endARSession()`.
+- The store is created per session (re-passed to `initAR`); no GPS/alignment is
+  wired (physics needs only AR-local tracking + depth).
+
+## Tests
+
+- None directly (device-only WebXR glue). Covered indirectly by the unit tests of
+  its building blocks; behaviour verified on-device.

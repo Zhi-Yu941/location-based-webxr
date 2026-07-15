@@ -3,8 +3,9 @@
 Physics balls bounce off the **reconstructed occupancy mesh** of a real space.
 Two modes, one placement/spawn story:
 
-- **AR (on device):** a live WebXR session reconstructs the room and balls bounce
-  off it. _(Lands in a later iteration.)_
+- **AR (on device):** a live WebXR session reconstructs the room from the depth
+  stream and balls bounce off it; tap a surface (screen-centre hit-test reticle) to
+  drop one. Android + Chrome; verify with `pnpm dev` on a phone.
 - **Desktop replay (the developer harness):** load a recorded walk (`.zip`) and
   replay it — the same occupancy mesh reconstructs from the replayed depth stream
   while you spawn balls against it. No phone, no WebXR, deterministic world.
@@ -15,11 +16,14 @@ TDD-friendly harness (record once, iterate on the desktop).
 
 ## Status
 
-- **C1 (this iteration):** desktop-replay skeleton — load a recording and replay
-  it with live occupancy-mesh reconstruction, play/pause + speed. Built on the
-  framework's `startReplaySession` (Part A) and `pointer-picking` (Part B).
-- **Next:** a demo-local mesh-view controller (Cubes/Detailed live toggle), then
-  Rapier physics (collider from the mesh, spawn/step/bounce), and live AR.
+Both modes implemented: desktop replay (load a recording → live occupancy mesh →
+click/drop balls that bounce & settle) and live AR (initAR → live occupancy → tap a
+hit-test reticle to spawn). Physics is Rapier; the collider is rebuilt from the
+reconstructed mesh (AABB-compound / trimesh). The physics logic is
+deterministically tested headlessly with real Rapier; the WebXR AR glue is
+device-verified (`pnpm dev` on a phone). Built on the framework's
+`startReplaySession` + `pointer-picking` + the live-AR seams (`initAR`,
+`subscribeReplayOccupancy`, the hit-test reticle).
 
 See the design + implementation docs in the private repo:
 `GpsPlusSlamJs_Docs/docs/2026-07-15-0533-replay-as-dev-harness-and-physics-demo-design.md`

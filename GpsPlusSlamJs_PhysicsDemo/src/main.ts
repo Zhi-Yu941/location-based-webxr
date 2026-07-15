@@ -19,13 +19,13 @@ import {
   createMeshViewController,
   type MeshStyle,
 } from "./mesh-view-controller";
-import { initRapier, createPhysicsWorld } from "./physics-world";
-import { createPhysicsSession } from "./physics-session";
+import { initRapier } from "./physics-world";
+import { createPhysicsRuntime } from "./physics-runtime";
+import { startArMode } from "./ar-mode";
 import {
   pointerToNdc,
   pickWorldPoint,
 } from "gps-plus-slam-app-framework/visualization";
-import { WEBXR_TO_NUE } from "gps-plus-slam-app-framework/ar/webxr-nue-basis";
 import type { ReplaySessionController } from "gps-plus-slam-app-framework/state/replay-session";
 
 function requireEl<T extends HTMLElement = HTMLElement>(id: string): T {
@@ -52,15 +52,40 @@ async function main(): Promise<void> {
   const dropBallButton = requireEl<HTMLButtonElement>("drop-ball-button");
   const clearBallsButton = requireEl<HTMLButtonElement>("clear-balls-button");
   const statsEl = requireEl("stats");
+  const replayControls = requireEl("replay-controls");
 
-  // Live AR physics is a later iteration; here the button only advertises it so
-  // a capable device is not left thinking the demo is desktop-only.
+  // Live AR: on a WebXR-capable device, "Start AR" launches a genuine AR physics
+  // session (device-only — verified via `pnpm dev` on a phone). The play/pause +
+  // speed row is replay-only, so it is hidden in AR; the mesh + physics controls
+  // are shared.
   if (await detectArSupport()) {
     startArButton.hidden = false;
     startArButton.addEventListener("click", () => {
+      startArButton.disabled = true;
       capabilityMessage.hidden = false;
-      capabilityMessage.textContent =
-        "Live AR physics lands in a later iteration — load a recording to try the replay harness now.";
+      capabilityMessage.textContent = "Starting AR…";
+      void initRapier().then(() =>
+        startArMode({
+          container: app,
+          dropButton: dropBallButton,
+          clearButton: clearBallsButton,
+          statsEl,
+          meshVisibleInput,
+          meshStyleSelect,
+          onError: (message) => {
+            startArButton.disabled = false;
+            capabilityMessage.hidden = false;
+            capabilityMessage.textContent = `⚠ ${message}`;
+          },
+          onStarted: () => {
+            modeScreen.hidden = true;
+            replayPanel.hidden = false;
+            replayControls.hidden = true; // play/pause/speed are replay-only
+            replayStatus.textContent =
+              "AR running — tap a surface to drop a ball.";
+          },
+        }),
+      );
     });
   }
 
@@ -103,7 +128,7 @@ async function main(): Promise<void> {
       );
 
       // Physics starts once Rapier's WASM is ready (loaded lazily on first replay).
-      void initRapier().then(() => setupPhysics(readyController));
+      void initRapier().then(() => setupReplayPhysics(readyController));
 
       setPlaying(true);
       void controller.play(Number(speedInput.value) || 1);
@@ -115,48 +140,24 @@ async function main(): Promise<void> {
     },
   };
 
-  // Rebuild the collider from the growing occupied AABBs at most this often (ms),
-  // coalescing the fast replay-driven grid growth so a rebuild every frame does
-  // not teleport resting balls (design §6 churn note).
-  const COLLIDER_REBUILD_MS = 500;
-
-  function setupPhysics(session: ReplaySessionController): void {
+  function setupReplayPhysics(session: ReplaySessionController): void {
     const scene = session.getScene();
     const occlusionMesh = session.getOcclusionMesh();
+    const runtime = createPhysicsRuntime(scene.arWorldGroup, occlusionMesh, {
+      onStats: (balls, boxes) => {
+        statsEl.textContent = `balls ${balls} · collider ${boxes} boxes`;
+      },
+    });
 
-    // Balls live in raw-WebXR space; parent them under a WEBXR_TO_NUE node so they
-    // ride the same alignment × WEBXR_TO_NUE chain as the reconstructed mesh and
-    // visually coincide with it.
-    const ballGroup = new THREE.Group();
-    ballGroup.matrixAutoUpdate = false;
-    ballGroup.matrix.copy(WEBXR_TO_NUE);
-    scene.arWorldGroup.add(ballGroup);
-
-    const physics = createPhysicsWorld();
-    const physicsSession = createPhysicsSession(physics, ballGroup);
-
-    let lastRebuild = -Infinity;
+    // Desktop replay is driven by window rAF.
     const tick = (t: number): void => {
-      if (occlusionMesh && t - lastRebuild >= COLLIDER_REBUILD_MS) {
-        const aabbs = occlusionMesh.getAabbs();
-        if (aabbs.length > 0) {
-          physicsSession.setColliderFromAabbs(aabbs);
-        }
-        lastRebuild = t;
-      }
-      physicsSession.step();
-      statsEl.textContent = `balls ${physicsSession.ballCount()} · collider ${physicsSession.colliderShapeCount()} boxes`;
+      runtime.step(t);
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
 
-    const spawnAtWorld = (world: THREE.Vector3, lift: number): void => {
-      const local = ballGroup.worldToLocal(world.clone());
-      physicsSession.spawnBallAt({ x: local.x, y: local.y + lift, z: local.z });
-    };
-
-    // Click a real reconstructed surface → spawn a ball just above it (Part B
-    // raycast against the occlusion mesh).
+    // Placement (desktop): click a real reconstructed surface → spawn a ball just
+    // above it, via the Part-B raycast against the occlusion mesh.
     const canvas = scene.renderer.domElement;
     canvas.addEventListener("pointerdown", (e: PointerEvent) => {
       if (!occlusionMesh) return;
@@ -166,16 +167,14 @@ async function main(): Promise<void> {
         canvas.getBoundingClientRect(),
       );
       const hit = pickWorldPoint(scene.camera, ndc, [occlusionMesh.getMesh()]);
-      if (hit) spawnAtWorld(hit, 0.3);
+      if (hit) runtime.spawnAtWorld(hit, 0.3);
     });
 
     dropBallButton.addEventListener("click", () => {
       const camWorld = scene.camera.getWorldPosition(new THREE.Vector3());
-      spawnAtWorld(camWorld, 0.5);
+      runtime.spawnAtWorld(camWorld, 0.5);
     });
-    clearBallsButton.addEventListener("click", () =>
-      physicsSession.clearBalls(),
-    );
+    clearBallsButton.addEventListener("click", () => runtime.clearBalls());
   }
 
   fileInput.addEventListener("change", () => {

@@ -13,7 +13,7 @@
  */
 
 import * as THREE from "three";
-import { detectArSupport } from "./mode-detection";
+import { detectArSupport, applyModeEntry } from "./mode-detection";
 import { loadAndStartReplay, type ReplayLaunchSink } from "./replay-launch";
 import { createOccupancyView } from "./occupancy-view";
 import { initRapier } from "./physics-world";
@@ -38,6 +38,7 @@ function main(): void {
   const modeScreen = requireEl("mode-screen");
   const capabilityMessage = requireEl("capability-message");
   const fileInput = requireEl<HTMLInputElement>("recording-input");
+  const fileRow = requireEl("file-row");
   const startArButton = requireEl<HTMLButtonElement>("start-ar-button");
   const replayPanel = requireEl("replay-panel");
   const replayStatus = requireEl("replay-status");
@@ -54,9 +55,14 @@ function main(): void {
   // speed row is replay-only, so it is hidden in AR; the mesh + physics controls
   // are shared. Detection is fire-and-forget so the replay listeners below wire
   // synchronously (a blocking await here would leave the file input briefly dead).
+  //
+  // The mode screen is EITHER-OR: a capable phone shows only "Start AR" (the
+  // recording file-row is hidden); the desktop shows only the file-row. The
+  // file-row defaults visible in the HTML, so the desktop path already works if
+  // detection never resolves.
   void detectArSupport().then((supported) => {
+    applyModeEntry(supported, { startArButton, fileRow });
     if (!supported) return;
-    startArButton.hidden = false;
     startArButton.addEventListener("click", () => {
       startArButton.disabled = true;
       capabilityMessage.hidden = false;

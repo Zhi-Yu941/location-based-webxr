@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { detectArSupport } from "./mode-detection";
+import { detectArSupport, applyModeEntry } from "./mode-detection";
 
 describe("detectArSupport", () => {
   it("returns false when navigator.xr is absent", async () => {
@@ -40,5 +40,27 @@ describe("detectArSupport", () => {
         isSessionSupported: () => Promise.reject(new Error("nope")),
       }),
     ).toBe(false);
+  });
+});
+
+describe("applyModeEntry", () => {
+  // Why this test matters: user feedback #4 (2026-07-15) — the mode screen must
+  // offer EXACTLY ONE entry path. Before this seam the recording file-row was
+  // always visible and only "Start AR" was conditionally revealed, so a
+  // WebXR-capable phone showed BOTH. These two branches pin the either-or.
+  it("shows only Start AR (hides the file-row) on a WebXR-capable device", () => {
+    const startArButton = { hidden: true };
+    const fileRow = { hidden: false };
+    applyModeEntry(true, { startArButton, fileRow });
+    expect(startArButton.hidden).toBe(false);
+    expect(fileRow.hidden).toBe(true);
+  });
+
+  it("shows only the file-row (Start AR hidden) on the desktop", () => {
+    const startArButton = { hidden: false };
+    const fileRow = { hidden: true };
+    applyModeEntry(false, { startArButton, fileRow });
+    expect(startArButton.hidden).toBe(true);
+    expect(fileRow.hidden).toBe(false);
   });
 });

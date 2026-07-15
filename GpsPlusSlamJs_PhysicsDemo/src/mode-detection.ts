@@ -30,3 +30,30 @@ export async function detectArSupport(
     return false;
   }
 }
+
+/**
+ * The two mutually-exclusive entry controls (structural — tests pass plain
+ * objects). `Pick<HTMLElement, "hidden">` tracks the DOM lib's `hidden` type
+ * (`string | boolean` — the `"until-found"` value) so real elements assign cleanly.
+ */
+export interface ModeEntryElements {
+  /** The "Start AR" button — shown only on a WebXR-capable device. */
+  readonly startArButton: Pick<HTMLElement, "hidden">;
+  /** The "Load a recording" file-row — shown only on the desktop. */
+  readonly fileRow: Pick<HTMLElement, "hidden">;
+}
+
+/**
+ * Show exactly ONE entry path on the mode screen: on a WebXR-capable device the
+ * "Start AR" button (hide the recording file-row); everywhere else the file-row
+ * (hide "Start AR"). The demo is either-or — a phone runs live AR, the desktop
+ * replays a recording — so showing both was a bug (the file-row used to be
+ * unconditionally visible).
+ */
+export function applyModeEntry(
+  arSupported: boolean,
+  { startArButton, fileRow }: ModeEntryElements,
+): void {
+  startArButton.hidden = !arSupported;
+  fileRow.hidden = arSupported;
+}

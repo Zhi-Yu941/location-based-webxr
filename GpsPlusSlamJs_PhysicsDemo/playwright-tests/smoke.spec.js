@@ -27,7 +27,9 @@ test.describe("Physics Demo Smoke", () => {
     await expect(page.getByTestId("mode-screen")).toBeVisible();
     await expect(page.getByTestId("recording-input")).toBeVisible();
 
-    // No WebXR in Playwright → the AR button stays hidden, replay is offered.
+    // No WebXR in Playwright → the mode screen shows the desktop path ONLY: the
+    // recording file-row is visible and "Start AR" is hidden (either-or entry).
+    await expect(page.getByTestId("file-row")).toBeVisible();
     await expect(page.getByTestId("start-ar-button")).toBeHidden();
     // Replay controls are not shown until a recording is loaded.
     await expect(page.getByTestId("replay-panel")).toBeHidden();

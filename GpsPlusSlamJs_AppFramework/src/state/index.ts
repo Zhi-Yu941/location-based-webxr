@@ -164,6 +164,21 @@ export {
   wireStoreSubscribers,
 } from './store-subscribers.js';
 
+// --- replay-session (desktop-replay composer for consumer apps) ---
+export {
+  type ReplaySessionController,
+  type StartReplaySessionOptions,
+  type ReplayOccupancyConfig,
+  type ReplaySceneHandles,
+  startReplaySession,
+} from './replay-session.js';
+export {
+  type ReplayOccupancySubscriberOptions,
+  type DepthSampleStore,
+  type OccupancyGridSink,
+  subscribeReplayOccupancy,
+} from './replay-occupancy-subscriber.js';
+
 // --- subscribe-to-selector ---
 export { subscribeToSelector } from './subscribe-to-selector.js';
 

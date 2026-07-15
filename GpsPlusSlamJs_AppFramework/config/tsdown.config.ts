@@ -106,6 +106,12 @@ const entryFiles = [
   'src/state/qr-detected-slice.ts',
   'src/state/recording-replayer.ts',
   'src/state/replay-engine.ts',
+  // Desktop-replay composer + its occupancy subscriber (2026-07-15 replay-harness
+  // Part A) — deep-imported by consumer apps (PhysicsDemo) via the `./state/*`
+  // wildcard, so each must be a per-file dist entry (missing entry breaks Vite
+  // resolution at runtime; see 2026-04-29-recorder-e2e-import-resolution doc).
+  'src/state/replay-session.ts',
+  'src/state/replay-occupancy-subscriber.ts',
   'src/state/store-subscribers.ts',
   'src/state/subscribe-to-selector.ts',
 

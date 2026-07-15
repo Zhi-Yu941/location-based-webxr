@@ -42,6 +42,8 @@ export interface ArModeDeps {
   readonly onError: (message: string) => void;
   /** Called once the live AR session is up and physics is running. */
   readonly onStarted?: () => void;
+  /** Called once per XR frame (drives the always-on perf panel). */
+  readonly onFrame?: () => void;
 }
 
 /**
@@ -118,6 +120,7 @@ export async function startArMode(deps: ArModeDeps): Promise<() => void> {
   const unregisterFrame = registerXrFrameUpdate(({ session }) => {
     // Step physics every XR frame (the throttle uses wall-clock ms).
     runtime.step(performance.now());
+    deps.onFrame?.(); // advance the always-on perf panel
     if (!selectWired) {
       selectWired = true;
       session.addEventListener("select", shootForward);

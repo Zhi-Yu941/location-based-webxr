@@ -11,7 +11,8 @@ direction into the room.
 
 - **`startArMode(deps): Promise<() => void>`** — starts a WebXR session and returns
   a disposer that ends it. `deps`: `{ container, statsEl, meshStyleSelect,
-meshShaderSelect, onError, onStarted? }`.
+meshShaderSelect, onError, onStarted?, onFrame? }`. `onFrame` is called once per XR
+  frame (drives the always-on perf panel; see `perf-stats.ts`).
 
 ## Behaviour / wiring
 

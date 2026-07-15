@@ -34,6 +34,11 @@ test.describe("Physics Demo Smoke", () => {
     // Replay controls are not shown until a recording is loaded.
     await expect(page.getByTestId("replay-panel")).toBeHidden();
 
+    // The always-on perf panel (FPS/MS/MB) mounts unconditionally — Stats.js
+    // renders one <canvas> per metric (3 with Chrome's performance.memory).
+    await expect(page.locator(".perf-stats")).toBeAttached();
+    await expect(page.locator(".perf-stats canvas").first()).toBeAttached();
+
     expect(errors).toEqual([]);
   });
 });

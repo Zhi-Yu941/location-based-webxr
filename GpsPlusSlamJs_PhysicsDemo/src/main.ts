@@ -19,6 +19,7 @@ import { createOccupancyView } from "./occupancy-view";
 import { initRapier } from "./physics-world";
 import { createPhysicsRuntime } from "./physics-runtime";
 import { startArMode } from "./ar-mode";
+import { createPerfStats } from "./perf-stats";
 import { shootBallFromCamera } from "./shoot-ball";
 import { pointerToNdc } from "gps-plus-slam-app-framework/visualization";
 import type { OccluderDebugStyle } from "gps-plus-slam-app-framework/visualization/occlusion-mesh";
@@ -35,6 +36,7 @@ function requireEl<T extends HTMLElement = HTMLElement>(id: string): T {
 
 function main(): void {
   const app = requireEl("app");
+  const overlay = requireEl("overlay");
   const modeScreen = requireEl("mode-screen");
   const capabilityMessage = requireEl("capability-message");
   const fileInput = requireEl<HTMLInputElement>("recording-input");
@@ -49,6 +51,11 @@ function main(): void {
   const meshShaderSelect = requireEl<HTMLSelectElement>("mesh-shader");
   const statsEl = requireEl("stats");
   const replayControls = requireEl("replay-controls");
+
+  // Always-on FPS / memory panel (user feedback #4): mounted into the dom-overlay
+  // layer so it composites over both the desktop scene and the AR camera feed. It
+  // is driven per-frame from whichever loop is active (desktop rAF / AR XR frame).
+  const perfStats = createPerfStats(overlay);
 
   // Live AR: on a WebXR-capable device, "Start AR" launches a genuine AR physics
   // session (device-only — verified via `pnpm dev` on a phone). The play/pause +
@@ -73,6 +80,7 @@ function main(): void {
           statsEl,
           meshStyleSelect,
           meshShaderSelect,
+          onFrame: () => perfStats.update(),
           onError: (message) => {
             startArButton.disabled = false;
             capabilityMessage.hidden = false;
@@ -151,6 +159,7 @@ function main(): void {
     // Desktop replay is driven by window rAF.
     const tick = (t: number): void => {
       runtime.step(t);
+      perfStats.update();
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);

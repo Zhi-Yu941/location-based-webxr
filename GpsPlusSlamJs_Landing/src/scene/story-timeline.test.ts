@@ -215,27 +215,22 @@ describe("buildStoryTimeline", () => {
       expect(part.scale.x).toBeLessThan(0.01);
     }
 
-    // Round-14 R14-13 (portrait feedback): the arrows must NOT pop while
-    // the camera is still swinging toward the tents (the camp move is
-    // 4850→5150) — they start only AFTER it has arrived, so they are down
-    // through the whole approach.
-    timeline.seek(4880);
-    for (const arrow of arrows) {
-      expect(arrow.scale.x).toBeLessThan(0.01);
-    }
-    timeline.seek(5100); // still approaching the tents: nothing up yet
+    // Portrait feedback: the gallery box rises and covers the tents very
+    // fast, so the arrows start as the box is only ~10 % visible (~5100)
+    // and ALL stand by the time it is ~50 % visible — a very tight, fast
+    // stagger. They are still down through the approach.
+    timeline.seek(5000); // approaching the tents: nothing up yet
     for (const arrow of arrows) {
       expect(arrow.scale.x).toBeLessThan(0.01);
     }
 
-    // Just after the camp arrival (5150): the arrows pop in a quick,
-    // tight stagger so they all land at nearly the same moment.
-    timeline.seek(5240);
+    // Mid-spawn (~5160): the quick stagger is under way.
+    timeline.seek(5160);
     const onRun = arrows.filter((a) => a.scale.x > 0.5).length;
     expect(onRun).toBeGreaterThan(0);
     expect(onRun).toBeLessThan(arrows.length); // …still staggering
 
-    timeline.seek(5400); // settled at the camp: every arrow stands
+    timeline.seek(5300); // all four already stand (fast spawn)
     for (const arrow of arrows) {
       expect(arrow.scale.x).toBeGreaterThan(0.9);
     }

@@ -906,12 +906,13 @@
         font-size: 0.95rem;
         line-height: 1.5;
       }
-      .faq a {
-        color: var(--link);
-      }
       /* License FAQ (round-14 R14-21): looks like a collapsed FAQ row but
          is an anchor that OPENS the repo LICENSE in a new tab instead of
-         expanding — no community-license prose to maintain. */
+         expanding. It must be VISUALLY IDENTICAL to the <summary> rows
+         (portrait feedback: it must not stand out) — so it takes the same
+         --text color, NOT the --link blue. (The old `.faq a { color:
+         var(--link) }` rule was dropped; it only ever matched this link
+         and made it stand out.) */
       .faq-link {
         display: block;
         background: var(--card);

@@ -657,14 +657,16 @@ export function buildStoryTimeline(
   // ist und jetzt auf die Burg zufliegt"). The two windows do not
   // overlap, and both complete by the castle arrival (~5980) so chapter
   // END states stay whole compositions (reduced motion shows those).
-  // Round-14 R14-13 (portrait feedback): the first arrow used to pop at
-  // 4940 — WHILE the camera was still swinging toward the tents (the camp
-  // move is 4850→5150), so it appeared before the camera had arrived.
-  // Delayed to just AFTER the camp arrival (5180) with a tighter,
-  // faster stagger, so the arrows appear once the tents are framed and
-  // all land at nearly the same moment ("etwas nach hinten verzögern und
-  // die Pfeile lieber schneller spawnen"). All up by ~5350, well before
-  // the castle swing at 5500.
+  // Campus arrow timing (portrait feedback, superseding the earlier
+  // 5180 delay): in portrait the "What will you build" gallery box rises
+  // and covers the tents VERY fast, so a late/slow spawn is hidden before
+  // the user sees anything appear. The arrows must start as the gallery
+  // box is only ~10 % visible and ALL be up by the time it is ~50 %
+  // visible ("wenn das bei 10 % ist … dann müssen die anfangen zu
+  // spawnen, und wenn das bei 50 % sichtbar ist, müssen alle vier da
+  // sein — sehr schnell"). Start at 5100 (just as the camera settles at
+  // the tents / the box begins to appear) with a very tight, fast
+  // stagger so all four stand by ~5230 — before the box swallows them.
   // Forest magic portal (round-14 R14-10): opens during the far-out
   // works-anywhere moment (the forest + tents are in frame) and closes
   // as the camera turns to the city — "danach kann das Portal auch wieder
@@ -702,8 +704,8 @@ export function buildStoryTimeline(
   campusArrows?.children.forEach((arrow, index) => {
     timeline.add(
       arrow,
-      { scale: { from: 0.001, to: 1 }, duration: 80, ease: "outBack" },
-      5180 + index * 30,
+      { scale: { from: 0.001, to: 1 }, duration: 55, ease: "outBack" },
+      5100 + index * 22,
     );
   });
   const castleGhost = world.getObjectByName(VIGNETTE_NODE.ghost);

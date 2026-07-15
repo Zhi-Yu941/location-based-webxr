@@ -172,6 +172,9 @@ const entryFiles = [
   'src/visualization/lerp-utils.ts',
   'src/visualization/map-data.ts',
   'src/visualization/map-overlay-draw.ts',
+  // Engine-free desktop pointer raycast helper (2026-07-15 replay-harness Part B)
+  // — deep-imported by consumer apps (PhysicsDemo) via `./visualization/*`.
+  'src/visualization/pointer-picking.ts',
   'src/visualization/three-dispose.ts',
   'src/visualization/vis-colors.ts',
 ];

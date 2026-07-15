@@ -98,6 +98,15 @@ describe('OcclusionMesh', () => {
     occluder.dispose();
   });
 
+  it('exposes the underlying mesh via getMesh() for pointer raycasting', () => {
+    // The Part-B pointer-picking layer needs a handle to the real occluder mesh;
+    // getMesh() must return the very object attached to the scene graph.
+    const parent = new THREE.Group();
+    const occluder = new OcclusionMesh(parent);
+    expect(occluder.getMesh()).toBe(findMesh(parent));
+    occluder.dispose();
+  });
+
   it('starts empty and meshes a snapshot on update', () => {
     const parent = new THREE.Group();
     const occluder = new OcclusionMesh(parent);

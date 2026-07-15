@@ -98,6 +98,15 @@ export { DEFAULT_LERP_RATE, clampedAlpha } from './lerp-utils.js';
 // --- map-data (shared trajectory model) ---
 export { type MapData, type MapDataInput, buildMapData } from './map-data.js';
 
+// --- pointer-picking (engine-free desktop raycast helper) ---
+export {
+  type Ndc,
+  type ElementRect,
+  pointerToNdc,
+  raycastPointer,
+  pickWorldPoint,
+} from './pointer-picking.js';
+
 // --- accuracy-circles (shared per-event GPS accuracy circles) ---
 export {
   type AccuracyCircleSample,

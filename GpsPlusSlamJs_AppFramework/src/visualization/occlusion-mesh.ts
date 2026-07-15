@@ -314,6 +314,18 @@ export class OcclusionMesh {
   }
 
   /**
+   * The underlying `THREE.Mesh` (the depth-only occluder geometry), for a
+   * pointer-raycast layer to target the real occluder surface (2026-07-15
+   * replay-harness Part B). The mesh's `colorWrite:false` invisibility does NOT
+   * affect `THREE.Raycaster`, and `frustumCulled:false` is fine for raycasting.
+   * Treat it as read-only — re-mesh via {@link update} / restyle via
+   * {@link setDebugStyle} instead of mutating the returned object.
+   */
+  getMesh(): THREE.Mesh {
+    return this.mesh;
+  }
+
+  /**
    * Re-mesh from a fresh occupied-cell snapshot. Pass
    * `grid.getOccupiedCells(occupancy.minConfidence)` so the occluder shares the
    * same noise floor as the cubes and the COLMAP export.

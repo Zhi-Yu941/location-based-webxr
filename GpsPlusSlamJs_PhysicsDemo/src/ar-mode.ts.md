@@ -4,20 +4,20 @@
 
 The live-AR mode — a genuine on-device AR physics session (the other half of the
 demo; the desktop-replay path lives in `main.ts`). Balls bounce off the room the
-device reconstructs live, spawned where a screen-centre WebXR hit-test reticle sits
-when the user taps.
+device reconstructs live; a tap shoots a ball from the camera along its forward
+direction into the room.
 
 ## Public API
 
 - **`startArMode(deps): Promise<() => void>`** — starts a WebXR session and returns
-  a disposer that ends it. `deps`: `{ container, dropButton, clearButton, statsEl,
-meshVisibleInput, meshStyleSelect, onError, onStarted? }`.
+  a disposer that ends it. `deps`: `{ container, statsEl, meshVisibleInput,
+meshStyleSelect, onError, onStarted? }`.
 
 ## Behaviour / wiring
 
 - Creates a framework store (`createSlamAppStore` + `NullStorageBackend`), then
-  `initAR(container, {}, { requestHitTest, requestDepthOcclusion }, { tracking:
-{store}, depth: { onCaptured → dispatch recordDepthSample } })`.
+  `initAR(container, {}, { requestDepthOcclusion }, { tracking: {store}, depth: {
+  onCaptured → dispatch recordDepthSample } })`.
 - `startDepthCapture()` + `createOccupancyView(arWorldGroup, store)` reconstruct the
   room from the live depth stream (same occupancy stack as replay).
 - `createPhysicsRuntime(arWorldGroup, occlusionMesh)` runs the physics; it is

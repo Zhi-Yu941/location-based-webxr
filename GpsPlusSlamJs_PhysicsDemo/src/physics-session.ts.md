@@ -10,7 +10,9 @@ headless-testable (real Rapier + real THREE objects, no WebGL/rAF).
 
 ## Public API
 
-- **`createPhysicsSession(physics, ballParent): PhysicsSession`** —
+- **`createPhysicsSession(physics, ballParent, options?): PhysicsSession`** —
+  `options.maxAgeSteps` (default 3600 = 60 s at the 1/60 s timestep) auto-despawns a
+  ball that many steps after it spawned.
   - `spawnBallAt(position, velocity?)` — dynamic sphere at `position` (raw-WebXR),
     rendered as a `THREE.Mesh` under `ballParent`.
   - `clearBalls()` / `ballCount()`.
@@ -27,6 +29,8 @@ headless-testable (real Rapier + real THREE objects, no WebGL/rAF).
   `arWorldGroup` (main.ts) so the balls ride the same chain as the mesh.
 - **Rebuild replaces, never stacks** — each `setCollider*` removes the previous
   collider body first, so the collider count reflects the latest geometry only.
+- **Auto-despawn** is counted in fixed physics steps (not wall-clock), so it is
+  deterministic and testable; `step` prunes balls older than `maxAgeSteps`.
 - Shared unit-sphere geometry + one material across balls (each mesh scaled to its
   radius); freed on `dispose`.
 - `initRapier()` must have resolved before the `physics` world was created.

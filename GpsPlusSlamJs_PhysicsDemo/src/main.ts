@@ -47,8 +47,6 @@ function main(): void {
   const speedValue = requireEl("replay-speed-value");
   const meshVisibleInput = requireEl<HTMLInputElement>("mesh-visible");
   const meshStyleSelect = requireEl<HTMLSelectElement>("mesh-style");
-  const dropBallButton = requireEl<HTMLButtonElement>("drop-ball-button");
-  const clearBallsButton = requireEl<HTMLButtonElement>("clear-balls-button");
   const statsEl = requireEl("stats");
   const replayControls = requireEl("replay-controls");
 
@@ -67,8 +65,6 @@ function main(): void {
       void initRapier().then(() =>
         startArMode({
           container: app,
-          dropButton: dropBallButton,
-          clearButton: clearBallsButton,
           statsEl,
           meshVisibleInput,
           meshStyleSelect,
@@ -173,15 +169,6 @@ function main(): void {
         raycaster.ray.direction,
       );
     });
-
-    dropBallButton.addEventListener("click", () =>
-      shootBallFromCamera(
-        runtime,
-        scene.camera.getWorldPosition(new THREE.Vector3()),
-        scene.camera.getWorldDirection(new THREE.Vector3()),
-      ),
-    );
-    clearBallsButton.addEventListener("click", () => runtime.clearBalls());
   }
 
   fileInput.addEventListener("change", () => {

@@ -25,6 +25,8 @@ type ColliderKind = "aabb" | "trimesh";
 interface Ball {
   readonly body: BallBody;
   readonly mesh: THREE.Mesh;
+  /** The step index this ball was spawned at (for age-based auto-despawn). */
+  readonly bornAtStep: number;
 }
 
 interface Vec3 {
@@ -53,22 +55,35 @@ interface PhysicsSession {
 
 const BALL_COLOR = 0x4f8cff;
 
+export interface PhysicsSessionOptions {
+  /**
+   * Auto-despawn a ball after this many `step`s. Default 3600 — 60 s at the fixed
+   * 1/60 s timestep. Counting steps (not wall-clock) keeps it deterministic + testable.
+   */
+  readonly maxAgeSteps?: number;
+}
+
 export function createPhysicsSession(
   physics: PhysicsWorld,
   ballParent: THREE.Object3D,
+  options: PhysicsSessionOptions = {},
 ): PhysicsSession {
+  const maxAgeSteps = options.maxAgeSteps ?? 3600;
   const balls: Ball[] = [];
+  let stepCount = 0;
   // One shared unit sphere; each ball mesh is scaled to its radius.
   const geometry = new THREE.SphereGeometry(1, 16, 12);
   const material = new THREE.MeshStandardMaterial({ color: BALL_COLOR });
   let collider: StaticCollider | null = null;
   let kind: ColliderKind | null = null;
 
+  const removeBall = (ball: Ball): void => {
+    ballParent.remove(ball.mesh);
+    physics.world.removeRigidBody(ball.body.body);
+  };
+
   const clearBalls = (): void => {
-    for (const ball of balls) {
-      ballParent.remove(ball.mesh);
-      physics.world.removeRigidBody(ball.body.body);
-    }
+    for (const ball of balls) removeBall(ball);
     balls.length = 0;
   };
 
@@ -85,7 +100,7 @@ export function createPhysicsSession(
       mesh.scale.setScalar(radius);
       mesh.position.set(position.x, position.y, position.z);
       ballParent.add(mesh);
-      balls.push({ body, mesh });
+      balls.push({ body, mesh, bornAtStep: stepCount });
     },
     clearBalls,
     ballCount: () => balls.length,
@@ -105,8 +120,17 @@ export function createPhysicsSession(
     colliderKind: () => kind,
     colliderShapeCount: () => collider?.shapeCount ?? 0,
     step(): void {
+      stepCount++;
       physics.step();
-      for (const ball of balls) {
+      // Sync surviving balls; auto-despawn any older than maxAgeSteps. Iterate
+      // backwards so splicing removed balls doesn't skip the next one.
+      for (let i = balls.length - 1; i >= 0; i--) {
+        const ball = balls[i]!;
+        if (stepCount - ball.bornAtStep > maxAgeSteps) {
+          removeBall(ball);
+          balls.splice(i, 1);
+          continue;
+        }
         const t = ball.body.body.translation();
         ball.mesh.position.set(t.x, t.y, t.z);
       }

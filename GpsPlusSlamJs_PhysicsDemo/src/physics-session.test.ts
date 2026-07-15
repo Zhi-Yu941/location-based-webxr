@@ -47,6 +47,26 @@ describe("createPhysicsSession", () => {
     physics.dispose();
   });
 
+  it("auto-despawns a ball after maxAgeSteps steps", () => {
+    const physics = createPhysicsWorld();
+    const parent = new THREE.Group();
+    const session = createPhysicsSession(physics, parent, { maxAgeSteps: 5 });
+    session.spawnBallAt({ x: 0, y: 1, z: 0 });
+    expect(session.ballCount()).toBe(1);
+
+    // Alive through maxAgeSteps steps...
+    for (let i = 0; i < 5; i++) session.step();
+    expect(session.ballCount()).toBe(1);
+    expect(parent.children).toHaveLength(1);
+
+    // ...and despawned (body + mesh removed) on the step past maxAgeSteps.
+    session.step();
+    expect(session.ballCount()).toBe(0);
+    expect(parent.children).toHaveLength(0);
+    session.dispose();
+    physics.dispose();
+  });
+
   it("clearBalls removes every body and mesh", () => {
     const physics = createPhysicsWorld();
     const parent = new THREE.Group();

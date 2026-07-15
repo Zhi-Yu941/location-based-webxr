@@ -44,17 +44,15 @@ test.describe("Physics Demo — desktop replay end-to-end", () => {
       timeout: 90_000,
     });
 
-    // Drop a ball → the count increments (spawn + the physics step loop are live).
-    await page.getByTestId("drop-ball-button").click();
+    // Click the scene (below the top control panel) → a ball is shot from the
+    // camera; the count increments (spawn + the physics step loop are live).
+    await page.mouse.click(640, 600);
     await expect(stats).toContainText(/balls 1 /, { timeout: 10_000 });
-    await page.getByTestId("drop-ball-button").click();
+    await page.mouse.click(660, 560);
     await expect(stats).toContainText(/balls 2 /, { timeout: 10_000 });
 
-    // Clear removes them.
-    await page.getByTestId("clear-balls-button").click();
-    await expect(stats).toContainText(/balls 0 /, { timeout: 10_000 });
-
     // The live mesh-view toggle (Cubes ↔ Detailed, hide/show) must not crash.
+    await page.getByTestId("mesh-style").selectOption("cubes");
     await page.getByTestId("mesh-style").selectOption("detailed");
     await page.getByTestId("mesh-visible").uncheck();
     await page.getByTestId("mesh-visible").check();

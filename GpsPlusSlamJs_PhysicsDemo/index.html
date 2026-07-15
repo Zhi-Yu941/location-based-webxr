@@ -120,13 +120,8 @@
         font-size: 13px;
         margin-left: 4px;
       }
-      #physics-controls {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        font-size: 13px;
-      }
       #physics-hint {
+        font-size: 13px;
         color: #cfcfcf;
       }
       #stats {
@@ -221,14 +216,8 @@
               </select>
             </label>
           </div>
-          <div id="physics-controls">
-            <button id="drop-ball-button" data-testid="drop-ball-button">
-              Drop ball
-            </button>
-            <button id="clear-balls-button" data-testid="clear-balls-button">
-              Clear balls
-            </button>
-            <span id="physics-hint">…or click a surface to spawn.</span>
+          <div id="physics-hint">
+            Click / tap to shoot a ball into the scene.
           </div>
           <div id="stats" data-testid="stats"></div>
           <div id="error" data-testid="error" hidden></div>

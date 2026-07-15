@@ -35,8 +35,6 @@ import {
 
 export interface ArModeDeps {
   readonly container: HTMLElement;
-  readonly dropButton: HTMLButtonElement;
-  readonly clearButton: HTMLButtonElement;
   readonly statsEl: HTMLElement;
   readonly meshVisibleInput: HTMLInputElement;
   readonly meshStyleSelect: HTMLSelectElement;
@@ -130,9 +128,6 @@ export async function startArMode(deps: ArModeDeps): Promise<() => void> {
       session.addEventListener("select", shootForward);
     }
   });
-
-  deps.dropButton.addEventListener("click", shootForward);
-  deps.clearButton.addEventListener("click", () => runtime.clearBalls());
 
   deps.onStarted?.();
 

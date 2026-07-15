@@ -180,6 +180,15 @@ export class OccupancyCubesVisualizer {
   }
 
   /**
+   * Show or hide the cubes live without discarding them — the cheap
+   * mesh-view toggle (a later `refresh` still repopulates them). Flips the
+   * instanced mesh's `visible` flag; O(1), no re-mesh.
+   */
+  setVisible(visible: boolean): void {
+    this.mesh.visible = visible;
+  }
+
+  /**
    * Redraw from the grid: every sufficiently-observed cell when under the
    * instance cap. Over cap, draw the cells **nearest the viewer** when a
    * `viewerPose` is supplied (Issue B1 — keeps the local neighbourhood

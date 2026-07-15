@@ -26,7 +26,9 @@ minObservations=1, showCubes=true, showOcclusionMesh=true, refreshIntervalMs=250
 - **`ReplaySessionController`** — `play(speedFactor=1)`, `pause()`, `resume()`,
   `setSpeed(factor)`, `getState()`, `getStore()`, `getScene()` (→ `{scene,
 arWorldGroup, arpose, camera, renderer}`), `getOccupancyGrid()` (or `null`),
-  `getOcclusionMesh()` (or `null`), `getActionCount()`, `dispose()`.
+  `getCubesVisualizer()` (or `null`), `getOcclusionMesh()` (or `null`),
+  `getActionCount()`, `dispose()`. The cubes + occlusion-mesh handles let a
+  consumer's mesh-view controller toggle visibility/style live.
 
 ## Invariants & assumptions
 

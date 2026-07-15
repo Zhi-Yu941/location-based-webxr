@@ -89,6 +89,7 @@ describe('startReplaySession', () => {
       'getStore',
       'getScene',
       'getOccupancyGrid',
+      'getCubesVisualizer',
       'getOcclusionMesh',
       'getActionCount',
       'dispose',
@@ -97,8 +98,9 @@ describe('startReplaySession', () => {
         typeof (session as unknown as Record<string, unknown>)[method]
       ).toBe('function');
     }
-    // Occupancy on by default → grid + occlusion mesh are built and exposed.
+    // Occupancy on by default → grid + cubes + occlusion mesh built and exposed.
     expect(session.getOccupancyGrid()).toBeInstanceOf(OccupancyGrid);
+    expect(session.getCubesVisualizer()).not.toBeNull();
     expect(session.getOcclusionMesh()).not.toBeNull();
     expect(session.getActionCount()).toBe(0);
     session.dispose();
@@ -131,6 +133,7 @@ describe('startReplaySession', () => {
       occupancy: { enabled: false },
     });
     expect(session.getOccupancyGrid()).toBeNull();
+    expect(session.getCubesVisualizer()).toBeNull();
     expect(session.getOcclusionMesh()).toBeNull();
     session.dispose();
   });

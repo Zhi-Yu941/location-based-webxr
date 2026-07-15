@@ -63,6 +63,19 @@ describe('OccupancyCubesVisualizer', () => {
     visualizer.dispose();
   });
 
+  it('setVisible toggles the mesh visibility live without clearing it', () => {
+    // The mesh-view controller flips this to hide/show cubes without a re-mesh.
+    const arSpaceNode = new THREE.Group();
+    const visualizer = new OccupancyCubesVisualizer(arSpaceNode);
+    const mesh = findMesh(arSpaceNode);
+    expect(mesh.visible).toBe(true);
+    visualizer.setVisible(false);
+    expect(mesh.visible).toBe(false);
+    visualizer.setVisible(true);
+    expect(mesh.visible).toBe(true);
+    visualizer.dispose();
+  });
+
   it('carries the WebXR→NUE basis change as the mesh local matrix', () => {
     // The grid's cells are raw WebXR while the AR-space node (arWorldGroup)
     // is AR-odometry NUE — the mesh must hold the same static basis change

@@ -125,6 +125,8 @@ export interface ReplaySessionController {
   getScene(): ReplaySceneHandles;
   /** The reconstructed occupancy grid, or `null` when occupancy is disabled. */
   getOccupancyGrid(): OccupancyGrid | null;
+  /** The cube visualizer, or `null` when disabled/not built (for a live mesh-view toggle). */
+  getCubesVisualizer(): OccupancyCubesVisualizer | null;
   /** The occlusion mesh, or `null` when disabled/not built. */
   getOcclusionMesh(): OcclusionMesh | null;
   /** Total number of loaded actions. */
@@ -224,6 +226,9 @@ export function startReplaySession(
     getOccupancyGrid(): OccupancyGrid | null {
       return occupancy?.grid ?? null;
     },
+    getCubesVisualizer(): OccupancyCubesVisualizer | null {
+      return occupancy?.cubes ?? null;
+    },
     getOcclusionMesh(): OcclusionMesh | null {
       return occupancy?.occlusionMesh ?? null;
     },
@@ -248,6 +253,7 @@ export function startReplaySession(
 /** The occupancy grid + its visualizers + their combined teardown. */
 interface OccupancyReconstruction {
   readonly grid: OccupancyGrid;
+  readonly cubes: OccupancyCubesVisualizer | null;
   readonly occlusionMesh: OcclusionMesh | null;
   dispose(): void;
 }
@@ -289,6 +295,7 @@ function setupOccupancyReconstruction(
 
   return {
     grid,
+    cubes,
     occlusionMesh,
     dispose(): void {
       unsubscribe();

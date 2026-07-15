@@ -53,7 +53,7 @@ arWorldGroup, arpose, camera, renderer}`), `getOccupancyGrid()` (or `null`),
 ## Examples
 
 ```ts
-import { startReplaySession } from 'gps-plus-slam-app-framework/state';
+import { startReplaySession } from 'gps-plus-slam-app-framework/state/replay-session';
 import { loadActionsFromZip } from 'gps-plus-slam-app-framework/storage/zip-reader';
 
 const entries = await loadActionsFromZip(zipBytes);

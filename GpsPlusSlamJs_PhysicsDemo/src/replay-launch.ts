@@ -13,7 +13,7 @@ import type { RecordedAction } from "gps-plus-slam-app-framework/storage/zip-rea
 import {
   startReplaySession,
   type ReplaySessionController,
-} from "gps-plus-slam-app-framework/state";
+} from "gps-plus-slam-app-framework/state/replay-session";
 
 /** Load a current-era recording zip into its recorded action list. */
 export async function loadRecordingActions(

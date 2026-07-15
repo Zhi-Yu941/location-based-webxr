@@ -26,7 +26,7 @@ import {
   pickWorldPoint,
 } from "gps-plus-slam-app-framework/visualization";
 import { WEBXR_TO_NUE } from "gps-plus-slam-app-framework/ar/webxr-nue-basis";
-import type { ReplaySessionController } from "gps-plus-slam-app-framework/state";
+import type { ReplaySessionController } from "gps-plus-slam-app-framework/state/replay-session";
 
 function requireEl<T extends HTMLElement = HTMLElement>(id: string): T {
   const el = document.getElementById(id);

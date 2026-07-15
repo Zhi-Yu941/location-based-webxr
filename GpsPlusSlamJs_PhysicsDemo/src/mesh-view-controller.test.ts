@@ -15,18 +15,20 @@ import { createMeshViewController } from "./mesh-view-controller";
 function targets() {
   return {
     cubes: { setVisible: vi.fn() },
-    occlusionMesh: { setDebugStyle: vi.fn() },
+    occlusionMesh: { setDebugStyle: vi.fn(), setVisible: vi.fn() },
   };
 }
 
 describe("createMeshViewController", () => {
-  it("applies the initial state on construction (cubes visible, occluder off)", () => {
+  it("applies the initial state on construction (cubes visible, occluder hidden)", () => {
     const t = targets();
     const c = createMeshViewController(t);
     expect(c.getVisible()).toBe(true);
     expect(c.getStyle()).toBe("cubes");
     expect(t.cubes.setVisible).toHaveBeenLastCalledWith(true);
     expect(t.occlusionMesh.setDebugStyle).toHaveBeenLastCalledWith("off");
+    // The occluder is HIDDEN in cubes view so it does not occlude the cubes.
+    expect(t.occlusionMesh.setVisible).toHaveBeenLastCalledWith(false);
   });
 
   it("switching to detailed hides the cubes and shows the occluder skin", () => {
@@ -37,6 +39,8 @@ describe("createMeshViewController", () => {
     // Exactly one representation is visible.
     expect(t.cubes.setVisible).toHaveBeenLastCalledWith(false);
     expect(t.occlusionMesh.setDebugStyle).toHaveBeenLastCalledWith("wireframe");
+    // The occluder is VISIBLE only for the detailed view.
+    expect(t.occlusionMesh.setVisible).toHaveBeenLastCalledWith(true);
   });
 
   it("hiding turns BOTH representations off regardless of style", () => {

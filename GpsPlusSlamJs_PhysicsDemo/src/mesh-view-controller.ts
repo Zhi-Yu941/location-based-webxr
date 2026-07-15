@@ -28,6 +28,8 @@ interface CubeTarget {
 /** The occlusion-mesh surface this controller drives (structural for testing). */
 interface OcclusionTarget {
   setDebugStyle(style: OccluderDebugStyle): void;
+  /** Show/hide the whole occluder (depth mesh + skins). */
+  setVisible(visible: boolean): void;
 }
 
 export interface MeshViewTargets {
@@ -73,6 +75,10 @@ export function createMeshViewController(
     // so cubes and the detailed skin never double up on the same surface.
     targets.cubes?.setVisible(showCubes);
     targets.occlusionMesh?.setDebugStyle(showDetailed ? detailedStyle : "off");
+    // The occluder writes depth even when its skin is 'off', which would hide the
+    // co-located cubes behind it. So the occluder is only VISIBLE for the detailed
+    // view; in cubes/hidden it is fully hidden and the cubes render.
+    targets.occlusionMesh?.setVisible(showDetailed);
   };
 
   apply();

@@ -29,6 +29,11 @@ alongside it when Rapier physics lands.
 
 - **Exactly one representation visible at a time.** Cubes and the detailed skin
   never double up on the same surface; `setStyle` switches which is shown.
+- **The occluder is only VISIBLE in the detailed view.** Its depth-only mesh writes
+  depth even when its skin is `'off'`, which would hide the co-located cubes behind
+  it — so in cubes/hidden the controller calls `occlusionMesh.setVisible(false)`
+  (fully hidden) and the cubes render. This is why the target needs `setVisible`
+  alongside `setDebugStyle`.
 - **Hiding turns BOTH off** (cubes `setVisible(false)`, occluder `setDebugStyle('off')`)
   regardless of the selected style; re-showing restores that style.
 - **Null-target safe** (occupancy disabled) — every call is a no-op, never throws.

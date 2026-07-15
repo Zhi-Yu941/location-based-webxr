@@ -23,7 +23,10 @@ light/mono skip it.
   trajectories derive from `hash01(k)` — NO runtime `Math.random`, so
   the effect is history-independent (test-pinned) and never perturbs
   scrub-path independence.
-- **Gaps 30–60 s** between events (test-pinned).
+- **Gaps 30–60 s** between events, INCLUDING the first: `eventStart(0)`
+  is one full gap (≥30 s), not `0`. The caller feeds the page-load-
+  relative clock, so a `t=0` event 0 would greet a fast load with an
+  immediate meteor (test-pinned: first streak ≥30 s).
 - **Dark-sky gate:** `enabled` is passed by the scene controller
   (`theme !== light && theme !== mono`); false → always hidden.
 - **Continuous-render gate:** driven next to the particles/satellites,

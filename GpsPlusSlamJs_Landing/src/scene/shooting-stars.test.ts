@@ -60,6 +60,18 @@ describe("shooting stars", () => {
     expect(group.position.y).toBeGreaterThan(15);
   });
 
+  it("delays the first streak by at least the minimum gap (no meteor on load)", () => {
+    // Regression: eventStart(0) used to be 0, so scheduled event k=0 fired
+    // at clock t=0. The caller (scene-controller) feeds the page-load-
+    // relative rAF timestamp, so on a fast load — first frame earlier than
+    // STREAK_DURATION_MS — the very first frame lands inside the [0, 1200)
+    // window and a meteor greets the visitor on load, contradicting the
+    // "rare, every 30–60 s" contract. The first streak must start no
+    // earlier than the advertised minimum gap.
+    const first = firstActiveTime();
+    expect(first).toBeGreaterThanOrEqual(30_000);
+  });
+
   it("hides again after the streak window", () => {
     const group = buildShootingStar();
     const start = firstActiveTime();

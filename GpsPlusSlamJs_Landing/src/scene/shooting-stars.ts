@@ -35,10 +35,13 @@ function hash01(n: number): number {
 
 /** Start time of scheduled event k (monotonic, 30–60 s gaps). */
 function eventStart(k: number): number {
-  // Sum of per-gap jittered spacings — closed form via the running base
-  // plus each event's own jitter (bounded, so events never reorder).
+  // Sum of per-gap jittered spacings — one gap per event INCLUDING event 0,
+  // so the first streak lands at 30–60 s rather than at t=0 (the caller
+  // feeds the page-load-relative clock, and a t=0 event would greet a fast
+  // load with an immediate meteor). Gaps are bounded, so events never
+  // reorder.
   let t = 0;
-  for (let i = 0; i < k; i++) {
+  for (let i = 0; i <= k; i++) {
     t += MIN_GAP_MS + hash01(i * 2 + 1) * GAP_JITTER_MS;
   }
   return t;

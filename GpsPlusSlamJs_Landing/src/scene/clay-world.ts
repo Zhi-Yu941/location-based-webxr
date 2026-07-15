@@ -11,6 +11,7 @@ import {
   type MeshStandardMaterial,
 } from "three";
 import { buildBird } from "./bird";
+import { buildParcoursPark } from "./park";
 import { buildForestPortal } from "./portal";
 import { buildGeocache } from "./geocache";
 import { clayMesh, namedGroup } from "./palette";
@@ -173,6 +174,15 @@ const PORTAL_ANCHOR = VIGNETTE_ANCHORS.campus
   .clone()
   .add(VIGNETTE_ANCHORS.campus.clone().setY(0).normalize().multiplyScalar(-15))
   .setY(2.8);
+
+// Parkour park anchor (round-14 R14-12): a lawn patch IN FRONT of the
+// city highrises — pulled ~11 units back toward the world center from
+// the skyline row so it sits between the city and the viewer.
+const PARK_ANCHOR = skylineCenter
+  .clone()
+  .add(skyDirection.clone().multiplyScalar(-11))
+  .add(new Vector3(-skyDirection.z, 0, skyDirection.x).multiplyScalar(9))
+  .setY(0);
 
 /** Deterministic LCG (numerical recipes constants) — NOT crypto, just art. */
 function createRng(seed: number): () => number {
@@ -588,6 +598,9 @@ export function buildClayWorld(detail: "high" | "low"): Group {
     // works-anywhere copy is on screen; primed closed here, the story
     // timeline pops it open + shut and the render loop swirls its rings.
     buildForestPortal(PORTAL_ANCHOR, new Vector3(0, PORTAL_ANCHOR.y, 0)),
+    // Parkour park (round-14 R14-12): a lawn + green course in front of
+    // the highrises; the blocks pop in during the works-anywhere copy.
+    buildParcoursPark(PARK_ANCHOR),
     // World-detail layer (v3 F7, curb removed in round-9): instanced
     // grass + contact shadows.
     buildGrass(detail, createPathCurve(), Object.values(WORLD_ANCHORS)),

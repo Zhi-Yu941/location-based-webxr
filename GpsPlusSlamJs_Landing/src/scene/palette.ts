@@ -40,6 +40,7 @@ export const PALETTE_ROLES = [
   "ghost",
   "satellite",
   "portal",
+  "parkour",
 ] as const;
 
 export type PaletteRole = (typeof PALETTE_ROLES)[number];
@@ -142,6 +143,9 @@ const LIGHT: ScenePalette = {
     satellite: { color: 0x5b7fd4 },
     // Forest portal (round-14 R14-10): a distinct cyan "magic" blue.
     portal: { color: 0x0ea5e9 },
+    // Parkour blocks (round-14 R14-12): a fresh green, a new coding
+    // color for the "jump-and-run parkour" park course.
+    parkour: { color: 0x16a34a },
   },
 };
 
@@ -198,6 +202,7 @@ const DARK: ScenePalette = {
     // read at all (same reasoning as the skyline floor).
     satellite: { color: 0x7fa8ff, emissiveIntensity: 0.5 },
     portal: { color: 0x38bdf8, emissiveIntensity: 0.8 },
+    parkour: { color: 0x22c55e, emissiveIntensity: 0.4 },
   },
 };
 
@@ -242,6 +247,7 @@ const NEON: ScenePalette = {
     ghost: { color: 0x22d3ee, emissiveIntensity: 0.9 },
     satellite: { color: 0x67e8f9, emissiveIntensity: 0.7 },
     portal: { color: 0x22d3ee, emissiveIntensity: 0.9 },
+    parkour: { color: 0x4ade80, emissiveIntensity: 0.6 },
   },
 };
 
@@ -286,6 +292,7 @@ const DUSK: ScenePalette = {
     ghost: { color: 0x93c5fd, emissiveIntensity: 0.6 },
     satellite: { color: 0x8fb3ff, emissiveIntensity: 0.4 },
     portal: { color: 0x38bdf8, emissiveIntensity: 0.7 },
+    parkour: { color: 0x34d399, emissiveIntensity: 0.4 },
   },
 };
 
@@ -332,6 +339,7 @@ const MONO: ScenePalette = {
     ghost: { color: 0x2563eb },
     satellite: { color: 0x2563eb },
     portal: { color: 0x0284c7 },
+    parkour: { color: 0x15803d },
   },
 };
 
@@ -380,6 +388,7 @@ const TERMINAL: ScenePalette = {
     ghost: { color: 0x60a5fa, emissiveIntensity: 0.9 },
     satellite: { color: PHOSPHOR, emissiveIntensity: 0.7 },
     portal: { color: 0x38bdf8, emissiveIntensity: 0.9 },
+    parkour: { color: 0x4ade80, emissiveIntensity: 0.5 },
   },
 };
 

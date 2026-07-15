@@ -71,6 +71,7 @@
         --hl-ar: #60a5fa;
         --hl-story: #c084fc;
         --hl-portal: #38bdf8;
+        --hl-parkour: #4ade80;
         --panel: rgb(19 19 23 / 62%);
         --panel-border: rgb(255 255 255 / 10%);
         --panel-border-hi: rgb(255 255 255 / 30%);
@@ -95,6 +96,7 @@
         --hl-ar: #3b82f6;
         --hl-story: #7c3aed;
         --hl-portal: #0ea5e9;
+        --hl-parkour: #16a34a;
         --panel: rgb(255 255 255 / 66%);
         --panel-border: rgb(0 0 0 / 8%);
         --panel-border-hi: rgb(0 0 0 / 20%);
@@ -117,6 +119,7 @@
         --hl-ar: #22d3ee;
         --hl-story: #e879f9;
         --hl-portal: #22d3ee;
+        --hl-parkour: #4ade80;
         --panel: rgb(10 12 28 / 62%);
         --panel-border: rgb(120 140 255 / 18%);
         --panel-border-hi: rgb(120 240 255 / 50%);
@@ -141,6 +144,7 @@
         --hl-ar: #60a5fa;
         --hl-story: #d8b4fe;
         --hl-portal: #38bdf8;
+        --hl-parkour: #34d399;
         --panel: rgb(42 26 62 / 62%);
         --panel-border: rgb(255 176 138 / 18%);
         --panel-border-hi: rgb(255 176 138 / 50%);
@@ -165,6 +169,7 @@
         --hl-ar: #2563eb;
         --hl-story: #6d28d9;
         --hl-portal: #0284c7;
+        --hl-parkour: #15803d;
         --panel: rgb(255 255 255 / 66%);
         --panel-border: rgb(0 0 0 / 10%);
         --panel-border-hi: rgb(0 0 0 / 24%);
@@ -190,6 +195,7 @@
         --hl-ar: #60a5fa;
         --hl-story: #c084fc;
         --hl-portal: #38bdf8;
+        --hl-parkour: #4ade80;
         --panel: rgb(8 22 12 / 70%);
         --panel-border: rgb(51 255 102 / 22%);
         --panel-border-hi: rgb(51 255 102 / 50%);
@@ -547,6 +553,11 @@
       .hl-portal {
         color: var(--hl-portal);
       }
+      /* Parkour green (round-14 R14-12): the word "jump-and-run parkour"
+         fades to the green of the park's parkour-course blocks. */
+      .hl-parkour {
+        color: var(--hl-parkour);
+      }
 
       /* Round-14 R14-4: in the scrolling COPY blocks (not the hero, not
          the snippet) the color-coded words fade from plain text color to
@@ -599,6 +610,14 @@
         color: color-mix(
           in srgb,
           var(--hl-portal) calc(var(--hl-strength) * 100%),
+          var(--text)
+        );
+      }
+      .copy .hl-parkour {
+        /* stylelint-disable-next-line csstree/validator -- color-mix is valid CSS; the bundled css-tree grammar predates it (false positive). */
+        color: color-mix(
+          in srgb,
+          var(--hl-parkour) calc(var(--hl-strength) * 100%),
           var(--text)
         );
       }
@@ -1144,7 +1163,7 @@ world.add(marker);               <span class="c">// marker: any three.js Object3
             real-world AR experience you always wanted to build: a forest with a
             <span class="hl-portal">magic portal</span> that only opens at dawn,
             a plaza your users capture in 3D to take home, a park with your
-            jump-and-run parkour.
+            <span class="hl-parkour">jump-and-run parkour</span>.
           </p>
         </div>
       </section>

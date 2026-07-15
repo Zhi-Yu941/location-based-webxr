@@ -419,6 +419,31 @@ describe("buildStoryTimeline", () => {
     expect(portal!.scale.x).toBeLessThan(0.01);
   });
 
+  it("pops the parkour blocks in during works-anywhere (round-14 R14-12)", () => {
+    const timeline = buildStoryTimeline(stage, () => {});
+    const blocks = stage.world.getObjectByName("parkour-blocks");
+    expect(blocks).toBeDefined();
+    const parts = blocks!.children;
+    expect(parts.length).toBeGreaterThanOrEqual(3);
+
+    timeline.seek(3800); // before: all hidden
+    for (const b of parts) {
+      expect(b.scale.x).toBeLessThan(0.01);
+    }
+    timeline.seek(4100); // works-anywhere: staggering in
+    const up = parts.filter((b) => b.scale.x > 0.5).length;
+    expect(up).toBeGreaterThan(0);
+    timeline.seek(4700); // all standing
+    for (const b of parts) {
+      expect(b.scale.x).toBeGreaterThan(0.9);
+    }
+    // Scrub back re-hides them.
+    timeline.seek(3800);
+    for (const b of parts) {
+      expect(b.scale.x).toBeLessThan(0.01);
+    }
+  });
+
   it("moves the camera between chapters when scrubbed", () => {
     const timeline = buildStoryTimeline(stage, () => {});
     timeline.seek(50);

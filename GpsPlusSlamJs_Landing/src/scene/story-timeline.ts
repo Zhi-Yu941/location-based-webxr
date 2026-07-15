@@ -14,6 +14,7 @@ import {
 import type { MarkerPair } from "./markers";
 import { VIGNETTE_NODE } from "./use-case-vignettes";
 import { PORTAL_NAME } from "./portal";
+import { PARK_BLOCKS_NAME } from "./park";
 
 /**
  * The scroll-scrubbed story timeline: one anime.js timeline covering all
@@ -126,7 +127,11 @@ export function createStoryStage(parts: StageParts): StoryStage {
   // Round-13 R13-4: the vignettes' AR overlays (campus trail arrows,
   // castle ghost) spawn DURING the journey flyover — primed hidden per
   // PART so the timeline can pop them in staggered.
-  for (const name of [VIGNETTE_NODE.campusArrows, VIGNETTE_NODE.ghost]) {
+  for (const name of [
+    VIGNETTE_NODE.campusArrows,
+    VIGNETTE_NODE.ghost,
+    PARK_BLOCKS_NAME,
+  ]) {
     parts.world.getObjectByName(name)?.children.forEach((part) => {
       part.scale.setScalar(0.001);
     });
@@ -678,6 +683,20 @@ export function buildStoryTimeline(
       4480,
     );
   }
+
+  // Parkour park blocks (round-14 R14-12): pop in one by one while the
+  // works-anywhere copy is on screen (the word "jump-and-run parkour"
+  // colors to match). They stand in front of the city, so they are a
+  // distant green twinkle during the far-out moment and are already
+  // there when the camera reaches the city.
+  const parkBlocks = world.getObjectByName(PARK_BLOCKS_NAME);
+  parkBlocks?.children.forEach((block, index) => {
+    timeline.add(
+      block,
+      { scale: { from: 0.001, to: 1 }, duration: 200, ease: "outBack" },
+      3980 + index * 95,
+    );
+  });
 
   const campusArrows = world.getObjectByName(VIGNETTE_NODE.campusArrows);
   campusArrows?.children.forEach((arrow, index) => {

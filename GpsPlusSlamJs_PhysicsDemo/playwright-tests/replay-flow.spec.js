@@ -51,11 +51,17 @@ test.describe("Physics Demo — desktop replay end-to-end", () => {
     await page.mouse.click(660, 560);
     await expect(stats).toContainText(/balls 2 /, { timeout: 10_000 });
 
-    // The live mesh-view toggle (Cubes ↔ Detailed, hide/show) must not crash.
-    await page.getByTestId("mesh-style").selectOption("cubes");
-    await page.getByTestId("mesh-style").selectOption("detailed");
-    await page.getByTestId("mesh-visible").uncheck();
-    await page.getByTestId("mesh-visible").check();
+    // The live mesh-mode + shader dropdowns must not crash (mode recreates the
+    // occluder + re-meshes; shader is a live setDebugStyle).
+    await page.getByTestId("mesh-style").selectOption("greedy");
+    await page.getByTestId("mesh-style").selectOption("smooth");
+    await page.getByTestId("mesh-shader").selectOption("wireframe");
+    await page
+      .getByTestId("mesh-shader")
+      .selectOption("depth-shaded-wireframe");
+    // A ball still spawns after switching mesh mode (collider survived the swap).
+    await page.mouse.click(680, 620);
+    await expect(stats).toContainText(/balls 3 /, { timeout: 10_000 });
 
     // No uncaught exceptions across the whole flow.
     expect(pageErrors).toEqual([]);

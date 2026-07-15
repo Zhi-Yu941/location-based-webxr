@@ -10,8 +10,8 @@ direction into the room.
 ## Public API
 
 - **`startArMode(deps): Promise<() => void>`** — starts a WebXR session and returns
-  a disposer that ends it. `deps`: `{ container, statsEl, meshVisibleInput,
-meshStyleSelect, onError, onStarted? }`.
+  a disposer that ends it. `deps`: `{ container, statsEl, meshStyleSelect,
+meshShaderSelect, onError, onStarted? }`.
 
 ## Behaviour / wiring
 

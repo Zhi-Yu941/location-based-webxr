@@ -15,15 +15,14 @@
 import * as THREE from "three";
 import { detectArSupport } from "./mode-detection";
 import { loadAndStartReplay, type ReplayLaunchSink } from "./replay-launch";
-import {
-  createMeshViewController,
-  type MeshStyle,
-} from "./mesh-view-controller";
+import { createOccupancyView } from "./occupancy-view";
 import { initRapier } from "./physics-world";
 import { createPhysicsRuntime } from "./physics-runtime";
 import { startArMode } from "./ar-mode";
 import { shootBallFromCamera } from "./shoot-ball";
 import { pointerToNdc } from "gps-plus-slam-app-framework/visualization";
+import type { OccluderDebugStyle } from "gps-plus-slam-app-framework/visualization/occlusion-mesh";
+import type { MeshMode } from "gps-plus-slam-app-framework/ar/occupancy-mesher";
 import type { ReplaySessionController } from "gps-plus-slam-app-framework/state/replay-session";
 
 function requireEl<T extends HTMLElement = HTMLElement>(id: string): T {
@@ -45,8 +44,8 @@ function main(): void {
   const playPauseButton = requireEl<HTMLButtonElement>("play-pause-button");
   const speedInput = requireEl<HTMLInputElement>("replay-speed");
   const speedValue = requireEl("replay-speed-value");
-  const meshVisibleInput = requireEl<HTMLInputElement>("mesh-visible");
   const meshStyleSelect = requireEl<HTMLSelectElement>("mesh-style");
+  const meshShaderSelect = requireEl<HTMLSelectElement>("mesh-shader");
   const statsEl = requireEl("stats");
   const replayControls = requireEl("replay-controls");
 
@@ -66,8 +65,8 @@ function main(): void {
         startArMode({
           container: app,
           statsEl,
-          meshVisibleInput,
           meshStyleSelect,
+          meshShaderSelect,
           onError: (message) => {
             startArButton.disabled = false;
             capabilityMessage.hidden = false;
@@ -105,24 +104,6 @@ function main(): void {
       replayPanel.hidden = false;
       replayStatus.textContent = `Replaying ${actionCount} recorded actions — the mesh reconstructs as the walk plays back.`;
 
-      // Live mesh-view toggle over the visualizers the session owns.
-      const meshView = createMeshViewController(
-        {
-          cubes: readyController.getCubesVisualizer(),
-          occlusionMesh: readyController.getOcclusionMesh(),
-        },
-        {
-          visible: meshVisibleInput.checked,
-          style: meshStyleSelect.value as MeshStyle,
-        },
-      );
-      meshVisibleInput.addEventListener("change", () =>
-        meshView.setVisible(meshVisibleInput.checked),
-      );
-      meshStyleSelect.addEventListener("change", () =>
-        meshView.setStyle(meshStyleSelect.value as MeshStyle),
-      );
-
       // Physics starts once Rapier's WASM is ready (loaded lazily on first replay).
       void initRapier().then(() => setupReplayPhysics(readyController));
 
@@ -138,10 +119,26 @@ function main(): void {
 
   function setupReplayPhysics(session: ReplaySessionController): void {
     const scene = session.getScene();
-    const occlusionMesh = session.getOcclusionMesh();
-    const runtime = createPhysicsRuntime(scene.arWorldGroup, occlusionMesh, {
-      onStats: (balls, boxes) => {
-        statsEl.textContent = `balls ${balls} · collider ${boxes} tris`;
+    // The demo owns its occupancy view (one occluder for occlusion AND physics),
+    // fed by the replay store's depth stream. Mesh mode + shader come from the UI.
+    const occupancyView = createOccupancyView(
+      scene.arWorldGroup,
+      session.getStore(),
+      {
+        meshMode: meshStyleSelect.value as MeshMode,
+        debugStyle: meshShaderSelect.value as OccluderDebugStyle,
+      },
+    );
+    meshStyleSelect.addEventListener("change", () =>
+      occupancyView.setMeshMode(meshStyleSelect.value as MeshMode),
+    );
+    meshShaderSelect.addEventListener("change", () =>
+      occupancyView.setDebugStyle(meshShaderSelect.value as OccluderDebugStyle),
+    );
+
+    const runtime = createPhysicsRuntime(scene.arWorldGroup, occupancyView, {
+      onStats: (balls, tris) => {
+        statsEl.textContent = `balls ${balls} · collider ${tris} tris`;
       },
     });
 

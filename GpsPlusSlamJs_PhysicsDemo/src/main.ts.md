@@ -20,9 +20,10 @@ lives in the tested `mode-detection` / `replay-launch` modules; this file is glu
   on failure the message reverts to the error and the input re-enables.
 - Play/pause toggles `controller.pause()`/`resume()` and its label; the speed
   slider calls `controller.setSpeed()` and updates the `N×` readout.
-- On ready it builds a `createMeshViewController` over the session's cube +
-  occlusion-mesh handles and wires the mesh panel (Show-mesh checkbox +
-  Cubes/Detailed select) to it — the live mesh-view toggle.
+- On ready `setupReplayPhysics` builds a `createOccupancyView` over the session's
+  store (the composer's own occupancy is disabled), and wires the two mesh panel
+  dropdowns to it: Mesh (mesh mode — recreates the occluder) and Shader (live
+  `setDebugStyle`). The same occupancy view feeds the physics collider.
 - Once Rapier's WASM is ready (loaded lazily on first replay) it calls
   `setupReplayPhysics`: a shared `createPhysicsRuntime` under `arWorldGroup`, an rAF
   loop that steps it (which rebuilds the AABB collider from the growing mesh,

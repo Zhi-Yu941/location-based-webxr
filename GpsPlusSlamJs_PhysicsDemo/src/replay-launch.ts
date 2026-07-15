@@ -45,8 +45,11 @@ export interface ReplayLaunchSink {
 
 const defaultDeps: ReplayLaunchDeps = {
   loadActions: loadRecordingActions,
+  // Disable the composer's built-in occupancy: the demo builds its OWN occupancy
+  // view (one occluder used for occlusion AND physics, with a live mesh-mode +
+  // shader) so both modes share the same building block.
   startSession: (actions, container) =>
-    startReplaySession({ actions, container }),
+    startReplaySession({ actions, container, occupancy: { enabled: false } }),
 };
 
 /**

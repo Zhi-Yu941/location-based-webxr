@@ -200,19 +200,23 @@
           </div>
           <div id="mesh-controls">
             <label>
-              <input
-                id="mesh-visible"
-                data-testid="mesh-visible"
-                type="checkbox"
-                checked
-              />
-              Show mesh
+              Mesh
+              <select id="mesh-style" data-testid="mesh-style">
+                <option value="smooth" selected>Surface nets</option>
+                <option value="greedy">Cubes (blocky)</option>
+                <option value="corner-fit">Corner-fit (smoothed)</option>
+              </select>
             </label>
             <label>
-              Style
-              <select id="mesh-style" data-testid="mesh-style">
-                <option value="detailed" selected>Detailed</option>
-                <option value="cubes">Cubes</option>
+              Shader
+              <select id="mesh-shader" data-testid="mesh-shader">
+                <option value="depth-shaded-wireframe" selected>
+                  Depth-shaded + wireframe
+                </option>
+                <option value="depth-shaded">Depth-shaded</option>
+                <option value="matcap">Matcap</option>
+                <option value="wireframe">Wireframe</option>
+                <option value="off">Off</option>
               </select>
             </label>
           </div>

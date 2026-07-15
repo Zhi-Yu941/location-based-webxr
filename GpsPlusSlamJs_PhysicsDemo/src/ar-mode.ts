@@ -28,16 +28,16 @@ import { recordDepthSample } from "gps-plus-slam-app-framework/state/recording-s
 import { createOccupancyView } from "./occupancy-view";
 import { createPhysicsRuntime } from "./physics-runtime";
 import { shootBallFromCamera } from "./shoot-ball";
-import {
-  createMeshViewController,
-  type MeshStyle,
-} from "./mesh-view-controller";
+import type { OccluderDebugStyle } from "gps-plus-slam-app-framework/visualization/occlusion-mesh";
+import type { MeshMode } from "gps-plus-slam-app-framework/ar/occupancy-mesher";
 
 export interface ArModeDeps {
   readonly container: HTMLElement;
   readonly statsEl: HTMLElement;
-  readonly meshVisibleInput: HTMLInputElement;
+  /** Mesh-mode dropdown (Surface nets / Cubes / Corner-fit). */
   readonly meshStyleSelect: HTMLSelectElement;
+  /** Shader dropdown (the OccluderDebugStyle skins). */
+  readonly meshShaderSelect: HTMLSelectElement;
   /** Surface a failure (permission denied, no depth, WebXR error) to the UI. */
   readonly onError: (message: string) => void;
   /** Called once the live AR session is up and physics is running. */
@@ -81,31 +81,26 @@ export async function startArMode(deps: ArModeDeps): Promise<() => void> {
     return () => {};
   }
 
-  // Live room reconstruction from the depth stream.
+  // Live room reconstruction from the depth stream — one occluder for occlusion
+  // AND physics, with the mesh mode + shader from the UI dropdowns.
   startDepthCapture();
-  const occupancy = createOccupancyView(arWorldGroup, store);
+  const occupancy = createOccupancyView(arWorldGroup, store, {
+    meshMode: deps.meshStyleSelect.value as MeshMode,
+    debugStyle: deps.meshShaderSelect.value as OccluderDebugStyle,
+  });
+  deps.meshStyleSelect.addEventListener("change", () =>
+    occupancy.setMeshMode(deps.meshStyleSelect.value as MeshMode),
+  );
+  deps.meshShaderSelect.addEventListener("change", () =>
+    occupancy.setDebugStyle(deps.meshShaderSelect.value as OccluderDebugStyle),
+  );
 
-  // Shared physics runtime (collider follows the occlusion mesh).
-  const runtime = createPhysicsRuntime(arWorldGroup, occupancy.occlusionMesh, {
-    onStats: (balls, boxes) => {
-      deps.statsEl.textContent = `balls ${balls} · collider ${boxes} tris`;
+  // Shared physics runtime — its trimesh collider follows the same occluder.
+  const runtime = createPhysicsRuntime(arWorldGroup, occupancy, {
+    onStats: (balls, tris) => {
+      deps.statsEl.textContent = `balls ${balls} · collider ${tris} tris`;
     },
   });
-
-  // Live mesh-view toggle (Cubes / Detailed), shared with the replay path.
-  const meshView = createMeshViewController(
-    { cubes: occupancy.cubes, occlusionMesh: occupancy.occlusionMesh },
-    {
-      visible: deps.meshVisibleInput.checked,
-      style: deps.meshStyleSelect.value as MeshStyle,
-    },
-  );
-  deps.meshVisibleInput.addEventListener("change", () =>
-    meshView.setVisible(deps.meshVisibleInput.checked),
-  );
-  deps.meshStyleSelect.addEventListener("change", () =>
-    meshView.setStyle(deps.meshStyleSelect.value as MeshStyle),
-  );
 
   // Tap-to-shoot: a ball leaves the camera along its forward direction and flies
   // into the reconstructed room. No reticle — the ball goes where you look.

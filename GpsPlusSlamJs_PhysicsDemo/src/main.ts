@@ -14,6 +14,10 @@
 
 import { detectArSupport } from "./mode-detection";
 import { loadAndStartReplay, type ReplayLaunchSink } from "./replay-launch";
+import {
+  createMeshViewController,
+  type MeshStyle,
+} from "./mesh-view-controller";
 import type { ReplaySessionController } from "gps-plus-slam-app-framework/state";
 
 function requireEl<T extends HTMLElement = HTMLElement>(id: string): T {
@@ -35,6 +39,8 @@ async function main(): Promise<void> {
   const playPauseButton = requireEl<HTMLButtonElement>("play-pause-button");
   const speedInput = requireEl<HTMLInputElement>("replay-speed");
   const speedValue = requireEl("replay-speed-value");
+  const meshVisibleInput = requireEl<HTMLInputElement>("mesh-visible");
+  const meshStyleSelect = requireEl<HTMLSelectElement>("mesh-style");
 
   // Live AR physics is a later iteration; here the button only advertises it so
   // a capable device is not left thinking the demo is desktop-only.
@@ -66,6 +72,25 @@ async function main(): Promise<void> {
       modeScreen.hidden = true;
       replayPanel.hidden = false;
       replayStatus.textContent = `Replaying ${actionCount} recorded actions — the mesh reconstructs as the walk plays back.`;
+
+      // Live mesh-view toggle over the visualizers the session owns.
+      const meshView = createMeshViewController(
+        {
+          cubes: readyController.getCubesVisualizer(),
+          occlusionMesh: readyController.getOcclusionMesh(),
+        },
+        {
+          visible: meshVisibleInput.checked,
+          style: meshStyleSelect.value as MeshStyle,
+        },
+      );
+      meshVisibleInput.addEventListener("change", () =>
+        meshView.setVisible(meshVisibleInput.checked),
+      );
+      meshStyleSelect.addEventListener("change", () =>
+        meshView.setStyle(meshStyleSelect.value as MeshStyle),
+      );
+
       setPlaying(true);
       void controller.play(Number(speedInput.value) || 1);
     },

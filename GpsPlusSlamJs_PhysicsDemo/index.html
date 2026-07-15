@@ -109,6 +109,17 @@
         font-size: 13px;
         color: #cfcfcf;
       }
+      #mesh-controls {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        font-size: 13px;
+      }
+      #mesh-controls select {
+        font: inherit;
+        font-size: 13px;
+        margin-left: 4px;
+      }
       #error {
         color: #ff8a8a;
         font-size: 13px;
@@ -177,6 +188,24 @@
             <span id="replay-speed-value" data-testid="replay-speed-value"
               >1×</span
             >
+          </div>
+          <div id="mesh-controls">
+            <label>
+              <input
+                id="mesh-visible"
+                data-testid="mesh-visible"
+                type="checkbox"
+                checked
+              />
+              Show mesh
+            </label>
+            <label>
+              Style
+              <select id="mesh-style" data-testid="mesh-style">
+                <option value="cubes">Cubes</option>
+                <option value="detailed">Detailed</option>
+              </select>
+            </label>
           </div>
           <div id="error" data-testid="error" hidden></div>
         </section>

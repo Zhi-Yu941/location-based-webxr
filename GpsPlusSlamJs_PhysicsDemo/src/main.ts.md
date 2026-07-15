@@ -24,12 +24,12 @@ lives in the tested `mode-detection` / `replay-launch` modules; this file is glu
   occlusion-mesh handles and wires the mesh panel (Show-mesh checkbox +
   Cubes/Detailed select) to it — the live mesh-view toggle.
 - Once Rapier's WASM is ready (loaded lazily on first replay) it calls
-  `setupPhysics`: parents a `WEBXR_TO_NUE` ball group under `arWorldGroup`, creates
-  a `createPhysicsSession`, runs an rAF loop that rebuilds the AABB collider from
-  the growing occupied AABBs (throttled, ~500 ms) and steps the world, and wires
-  spawning — click a surface (Part B `pickWorldPoint` against the occlusion mesh,
-  converted to the ball group's local raw-WebXR space) or the Drop-ball button;
-  Clear-balls empties them. The stats line shows ball + collider-box counts.
+  `setupReplayPhysics`: a shared `createPhysicsRuntime` under `arWorldGroup`, an rAF
+  loop that steps it (which rebuilds the AABB collider from the growing mesh,
+  throttled), and click-to-shoot — a click computes the camera→pointer ray
+  (`THREE.Raycaster`) and `shootBallFromCamera` fires a ball from the camera along
+  it, so it flies into the reconstructed mesh and bounces. The stats line shows the
+  ball + collider-box counts.
 
 ## Invariants & assumptions
 

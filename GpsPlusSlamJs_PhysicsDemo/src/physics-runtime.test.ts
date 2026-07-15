@@ -65,32 +65,36 @@ describe("createPhysicsRuntime", () => {
     runtime.dispose();
   });
 
-  it("converts a WORLD-space spawn point into the ball group local (WEBXR_TO_NUE) space", () => {
+  it("shoots a ball from a WORLD origin with a WORLD velocity (both converted to local)", () => {
     const arWorldGroup = new THREE.Group(); // identity → ball group world = WEBXR_TO_NUE
-    const runtime = createPhysicsRuntime(arWorldGroup, null);
+    const runtime = createPhysicsRuntime(arWorldGroup, null); // no floor → free flight
 
-    // A reference node with the same WEBXR_TO_NUE transform maps a KNOWN local
-    // point to its world point; spawning at that world point must round-trip back
-    // to the known local on the internal ball mesh.
-    const targetLocal = new THREE.Vector3(0.5, 1.0, -0.3);
+    // A reference node with the same WEBXR_TO_NUE transform maps KNOWN local
+    // origin/direction into world space; the runtime must round-trip them back.
     const ref = new THREE.Group();
     ref.matrixAutoUpdate = false;
     ref.matrix.copy(WEBXR_TO_NUE);
     ref.updateWorldMatrix(false, false);
-    const worldPoint = ref.localToWorld(targetLocal.clone());
+    const worldOrigin = ref.localToWorld(new THREE.Vector3(0, 5, 0));
+    // Local +X velocity, 3 m/s (WEBXR_TO_NUE has no translation, so localToWorld
+    // of a vector is a pure basis change → a world direction).
+    const worldVelocity = ref.localToWorld(new THREE.Vector3(3, 0, 0));
 
-    runtime.spawnAtWorld(worldPoint, 0); // lift 0 so the local equals targetLocal
+    runtime.spawnBallWithVelocity(worldOrigin, worldVelocity);
 
-    expect(runtime.ballCount()).toBe(1);
-    const ballGroup = arWorldGroup.children[0]!; // the WEBXR_TO_NUE group
-    const ballMesh = ballGroup.children[0]!; // the spawned ball
-    expect(ballMesh.position.x).toBeCloseTo(0.5, 5);
-    expect(ballMesh.position.y).toBeCloseTo(1.0, 5);
-    expect(ballMesh.position.z).toBeCloseTo(-0.3, 5);
+    const ballMesh = arWorldGroup.children[0]!.children[0]!;
+    // Spawns at the local origin.
+    expect(ballMesh.position.x).toBeCloseTo(0, 5);
+    expect(ballMesh.position.y).toBeCloseTo(5, 5);
+
+    for (let i = 0; i < 10; i++) runtime.step(i * 16);
+    // The velocity carried it in +X, and gravity pulled it down a little.
+    expect(ballMesh.position.x).toBeGreaterThan(0.3);
+    expect(ballMesh.position.y).toBeLessThan(5);
     runtime.dispose();
   });
 
-  it("spawns and clears balls, and reports stats via onStats", () => {
+  it("clears balls and reports stats via onStats", () => {
     const arWorldGroup = new THREE.Group();
     let lastBalls = -1;
     const runtime = createPhysicsRuntime(arWorldGroup, mutableSource(FLOOR), {
@@ -98,8 +102,9 @@ describe("createPhysicsRuntime", () => {
         lastBalls = balls;
       },
     });
-    runtime.spawnAtWorld(new THREE.Vector3(0, 1, 0));
-    runtime.spawnAtWorld(new THREE.Vector3(0, 1, 0));
+    const zero = new THREE.Vector3(0, 0, 0);
+    runtime.spawnBallWithVelocity(new THREE.Vector3(0, 1, 0), zero);
+    runtime.spawnBallWithVelocity(new THREE.Vector3(0, 1, 0), zero);
     expect(runtime.ballCount()).toBe(2);
 
     runtime.step(0);

@@ -23,9 +23,11 @@ meshVisibleInput, meshStyleSelect, onError, onStarted? }`.
 - `createPhysicsRuntime(arWorldGroup, occlusionMesh)` runs the physics; it is
   stepped every XR frame via `registerXrFrameUpdate` (`performance.now()` drives the
   collider-rebuild throttle).
-- A `createReticleMesh` reticle is driven by `frame.getHitTestResults` each frame
-  (mirrors the sibling apps' `reticle-hit-test.ts`); `session`'s `select` (tap) —
-  and the Drop-ball button — spawn a ball at the reticle's world position.
+- Tap-to-shoot: `session`'s `select` (tap) fires `shootBallFromCamera` — a ball
+  leaves the camera along its forward direction (`getCamera().getWorldDirection`)
+  and flies into the room. No hit-test reticle (removed per user feedback — it
+  clipped through the mesh and the ball should go where you look, not sit on a
+  surface).
 - The mesh-view controller (Cubes/Detailed) is shared with the replay path.
 
 ## Invariants & assumptions

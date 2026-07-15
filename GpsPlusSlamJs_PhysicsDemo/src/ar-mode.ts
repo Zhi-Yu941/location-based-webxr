@@ -17,19 +17,17 @@ import {
   initAR,
   endARSession,
   getArWorldGroup,
+  getCamera,
   startDepthCapture,
   stopDepthCapture,
 } from "gps-plus-slam-app-framework/ar/webxr-session";
 import { registerXrFrameUpdate } from "gps-plus-slam-app-framework/ar/xr-frame-loop";
-import {
-  createReticleMesh,
-  updateReticle,
-} from "gps-plus-slam-app-framework/visualization";
 import { createSlamAppStore } from "gps-plus-slam-app-framework/state/create-slam-app-store";
 import { NullStorageBackend } from "gps-plus-slam-app-framework/storage/null-storage-backend";
 import { recordDepthSample } from "gps-plus-slam-app-framework/state/recording-slice";
 import { createOccupancyView } from "./occupancy-view";
 import { createPhysicsRuntime } from "./physics-runtime";
+import { shootBallFromCamera } from "./shoot-ball";
 import {
   createMeshViewController,
   type MeshStyle,
@@ -48,15 +46,6 @@ export interface ArModeDeps {
   readonly onStarted?: () => void;
 }
 
-/** Request a screen-centre hit-test source (null on older runtimes). */
-async function requestHitTestSource(
-  session: XRSession,
-): Promise<XRHitTestSource | null> {
-  const viewerSpace = await session.requestReferenceSpace("viewer");
-  const source = await session.requestHitTestSource?.({ space: viewerSpace });
-  return source ?? null;
-}
-
 /**
  * Start the live-AR physics session. Resolves once the session is running (or
  * rejects/`onError`s on failure). The returned disposer ends the AR session.
@@ -70,7 +59,7 @@ export async function startArMode(deps: ArModeDeps): Promise<() => void> {
     await initAR(
       deps.container,
       {},
-      { requestHitTest: true, requestDepthOcclusion: true },
+      { requestDepthOcclusion: true },
       {
         tracking: { store },
         depth: {
@@ -120,61 +109,35 @@ export async function startArMode(deps: ArModeDeps): Promise<() => void> {
     meshView.setStyle(deps.meshStyleSelect.value as MeshStyle),
   );
 
-  // Screen-centre hit-test reticle + tap-to-spawn (mirrors reticle-hit-test.ts).
-  const reticle = createReticleMesh();
-  arWorldGroup.add(reticle);
-  const reticleWorld = new THREE.Vector3();
-
-  const spawnAtReticle = (lift: number): void => {
-    if (!reticle.visible) return;
-    reticle.getWorldPosition(reticleWorld);
-    runtime.spawnAtWorld(reticleWorld.clone(), lift);
+  // Tap-to-shoot: a ball leaves the camera along its forward direction and flies
+  // into the reconstructed room. No reticle — the ball goes where you look.
+  const shootForward = (): void => {
+    const camera = getCamera();
+    if (!camera) return;
+    shootBallFromCamera(
+      runtime,
+      camera.getWorldPosition(new THREE.Vector3()),
+      camera.getWorldDirection(new THREE.Vector3()),
+    );
   };
 
-  let hitTestSource: XRHitTestSource | null = null;
-  let hitTestRequested = false;
   let selectWired = false;
+  const unregisterFrame = registerXrFrameUpdate(({ session }) => {
+    // Step physics every XR frame (the throttle uses wall-clock ms).
+    runtime.step(performance.now());
+    if (!selectWired) {
+      selectWired = true;
+      session.addEventListener("select", shootForward);
+    }
+  });
 
-  const unregisterFrame = registerXrFrameUpdate(
-    ({ frame, referenceSpace, session }) => {
-      // Step physics every XR frame (the throttle uses wall-clock ms).
-      runtime.step(performance.now());
-
-      // Tap-to-spawn: a ball at the reticle-hit surface.
-      if (!selectWired) {
-        selectWired = true;
-        session.addEventListener("select", () => spawnAtReticle(0.05));
-      }
-
-      if (!hitTestSource) {
-        if (!hitTestRequested) {
-          hitTestRequested = true;
-          requestHitTestSource(session)
-            .then((source) => {
-              hitTestSource = source;
-            })
-            .catch(() => {
-              hitTestRequested = false; // allow a retry next frame
-            });
-        }
-        updateReticle(reticle, null);
-        return;
-      }
-
-      const [hit] = frame.getHitTestResults(hitTestSource);
-      const pose = hit?.getPose(referenceSpace);
-      updateReticle(reticle, pose ? pose.transform.matrix : null);
-    },
-  );
-
-  deps.dropButton.addEventListener("click", () => spawnAtReticle(0.5));
+  deps.dropButton.addEventListener("click", shootForward);
   deps.clearButton.addEventListener("click", () => runtime.clearBalls());
 
   deps.onStarted?.();
 
   return () => {
     unregisterFrame();
-    hitTestSource?.cancel();
     stopDepthCapture();
     occupancy.dispose();
     runtime.dispose();

@@ -22,10 +22,8 @@ import {
 import { initRapier } from "./physics-world";
 import { createPhysicsRuntime } from "./physics-runtime";
 import { startArMode } from "./ar-mode";
-import {
-  pointerToNdc,
-  pickWorldPoint,
-} from "gps-plus-slam-app-framework/visualization";
+import { shootBallFromCamera } from "./shoot-ball";
+import { pointerToNdc } from "gps-plus-slam-app-framework/visualization";
 import type { ReplaySessionController } from "gps-plus-slam-app-framework/state/replay-session";
 
 function requireEl<T extends HTMLElement = HTMLElement>(id: string): T {
@@ -158,24 +156,31 @@ function main(): void {
     };
     requestAnimationFrame(tick);
 
-    // Placement (desktop): click a real reconstructed surface → spawn a ball just
-    // above it, via the Part-B raycast against the occlusion mesh.
+    // Placement (desktop): click → shoot a ball FROM the camera toward where you
+    // clicked, so it flies out, hits the reconstructed mesh and bounces.
     const canvas = scene.renderer.domElement;
+    const raycaster = new THREE.Raycaster();
     canvas.addEventListener("pointerdown", (e: PointerEvent) => {
-      if (!occlusionMesh) return;
       const ndc = pointerToNdc(
         e.clientX,
         e.clientY,
         canvas.getBoundingClientRect(),
       );
-      const hit = pickWorldPoint(scene.camera, ndc, [occlusionMesh.getMesh()]);
-      if (hit) runtime.spawnAtWorld(hit, 0.3);
+      raycaster.setFromCamera(new THREE.Vector2(ndc.x, ndc.y), scene.camera);
+      shootBallFromCamera(
+        runtime,
+        scene.camera.getWorldPosition(new THREE.Vector3()),
+        raycaster.ray.direction,
+      );
     });
 
-    dropBallButton.addEventListener("click", () => {
-      const camWorld = scene.camera.getWorldPosition(new THREE.Vector3());
-      runtime.spawnAtWorld(camWorld, 0.5);
-    });
+    dropBallButton.addEventListener("click", () =>
+      shootBallFromCamera(
+        runtime,
+        scene.camera.getWorldPosition(new THREE.Vector3()),
+        scene.camera.getWorldDirection(new THREE.Vector3()),
+      ),
+    );
     clearBallsButton.addEventListener("click", () => runtime.clearBalls());
   }
 

@@ -15,8 +15,9 @@ rAF for replay, the XR frame loop for AR) and how a spawn point is obtained
   `aabbSource` is the occlusion mesh (`{ getAabbs() }`) or `null`. Options:
   `{ colliderRebuildMs=500, onStats? }`.
 - **`PhysicsRuntime`** — `step(nowMs)` (throttled collider rebuild + world step +
-  mesh sync + `onStats`), `spawnAtWorld(worldPoint, liftM=0.3)` (converts a WORLD
-  point into the ball group's local raw-WebXR space and spawns), `clearBalls()`,
+  mesh sync + `onStats`), `spawnBallWithVelocity(worldOrigin, worldVelocity)`
+  (converts a WORLD origin + velocity into the ball group's local raw-WebXR space
+  and spawns a moving ball — the "shoot from the camera" primitive), `clearBalls()`,
   `ballCount()`, `colliderShapeCount()`, `dispose()`.
 
 ## Invariants & assumptions
@@ -30,5 +31,6 @@ rAF for replay, the XR frame loop for AR) and how a spawn point is obtained
 ## Tests
 
 - `physics-runtime.test.ts` (headless, real Rapier + THREE) — collider rebuilt only
-  once per throttle window as the AABB source grows; a WORLD-space spawn point
-  round-trips to the expected ball-group-local position; spawn/clear + `onStats`.
+  once per throttle window as the AABB source grows; a WORLD origin + velocity
+  round-trip to the ball-group-local space (the ball spawns at the origin and the
+  velocity carries it in the aimed direction under gravity); clear + `onStats`.

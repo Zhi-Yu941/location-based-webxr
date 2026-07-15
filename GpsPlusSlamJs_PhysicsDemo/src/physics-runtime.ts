@@ -36,8 +36,15 @@ export interface PhysicsRuntime {
    * timestamp (rAF / XR frame time) driving the rebuild throttle.
    */
   step(nowMs: number): void;
-  /** Spawn a ball `liftM` above a WORLD-space point (converted to physics space). */
-  spawnAtWorld(worldPoint: THREE.Vector3, liftM?: number): void;
+  /**
+   * Shoot a ball from a WORLD-space origin with a WORLD-space velocity (both
+   * converted into physics space). This is how the demo spawns: a ball leaves the
+   * camera and flies toward where the user aimed, then collides with the mesh.
+   */
+  spawnBallWithVelocity(
+    worldOrigin: THREE.Vector3,
+    worldVelocity: THREE.Vector3,
+  ): void;
   clearBalls(): void;
   ballCount(): number;
   colliderShapeCount(): number;
@@ -78,11 +85,24 @@ export function createPhysicsRuntime(
       session.step();
       options.onStats?.(session.ballCount(), session.colliderShapeCount());
     },
-    spawnAtWorld(worldPoint: THREE.Vector3, liftM = 0.3): void {
-      // Convert the world hit into the ball group's local (raw-WebXR) space.
+    spawnBallWithVelocity(
+      worldOrigin: THREE.Vector3,
+      worldVelocity: THREE.Vector3,
+    ): void {
       ballGroup.updateWorldMatrix(true, false);
-      const local = ballGroup.worldToLocal(worldPoint.clone());
-      session.spawnBallAt({ x: local.x, y: local.y + liftM, z: local.z });
+      // Origin: a full world→local point transform.
+      const localOrigin = ballGroup.worldToLocal(worldOrigin.clone());
+      // Velocity is a DIRECTION: transform origin + velocity and subtract, so the
+      // group's translation cancels and only its rotation/basis applies (the
+      // magnitude is preserved — WEBXR_TO_NUE has no scale).
+      const localTip = ballGroup.worldToLocal(
+        worldOrigin.clone().add(worldVelocity),
+      );
+      const localVelocity = localTip.sub(localOrigin);
+      session.spawnBallAt(
+        { x: localOrigin.x, y: localOrigin.y, z: localOrigin.z },
+        { x: localVelocity.x, y: localVelocity.y, z: localVelocity.z },
+      );
     },
     clearBalls(): void {
       session.clearBalls();

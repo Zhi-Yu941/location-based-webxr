@@ -11,9 +11,11 @@ rAF for replay, the XR frame loop for AR) and how a spawn point is obtained
 
 ## Public API
 
-- **`createPhysicsRuntime(arWorldGroup, aabbSource, options?): PhysicsRuntime`** —
-  `aabbSource` is the occlusion mesh (`{ getAabbs() }`) or `null`. Options:
-  `{ colliderRebuildMs=500, onStats? }`.
+- **`createPhysicsRuntime(arWorldGroup, meshSource, options?): PhysicsRuntime`** —
+  `meshSource` is the occlusion mesh (`{ getMesh(): THREE.Mesh }`) or `null`.
+  Options: `{ colliderRebuildMs=500, onStats? }`. The collider is a Rapier
+  **trimesh** built from the occluder's own geometry (raw-WebXR positions), so
+  physics and the visual occlusion use the SAME mesh (user feedback M3).
 - **`PhysicsRuntime`** — `step(nowMs)` (throttled collider rebuild + world step +
   mesh sync + `onStats`), `spawnBallWithVelocity(worldOrigin, worldVelocity)`
   (converts a WORLD origin + velocity into the ball group's local raw-WebXR space

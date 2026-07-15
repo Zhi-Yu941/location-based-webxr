@@ -40,7 +40,7 @@ test.describe("Physics Demo — desktop replay end-to-end", () => {
     // The occupancy mesh reconstructs from the replayed depth stream and the
     // physics collider is rebuilt from it — the stats line reports the box count.
     const stats = page.getByTestId("stats");
-    await expect(stats).toContainText(/collider [1-9]\d* boxes/, {
+    await expect(stats).toContainText(/collider [1-9]\d* tris/, {
       timeout: 90_000,
     });
 

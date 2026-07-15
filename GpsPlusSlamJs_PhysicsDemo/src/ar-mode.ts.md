@@ -17,7 +17,7 @@ meshStyleSelect, onError, onStarted? }`.
 
 - Creates a framework store (`createSlamAppStore` + `NullStorageBackend`), then
   `initAR(container, {}, { requestDepthOcclusion }, { tracking: {store}, depth: {
-  onCaptured → dispatch recordDepthSample } })`.
+onCaptured → dispatch recordDepthSample } })`.
 - `startDepthCapture()` + `createOccupancyView(arWorldGroup, store)` reconstruct the
   room from the live depth stream (same occupancy stack as replay).
 - `createPhysicsRuntime(arWorldGroup, occlusionMesh)` runs the physics; it is

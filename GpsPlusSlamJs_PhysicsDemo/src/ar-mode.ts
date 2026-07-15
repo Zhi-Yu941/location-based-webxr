@@ -88,7 +88,7 @@ export async function startArMode(deps: ArModeDeps): Promise<() => void> {
   // Shared physics runtime (collider follows the occlusion mesh).
   const runtime = createPhysicsRuntime(arWorldGroup, occupancy.occlusionMesh, {
     onStats: (balls, boxes) => {
-      deps.statsEl.textContent = `balls ${balls} · collider ${boxes} boxes`;
+      deps.statsEl.textContent = `balls ${balls} · collider ${boxes} tris`;
     },
   });
 

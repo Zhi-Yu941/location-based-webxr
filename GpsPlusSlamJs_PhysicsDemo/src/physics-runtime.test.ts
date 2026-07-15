@@ -15,24 +15,38 @@ import { describe, it, expect, beforeAll } from "vitest";
 import * as THREE from "three";
 import { WEBXR_TO_NUE } from "gps-plus-slam-app-framework/ar/webxr-nue-basis";
 import { initRapier } from "./physics-world";
-import { createPhysicsRuntime, type AabbSource } from "./physics-runtime";
-import type { Aabb } from "gps-plus-slam-app-framework/ar/occupancy-mesher";
+import {
+  createPhysicsRuntime,
+  type OccluderMeshSource,
+} from "./physics-runtime";
 
-const FLOOR: readonly Aabb[] = [
-  { center: [0, -0.075, 0], halfExtents: [5, 0.075, 5] },
-];
-
-/** A mutable AABB source so a test can grow the reconstructed mesh over time. */
-function mutableSource(initial: readonly Aabb[]): AabbSource & {
-  set(aabbs: readonly Aabb[]): void;
-} {
-  let current = initial;
+/** A quad (2 triangles) at y=0; the trimesh source the collider follows. */
+function quad(): { positions: Float32Array; indices: Uint32Array } {
   return {
-    getAabbs: () => current,
-    set(aabbs) {
-      current = aabbs;
-    },
+    positions: new Float32Array([-2, 0, -2, 2, 0, -2, 2, 0, 2, -2, 0, 2]),
+    indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
   };
+}
+
+/** A mutable occluder-mesh source so a test can grow the reconstructed mesh. */
+function meshSource(
+  initial: { positions: Float32Array; indices: Uint32Array } | null,
+): OccluderMeshSource & {
+  set(data: { positions: Float32Array; indices: Uint32Array }): void;
+} {
+  const mesh = new THREE.Mesh(new THREE.BufferGeometry());
+  const apply = (
+    data: { positions: Float32Array; indices: Uint32Array } | null,
+  ): void => {
+    if (!data) return;
+    mesh.geometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(data.positions, 3),
+    );
+    mesh.geometry.setIndex(new THREE.BufferAttribute(data.indices, 1));
+  };
+  apply(initial);
+  return { getMesh: () => mesh, set: apply };
 }
 
 beforeAll(async () => {
@@ -40,28 +54,29 @@ beforeAll(async () => {
 });
 
 describe("createPhysicsRuntime", () => {
-  it("rebuilds the collider from the AABB source only once per throttle window", () => {
+  it("rebuilds the trimesh collider from the mesh source only once per throttle window", () => {
     const arWorldGroup = new THREE.Group();
-    const source = mutableSource(FLOOR);
+    const source = meshSource(quad()); // 2 triangles
     const runtime = createPhysicsRuntime(arWorldGroup, source, {
       colliderRebuildMs: 500,
     });
 
     runtime.step(0); // first step rebuilds (throttle satisfied from -Infinity)
-    expect(runtime.colliderShapeCount()).toBe(1);
+    expect(runtime.colliderShapeCount()).toBe(2); // triangles
 
-    // Grow the mesh to 3 AABBs; a step INSIDE the window must NOT pick it up yet.
-    source.set([
-      { center: [0, 0, 0], halfExtents: [1, 1, 1] },
-      { center: [2, 0, 0], halfExtents: [1, 1, 1] },
-      { center: [0, 0, 2], halfExtents: [1, 1, 1] },
-    ]);
+    // Grow the mesh to 4 triangles; a step INSIDE the window must NOT pick it up.
+    source.set({
+      positions: new Float32Array([
+        -2, 0, -2, 2, 0, -2, 2, 0, 2, -2, 0, 2, 0, 2, 0, 4, 2, 0,
+      ]),
+      indices: new Uint32Array([0, 1, 2, 0, 2, 3, 4, 5, 0, 4, 0, 1]),
+    });
     runtime.step(100);
-    expect(runtime.colliderShapeCount()).toBe(1);
+    expect(runtime.colliderShapeCount()).toBe(2);
 
     // A step past the window rebuilds to the new geometry.
     runtime.step(600);
-    expect(runtime.colliderShapeCount()).toBe(3);
+    expect(runtime.colliderShapeCount()).toBe(4);
     runtime.dispose();
   });
 
@@ -97,7 +112,7 @@ describe("createPhysicsRuntime", () => {
   it("clears balls and reports stats via onStats", () => {
     const arWorldGroup = new THREE.Group();
     let lastBalls = -1;
-    const runtime = createPhysicsRuntime(arWorldGroup, mutableSource(FLOOR), {
+    const runtime = createPhysicsRuntime(arWorldGroup, meshSource(quad()), {
       onStats: (balls) => {
         lastBalls = balls;
       },

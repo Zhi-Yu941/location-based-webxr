@@ -13,13 +13,35 @@
 
 import * as THREE from "three";
 import { WEBXR_TO_NUE } from "gps-plus-slam-app-framework/ar/webxr-nue-basis";
-import type { Aabb } from "gps-plus-slam-app-framework/ar/occupancy-mesher";
 import { createPhysicsWorld } from "./physics-world";
 import { createPhysicsSession } from "./physics-session";
 
-/** The occupied-AABB feed (the framework `OcclusionMesh`) the collider follows. */
-export interface AabbSource {
-  getAabbs(): readonly Aabb[];
+/**
+ * The reconstructed occlusion mesh the collider follows — the SAME mesh the scene
+ * renders/occludes with, so physics and occlusion use one building block. The
+ * runtime reads its `THREE.Mesh` geometry (raw-WebXR positions, matching the
+ * physics space) and builds a Rapier trimesh from it.
+ */
+export interface OccluderMeshSource {
+  getMesh(): THREE.Mesh;
+}
+
+/** Extract `{positions, indices}` from an occluder mesh, or null when empty. */
+function readTrimesh(
+  mesh: THREE.Mesh,
+): { positions: Float32Array; indices: Uint32Array } | null {
+  const posAttr = mesh.geometry.getAttribute("position");
+  const idxAttr = mesh.geometry.getIndex();
+  if (!posAttr || !idxAttr || idxAttr.count < 3) return null;
+  const positions =
+    posAttr.array instanceof Float32Array
+      ? posAttr.array
+      : new Float32Array(posAttr.array);
+  const indices =
+    idxAttr.array instanceof Uint32Array
+      ? idxAttr.array
+      : new Uint32Array(idxAttr.array);
+  return { positions, indices };
 }
 
 export interface PhysicsRuntimeOptions {
@@ -31,9 +53,9 @@ export interface PhysicsRuntimeOptions {
 
 export interface PhysicsRuntime {
   /**
-   * Rebuild the collider from the AABB source (throttled to `colliderRebuildMs`),
-   * step the world, sync ball meshes, and report stats. `nowMs` is the frame
-   * timestamp (rAF / XR frame time) driving the rebuild throttle.
+   * Rebuild the trimesh collider from the occluder geometry (throttled to
+   * `colliderRebuildMs`), step the world, sync ball meshes, and report stats.
+   * `nowMs` is the frame timestamp (rAF / XR frame time) driving the throttle.
    */
   step(nowMs: number): void;
   /**
@@ -54,12 +76,12 @@ export interface PhysicsRuntime {
 /**
  * Create the runtime. `arWorldGroup` is the scene node carrying the alignment
  * (replay scene or live AR); the balls hang under a `WEBXR_TO_NUE` child of it so
- * they ride the same chain as the reconstructed mesh. `aabbSource` is the
- * occlusion mesh (or `null` to run without a collider, e.g. occupancy disabled).
+ * they ride the same chain as the reconstructed mesh. `meshSource` is the occlusion
+ * mesh whose trimesh becomes the collider (or `null` to run without a collider).
  */
 export function createPhysicsRuntime(
   arWorldGroup: THREE.Object3D,
-  aabbSource: AabbSource | null,
+  meshSource: OccluderMeshSource | null,
   options: PhysicsRuntimeOptions = {},
 ): PhysicsRuntime {
   const colliderRebuildMs = options.colliderRebuildMs ?? 500;
@@ -75,10 +97,10 @@ export function createPhysicsRuntime(
 
   return {
     step(nowMs: number): void {
-      if (aabbSource && nowMs - lastRebuild >= colliderRebuildMs) {
-        const aabbs = aabbSource.getAabbs();
-        if (aabbs.length > 0) {
-          session.setColliderFromAabbs(aabbs);
+      if (meshSource && nowMs - lastRebuild >= colliderRebuildMs) {
+        const trimesh = readTrimesh(meshSource.getMesh());
+        if (trimesh) {
+          session.setColliderFromTrimesh(trimesh.positions, trimesh.indices);
         }
         lastRebuild = nowMs;
       }

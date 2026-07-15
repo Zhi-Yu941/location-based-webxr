@@ -141,7 +141,7 @@ function main(): void {
     const occlusionMesh = session.getOcclusionMesh();
     const runtime = createPhysicsRuntime(scene.arWorldGroup, occlusionMesh, {
       onStats: (balls, boxes) => {
-        statsEl.textContent = `balls ${balls} · collider ${boxes} boxes`;
+        statsEl.textContent = `balls ${balls} · collider ${boxes} tris`;
       },
     });
 

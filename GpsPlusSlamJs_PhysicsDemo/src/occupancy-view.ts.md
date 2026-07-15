@@ -11,8 +11,12 @@ physics collider (user feedback: same framework building block). Owns an
 ## Public API
 
 - **`createOccupancyView(arWorldGroup, store, options?): OccupancyView`** —
-  `options` = `{ cellSizeM=0.15, minObservations=1, meshMode='smooth',
-debugStyle='depth-shaded-wireframe' }` (matches the RecorderApp defaults).
+  `options` = `{ cellSizeM=DEFAULT_OCCUPANCY_CELL_SIZE_M (0.18),
+minObservations=DEFAULT_OCCUPANCY_MIN_OBSERVATIONS (2), meshMode='smooth',
+debugStyle='depth-shaded-wireframe' }`. The voxel size + noise floor come from the
+  framework constants so the demo shares the RecorderApp's FAST-reconstruction
+  tuning (2026-07-15: 18 cm / 2 build the mesh + physics up faster than the old
+  15 cm / 1).
 - **`OccupancyView`**:
   - `getMesh(): THREE.Mesh` — the CURRENT occluder's mesh (a stable handle across
     `setMeshMode` recreation), whose trimesh feeds the physics collider.

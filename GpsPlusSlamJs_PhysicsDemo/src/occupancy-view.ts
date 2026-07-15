@@ -18,7 +18,11 @@
  */
 
 import type { Mesh, Object3D } from "three";
-import { OccupancyGrid } from "gps-plus-slam-app-framework/ar/occupancy-grid";
+import {
+  OccupancyGrid,
+  DEFAULT_OCCUPANCY_CELL_SIZE_M,
+  DEFAULT_OCCUPANCY_MIN_OBSERVATIONS,
+} from "gps-plus-slam-app-framework/ar/occupancy-grid";
 import {
   OcclusionMesh,
   type OccluderDebugStyle,
@@ -30,7 +34,9 @@ import {
 } from "gps-plus-slam-app-framework/state/replay-occupancy-subscriber";
 
 export interface OccupancyViewOptions {
+  /** Voxel edge (m). Default `DEFAULT_OCCUPANCY_CELL_SIZE_M` (0.18 — framework FAST-reconstruction). */
   readonly cellSizeM?: number;
+  /** Noise floor (min observations). Default `DEFAULT_OCCUPANCY_MIN_OBSERVATIONS` (2 — framework FAST-reconstruction). */
   readonly minObservations?: number;
   /** Mesher mode. Default `'smooth'` (Surface nets — the RecorderApp default). */
   readonly meshMode?: MeshMode;
@@ -53,8 +59,9 @@ export function createOccupancyView(
   store: DepthSampleStore,
   options: OccupancyViewOptions = {},
 ): OccupancyView {
-  const cellSizeM = options.cellSizeM ?? 0.15;
-  const minObservations = options.minObservations ?? 1;
+  const cellSizeM = options.cellSizeM ?? DEFAULT_OCCUPANCY_CELL_SIZE_M;
+  const minObservations =
+    options.minObservations ?? DEFAULT_OCCUPANCY_MIN_OBSERVATIONS;
   let debugStyle: OccluderDebugStyle =
     options.debugStyle ?? "depth-shaded-wireframe";
   let meshMode: MeshMode = options.meshMode ?? "smooth";

@@ -11,7 +11,11 @@
  */
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { OccupancyGrid } from "gps-plus-slam-app-framework/ar/occupancy-grid";
+import {
+  OccupancyGrid,
+  DEFAULT_OCCUPANCY_CELL_SIZE_M,
+  DEFAULT_OCCUPANCY_MIN_OBSERVATIONS,
+} from "gps-plus-slam-app-framework/ar/occupancy-grid";
 import { OcclusionMesh } from "gps-plus-slam-app-framework/visualization/occlusion-mesh";
 import { createOccupancyView } from "./occupancy-view";
 import type { DepthSampleStore } from "gps-plus-slam-app-framework/state/replay-occupancy-subscriber";
@@ -57,6 +61,30 @@ describe("createOccupancyView", () => {
     expect(addSample).toHaveBeenCalledTimes(1);
     // The occluder re-meshes — it feeds BOTH occlusion and the physics collider.
     expect(meshUpdate).toHaveBeenCalledTimes(1);
+    view.dispose();
+  });
+
+  it("inherits the framework voxel size + noise floor for the mesh (FAST reconstruction)", () => {
+    // User feedback (2026-07-15): the demo must use the same framework defaults
+    // as the recorder — 18 cm voxels + a noise floor of 2 — so the mesh/physics
+    // build up fast. The mesher is fed the cell size and the grid is queried at
+    // the noise floor, so spy on both to prove the demo reads the constants.
+    const getOccupied = vi.spyOn(OccupancyGrid.prototype, "getOccupiedCells");
+    const meshUpdate = vi.spyOn(OcclusionMesh.prototype, "update");
+    const store = makeFakeStore();
+    const view = createOccupancyView(new THREE.Group(), store);
+    store.push(sample);
+
+    // Noise floor: getOccupiedCells is queried at the framework default (2).
+    expect(getOccupied).toHaveBeenLastCalledWith(
+      DEFAULT_OCCUPANCY_MIN_OBSERVATIONS,
+    );
+    // Voxel size: the mesher receives the framework default cell size (0.18 m).
+    expect(meshUpdate).toHaveBeenLastCalledWith(
+      expect.anything(),
+      DEFAULT_OCCUPANCY_CELL_SIZE_M,
+      expect.anything(),
+    );
     view.dispose();
   });
 

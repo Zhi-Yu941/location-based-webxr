@@ -287,6 +287,9 @@ importers:
 
   GpsPlusSlamJs_PhysicsDemo:
     dependencies:
+      '@dimforge/rapier3d-compat':
+        specifier: ^0.12.0
+        version: 0.12.0
       gps-plus-slam-app-framework:
         specifier: workspace:*
         version: link:../GpsPlusSlamJs_AppFramework

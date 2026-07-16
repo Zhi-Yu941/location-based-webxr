@@ -1412,7 +1412,7 @@ async function handleEnterAR(): Promise<void> {
           occupancyCubesVisualizer = new OccupancyCubesVisualizer(
             arWorldGroup,
             // Noise filter: only render voxels seen ≥ minConfidence times
-            // (recording-options `occupancy.minConfidence`, default 2). Read
+            // (recording-options `occupancy.minConfidence`, default 3). Read
             // here so a changed value applies on the next Enter-AR, same as
             // cellSizeM above.
             { minObservations: recordingOptions.occupancy.minConfidence }

@@ -65,17 +65,18 @@ describe("createOccupancyView", () => {
   });
 
   it("inherits the framework voxel size + noise floor for the mesh (FAST reconstruction)", () => {
-    // User feedback (2026-07-15): the demo must use the same framework defaults
-    // as the recorder — 18 cm voxels + a noise floor of 2 — so the mesh/physics
-    // build up fast. The mesher is fed the cell size and the grid is queried at
-    // the noise floor, so spy on both to prove the demo reads the constants.
+    // The demo must use the same framework defaults as the recorder — 18 cm
+    // voxels (the speed lever) + a noise floor of 3 (keeps floaters/phantom
+    // colliders low; 2026-07-16 sweep). The mesher is fed the cell size and the
+    // grid is queried at the noise floor, so spy on both to prove the demo reads
+    // the constants (asserted against the constants, not hardcoded numbers).
     const getOccupied = vi.spyOn(OccupancyGrid.prototype, "getOccupiedCells");
     const meshUpdate = vi.spyOn(OcclusionMesh.prototype, "update");
     const store = makeFakeStore();
     const view = createOccupancyView(new THREE.Group(), store);
     store.push(sample);
 
-    // Noise floor: getOccupiedCells is queried at the framework default (2).
+    // Noise floor: getOccupiedCells is queried at the framework default (3).
     expect(getOccupied).toHaveBeenLastCalledWith(
       DEFAULT_OCCUPANCY_MIN_OBSERVATIONS,
     );

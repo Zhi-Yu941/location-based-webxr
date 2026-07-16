@@ -36,7 +36,7 @@ import {
 export interface OccupancyViewOptions {
   /** Voxel edge (m). Default `DEFAULT_OCCUPANCY_CELL_SIZE_M` (0.18 — framework FAST-reconstruction). */
   readonly cellSizeM?: number;
-  /** Noise floor (min observations). Default `DEFAULT_OCCUPANCY_MIN_OBSERVATIONS` (2 — framework FAST-reconstruction). */
+  /** Noise floor (min observations). Default `DEFAULT_OCCUPANCY_MIN_OBSERVATIONS` (3 — framework default; keeps phantom colliders low). */
   readonly minObservations?: number;
   /** Mesher mode. Default `'smooth'` (Surface nets — the RecorderApp default). */
   readonly meshMode?: MeshMode;

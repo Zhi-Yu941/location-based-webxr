@@ -56,10 +56,15 @@ export interface OccupancyGridOptions {
  * quantization. Both apps always pass an explicit `cellSizeM`, so the app-facing
  * recommended default and the primitive fallback can differ without conflict.
  *
- * 2026-07-15 FAST-reconstruction tuning (device testing): coarser 18 cm voxels and
- * a noise floor of 2 make the mesh/physics build up noticeably faster than the
- * previous 15 cm / 3 — fewer, larger cells confirm sooner. `0.18` stays within
- * `OCCUPANCY_CONSTRAINTS.cellSizeM.max` (0.20); `2` within `minConfidence` 1–10.
+ * Tuning (2026-07-16 cellSize × noise corpus sweep — supersedes the 2026-07-15
+ * device-impression change that briefly shipped noise 2): the SPEED comes from the
+ * coarser 18 cm voxel (fewer, larger cells confirm sooner — +18% early coverage vs
+ * the old 15 cm at equal fidelity), and the noise floor stays at 3 because isolation
+ * (floaters = phantom colliders) is governed almost entirely by the noise floor, not
+ * the voxel size — mc 3 ≈ 1.9% floaters vs mc 2 ≈ 3.5%. So raising the voxel is the
+ * clean speed lever; lowering the floor is not. `0.18` stays within
+ * `OCCUPANCY_CONSTRAINTS.cellSizeM.max` (0.20); `3` within `minConfidence` 1–10. See
+ * GpsPlusSlamJs_Docs/docs/2026-07-16-0557-occupancy-cellsize-noise-quality-sweep-plan.md.
  */
 export const DEFAULT_OCCUPANCY_CELL_SIZE_M = 0.18;
 
@@ -68,7 +73,7 @@ export const DEFAULT_OCCUPANCY_CELL_SIZE_M = 0.18;
  * is rendered/meshed (the Recorder's `minConfidence`, the demo's `minObservations`).
  * See {@link DEFAULT_OCCUPANCY_CELL_SIZE_M} for the rationale and the tuning note.
  */
-export const DEFAULT_OCCUPANCY_MIN_OBSERVATIONS = 2;
+export const DEFAULT_OCCUPANCY_MIN_OBSERVATIONS = 3;
 
 /**
  * Per-cell state, deliberately FLAT (Step 3.1 of the 2026-07-03 long-session

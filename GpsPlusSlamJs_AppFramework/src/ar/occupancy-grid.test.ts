@@ -692,9 +692,12 @@ describe('OccupancyGrid', () => {
      * proves it is a valid (in-range, non-throwing) grid parameter — the app
      * defaults can never ship a value the grid rejects.
      */
-    it('pin the FAST-reconstruction voxel size (18 cm) and noise floor (2)', () => {
+    it('pin the FAST-reconstruction voxel size (18 cm) and noise floor (3)', () => {
+      // 2026-07-16 sweep: speed comes from the 18 cm voxel; the noise floor stays
+      // at 3 because floaters (phantom colliders) are set by the floor, not the
+      // voxel size (mc 3 ≈ 1.9% vs mc 2 ≈ 3.5%).
       expect(DEFAULT_OCCUPANCY_CELL_SIZE_M).toBe(0.18);
-      expect(DEFAULT_OCCUPANCY_MIN_OBSERVATIONS).toBe(2);
+      expect(DEFAULT_OCCUPANCY_MIN_OBSERVATIONS).toBe(3);
     });
 
     it('the recommended cell size constructs a valid grid', () => {

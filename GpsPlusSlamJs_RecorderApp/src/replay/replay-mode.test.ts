@@ -163,12 +163,15 @@ vi.mock('../ui/stats-overlay', () => ({
     dispose: vi.fn(),
   })),
 }));
-vi.mock('../visualization/occupancy-cubes-visualizer', () => ({
-  // `function` (not arrow) so `new OccupancyCubesVisualizer()` is constructable.
-  OccupancyCubesVisualizer: vi.fn(function () {
-    return { refresh: vi.fn(), clear: vi.fn(), dispose: vi.fn() };
-  }),
-}));
+vi.mock(
+  'gps-plus-slam-app-framework/visualization/occupancy-cubes-visualizer',
+  () => ({
+    // `function` (not arrow) so `new OccupancyCubesVisualizer()` is constructable.
+    OccupancyCubesVisualizer: vi.fn(function () {
+      return { refresh: vi.fn(), clear: vi.fn(), dispose: vi.fn() };
+    }),
+  })
+);
 vi.mock('../visualization/wire-occupancy-grid-subscribers', () => ({
   wireOccupancyGridSubscribers: vi.fn(() => vi.fn()),
 }));

@@ -37,6 +37,10 @@ import {
   type RecordingOptions,
   type OccupancyOptions,
 } from './recording-options';
+import {
+  DEFAULT_OCCUPANCY_CELL_SIZE_M,
+  DEFAULT_OCCUPANCY_MIN_OBSERVATIONS,
+} from 'gps-plus-slam-app-framework/ar/occupancy-grid';
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -1519,23 +1523,32 @@ describe('recording-options', () => {
      * the depth/occupancy defaults for FAST mesh reconstruction — surfaces
      * should mesh ASAP. These pin that decision: intervalMs 500 (min cadence),
      * gridSize 32 (max points/sample ⇒ cells confirm fastest), minConfidence 3
-     * (fastest noise floor that still suppresses phantoms — ~1.5s dwell),
-     * cellSizeM 0.15 (detail). See
-     * GpsPlusSlamJs_Docs/docs/2026-06-30-0829-occluder-tuning-followups.md (Round 6).
+     * and cellSizeM 0.18 (2026-07-16 cellSize × noise corpus sweep: the speed comes
+     * from the coarser 18 cm voxel, the noise floor stays at 3 because floaters =
+     * phantom colliders are set by the floor not the voxel — these come from the
+     * framework-level DEFAULT_OCCUPANCY_* constants so the demo shares them). See
+     * GpsPlusSlamJs_Docs/docs/2026-07-16-0557-occupancy-cellsize-noise-quality-sweep-plan.md.
      */
     it('uses the fast-reconstruction depth/occupancy defaults', () => {
       expect(DEFAULT_RECORDING_OPTIONS.depth.intervalMs).toBe(500);
       expect(DEFAULT_RECORDING_OPTIONS.depth.gridSize).toBe(32);
       expect(DEFAULT_RECORDING_OPTIONS.occupancy.minConfidence).toBe(3);
-      expect(DEFAULT_RECORDING_OPTIONS.occupancy.cellSizeM).toBe(0.15);
+      expect(DEFAULT_RECORDING_OPTIONS.occupancy.cellSizeM).toBe(0.18);
     });
 
     it('has resolutionDivisor defaulting to 1 (full resolution)', () => {
       expect(DEFAULT_RECORDING_OPTIONS.images.resolutionDivisor).toBe(1);
     });
 
-    it('has occupancy cell size defaulting to 0.15 m (OccupancyGrid parity)', () => {
-      expect(DEFAULT_RECORDING_OPTIONS.occupancy.cellSizeM).toBe(0.15);
+    it('inherits its occupancy voxel size + noise floor from the framework defaults', () => {
+      // Single source of truth: both the recorder and the PhysicsDemo read these
+      // framework constants, so this pins the inheritance (not just the number).
+      expect(DEFAULT_RECORDING_OPTIONS.occupancy.cellSizeM).toBe(
+        DEFAULT_OCCUPANCY_CELL_SIZE_M
+      );
+      expect(DEFAULT_RECORDING_OPTIONS.occupancy.minConfidence).toBe(
+        DEFAULT_OCCUPANCY_MIN_OBSERVATIONS
+      );
     });
 
     it('has frame-tile display divisor defaulting to 2 (half resolution)', () => {

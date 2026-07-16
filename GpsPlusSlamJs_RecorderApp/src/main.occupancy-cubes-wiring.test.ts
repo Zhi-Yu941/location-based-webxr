@@ -120,9 +120,12 @@ vi.mock('gps-plus-slam-app-framework/ar/xr-frame-loop', () => ({
 vi.mock('gps-plus-slam-app-framework/ar/occupancy-grid', () => ({
   OccupancyGrid: mockOccupancyGridCtor,
 }));
-vi.mock('./visualization/occupancy-cubes-visualizer', () => ({
-  OccupancyCubesVisualizer: mockVisualizerCtor,
-}));
+vi.mock(
+  'gps-plus-slam-app-framework/visualization/occupancy-cubes-visualizer',
+  () => ({
+    OccupancyCubesVisualizer: mockVisualizerCtor,
+  })
+);
 vi.mock('./visualization/wire-occupancy-grid-subscribers', () => ({
   wireOccupancyGridSubscribers: mockWireOccupancyGridSubscribers,
 }));

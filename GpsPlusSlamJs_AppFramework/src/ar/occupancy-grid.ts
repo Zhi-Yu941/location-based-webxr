@@ -45,6 +45,37 @@ export interface OccupancyGridOptions {
 }
 
 /**
+ * Recommended reconstruction defaults for apps that build AND render an occupancy
+ * mesh (the Recorder, the PhysicsDemo). These are the single framework-level source
+ * of truth so every consumer inherits the same tuning — change them here and both
+ * apps follow.
+ *
+ * They are DELIBERATELY separate from {@link OccupancyGrid}'s constructor fallback
+ * (`cellSizeM ?? 0.15`, Unity parity): that primitive fallback stays 0.15 because a
+ * pile of low-level tests build `new OccupancyGrid()` with no args and assume 0.15
+ * quantization. Both apps always pass an explicit `cellSizeM`, so the app-facing
+ * recommended default and the primitive fallback can differ without conflict.
+ *
+ * Tuning (2026-07-16 cellSize × noise corpus sweep — supersedes the 2026-07-15
+ * device-impression change that briefly shipped noise 2): the SPEED comes from the
+ * coarser 18 cm voxel (fewer, larger cells confirm sooner — +18% early coverage vs
+ * the old 15 cm at equal fidelity), and the noise floor stays at 3 because isolation
+ * (floaters = phantom colliders) is governed almost entirely by the noise floor, not
+ * the voxel size — mc 3 ≈ 1.9% floaters vs mc 2 ≈ 3.5%. So raising the voxel is the
+ * clean speed lever; lowering the floor is not. `0.18` stays within
+ * `OCCUPANCY_CONSTRAINTS.cellSizeM.max` (0.20); `3` within `minConfidence` 1–10. See
+ * GpsPlusSlamJs_Docs/docs/2026-07-16-0557-occupancy-cellsize-noise-quality-sweep-plan.md.
+ */
+export const DEFAULT_OCCUPANCY_CELL_SIZE_M = 0.18;
+
+/**
+ * Recommended occupancy noise floor — the minimum observation count before a cell
+ * is rendered/meshed (the Recorder's `minConfidence`, the demo's `minObservations`).
+ * See {@link DEFAULT_OCCUPANCY_CELL_SIZE_M} for the rationale and the tuning note.
+ */
+export const DEFAULT_OCCUPANCY_MIN_OBSERVATIONS = 3;
+
+/**
  * Per-cell state, deliberately FLAT (Step 3.1 of the 2026-07-03 long-session
  * fps plan): one plain object with eight scalar fields instead of the former
  * `{ cell, posSum: [..], colorSum: [..] }` shape (~5 heap objects per cell,

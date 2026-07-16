@@ -38,6 +38,10 @@ import {
   OCCLUDER_DEBUG_STYLES,
   type OccluderDebugStyle,
 } from 'gps-plus-slam-app-framework/visualization/occlusion-mesh';
+import {
+  DEFAULT_OCCUPANCY_CELL_SIZE_M,
+  DEFAULT_OCCUPANCY_MIN_OBSERVATIONS,
+} from 'gps-plus-slam-app-framework/ar/occupancy-grid';
 
 // Re-exported so recorder import sites keep sourcing the style union from the
 // catalog (the framework owns the definition — see the header comment).
@@ -195,8 +199,9 @@ export type OccluderMeshMode = (typeof OCCLUDER_MESH_MODES)[number];
 export interface OccupancyOptions {
   /**
    * Voxel edge length in metres. Drives the occupancy-grid quantization, the
-   * debug cubes, and the COLMAP `points3D` density. Default 0.15 (15 cm, Unity
-   * parity). Smaller = finer detail but cell count scales as 1/cellSize³, so the
+   * debug cubes, and the COLMAP `points3D` density. Default `DEFAULT_OCCUPANCY_CELL_SIZE_M`
+   * (0.18 = 18 cm; framework FAST-reconstruction default, shared with the
+   * PhysicsDemo). Smaller = finer detail but cell count scales as 1/cellSize³, so the
    * range is deliberately clamped (see `OCCUPANCY_CONSTRAINTS`). Read once when
    * the grid is constructed (Enter-AR / replay load), so a change takes effect
    * on the next session rather than mid-session.
@@ -209,7 +214,8 @@ export interface OccupancyOptions {
    * lands in it; raising this filters single-frame depth noise — in
    * particular the **behind-surface** phantoms (e.g. below the floor) that
    * free-space carving can never clear because no ray passes through occluded
-   * space. Default 3 (1 = unfiltered/legacy). Higher = less noise but
+   * space. Default `DEFAULT_OCCUPANCY_MIN_OBSERVATIONS` (3; framework noise floor,
+   * shared with the PhysicsDemo). 1 = unfiltered/legacy. Higher = less noise but
    * briefly-glimpsed real surfaces may be dropped, so it is exposed for
    * on-device tuning. Read once when the visualizer is constructed (Enter-AR
    * / replay load). See
@@ -474,8 +480,8 @@ export const DEFAULT_RECORDING_OPTIONS: RecordingOptions = {
   // DEFAULT_AR_CRASH_ISOLATION (same rationale as the filter groups above).
   arCrashIsolation: { ...DEFAULT_AR_CRASH_ISOLATION },
   occupancy: {
-    cellSizeM: 0.15, // 15 cm voxels — matches OccupancyGrid's own default (Unity parity); balances detail vs speed
-    minConfidence: 3, // ≥3 observations to render a voxel — the FAST-reconstruction noise floor (2026-07-01; ~1.5s dwell before a surface meshes vs 2.5s at 5, +25% early coverage; 1 = legacy/unfiltered)
+    cellSizeM: DEFAULT_OCCUPANCY_CELL_SIZE_M, // 18 cm voxels — framework default (2026-07-16 sweep); the speed lever, coarser/faster than the old 15 cm. Shared with the PhysicsDemo.
+    minConfidence: DEFAULT_OCCUPANCY_MIN_OBSERVATIONS, // ≥3 observations to render a voxel — framework noise floor. Kept at 3 (the sweep: floaters = phantom colliders are set by the floor, not the voxel). 1 = legacy/unfiltered. Shared with the PhysicsDemo.
     persistentOcclusion: true, // persistent depth-only mesh occluder ON by default (2026-07-01: Web-Worker offload removed the render stall — see 2026-07-01-0733-occluder-worker-and-chunked-remesh-plan.md)
     liveOcclusion: false, // live CPU-depth occluder OFF by default (device-gated quality; replay no-op)
     occluderDebugStyle: 'off', // debug visualization of the persistent occluder mesh OFF by default (occlusion is invisible in normal use)

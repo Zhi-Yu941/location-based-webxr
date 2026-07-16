@@ -15,7 +15,11 @@ import { describe, it, expect } from 'vitest';
 import { mat4 } from 'gl-matrix';
 import type { Matrix4, Vector3 } from 'gps-plus-slam-js';
 import type { DepthSample } from '../types/ar-types';
-import { OccupancyGrid } from './occupancy-grid';
+import {
+  OccupancyGrid,
+  DEFAULT_OCCUPANCY_CELL_SIZE_M,
+  DEFAULT_OCCUPANCY_MIN_OBSERVATIONS,
+} from './occupancy-grid';
 
 const PROJECTION: Matrix4 = Array.from(
   mat4.perspective(mat4.create(), Math.PI / 3, 16 / 9, 0.1, 1000)
@@ -676,6 +680,31 @@ describe('OccupancyGrid', () => {
 
       // An untouched chunk reports 0.
       expect(grid.getChunkRevision([50, 50, 50])).toBe(0);
+    });
+  });
+
+  describe('recommended reconstruction defaults', () => {
+    /**
+     * Why this test matters: these two constants are the single framework-level
+     * source of truth the Recorder AND the PhysicsDemo inherit for voxel size +
+     * noise floor (2026-07-15 FAST-reconstruction tuning). Pinning the values
+     * guards an accidental drift, and constructing a grid with the cell-size
+     * proves it is a valid (in-range, non-throwing) grid parameter — the app
+     * defaults can never ship a value the grid rejects.
+     */
+    it('pin the FAST-reconstruction voxel size (18 cm) and noise floor (3)', () => {
+      // 2026-07-16 sweep: speed comes from the 18 cm voxel; the noise floor stays
+      // at 3 because floaters (phantom colliders) are set by the floor, not the
+      // voxel size (mc 3 ≈ 1.9% vs mc 2 ≈ 3.5%).
+      expect(DEFAULT_OCCUPANCY_CELL_SIZE_M).toBe(0.18);
+      expect(DEFAULT_OCCUPANCY_MIN_OBSERVATIONS).toBe(3);
+    });
+
+    it('the recommended cell size constructs a valid grid', () => {
+      const grid = new OccupancyGrid({
+        cellSizeM: DEFAULT_OCCUPANCY_CELL_SIZE_M,
+      });
+      expect(grid.cellSizeM).toBe(0.18);
     });
   });
 });

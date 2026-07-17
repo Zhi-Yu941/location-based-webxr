@@ -23,7 +23,7 @@
 ## Evidence used
 
 - **Verified fact:** Mingna's proposal is in [`Draft/mingna-contract.md`](../../Draft/mingna-contract.md).
-- **Verified fact:** The independent Codex audit is in [`Draft/filip-contract.md`](../../Draft/filip-contract.md).
+- **Verified fact:** The independent Codex audit is in [`archive/task2/filip-contract-audit.md`](../../archive/task2/filip-contract-audit.md).
 - **Verified fact:** Project boundaries and source precedence are in [`AGENTS.md`](../../AGENTS.md).
 - **Verified fact:** The completed Task 1 review was read from the linked `task1-data` worktree at `docs/task1-review.md`, dated 11 July 2026.
 - **Verified fact:** Recorder behavior was checked in [`colmap-conversions.ts`](../../GpsPlusSlamJs_RecorderApp/src/colmap/colmap-conversions.ts), [`colmap-serializers.ts`](../../GpsPlusSlamJs_RecorderApp/src/colmap/colmap-serializers.ts), [`colmap-zip-contributor.ts`](../../GpsPlusSlamJs_RecorderApp/src/colmap/colmap-zip-contributor.ts), and their tests.

@@ -1,8 +1,10 @@
 # Task 2 contracts comparison
 
+> **Status: Superseded.** Unfilled historical comparison template. The populated Goal 1A comparison is `reviews/task2-goal1a-technical-comparison.md`; this file must not be treated as a completed review.
+
 ## Sources
 
-- Codex draft: `Draft/filip-contract.md`
+- Codex draft: `archive/task2/filip-contract-audit.md`
 - Gemini draft: `Draft/migna-contract.md`
 
 ## Comparison

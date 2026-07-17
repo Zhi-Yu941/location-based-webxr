@@ -1,5 +1,7 @@
 # Task 2 contract planning audit
 
+> **Status: Superseded.** Independent Filip audit retained for history. It was replaced by the broad v2 candidate and later by the bounded Iteration 1A proposal for reader/writer scope. It is not an official plan or accepted decision record.
+
 Status: independent Codex draft for team and Product Owner review. This is an audit, not the official plan and not an algorithm decision.
 
 Evidence inspected: `AGENTS.md`; the 12-page SoftwareLab assignment; `task1-review.md`; files under `GpsPlusSlamJs_RecorderApp/src/colmap/`; and only the ZIP entry structure plus `sparse/0/*.txt` from the two Task 1 fixtures. The Gemini draft, comparison review and official Task 2 plan were not read.

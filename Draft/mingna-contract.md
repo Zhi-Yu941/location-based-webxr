@@ -1,5 +1,7 @@
 # Pose Refinement Pipeline: Initial Architecture & Seam Plan
 
+> **Status: Current proposal.** Independent Mingna-led Task 2 architecture candidate; the file credits Mingna Sun and Filip Kral. It remains separate from Filip's proposal lineage and is not an official plan or accepted decision record.
+
 **Date:** 2026-07-14
 **Authors:** Mingna Sun, Filip Kral
 **Component:** COLMAP Reader/Writer & Pose Refinement Core

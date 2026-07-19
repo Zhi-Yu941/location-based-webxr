@@ -88,3 +88,23 @@ Scope: only recorder ZIP handling, COLMAP text codec/model, faithful output ZIP,
 | Preservation guarantees | **Sufficient** — path set and untouched payloads are testable. | **Partially sufficient** — mandatory prose conflicts with optional source input. | **Sufficient** — copy-through is unconditional. |
 | Coordinate safety | **Sufficient** — direction, order and conversion guards are testable. | **Partially sufficient** — core labels exist, but operational safeguards are missing. | **Sufficient** — Filip’s codec guards cover Mingna’s seam. |
 | First-iteration size | **Partially sufficient** — extensive archive policy exceeds the smallest demonstrator. | **Insufficient** — later refinement/measurement and generic-model concerns dominate. | **Sufficient** — only strict ZIP/codec/demo/smoke behavior remains. |
+
+## 7. Comments
+ 1. About 4. Material conflicts :
+    - **Numeric/no-op contract.** : The plan looks good for this point.
+    - **Public failures.** : Throwing errors is easier to implement and more efficient. But Filip's plan might be more user-friendly for debugging. You can decide it by yourself.
+    - **Smoke-test strength.** : The plan looks good for this point.
+
+2. About 5. Merge candidates :
+   - About 1. Merge candidates : The plan looks good for this point.
+   - About 2. Merge candidates : The plan looks good for this point.
+   - About 3. Merge candidates : The plan looks good for this point.
+   - About 4. Merge candidates : Mentioned above.
+   - About 5. Merge candidates : The plan looks good for this point.
+   - About 6. Merge candidates : Not a bad idea, it's also a good way.
+
+3. Notes from review meeting on Friday :
+    - harness is not part of the product provided to user, it just for us to proof our refiner.
+    - The proof pipeline is not required to be automatic, we can operate it ourselves.
+    - Everything should run locally, there's no server for us to use.
+    - Our product is a web-based tool seperate from the recorder tool, which the users operate themselves.

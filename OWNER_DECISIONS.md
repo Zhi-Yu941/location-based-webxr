@@ -103,16 +103,88 @@ Iteration 1A will not implement that button or decide its final location and UX.
 
 The current reusable boundary must not prevent later integration, but speculative integration requirements must not expand Iteration 1A.
 
+## OD-008 — Archive, codec, and model-validation ownership is separated
+
+**Status:** Agreed by Filip and Mingna
+
+One recorder ZIP adapter exclusively owns ZIP decoding and encoding, archive-entry paths, image-asset resolution, opaque copy-through, and replacement of the selected COLMAP files. No second component independently reconstructs or writes the archive.
+
+The COLMAP text codec only parses and serializes `cameras.txt`, `images.txt`, and `points3D.txt`. It knows the COLMAP text grammar and coordinate representation, but it does not know about ZIP layout, filesystem paths, LichtFeld execution, refinement, or measurement.
+
+Typed-model validation protects IDs, references, supported record shapes, numeric validity, pose conventions, and the current recorder profile. Validation may be implemented next to the codec as small pure modules; this ownership decision does not require a large framework.
+
+The resulting boundary is:
+
+```text
+recorder ZIP
+  -> archive adapter
+  -> COLMAP text codec
+  -> typed model and model validation
+  -> COLMAP text codec
+  -> archive adapter
+  -> output ZIP
+```
+
+## OD-009 — The 1A model is recorder-specific but deliberately extensible
+
+**Status:** Agreed by Filip and Mingna
+
+Iteration 1A supports the verified recorder COLMAP text profile required by the assignment. The initial accepted profile is `.txt`, the current `PINHOLE` camera shape, and the observation and track shapes present in the recorder fixtures. Binary COLMAP, a general camera-model registry, and generic COLMAP compatibility remain outside 1A.
+
+The typed model will nevertheless represent cameras, images, image poses, points3D, IDs and references. Observations and tracks will have typed collection fields even when the 1A recorder-profile validator requires those collections to be empty. Camera types should permit later extension through additional explicit variants without implementing those variants now.
+
+This is the intended meaning of a broad foundation: later work can extend the model and validator without replacing the ZIP/codec/model seam, while 1A remains bounded to behavior that can be verified against current recorder fixtures.
+
+## OD-010 — Round-trip fidelity is semantic, deterministic, and archive-preserving
+
+**Status:** Agreed by Filip and Mingna
+
+The shared 1A contract will distinguish three guarantees:
+
+- `parse -> serialize -> parse` preserves the typed model semantically;
+- serialization is deterministic and uses round-trip-safe numeric formatting rather than a fixed decimal precision that may introduce drift;
+- every untouched archive entry keeps the same normalized path and decompressed bytes.
+
+Source record order is preserved for generated COLMAP records. Quaternion comparisons are sign-invariant because `q` and `-q` represent the same rotation. An unchanged model should also pass a separate no-op value-preservation assertion so tolerant comparison cannot hide unintended serializer changes.
+
+Byte-identical generated COLMAP text, compressed ZIP bytes, ZIP entry order, timestamps, and compression metadata are not required.
+
+## OD-011 — The 1A LichtFeld check is one external compatibility gate
+
+**Status:** Agreed by Filip and Mingna
+
+Normal reader/writer development and verification will use fast local codec, archive, pose-convention, and fixture-replay tests. LichtFeld is not invoked by the reusable component and is not run after every automated test.
+
+After those checks pass, the CLI-emitted ZIP must receive one recorded external compatibility smoke test showing that an identified LichtFeld build can accept it, complete training, and produce an openable artifact. This proves compatibility only. It does not claim identical training behavior, equal visual quality, or pose improvement.
+
+Repeated runs, source-versus-prebuilt comparison, frozen LichtFeld settings, and the reproducible ZIP-to-splat recipe belong to 1B.
+
+## OD-012 — The first shared plan records minimal future seams only
+
+**Status:** Confirmed by assignment
+
+The first shared plan must record the typed COLMAP model, a minimal future refinement signature, and a minimal measurement-harness interface so that the independently developed components share one seam.
+
+For planning purposes, the intended flow is only:
+
+```text
+refine(model, optional signals) -> refined model
+evaluate(baseline or candidate under a controlled run) -> evaluation report
+```
+
+These declarations do not select or implement a refinement algorithm, raw-signal parser, held-out policy, metric procedure, LichtFeld automation layer, or final synchronous/asynchronous adapter design. Those details must follow the evidence and later review gates. Training-image IDs, optimizer-specific settings, and speculative signal schemas must not become 1A implementation requirements merely because they appeared in one independent proposal.
+
 ## Decisions intentionally not recorded yet
 
 The following remain unresolved and must not be inferred from this file:
 
 - the precise scope and completion gate for the LichtFeld 1B work;
 - the baseline LichtFeld settings and which variables will be frozen;
-- when a LichtFeld run is required and when retained evidence may be reused;
+- when LichtFeld runs beyond the single 1A compatibility smoke are required and when retained evidence may be reused;
 - the measurement-harness implementation and held-out-view procedure;
 - use of action logs, depth, GPS, or other recorder-specific signals;
 - selection or implementation of a pose-refinement approach;
+- the exact production types and asynchronous behavior of the future refinement and measurement interfaces;
 - timeboxes and stop conditions for refinement investigations;
 - the exact source-module and package locations;
 - the pair-programming implementation sequence;

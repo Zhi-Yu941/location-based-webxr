@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>zip.js in-memory round-trip cheat sheet</title>
+    <link rel="stylesheet" href="../assets/lesson.css" />
+  </head>
+  <body>
+    <main class="compact">
+      <header>
+        <div class="eyebrow">Quick reference · @zip.js/zip.js 2.8.26</div>
+        <h1>In-memory ZIP round trips</h1>
+        <p class="lede">The four adapters and two archive objects needed for Slice 0A.</p>
+      </header>
+
+      <h2>API map</h2>
+      <table>
+        <thead>
+          <tr><th>Boundary</th><th>Use</th><th>Result</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>ZIP bytes → archive</td><td><code>new ZipReader(new Uint8ArrayReader(zipBytes))</code></td><td>Entries</td></tr>
+          <tr><td>File entry → bytes</td><td><code>entry.getData(new Uint8ArrayWriter())</code></td><td>Decompressed payload</td></tr>
+          <tr><td>Payload bytes → file entry</td><td><code>zipWriter.add(path, new Uint8ArrayReader(bytes))</code></td><td>Added file</td></tr>
+          <tr><td>Archive → ZIP bytes</td><td><code>new ZipWriter(new Uint8ArrayWriter())</code>, then <code>close()</code></td><td>ZIP <code>Uint8Array</code></td></tr>
+        </tbody>
+      </table>
+
+      <h2>Explicit directory</h2>
+      <pre><code>await zipWriter.add("sparse/", undefined, { directory: true });</code></pre>
+      <p>Keep the trailing slash in the path and set <code>directory: true</code>. On read, trust <code>entry.directory</code>; do not infer the kind only from the slash.</p>
+
+      <h2>Safe inventory branch</h2>
+      <pre><code>const item = entry.directory
+  ? {
+      path: entry.filename,
+      kind: "directory" as const,
+      bytes: new Uint8Array(),
+    }
+  : {
+      path: entry.filename,
+      kind: "file" as const,
+      bytes: await entry.getData(new Uint8ArrayWriter()),
+    };</code></pre>
+
+      <h2>Close both layers</h2>
+      <pre><code>const zipBytes = await zipWriter.close();
+await zipReader.close();</code></pre>
+      <p><code>ZipWriter.close()</code> finalizes the central directory. A writer result before finalization is not a complete ZIP.</p>
+
+      <h2>Assertions that match the contract</h2>
+      <ul class="checklist">
+        <li>Compare path sets, not entry order.</li>
+        <li>Compare <code>kind</code> separately from payload length.</li>
+        <li>Compare decompressed <code>Uint8Array</code> values with deep equality.</li>
+        <li>Use one non-text binary payload such as <code>[0, 255, 1, 128]</code>.</li>
+        <li>Keep an empty file in the fixture; zero bytes must not mean “omit entry.”</li>
+        <li>Reopen the output ZIP before making preservation claims.</li>
+      </ul>
+
+      <div class="warning">
+        <strong>Do not compare:</strong> complete ZIP bytes, compressed entry bytes, order, timestamps, compression level, comments, or unrelated metadata.
+      </div>
+
+      <footer>
+        Return to <a href="../lessons/0001-copy-through-zip-round-trip.html">Lesson 1: copy-through round trip</a>.
+      </footer>
+    </main>
+  </body>
+</html>

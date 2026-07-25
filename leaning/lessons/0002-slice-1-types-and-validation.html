@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lesson 2 — Connect Slice 1's TypeScript blocks</title>
+    <link rel="stylesheet" href="../assets/lesson.css" />
+    <script src="../assets/quiz.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Lesson 2 · about 20 minutes</div>
+        <h1>Connect Slice 1's TypeScript blocks</h1>
+        <p class="lede">
+          Learn what each file and helper is responsible for, why the pieces
+          stay separate, and how to assemble them test-first without receiving
+          a finished validator.
+        </p>
+      </header>
+
+      <div class="goal">
+        <strong>Your tangible win:</strong> sketch the validation pipeline and
+        explain which guarantees come from TypeScript, which require runtime
+        checks, and which belong at the package boundary.
+      </div>
+
+      <h2>1. Start with the central distinction</h2>
+      <div class="block-grid">
+        <article class="block-card">
+          <h3>Compile-time shape</h3>
+          <p>
+            <code>model.ts</code> helps the compiler and your editor. Its
+            declarations describe intended data, but they disappear from the
+            emitted JavaScript.
+          </p>
+        </article>
+        <article class="block-card">
+          <h3>Runtime evidence</h3>
+          <p>
+            <code>validate.ts</code> examines actual numbers, names, IDs, and
+            relationships. This is what protects later code from parsed or
+            externally supplied values.
+          </p>
+        </article>
+      </div>
+
+      <p>
+        A value can be typed as <code>CameraId</code> and still be
+        <code>-4</code>, because the alias is another name for
+        <code>number</code>. Likewise, a tuple guarantees four slots to checked
+        TypeScript callers, but runtime data can still contain NaN or a bad
+        quaternion norm. Slice 1 needs both layers.
+      </p>
+
+      <section class="quiz" data-quiz>
+        <h3>Retrieval check</h3>
+        <p>Which layer proves that camera ID 3 is a positive safe integer?</p>
+        <div class="quiz-options">
+          <button
+            data-correct="false"
+            data-success=""
+            data-retry="An alias documents meaning but does not inspect a runtime number."
+            aria-pressed="false"
+          >
+            Type alias
+          </button>
+          <button
+            data-correct="true"
+            data-success="Correct: that is a runtime value rule."
+            data-retry="An alias documents meaning but does not inspect a runtime number."
+            aria-pressed="false"
+          >
+            Validator
+          </button>
+        </div>
+        <p class="feedback" data-feedback aria-live="polite"></p>
+      </section>
+
+      <h2>2. Understand the blocks in <code>model.ts</code></h2>
+
+      <h3>Semantic aliases</h3>
+      <p>
+        <code>CameraId</code>, <code>ImageId</code>, and
+        <code>Point3DId</code> tell a human what a number means. They improve
+        signatures and reviews, but they are not branded types: TypeScript can
+        still allow one numeric alias where another number is expected.
+      </p>
+
+      <h3>Readonly tuples</h3>
+      <p>
+        A tuple such as <code>readonly [number, number, number]</code> fixes the
+        number and position of components. This is ideal for XYZ and RGB. The
+        quaternion name adds the missing semantic promise:
+        <code>Wxyz</code> tells you the order is
+        <code>[qw, qx, qy, qz]</code>.
+      </p>
+      <p class="note">
+        <code>readonly</code> is compile-time protection, not deep runtime
+        freezing. That is why a no-mutation test still matters.
+      </p>
+
+      <h3>Interfaces and the literal camera model</h3>
+      <p>
+        Interfaces group named fields. The literal type
+        <code>"PINHOLE"</code> is stronger than <code>string</code>: it states
+        the only accepted variant today. The <code>ColmapCamera</code> alias is
+        a future union seam, so a later reviewed camera type can be added
+        deliberately instead of weakening today's contract.
+      </p>
+
+      <h3>Pose meaning is part of the type name</h3>
+      <p>
+        <code>WorldToCameraPose</code> prevents a dangerous conceptual shortcut.
+        COLMAP's <code>tvec</code> is translation in the world-to-camera
+        transform; it is not the camera's world position. The validator checks
+        values only. It must not invert, reorder, normalize, flip, or recenter
+        the pose.
+      </p>
+
+      <h3>Arrays preserve order; IDs express relationships</h3>
+      <p>
+        The arrays retain source record order, while IDs may be sparse and out
+        of order. Therefore, an image's <code>cameraId</code> is resolved by
+        membership in a camera-ID set—not by using the ID as an array index.
+      </p>
+
+      <div class="practice">
+        <h3>Connect-it-yourself prompt</h3>
+        <p>
+          On paper, draw a model with camera ID 4 and image IDs 19 then 2. Mark
+          which arrows represent array order and which represent ID references.
+          If your design needs <code>images[19]</code>, revise it.
+        </p>
+      </div>
+
+      <h2>3. Treat <code>validate.ts</code> as a sequence of gates</h2>
+      <p>
+        A validator is easier to reason about when it has a visible order.
+        Each gate either throws one contextual <code>ColmapError</code> or
+        allows the unchanged model to continue.
+      </p>
+
+      <ol class="sequence">
+        <li>Check that there is exactly one camera.</li>
+        <li>Validate that camera and record its ID in a local set.</li>
+        <li>Check that at least one image exists.</li>
+        <li>Validate image values, uniqueness, names, poses, and references.</li>
+        <li>Validate point values and point-ID uniqueness.</li>
+        <li>Reject populated observations or tracks as unsupported profile.</li>
+        <li>Return or confirm the original complete model unchanged.</li>
+      </ol>
+
+      <p>
+        Small predicate helpers reduce repetition, but each should express one
+        rule: positive safe integer, finite number, safe filename, RGB channel,
+        or unit quaternion. Keep error creation near enough to the field being
+        checked that <code>kind</code> and <code>field</code> stay accurate.
+      </p>
+
+      <h3>Why <code>Number.isSafeInteger</code>?</h3>
+      <p>
+        JavaScript numbers cannot represent every large integer exactly.
+        Integer-like IDs and dimensions need positivity plus safe-integer
+        status. A check for “no decimal point” alone would miss unsafe values.
+      </p>
+
+      <h3>Why <code>Number.isFinite</code>?</h3>
+      <p>
+        Arithmetic comparisons do not reliably communicate the whole rule.
+        Intrinsics, translation, XYZ, and error must reject NaN and both
+        infinities. The non-coercing static method also avoids accepting numeric
+        strings.
+      </p>
+
+      <h3>Quaternion tolerance</h3>
+      <p>
+        Compute the norm from all four components and compare its distance from
+        1 with the accepted tolerance, <code>1e-6</code>. This is a validation
+        check, not an invitation to normalize. Rejecting exposes bad input;
+        repairing would hide it.
+      </p>
+
+      <section class="quiz" data-quiz>
+        <h3>Retrieval check</h3>
+        <p>An image contains one otherwise valid observation. Which kind fits?</p>
+        <div class="quiz-options">
+          <button
+            data-correct="true"
+            data-success="Correct: COLMAP supports it, but profile 1A does not."
+            data-retry="The value is valid COLMAP data; the current profile is narrower."
+            aria-pressed="false"
+          >
+            Unsupported profile
+          </button>
+          <button
+            data-correct="false"
+            data-success=""
+            data-retry="The value is valid COLMAP data; the current profile is narrower."
+            aria-pressed="false"
+          >
+            Validation failure
+          </button>
+        </div>
+        <p class="feedback" data-feedback aria-live="polite"></p>
+      </section>
+
+      <h2>4. Use one error class as structured data</h2>
+      <p>
+        <code>ColmapError</code> is a stable envelope. Its
+        <code>kind</code> answers what category failed; optional
+        <code>path</code>, <code>line</code>, and <code>field</code> locate it;
+        optional <code>cause</code> preserves an underlying failure. Slice 1
+        primarily exercises <code>validation</code>,
+        <code>reference</code>, and <code>unsupported-profile</code>.
+      </p>
+      <p>
+        Tests should assert the class and structured properties. Exact full
+        messages are deliberately not the contract, so wording can improve
+        without breaking every test.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Situation</th>
+            <th>Kind</th>
+            <th>Useful field</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Camera width is zero</td>
+            <td><code>validation</code></td>
+            <td><code>width</code></td>
+          </tr>
+          <tr>
+            <td>Image points to absent camera</td>
+            <td><code>reference</code></td>
+            <td><code>cameraId</code></td>
+          </tr>
+          <tr>
+            <td>Point track is populated</td>
+            <td><code>unsupported-profile</code></td>
+            <td><code>track</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>5. Build the tests as a ladder</h2>
+      <p>
+        Begin with one factory that returns a minimal valid model. Each test
+        changes one fact and names one expected outcome. This gives failures a
+        single cause and keeps the validator's growth visible.
+      </p>
+
+      <div class="block-grid">
+        <article class="block-card">
+          <h3>Happy path</h3>
+          <p>
+            Accept the model and prove it is returned unchanged. Add sparse IDs,
+            non-numeric source order, non-identity pose, zero points, and
+            multiple points as separate valid cases.
+          </p>
+        </article>
+        <article class="block-card">
+          <h3>Focused failures</h3>
+          <p>
+            One test per rule family: IDs, camera, image/name/reference, pose,
+            point/RGB/error, and unsupported profile.
+          </p>
+        </article>
+        <article class="block-card">
+          <h3>Mutation evidence</h3>
+          <p>
+            Keep a before value and verify validation neither changes content
+            nor replaces the successful model unexpectedly.
+          </p>
+        </article>
+      </div>
+
+      <div class="warning">
+        <strong>Shallow-copy trap:</strong> changing a nested field through a
+        shared object can accidentally mutate the base fixture. When overriding
+        a nested camera, pose, or intrinsics field, create new objects along
+        that path.
+      </div>
+
+      <p>
+        For thrown errors, capture the error once and inspect
+        <code>instanceof</code>, <code>kind</code>, and
+        <code>field</code>. Avoid calling the validator repeatedly in separate
+        assertions, because each assertion should describe the same failure.
+      </p>
+
+      <div class="practice">
+        <h3>Test-design drill</h3>
+        <p>
+          Write only three test names before implementation: one valid sparse-ID
+          case, one missing-camera reference, and one populated-track case.
+          Under each name, write the expected error kind. Do not write the
+          validator yet.
+        </p>
+      </div>
+
+      <h2>6. Protect <code>index.ts</code> as a product boundary</h2>
+      <p>
+        A declaration being <code>export</code>ed from its own file does not
+        automatically make it part of the package's supported subpath. The
+        barrel file chooses the public contract. Type-only exports disappear
+        from JavaScript; <code>ColmapError</code> remains because consumers need
+        the runtime class for <code>instanceof</code>.
+      </p>
+      <p>
+        The supplied Slice 1 brief says the low-level validator stays internal
+        and unfinished operations should not be exported. A public API test
+        should prove that the built <code>./colmap</code> subpath loads and has
+        only intentionally supported runtime values.
+      </p>
+
+      <div class="warning">
+        <strong>Repository review point:</strong> the current
+        <code>index.ts</code> also exports later-slice contract types such as
+        comparison and round-trip types. Do not remove them blindly. Compare
+        the Slice 1 brief with accepted team decisions and record the resolution
+        because those sources currently pull in different directions.
+      </div>
+
+      <h3>Browser compatibility is about the production graph</h3>
+      <p>
+        Build configuration may use <code>node:path</code>; it runs as tooling.
+        The browser-compatible promise concerns production modules reachable
+        from <code>src/colmap/index.ts</code>. Keep Node globals and filesystem
+        APIs out of that graph: no <code>node:fs</code>, <code>Buffer</code>,
+        <code>process</code>, AppFramework, or RecorderApp.
+      </p>
+
+      <section class="quiz" data-quiz>
+        <h3>Retrieval check</h3>
+        <p>Which export must exist as a JavaScript runtime value?</p>
+        <div class="quiz-options">
+          <button
+            data-correct="false"
+            data-success=""
+            data-retry="Interfaces are erased; think about instanceof checks."
+            aria-pressed="false"
+          >
+            Model interface
+          </button>
+          <button
+            data-correct="true"
+            data-success="Correct: consumers need the class at runtime."
+            data-retry="Interfaces are erased; think about instanceof checks."
+            aria-pressed="false"
+          >
+            ColmapError class
+          </button>
+        </div>
+        <p class="feedback" data-feedback aria-live="polite"></p>
+      </section>
+
+      <h2>7. Your assembly order</h2>
+      <ol class="checklist">
+        <li>Read the existing model and error declarations; do not duplicate them.</li>
+        <li>Choose and name the validator boundary according to the accepted contract.</li>
+        <li>Make one valid factory and one passing-case test.</li>
+        <li>Add one invalid rule, watch it fail, then add only its validation.</li>
+        <li>Repeat by rule family while keeping structured error assertions.</li>
+        <li>Add mutation, sparse-ID, order, and unsupported-profile evidence.</li>
+        <li>Review the public exports and browser production dependency graph.</li>
+        <li>Run formatting, lint, both typechecks, build, and unit tests.</li>
+      </ol>
+
+      <div class="goal">
+        <strong>Explain it to Mingna in one sentence:</strong> “Types document
+        the model, the validator proves runtime values and references without
+        repairing them, and the barrel file decides what consumers may rely
+        on.”
+      </div>
+
+      <h2>Primary sources and next step</h2>
+      <p>
+        Read the TypeScript Handbook sections on
+        <a href="https://www.typescriptlang.org/docs/handbook/2/objects.html"
+          >object and readonly tuple types</a
+        >
+        and
+        <a
+          href="https://www.typescriptlang.org/docs/handbook/modules/reference"
+          >type-only module exports</a
+        >. Keep the
+        <a href="../reference/slice-1-validation-map.html"
+          >Slice 1 validation map</a
+        >
+        open beside your tests.
+      </p>
+      <p>
+        Your practice task is to write the valid-model factory and the first
+        three test names only. Send them to me before connecting the validator,
+        and I will check whether each test isolates one contract rule.
+      </p>
+
+      <footer>
+        Sources:
+        <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/isSafeInteger"
+          >MDN Number.isSafeInteger</a
+        >,
+        <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/isFinite"
+          >MDN Number.isFinite</a
+        >, and
+        <a href="https://vitest.dev/api/expect.html">Vitest expect API</a>.
+        Previous:
+        <a href="./0001-copy-through-zip-round-trip.html"
+          >Lesson 1: ZIP copy-through</a
+        >.
+      </footer>
+    </main>
+  </body>
+</html>

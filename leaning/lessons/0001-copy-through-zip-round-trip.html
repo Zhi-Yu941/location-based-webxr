@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lesson 1 — Prove a copy-through ZIP round trip</title>
+    <link rel="stylesheet" href="../assets/lesson.css" />
+    <script src="../assets/quiz.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Lesson 1 · about 12 minutes</div>
+        <h1>Prove a copy-through ZIP round trip</h1>
+        <p class="lede">
+          Learn the small part of zip.js needed to build Slice 0A yourself: create bytes, inventory every entry, replace one payload, rebuild, reopen, and compare.
+        </p>
+      </header>
+
+      <div class="goal">
+        <strong>Your tangible win:</strong> after this lesson, you should be able to sketch the entire test from memory and explain why it proves preservation without parsing COLMAP.
+      </div>
+
+      <h2>1. The mental model: four byte boundaries</h2>
+      <p>
+        zip.js separates the ZIP container from each decompressed entry payload. For this experiment, both sides use <code>Uint8Array</code>, but they are not the same bytes.
+      </p>
+
+      <div class="flow" aria-label="ZIP copy-through flow">
+        <span class="step">ZIP bytes</span><span class="arrow">→</span>
+        <span class="step">entry snapshots</span><span class="arrow">→</span>
+        <span class="step">new ZIP bytes</span>
+      </div>
+
+      <table>
+        <thead>
+          <tr><th>Operation</th><th>zip.js objects</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Open archive bytes</td><td><code>ZipReader</code> + <code>Uint8ArrayReader</code></td></tr>
+          <tr><td>Extract one file payload</td><td><code>entry.getData(new Uint8ArrayWriter())</code></td></tr>
+          <tr><td>Add one file payload</td><td><code>zipWriter.add(path, new Uint8ArrayReader(bytes))</code></td></tr>
+          <tr><td>Collect archive bytes</td><td><code>ZipWriter</code> + <code>Uint8ArrayWriter</code></td></tr>
+        </tbody>
+      </table>
+
+      <p class="note">
+        The test runner may be Node, but the code under experiment remains browser-compatible because it uses typed arrays, <code>TextEncoder</code>, and zip.js—not <code>Buffer</code> or the filesystem.
+      </p>
+
+      <section class="quiz" data-quiz>
+        <h3>Retrieval check</h3>
+        <p>Which adapter collects a decompressed file payload as bytes?</p>
+        <div class="quiz-options">
+          <button data-correct="true" data-success="Correct: a Writer receives decompressed output." data-retry="That Reader supplies input bytes; try the other adapter." aria-pressed="false"><code>Uint8ArrayWriter</code></button>
+          <button data-correct="false" data-success="" data-retry="That Reader supplies input bytes; try the other adapter." aria-pressed="false"><code>Uint8ArrayReader</code></button>
+        </div>
+        <p class="feedback" data-feedback aria-live="polite"></p>
+      </section>
+
+      <h2>2. Create files and real directory records</h2>
+      <p>
+        A path prefix does not prove that an explicit directory entry exists. Add the directory itself with <code>directory: true</code>. Keep the trailing slash because the snapshot contract cares about the exact stored path.
+      </p>
+
+      <pre><code>const encoder = new TextEncoder();
+const zipWriter = new ZipWriter(new Uint8ArrayWriter());
+
+await zipWriter.add("sparse/", undefined, { directory: true });
+await zipWriter.add("sparse/0/", undefined, { directory: true });
+
+await zipWriter.add(
+  "sparse/0/cameras.txt",
+  new Uint8ArrayReader(encoder.encode("original camera data")),
+);
+
+await zipWriter.add(
+  "unknown/data.bin",
+  new Uint8ArrayReader(new Uint8Array([0, 255, 1, 128])),
+);
+
+const zipBytes = await zipWriter.close();</code></pre>
+
+      <p>
+        Use recognizable text for most fixtures, arbitrary bytes for at least one file, and an actually empty file such as <code>points3D.txt</code>. An empty file and a directory both have zero payload bytes, so only <code>kind</code> distinguishes them.
+      </p>
+
+      <div class="warning">
+        <strong>Common trap:</strong> omitting <code>close()</code>. It finalizes the ZIP's central directory and returns the complete <code>Uint8Array</code>.
+      </div>
+
+      <h2>3. Inventory by narrowing the entry type</h2>
+      <p>
+        <code>getEntries()</code> returns both file and directory entries. The boolean <code>entry.directory</code> is a TypeScript discriminant. Branch on it before calling <code>getData</code>, because directory entries do not have a file payload to extract.
+      </p>
+
+      <pre><code>type Snapshot = {
+  path: string;
+  kind: "file" | "directory";
+  bytes: Uint8Array;
+};
+
+const zipReader = new ZipReader(new Uint8ArrayReader(zipBytes));
+
+try {
+  const entries = await zipReader.getEntries();
+  const snapshot: Snapshot[] = [];
+
+  for (const entry of entries) {
+    if (entry.directory) {
+      snapshot.push({
+        path: entry.filename,
+        kind: "directory",
+        bytes: new Uint8Array(),
+      });
+    } else {
+      snapshot.push({
+        path: entry.filename,
+        kind: "file",
+        bytes: await entry.getData(new Uint8ArrayWriter()),
+      });
+    }
+  }
+} finally {
+  await zipReader.close();
+}</code></pre>
+
+      <p>
+        Notice that <code>entry.filename</code> is the archive path. Use forward slashes in ZIP paths. The zip.js API explicitly warns that backslashes are stored as literal filename characters and can be interpreted inconsistently.
+      </p>
+
+      <section class="quiz" data-quiz>
+        <h3>Retrieval check</h3>
+        <p>Which field should decide whether a snapshot is a file or directory?</p>
+        <div class="quiz-options">
+          <button data-correct="true" data-success="Correct: it is the API's kind discriminant." data-retry="A name is data, not the authoritative kind signal." aria-pressed="false"><code>entry.directory</code></button>
+          <button data-correct="false" data-success="" data-retry="A name is data, not the authoritative kind signal." aria-pressed="false"><code>entry.filename</code></button>
+        </div>
+        <p class="feedback" data-feedback aria-live="polite"></p>
+      </section>
+
+      <h2>4. Rebuild from the opened snapshot</h2>
+      <p>
+        This is the proof-producing step. The output must be derived from the inventory of the input. Only choose different bytes when the current path matches the replacement target.
+      </p>
+
+      <pre><code>const replacementPath = "sparse/0/cameras.txt";
+const replacementBytes = encoder.encode("replacement camera data");
+const outputWriter = new ZipWriter(new Uint8ArrayWriter());
+
+for (const item of inputSnapshot) {
+  if (item.kind === "directory") {
+    await outputWriter.add(item.path, undefined, { directory: true });
+    continue;
+  }
+
+  const bytes =
+    item.path === replacementPath ? replacementBytes : item.bytes;
+
+  await outputWriter.add(item.path, new Uint8ArrayReader(bytes));
+}
+
+const outputZipBytes = await outputWriter.close();</code></pre>
+
+      <p>
+        Do not build a second hard-coded entry list. If the loop walks the opened snapshot, then <code>unknown/data.bin</code> and <code>images/unreferenced.jpg</code> survive without special-case knowledge. That is the property the later adapter needs.
+      </p>
+
+      <h2>5. Reopen first, then compare semantics</h2>
+      <p>
+        Run the same inventory helper over <code>outputZipBytes</code>. Build maps keyed by path so entry order cannot accidentally become part of the contract.
+      </p>
+
+      <pre><code>const beforeByPath = new Map(
+  inputSnapshot.map((item) =&gt; [item.path, item]),
+);
+const afterByPath = new Map(
+  outputSnapshot.map((item) =&gt; [item.path, item]),
+);
+
+expect(new Set(afterByPath.keys())).toEqual(new Set(beforeByPath.keys()));
+
+for (const [path, before] of beforeByPath) {
+  const after = afterByPath.get(path);
+
+  expect(after?.kind).toBe(before.kind);
+  expect(after?.bytes).toEqual(
+    path === replacementPath ? replacementBytes : before.bytes,
+  );
+}</code></pre>
+
+      <p>
+        Deep equality is essential for typed arrays. <code>toBe</code> would test object identity, not byte content. Also include direct, named assertions for the explicit directories, binary file, unknown file, unreferenced image, and empty file: those assertions make the intent obvious during review.
+      </p>
+
+      <section class="quiz" data-quiz>
+        <h3>Retrieval check</h3>
+        <p>Which representation belongs in the preservation assertion?</p>
+        <div class="quiz-options">
+          <button data-correct="true" data-success="Correct: this is the promised semantic payload." data-retry="Compression and metadata may legitimately change during rewriting." aria-pressed="false">Decompressed bytes</button>
+          <button data-correct="false" data-success="" data-retry="Compression and metadata may legitimately change during rewriting." aria-pressed="false">Compressed bytes</button>
+        </div>
+        <p class="feedback" data-feedback aria-live="polite"></p>
+      </section>
+
+      <h2>Your implementation checklist</h2>
+      <ol class="checklist">
+        <li>Write the expected path list once for the synthetic input.</li>
+        <li>Add the five explicit directories with trailing slashes and <code>directory: true</code>.</li>
+        <li>Use text bytes, one arbitrary binary payload, and one empty file.</li>
+        <li>Write a small inventory helper that always closes its reader.</li>
+        <li>Create the output only by iterating over the first snapshot.</li>
+        <li>Reopen the output with the same inventory helper.</li>
+        <li>Compare path sets, kinds, replacement bytes, and untouched bytes.</li>
+        <li>Run the focused test, then the complete package checks.</li>
+      </ol>
+
+      <div class="goal">
+        <strong>Explain it to Mingna in one sentence:</strong> “We compare reopened, decompressed entry semantics because Slice 0A promises copy-through preservation of paths, kinds, and payloads—not byte-identical ZIP containers.”
+      </div>
+
+      <h2>Primary source and next step</h2>
+      <p>
+        Read the official <a href="https://github.com/gildas-lormeau/zip.js/blob/master/README.md">zip.js README</a>, especially its first reader/writer example, then keep the
+        <a href="../reference/zipjs-in-memory-cheat-sheet.html">in-memory ZIP cheat sheet</a> beside your test.
+      </p>
+      <p>
+        Your practice task is to write only the synthetic archive and inventory helper first. Then tell me what TypeScript error or test failure you get, or answer the three retrieval checks from memory, and I’ll give immediate feedback.
+      </p>
+
+      <footer>
+        Sources: <a href="https://gildas-lormeau.github.io/zip.js/api/classes/ZipWriter.html">ZipWriter API</a>,
+        <a href="https://gildas-lormeau.github.io/zip.js/api/classes/ZipReader.html">ZipReader API</a>, and
+        <a href="https://gildas-lormeau.github.io/zip.js/api/interfaces/FileEntry.html">FileEntry API</a>.
+      </footer>
+    </main>
+  </body>
+</html>

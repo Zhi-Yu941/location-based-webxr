@@ -1,4 +1,5 @@
 packages:
+  - Task2_Goal1A
   - GpsPlusSlamJs_AppFramework
   - GpsPlusSlamJs_RecorderApp
   - GpsPlusSlamJs_MinimalExample

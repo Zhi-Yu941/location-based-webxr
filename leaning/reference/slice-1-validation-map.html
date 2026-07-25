@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Slice 1 validation map</title>
+    <link rel="stylesheet" href="../assets/lesson.css" />
+  </head>
+  <body>
+    <main class="compact">
+      <header>
+        <div class="eyebrow">Quick reference · Slice 1</div>
+        <h1>Model, validation, and boundary map</h1>
+        <p class="lede">
+          A compact map of responsibilities and rules. It is a checklist, not a
+          finished implementation.
+        </p>
+      </header>
+
+      <h2>File responsibilities</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Owns</th>
+            <th>Must not own</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>model.ts</code></td>
+            <td>Type aliases, tuples, interfaces, literal camera variant</td>
+            <td>Checks, repairs, parsing, transformations</td>
+          </tr>
+          <tr>
+            <td><code>validate.ts</code></td>
+            <td>Runtime checks, ID sets, references, <code>ColmapError</code></td>
+            <td>Normalization, sorting, parsing, mutation</td>
+          </tr>
+          <tr>
+            <td><code>validate.test.ts</code></td>
+            <td>One valid factory and focused rule tests</td>
+            <td>Dependence on exact error prose</td>
+          </tr>
+          <tr>
+            <td><code>index.ts</code></td>
+            <td>Deliberately approved public exports</td>
+            <td>Unfinished operations and accidental internals</td>
+          </tr>
+          <tr>
+            <td><code>public-api.test.ts</code></td>
+            <td>Build/load surface and browser-boundary evidence</td>
+            <td>Private validator behavior already covered elsewhere</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Error classification</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Kind</th>
+            <th>Meaning in or around Slice 1</th>
+            <th>Example</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>validation</code></td>
+            <td>A value violates the recorder model contract</td>
+            <td>Width is zero; RGB is fractional</td>
+          </tr>
+          <tr>
+            <td><code>reference</code></td>
+            <td>A valid-looking ID points to a missing record</td>
+            <td>Image uses camera ID 99, which is absent</td>
+          </tr>
+          <tr>
+            <td><code>unsupported-profile</code></td>
+            <td>COLMAP can represent it, but recorder profile 1A does not</td>
+            <td>Populated observations or tracks</td>
+          </tr>
+          <tr>
+            <td><code>syntax</code></td>
+            <td>Reserved for later malformed COLMAP text</td>
+            <td>Not exercised by synthetic object validation</td>
+          </tr>
+          <tr>
+            <td><code>archive</code></td>
+            <td>Reserved for archive failures</td>
+            <td>Not exercised by this slice</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Rule matrix</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Area</th>
+            <th>Accept</th>
+            <th>Reject</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>IDs</td>
+            <td>Positive safe integers; sparse and out of order</td>
+            <td>Zero, negative, fractional, unsafe, duplicate</td>
+          </tr>
+          <tr>
+            <td>Camera count</td>
+            <td>Exactly one <code>PINHOLE</code></td>
+            <td>Zero, many, unsupported model</td>
+          </tr>
+          <tr>
+            <td>Dimensions</td>
+            <td>Positive safe integers</td>
+            <td>Zero, negative, fractional, unsafe</td>
+          </tr>
+          <tr>
+            <td>Intrinsics</td>
+            <td>Finite; <code>fx</code> and <code>fy</code> positive</td>
+            <td>NaN, infinity, non-positive focal length</td>
+          </tr>
+          <tr>
+            <td>Images</td>
+            <td>At least one; unique ID/name; existing camera reference</td>
+            <td>Duplicate, missing reference, unsafe filename</td>
+          </tr>
+          <tr>
+            <td>Pose</td>
+            <td>Finite tuple values; unit norm within <code>1e-6</code></td>
+            <td>NaN, infinity, non-unit quaternion</td>
+          </tr>
+          <tr>
+            <td>Points</td>
+            <td>Zero or more; finite XYZ; finite non-negative error</td>
+            <td>Duplicate ID, non-finite XYZ/error, negative error</td>
+          </tr>
+          <tr>
+            <td>RGB</td>
+            <td>Integer channels from 0 through 255</td>
+            <td>Fractional channels or values outside the range</td>
+          </tr>
+          <tr>
+            <td>Observations/tracks</td>
+            <td>Empty arrays</td>
+            <td>Any populated array, as unsupported profile</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Filename rule</h2>
+      <p>
+        Require a non-empty single filename. Reject <code>.</code>,
+        <code>..</code>, slashes, backslashes, spaces, tabs, quotes, NUL, and
+        control characters. Do not require a particular extension or
+        <code>frame-NNNNNN</code> pattern. Comparison is case-sensitive.
+      </p>
+
+      <h2>Mutation firewall</h2>
+      <ul class="checklist">
+        <li>Do not round or clamp numbers.</li>
+        <li>Do not normalize or sign-flip quaternions.</li>
+        <li>Do not reorder, renumber, insert, or remove records.</li>
+        <li>Do not alter filenames or pose meaning.</li>
+        <li>On success, return or confirm the same complete model.</li>
+        <li>On failure, throw; never return a partially accepted model.</li>
+      </ul>
+
+      <h2>Package gate</h2>
+      <p>
+        Formatting, lint, production typecheck, test typecheck, build, and unit
+        tests must all pass. Node imports may exist in build/test configuration;
+        they must not enter the production <code>src/colmap</code> dependency
+        graph.
+      </p>
+
+      <footer>
+        Continue with
+        <a href="../lessons/0002-slice-1-types-and-validation.html"
+          >Lesson 2: connect the TypeScript blocks</a
+        >.
+      </footer>
+    </main>
+  </body>
+</html>

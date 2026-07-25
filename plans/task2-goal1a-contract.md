@@ -1,6 +1,6 @@
 # Task 2 Goal 1A - Shared COLMAP ZIP Reader/Writer Contract and Implementation Plan
 
-> **Status: Proposed shared Team 6 plan.** This document merges the current Filip and Mingna proposals using the accepted decisions in `OWNER_DECISIONS.md` and the dispositions in `reviews/task2-goal1a-technical-comparison.md`. It becomes the implementation contract only after Filip and Mingna confirm the approval checklist in section 18. It does not select a pose-refinement algorithm or define 1B-1D in detail.
+> **Status: Accepted shared Team 6 implementation contract.** Filip and Mingna approved the complete section 18 checklist on 2026-07-23; Team 6 approved the isolated-development placement amendment later that day. This document merges their proposals using the accepted decisions in `OWNER_DECISIONS.md` and the dispositions in `reviews/task2-goal1a-technical-comparison.md`. It does not select a pose-refinement algorithm or define 1B-1D in detail.
 
 The labels 1A, 1B, 1C, and 1D are Team 6 planning labels, not assignment terminology.
 
@@ -122,40 +122,42 @@ Ownership MUST remain exclusive:
 
 No second archive writer may reconstruct the ZIP from only the typed COLMAP model. That would drop opaque recorder data and violate the preservation contract.
 
-## 6. Proposed runtime and repository placement
+## 6. Temporary development and final integration placement
 
-This section resolves exact module placement for implementation, which `OWNER_DECISIONS.md` intentionally left to Team 6. It is a new Team 6 proposal, not an assignment or Simon decision, and requires explicit approval in section 18.
+Exact module placement is a Team 6 technical decision, not an assignment or Simon decision. On 2026-07-23, Team 6 replaced the original direct-AppFramework development placement after identifying avoidable collision risk with regular upstream AppFramework package and build changes.
 
-The reusable core will live in a new public AppFramework subpath:
-
-```text
-GpsPlusSlamJs_AppFramework/src/colmap/
-  model.ts
-  validate.ts
-  text-codec.ts
-  model-comparison.ts
-  recorder-zip-adapter.ts
-  round-trip.ts
-  index.ts
-```
-
-Tests will be colocated as `*.test.ts` files under the same directory. The AppFramework package configuration will add a `./colmap` export and the explicit `src/colmap/index.ts` build entry required by its current `tsdown` configuration.
-
-The internal CLI will live at:
+During 1A development, the implementation lives in one private workspace package:
 
 ```text
-GpsPlusSlamJs_AppFramework/scripts/colmap-round-trip.mjs
+Task2_Goal1A/
+  src/colmap/
+    model.ts
+    validate.ts
+    text-codec.ts
+    model-comparison.ts
+    recorder-zip-adapter.ts
+    round-trip.ts
+    index.ts
+  scripts/
+    colmap-round-trip.mjs
+    colmap-round-trip.test.mjs
+  config/
+  package.json
 ```
 
-The CLI is not part of the published package because the AppFramework package currently publishes only `dist`. It imports the compiled `../dist/colmap/index.js` entry. The AppFramework package script will be named `colmap:roundtrip`, will build the AppFramework first, and will invoke the CLI as:
+Tests are colocated as `*.test.ts` files under `Task2_Goal1A/src/colmap/`. The private package builds and tests the same `./colmap` public boundary intended for final integration. It MUST NOT import AppFramework or RecorderApp implementation modules. Adding the package to `pnpm-workspace.yaml` and its lockfile importer is the one-time repository-level setup; ordinary 1A implementation stays inside `Task2_Goal1A/`.
+
+The local development CLI lives at `Task2_Goal1A/scripts/colmap-round-trip.mjs`, imports the compiled `../dist/colmap/index.js` entry, and is invoked as:
 
 ```text
-pnpm --filter gps-plus-slam-app-framework run colmap:roundtrip -- <input.zip> <output.zip>
+pnpm --filter task2-goal1a-colmap run colmap:roundtrip -- <input.zip> <output.zip>
 ```
 
-The CLI may use `node:fs/promises`; files under `src/colmap/` MUST NOT import `node:*`, use `Buffer`, or access filesystem/process APIs. A subprocess test at `GpsPlusSlamJs_AppFramework/scripts/colmap-round-trip.test.mjs` will exercise the built `./colmap` export and CLI boundary after the package build.
+The CLI may use `node:fs/promises`; files under `Task2_Goal1A/src/colmap/` MUST NOT import `node:*`, use `Buffer`, or access filesystem/process APIs. The subprocess test at `Task2_Goal1A/scripts/colmap-round-trip.test.mjs` exercises the built `./colmap` export and CLI boundary after the package build.
 
-The implementation will use the existing `@zip.js/zip.js` dependency directly inside the single recorder ZIP adapter. No new production dependency is planned.
+The implementation uses the already-approved `@zip.js/zip.js` dependency directly inside the single recorder ZIP adapter. No new external production dependency is introduced.
+
+After all local tests, Task 1 fixture replay, and the LichtFeld compatibility gate pass, a final integration slice MUST move—not copy—the accepted `src/colmap/` source and tests into `GpsPlusSlamJs_AppFramework/src/colmap/`. That same slice adds the AppFramework `./colmap` export, explicit tsdown entry, and internal CLI, runs the AppFramework gates, and removes `Task2_Goal1A` from the workspace. Team 6 MUST NOT maintain temporary and AppFramework implementations in parallel.
 
 ### Existing code reuse decision
 
@@ -164,9 +166,9 @@ The implementation will use the existing `@zip.js/zip.js` dependency directly in
 - `GpsPlusSlamJs_RecorderApp/src/colmap/colmap-serializers.ts` is generation-only and rounds/clamps some values. It MUST NOT be imported by the new codec.
 - `GpsPlusSlamJs_RecorderApp/src/colmap/colmap-conversions.ts` confirms the coordinate convention but MUST NOT run in 1A because recorder ZIP values are already in COLMAP coordinates.
 - `GpsPlusSlamJs_RecorderApp/src/colmap/colmap-zip-contributor.ts` writes from live recorder state and is not an input-ZIP adapter.
-- Existing recorder, exporter, storage, and COLMAP files remain unchanged in 1A unless Team 6 explicitly revises this plan.
+- Existing recorder, exporter, storage, and COLMAP files remain unchanged during isolated development. The final integration slice changes only the approved AppFramework package/build surface and adds the moved COLMAP modules; recorder and exporter behavior remain untouched.
 
-This dependency direction keeps the reusable core available to the recorder later without making the AppFramework depend on RecorderApp internals.
+This dependency direction proves the reusable core independently, then integrates the same reviewed code into AppFramework without making AppFramework depend on RecorderApp internals.
 
 ## 7. Recorder ZIP contract
 
@@ -231,7 +233,7 @@ function roundTripRecorderZip(
 
 `summarizeRecorderModel` requires the record whose image ID is exactly `1`. If it is absent, the function throws a contextual `ColmapError` with `kind: "reference"` and `field: "imageId"`; it does not fall back to another record. `roundTripRecorderZip` calls the same read, summary, and write functions with the unchanged model, then adds exact no-op verification. It is not an alternate implementation.
 
-`src/colmap/index.ts` exports the model and summary types, `ColmapError`, the four high-level functions above, and the two pure model-comparison functions in section 10. Low-level codec, validator, and ZIP-adapter helpers remain internal modules; tests may import them by relative source path, but package consumers use `./colmap`.
+`Task2_Goal1A/src/colmap/index.ts` exports the model and summary types, `ColmapError`, the four high-level functions above, and the two pure model-comparison functions in section 10. Low-level codec, validator, and ZIP-adapter helpers remain internal modules; tests may import them by relative source path, but package consumers use `./colmap`. The path becomes `GpsPlusSlamJs_AppFramework/src/colmap/index.ts` only in the final move defined by section 6.
 
 ### 7.2 Internal archive-adapter boundary
 
@@ -749,7 +751,7 @@ Every implementation slice starts with a failing test for its next behavior. Tes
 - emitted bytes are reopened and verified before success;
 - each of the three emitted sparse payloads equals the actual serializer output, including for the noncanonical input case;
 - CLI path handling is the only Node-specific layer;
-- the built `./colmap` package export loads successfully and no file under `src/colmap/` imports `node:*`, uses `Buffer`, or accesses filesystem/process APIs;
+- the built `./colmap` package export loads successfully and no file under `Task2_Goal1A/src/colmap/` imports `node:*`, uses `Buffer`, or accesses filesystem/process APIs;
 - errors produce a non-zero exit and no final output path;
 - successful output is moved into place only after verification.
 
@@ -800,8 +802,8 @@ The order below minimizes rework and keeps every slice independently reviewable.
 | Slice | Pair-programming work | Done when | Estimate | Suggested atomic commit boundary during implementation |
 |---|---|---|---:|---|
 | 0. Approve and recheck | Filip and Mingna approve this plan, recheck both fixture hashes, and record any contradiction. | Section 18 is complete and no verified fixture fact contradicts the model. | 0.5 | Accepted plan and fixture expectations only. |
-| 0A. ZIP feasibility spike | In a disposable test/spike, use the installed zip.js version to open a synthetic ZIP, snapshot every file payload, replace one selected entry, write bytes, reopen, and compare. Do not promote spike code automatically. | The chosen zip.js APIs work in the AppFramework browser target and preserve decompressed bytes; otherwise revise the adapter plan before model work. Re-estimate slices 1-8 here. | 0.5 | No production commit unless rewritten test-first. |
-| 1. Public surface, model, and validation | Add `model.ts`, `index.ts`, the `./colmap` package export, explicit tsdown entry, public-export/portability tests, then validator tests and implementation. | The built public subpath loads; valid and invalid synthetic models behave as section 8 requires. | 1 | Package surface + typed model + validator + tests. |
+| 0A. ZIP feasibility spike | In a disposable test/spike inside `Task2_Goal1A`, use the installed zip.js version to open a synthetic ZIP, snapshot every archive entry payload, replace one selected entry, write bytes, reopen, and compare. Do not promote spike code automatically. | The chosen zip.js APIs work in the browser-compatible package target and preserve decompressed bytes and directory records; otherwise revise the adapter plan before model work. Re-estimate slices 1-9 here. | 0.5 | No production commit unless rewritten test-first. |
+| 1. Public surface, model, and validation | Complete the scaffolded `model.ts`, `index.ts`, private-package `./colmap` build, public-export/portability tests, then validator tests and implementation. | The built public subpath loads; valid and invalid synthetic models behave as section 8 requires. | 1 | Package surface + typed model + validator + tests. |
 | 2. Text reader | Add known-record, malformed-record, encoding, empty-observation/track, sparse-ID, and pose tests; then implement candidate parsing and validation. | All three files parse into the validated ordered model with contextual failures. | 1-1.5 | Parser + parser/pose tests. |
 | 3. Text writer and comparisons | Add exact canonical output, semantic round-trip, exact no-op, noncanonical-input, quaternion-sign, and golden-format tests; then implement serialization/comparison. | All codec guarantees in section 10 pass without fixed-decimal rounding. | 1-1.5 | Writer/comparators + tests. |
 | 4. Archive adapter | Hand-build synthetic ZIP fixtures; test inventory, path rules, image resolution, copy-through, and selected replacement before implementation. | One adapter preserves all untouched entries and replaces only the three serializer outputs. | 1-1.5 | ZIP adapter + archive tests. |
@@ -809,8 +811,9 @@ The order below minimizes rework and keeps every slice independently reviewable.
 | 6. Node CLI | Build first; test exact arguments, path policy, exit status, image ID `1`, temporary cleanup, delayed final rename, and output formatting; then implement the `.mjs` wrapper and `colmap:roundtrip` script. | The subprocess test uses the built public core; local CLI produces only a verified output and prints the assignment summary. | 0.5-1 | CLI + CLI tests + package script. |
 | 7. Real fixture replay | Run the complete path on the first Task 1 ZIP, then the second if needed by section 13.6; fix contract violations rather than weakening assertions silently. | Required local replay passes and evidence is retained. | 0.5-1 | Fixture-driven corrections only, separate from unrelated refactors. |
 | 8. External smoke | Run one final emitted ZIP through LichtFeld and record the result. | Section 14 passes. | 0.5 active work | Evidence record only. |
+| 9. AppFramework integration | Stop feature work; move the accepted source/tests and CLI into AppFramework, add its `./colmap` export and tsdown entry, remove the temporary package/workspace entry, and rerun local gates. | Only one implementation remains, AppFramework builds the public subpath, all 1A tests still pass, and the fixture output remains semantically and archive equivalent. | 0.5-1 | One mechanical integration commit, separate from behavior changes. |
 
-Initial total: approximately **seven to ten focused pair sessions**. The spike, real fixture, or smoke may justify a new estimate; optional generalization does not.
+Revised initial total: approximately **eight to eleven focused pair sessions**, including final integration. The spike, real fixture, smoke, or an upstream integration conflict may justify a new estimate; optional generalization does not.
 
 Do not combine refactoring with a behavior slice. If a slice reveals that the contract is wrong, stop that slice, revise the decision record/plan with Team 6, then resume test-first work.
 
@@ -826,34 +829,34 @@ All production-code slices are pair-programmed in person using the assignment's 
 - Both Filip and Mingna review the diff and can explain every accepted behavior before the slice is considered done.
 - The navigator at the end of each slice records its commands, outcome, and relevant artifact identities in `reviews/task2-goal1a-implementation-evidence.md`; both verify the entry.
 - For slice 7, the driver operates the fixture replay and the navigator verifies hashes and preservation evidence. For slice 8, the driver operates LichtFeld and the navigator records settings/results; both inspect the openable artifact.
-- Run the focused tests during red/green work; run the full framework gate after each completed slice.
+- Run the focused tests during red/green work; run the complete `Task2_Goal1A` package gate after each completed development slice and the full AppFramework gate during slice 9.
 - Use a short Team 6 review whenever an implementation discovery changes the data model, ownership, or acceptance behavior. Book a Simon call only when the issue changes product scope or a decision already attributed to Simon.
 
 1A stops at the acceptance gate; optional cleanup, general COLMAP support, and 1B experimentation do not extend the iteration automatically.
 
 ## 17. Verification and completion evidence
 
-During development, run the existing AppFramework checks. No new test framework is needed.
+During isolated development, run the private package checks. It uses the repository's existing TypeScript, Vitest, ESLint, Prettier, and tsdown versions; no new test framework is introduced.
 
 Minimum final code gates, in this order so the CLI subprocess test uses current `dist/colmap` output:
 
 ```text
-pnpm --filter gps-plus-slam-app-framework run format
-pnpm --filter gps-plus-slam-app-framework run lint
-pnpm --filter gps-plus-slam-app-framework run typecheck
-pnpm --filter gps-plus-slam-app-framework run typecheck:tests
-pnpm --filter gps-plus-slam-app-framework run build
-pnpm --filter gps-plus-slam-app-framework run test:unit
+pnpm --filter task2-goal1a-colmap run format
+pnpm --filter task2-goal1a-colmap run lint
+pnpm --filter task2-goal1a-colmap run typecheck
+pnpm --filter task2-goal1a-colmap run typecheck:tests
+pnpm --filter task2-goal1a-colmap run build
+pnpm --filter task2-goal1a-colmap run test:unit
 ```
 
-The existing `test:core` command remains the convenient combined framework gate, but it does not build first. When it is used, run `build` immediately before it so `scripts/colmap-round-trip.test.mjs` cannot exercise stale output.
+After slice 9 moves the code, run the equivalent AppFramework format, lint, typecheck, test-typecheck, build, and unit gates. Run its build before the CLI subprocess test so the moved `scripts/colmap-round-trip.test.mjs` cannot exercise stale output.
 
-Before an upstream PR is considered later, also run the repository's wider applicable test gate. That PR and any CSUtils integration are not part of 1A.
+Before an upstream PR is considered, also run the repository's wider applicable test gate. The mechanical AppFramework integration is part of completing 1A; a CSUtils button or other product integration is not.
 
 1A is complete only when retained evidence shows:
 
 1. the focused model, codec, pose, archive, orchestrator, and CLI tests pass;
-2. the AppFramework typecheck, lint, build, and unit suite pass;
+2. the isolated package gates passed before the move and the AppFramework typecheck, lint, build, and unit suite pass after integration;
 3. a named Task 1 ZIP was parsed through the actual reader;
 4. all referenced images resolved and all opaque entries were preserved;
 5. the unchanged model passed semantic equivalence and exact no-op preservation;
@@ -867,18 +870,18 @@ Passing 1A proves a trustworthy data boundary. It MUST NOT be reported as eviden
 
 ## 18. Approval and go/no-go gate
 
-Implementation may start when all boxes are checked by the team:
+Implementation may start because Filip and Mingna approved every item below on 2026-07-23:
 
-- [ ] Filip confirms that this contract represents the accepted parts of his proposal.
-- [ ] Mingna confirms that this contract represents the accepted parts of his proposal and comments.
-- [ ] Both confirm the ZIP/codec/validator ownership boundary.
-- [ ] Both confirm the typed model and strict current recorder profile.
-- [ ] Both confirm round-trip, archive-preservation, pose, failure, and CLI behavior.
-- [ ] Both approve the proposed AppFramework `./colmap` placement, public API, existing zip.js dependency, and internal CLI path in sections 6-7.
-- [ ] Both approve `1e-12` as the semantic floating comparison tolerance, while keeping exact equality for identifiers/integer fields and exact no-op preservation.
-- [ ] Both verify the Task 1 fixture inventory and record contradictions, if any.
-- [ ] Both approve the complete slice order, evidence ownership, and initial seven-to-ten-session estimate in sections 15-16.
-- [ ] Both agree on the first pair-programming session, its starting driver, and the slice 0A ZIP feasibility test.
+- [x] Filip confirms that this contract represents the accepted parts of his proposal.
+- [x] Mingna confirms that this contract represents the accepted parts of his proposal and comments.
+- [x] Both confirm the ZIP/codec/validator ownership boundary.
+- [x] Both confirm the typed model and strict current recorder profile.
+- [x] Both confirm round-trip, archive-preservation, pose, failure, and CLI behavior.
+- [x] Both originally approved the public API and direct AppFramework placement; on 2026-07-23 Team 6 approved the section 6 amendment to develop in `Task2_Goal1A`, then move the single accepted implementation into AppFramework in slice 9.
+- [x] Both approve `1e-12` as the semantic floating comparison tolerance, while keeping exact equality for identifiers/integer fields and exact no-op preservation.
+- [x] Both verify the Task 1 fixture inventory; no contradiction was recorded at approval.
+- [x] Both approve the amended slice order, evidence ownership, and revised eight-to-eleven-session estimate in sections 15-16.
+- [x] Both agree that Filip starts as driver, Mingna starts as navigator, and their first technical activity is the slice 0A ZIP feasibility test.
 
 Simon does not need to choose codec internals, module names, or test structure. Ask Simon only if he corrects an owner decision or if Team 6 proposes changing the product boundary, current priority, offline requirement, or review progression.
 
@@ -931,8 +934,8 @@ Those decisions require 1B-1D evidence and the later Team 6/Simon review gate.
 | Detailed refinement and measurement APIs in 1A | Keep only the typed-model seam and two conceptual future operations; defer algorithms, signals, metrics, and async design. | Assignment; OD-012; comparison merge 6. |
 | Opaque raw recorder data | Preserve it byte-for-byte as untouched archive entries, including directory records; do not parse it in 1A. | Assignment; OD-006; OD-008; OD-010. |
 | Fixture storage status | The two Task 1 ZIPs are tracked, read-only repository files; generated outputs stay outside the repository. | Verified current Git index, which overrides older text calling `dev/` ignored. |
-| Exact module/API placement | AppFramework `./colmap` public core plus an unpublished package-local Node CLI. | New Team 6 implementation proposal based on verified dependency direction; approve in section 18. |
-| Pair sequence and estimate | Test-first slices 0A-8, rotating pair roles, evidence recorded by the navigator, initial seven-to-ten-session estimate. | New Team 6 implementation proposal; approve in section 18. |
+| Exact module/API placement | Develop and verify one private implementation in `Task2_Goal1A`; after acceptance, move it into AppFramework `./colmap` and delete the temporary package in the same integration slice. | Team 6 placement amendment approved on 2026-07-23; section 6 and section 18. |
+| Pair sequence and estimate | Test-first slices 0A-8 in the isolated package, slice 9 mechanical AppFramework integration, rotating pair roles, evidence recorded by the navigator, revised eight-to-eleven-session estimate. | Team 6 implementation decision approved in section 18. |
 
 Detailed source locations:
 

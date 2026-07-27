@@ -31,7 +31,7 @@ import {
   type QrDetectedState,
   type QrDetectionEntry,
 } from './qr-detected-slice';
-import { PlanarPnpSquare } from '../ar/planar-pnp';
+import { PlanarPnpSquare } from '../ar/qr/planar-pnp';
 
 function entry(
   text: string,

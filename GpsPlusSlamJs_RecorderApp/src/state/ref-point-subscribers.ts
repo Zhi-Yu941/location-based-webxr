@@ -35,7 +35,7 @@ import type { RefPointVisualizer } from '../visualization/ref-point-visualizer';
  * later store changes" wiring, which left the visualizer pinned to a stale
  * origin if the store ever re-zeroed.
  *
- * @see GpsPlusSlamJs_Docs/docs/2026-06-18-state-outside-store-audit.md (F2)
+ * @see GpsPlusSlamJs_Docs/docs/2026-06-18-1846-state-outside-store-audit.md (F2)
  */
 export function wireRefPointSubscribers(
   store: RecorderStore,

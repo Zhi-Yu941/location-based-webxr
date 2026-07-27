@@ -12,6 +12,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   sharpnessScore,
+  highFrequencyEnergyRatio,
+  blurMetricScorer,
+  BLUR_METRIC_IDS,
+  type BlurMetricId,
   meanLuminance,
   rgbaToGrayscale,
   ImageQualityGate,
@@ -203,5 +207,116 @@ describe('ImageQualityGate', () => {
     expect(gate.historyLength()).toBe(0);
     // Back in cold start → a tiny score is accepted again.
     expect(gate.evaluate(1, 200, cfg).accept).toBe(true);
+  });
+});
+
+/** Deterministic LCG so the noise-based checks are reproducible. */
+function makeLcg(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 0x100000000;
+  };
+}
+
+function noiseImage(w: number, h: number, seed: number): number[] {
+  const rnd = makeLcg(seed);
+  return Array.from({ length: w * h }, () => Math.floor(rnd() * 200));
+}
+
+describe('highFrequencyEnergyRatio', () => {
+  // Why these tests matter: the toggleable second gate metric must rank
+  // frames the same way it did in the offline benchmark it was promoted
+  // from; the single-bin spectral cases pin the FFT + band-split math
+  // exactly, and the defensive contract must match sharpnessScore so the
+  // worker can swap metrics without new failure modes.
+
+  it('is ~0 for a single low-frequency sinusoid and ~1 for a checkerboard', () => {
+    const w = 32;
+    const h = 32;
+    // All AC energy in bin (1, 0): normalized radius ~0.044 < cutoff 0.3.
+    const lowFreq = Array.from({ length: w * h }, (_, i) => {
+      const x = i % w;
+      return 128 + 100 * Math.sin((2 * Math.PI * x) / w);
+    });
+    expect(highFrequencyEnergyRatio(lowFreq, w, h)).toBeLessThan(0.05);
+    // Checkerboard = the (Nyquist, Nyquist) bin: normalized radius 1.
+    expect(highFrequencyEnergyRatio(checkerboard(w, h), w, h)).toBeGreaterThan(
+      0.95
+    );
+  });
+
+  it('blur strictly reduces the ratio on a noise image', () => {
+    const w = 32;
+    const h = 32;
+    const sharp = noiseImage(w, h, 1234);
+    const blurred = boxBlur(sharp, w, h);
+    const rSharp = highFrequencyEnergyRatio(sharp, w, h);
+    const rBlur = highFrequencyEnergyRatio(blurred, w, h);
+    expect(rSharp).toBeGreaterThan(0);
+    expect(rBlur).toBeLessThan(rSharp);
+  });
+
+  it('returns 0 for flat, degenerate, short-buffer, and sub-8x8 inputs', () => {
+    expect(highFrequencyEnergyRatio(new Array(32 * 32).fill(50), 32, 32)).toBe(
+      0
+    );
+    expect(highFrequencyEnergyRatio([1, 2, 3, 4], 2, 2)).toBe(0);
+    expect(highFrequencyEnergyRatio([1, 2, 3], 3, 3)).toBe(0);
+    expect(highFrequencyEnergyRatio(new Array(32 * 32).fill(0), 31.5, 32)).toBe(
+      0
+    );
+    // 7x7: largest pow2 crop is 4x4 < 8x8 minimum.
+    expect(
+      highFrequencyEnergyRatio(
+        Array.from({ length: 49 }, (_, i) => i),
+        7,
+        7
+      )
+    ).toBe(0);
+  });
+
+  it('scores the centered power-of-two crop for non-pow2 dims', () => {
+    // 33-wide image whose first 32 columns are a checkerboard: the crop
+    // (offset 0) sees exactly the 32x32 checkerboard, so the extra constant
+    // column must not change the score.
+    const w = 33;
+    const h = 32;
+    const gray = Array.from({ length: w * h }, (_, i) => {
+      const x = i % w;
+      const y = (i - x) / w;
+      return x < 32 ? ((x + y) % 2 === 0 ? 0 : 255) : 50;
+    });
+    expect(highFrequencyEnergyRatio(gray, w, h)).toBeCloseTo(
+      highFrequencyEnergyRatio(checkerboard(32, 32), 32, 32),
+      8
+    );
+  });
+});
+
+describe('blurMetricScorer', () => {
+  // Why this test matters: the worker is the untested device seam - the
+  // metric-id -> function mapping (incl. the undefined/unknown fallback for
+  // persisted pre-toggle configs) must be pinned HERE so the worker stays a
+  // thin shell.
+
+  it('maps each id to its function; undefined/unknown fall back to VoL', () => {
+    expect(blurMetricScorer('variance-of-laplacian')).toBe(sharpnessScore);
+    expect(blurMetricScorer('high-frequency-energy-ratio')).toBe(
+      highFrequencyEnergyRatio
+    );
+    expect(blurMetricScorer(undefined)).toBe(sharpnessScore);
+    expect(blurMetricScorer('bogus' as BlurMetricId)).toBe(sharpnessScore);
+  });
+
+  it('BLUR_METRIC_IDS lists exactly the two ids with the default first', () => {
+    expect(BLUR_METRIC_IDS).toEqual([
+      'variance-of-laplacian',
+      'high-frequency-energy-ratio',
+    ]);
+  });
+
+  it('DEFAULT_QUALITY_FILTER pins variance-of-laplacian (pre-toggle behavior)', () => {
+    expect(DEFAULT_QUALITY_FILTER.blurMetric).toBe('variance-of-laplacian');
   });
 });

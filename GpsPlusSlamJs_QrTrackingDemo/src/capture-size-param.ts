@@ -9,7 +9,7 @@
  * blit budget). Absent/invalid → `undefined` (the framework default, 1024, stands).
  *
  * @see seams.ts — passes the result to `startCameraFrameCapture({ captureSize })`.
- * @see 2026-06-17-followup-qr-size-thin-demo-next-steps.md — the sweep method.
+ * @see 2026-06-17-1204-qr-size-thin-demo-next-steps-followup.md — the sweep method.
  */
 
 /** Sane bounds for the longer-edge blit budget (px). */

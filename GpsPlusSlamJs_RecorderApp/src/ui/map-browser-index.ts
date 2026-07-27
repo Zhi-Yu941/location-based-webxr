@@ -11,7 +11,7 @@
  *     search (case-insensitive substring over the zip filename).
  *
  * @see ./recording-index.ts for the per-recording coverage this consumes
- * @see GpsPlusSlamJs_Docs/docs/2026-06-14-map-centric-recording-browser-and-h3-index-user-feedback.md (D3/D5)
+ * @see GpsPlusSlamJs_Docs/docs/2026-06-14-1048-map-centric-recording-browser-and-h3-index-user-feedback.md (D3/D5)
  */
 
 import { cellToLatLng, isValidCell } from 'h3-js';

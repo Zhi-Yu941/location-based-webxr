@@ -4,7 +4,7 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * Playwright configuration for the persistent-anchor starter example.
  *
- * Scope (Tier 0, see GpsPlusSlamJs_Docs/docs/2026-06-01-anchor-starter-e2e-test-plan.md):
+ * Scope (Tier 0, see GpsPlusSlamJs_Docs/docs/2026-06-01-0447-anchor-starter-e2e-test-plan.md):
  * - The page loads without console errors.
  * - The static start/intro UI renders.
  * - The E1 capability gate fires honestly in a desktop browser that lacks

@@ -39,7 +39,7 @@ class FrameTileVisualizer {
 - **AR-space node is injected** (no `getArWorldGroup()` call). Same P3
   rule as `syncGpsAnchoredMeshes`, `ref-point-visualizer`, and
   `OccupancyCubesVisualizer`.
-- **`maxTiles` FIFO cap (Step 4 of the [2026-07-03 long-session fps plan](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-03-long-session-fps-and-voxel-grid-scaling-plan.md)):**
+- **`maxTiles` FIFO cap (Step 4 of the [2026-07-03 long-session fps plan](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-03-1344-long-session-fps-and-voxel-grid-scaling-plan.md)):**
   adding a tile over the cap removes + disposes the OLDEST (the `tiles` Map is
   insertion-ordered), bounding draw calls / GPU texture memory / scene-graph
   size on long live sessions while keeping the recent-path breadcrumb. `0`,
@@ -50,14 +50,14 @@ class FrameTileVisualizer {
 - **Shared geometry** — one `PlaneGeometry(1, 1)` at module scope,
   reused by every tile. Per-tile size comes from `mesh.scale`.
 - **Default plane size `DEFAULT_SIZE = 0.1` m** (halved from 0.2, D7,
-  [2026-06-16-user-feedback-team1.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-16-user-feedback-team1.md)).
+  [2026-06-16-2053-team1-user-feedback.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-16-2053-team1-user-feedback.md)).
   The field tester read a tile spawning at the current pose as the camera
   "zooming in"; the smaller plane is less "in your face". **Plane size only —
   this does NOT reduce per-tile GPU texture memory.** The separate
   display-resolution divisor (Slice 4b) downscales the texture and is the part
   that cuts memory.
 - **Aspect-correct sizing (Finding 1 / D1 of
-  [2026-06-13-frame-tile-rendering-bugs-user-feedback.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-frame-tile-rendering-bugs-user-feedback.md)).**
+  [2026-06-13-1311-frame-tile-rendering-bugs-user-feedback.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-1311-frame-tile-rendering-bugs-user-feedback.md)).**
   The shared geometry is square, so a non-square JPEG would be **stretched**
   if scaled uniformly. `addTile` instead scales **non-uniformly** from the
   frame's dimensions: the **longer** edge = `sizeMeters`, the shorter edge =
@@ -67,7 +67,7 @@ class FrameTileVisualizer {
   coordinates": a `THREE.Texture` maps its `[0,1]` UVs across the whole plane,
   so nothing preserves aspect; the geometry footprint must carry it.
 - **Dimension precedence: persisted → bitmap → square (DA-1 of
-  [2026-06-14-followup-frame-tile-legacy-aspect-and-live-toggle.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-14-followup-frame-tile-legacy-aspect-and-live-toggle.md)).**
+  [2026-06-14-0012-frame-tile-legacy-aspect-and-live-toggle-followup.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-14-0012-frame-tile-legacy-aspect-and-live-toggle-followup.md)).**
   `addTile` resolves each axis as `frame.width ?? bitmapDim(texture, 'width')`
   (likewise height). Persisted `width`/`height` (D1 capture metadata) win when
   present. **Legacy recordings predate those fields**, so the visualizer falls
@@ -108,5 +108,5 @@ class FrameTileVisualizer {
     the world-pose test under a _non-trivial_ alignment in
     `frame-tile-visualizer.test.ts` — an identity fixture passes even
     with the bug present. See
-    [2026-06-12-followup-frame-tile-visualizer-frame-check.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-12-followup-frame-tile-visualizer-frame-check.md)
+    [2026-06-12-1628-frame-tile-visualizer-frame-check-followup.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-12-1628-frame-tile-visualizer-frame-check-followup.md)
     and the hit-test-reticle / occupancy-cube entries in lessons-learned.

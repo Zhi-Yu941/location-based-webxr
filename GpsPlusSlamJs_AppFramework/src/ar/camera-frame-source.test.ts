@@ -12,7 +12,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { CameraFrameSource } from './camera-frame-source';
-import type { RgbaImage } from './qr-frontend';
+import type { RgbaImage } from './qr/qr-frontend';
 
 function fakeImage(width = 4, height = 4): RgbaImage {
   return { data: new Uint8ClampedArray(width * height * 4), width, height };

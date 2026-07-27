@@ -4,7 +4,7 @@
 
 Reads WebXR **opaque** camera textures (protected GPU buffers where plain `readPixels`/`toBlob` return black) by blitting them onto a fullscreen quad into an intermediate `WebGLRenderTarget` and reading that back. Used for the periodic JPEG frame captures and, since Iter 8, for the per-depth-sample RGB voxel colors.
 
-Background: `docs/2026-02-06-bug-camera-frames-black.md`; RGB path: `GpsPlusSlamJs_Docs/docs/2026-06-11-depth-occupancy-grid-port-plan.md` §4 Iter 8.
+Background: `docs/2026-02-06-bug-camera-frames-black.md`; RGB path: `GpsPlusSlamJs_Docs/docs/2026-06-11-2134-depth-occupancy-grid-port-plan.md` §4 Iter 8.
 
 ## Public API
 
@@ -13,7 +13,7 @@ Background: `docs/2026-02-06-bug-camera-frames-black.md`; RGB path: `GpsPlusSlam
 - **`captureToPixels(renderer, cameraTexture): { pixels, width, height } | null`** — blit + readback only (steps A+B, shared with `captureToBlob`), returning the raw RGBA buffer for cheap per-point sampling (Iter 8). The returned `pixels` is the INTERNAL buffer — valid until the next capture or `resizeIfNeeded`; consume synchronously (e.g. `createRgbLookup`) or copy. Buffer is WebGL readback order (bottom-row-first). Null on failure/dispose, never throws.
 - **`captureToRgba(renderer, cameraTexture): { data: Uint8ClampedArray, width, height } | null`** — blit + readback + vertical flip, returning a FRESH, **top-left-origin** RGBA copy (safe to retain past the next capture). The efficient, lossless replacement for the QR demo's old JPEG→`OffscreenCanvas`→`getImageData` round-trip (B2). Use this to feed `BarcodeDetector`/OpenCV. Null on failure/dispose.
 - **`resizeIfNeeded(width, height): boolean`** — re-sizes target + buffer; no-op when unchanged/invalid/disposed.
-- **`getWidth(): number` / `getHeight(): number`** — current render-target dimensions. These equal the encoded JPEG's pixel size (the encode canvas is sized to the render target), so `webxr-session` reads them after `captureToBlob` to persist each captured frame's true width/height for aspect-correct frame-tile rendering (D1 of `2026-06-13-frame-tile-rendering-bugs-user-feedback.md`) without decoding the blob.
+- **`getWidth(): number` / `getHeight(): number`** — current render-target dimensions. These equal the encoded JPEG's pixel size (the encode canvas is sized to the render target), so `webxr-session` reads them after `captureToBlob` to persist each captured frame's true width/height for aspect-correct frame-tile rendering (D1 of `2026-06-13-1311-frame-tile-rendering-bugs-user-feedback.md`) without decoding the blob.
 - **`CameraBlitCapture.isBlackFrame(pixels): boolean`** — sampled all-zero check (blit-failed detection vs. dark scene).
 - **`computeCaptureSize(cameraWidth, cameraHeight, divisor)`** — capture dimensions from native camera resolution and the user's resolution divisor; falls back to the default config on invalid input.
 - **`computeAspectFitSize(cameraWidth, cameraHeight, maxEdge)`** — capture dimensions that **preserve the camera aspect** with the **longer edge fixed at `maxEdge`** (e.g. `512` → `512×384` for a 4:3 camera). Unlike `computeCaptureSize` (divide-by-divisor), this fits a fixed pixel budget — used by the QR blit (B2) so the detector sees an undistorted code. Integer, longer edge `== maxEdge`, each axis ≥ 1. For an invalid `maxEdge` (< 1 / NaN / Infinity) the edge length falls back to `DEFAULT_BLIT_CONFIG.width` (still aspect-preserving); for invalid camera dims (≤ 0 / NaN / Infinity) the aspect is unknown → a square at the (possibly defaulted) edge.

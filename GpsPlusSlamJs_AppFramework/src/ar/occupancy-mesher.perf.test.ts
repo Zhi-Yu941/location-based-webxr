@@ -44,7 +44,7 @@ const STRATEGIES: ReadonlyArray<{
   opts: (grid: OccupancyGrid) => MeshOccupiedCellsOptions | undefined;
 }> = [
   { name: 'per-face', opts: () => undefined },
-  { name: 'greedy', opts: () => ({ greedy: true }) },
+  { name: 'greedy', opts: () => ({ mode: 'greedy' }) },
   {
     name: 'smooth',
     opts: (grid) => ({

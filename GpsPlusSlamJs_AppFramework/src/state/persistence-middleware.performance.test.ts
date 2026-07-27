@@ -14,7 +14,7 @@
  * against a hard 0.1 ms threshold. That is inherently flaky — the same
  * code is "correct" at 0.099 ms and "broken" at 0.101 ms purely from
  * scheduler noise, GC, and whatever else the full suite runs concurrently
- * (see GpsPlusSlamJs_Docs/docs/2026-06-15-followup-flaky-persistence-perf-test.md).
+ * (see GpsPlusSlamJs_Docs/docs/2026-06-15-0922-flaky-persistence-perf-test-followup.md).
  *
  * Instead we assert the *algorithmic invariant* the test actually cares
  * about: per-dispatch cost does not grow with the number of dispatches in

@@ -24,7 +24,7 @@
  * regression test.
  *
  * SCOPE — single consumer (by design, for now). The session wires exactly ONE
- * `CameraFrameSource` + one callback + one blit (`setCameraFrameCallback`). One
+ * `CameraFrameSource` + one callback + one blit (initAR `callbacks.cameraFrame`). One
  * CV consumer at a time (QR *or* object detection) is the only current need.
  * If two live CV consumers must run **simultaneously** (e.g. QR + OpenCV object
  * detection at different cadences/resolutions), DO NOT bolt a second global
@@ -38,7 +38,7 @@
  * @see webxr-session.ts — owns the camera-frame blit and wires this in the frame loop.
  */
 
-import type { RgbaImage } from './qr-frontend.js';
+import type { RgbaImage } from './qr/qr-frontend.js';
 
 /** Tuning for the camera frame source. */
 export interface CameraFrameSourceConfig {

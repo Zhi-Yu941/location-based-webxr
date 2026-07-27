@@ -6,6 +6,10 @@ Samples sparse depth points from the WebXR depth sensing API at a configurable i
 
 ## Public API
 
+### Reconstruction cadence constants (2026-07-16)
+
+- **`DEFAULT_RECONSTRUCTION_DEPTH_INTERVAL_MS = 200`** / **`DEFAULT_RECONSTRUCTION_DEPTH_GRID_SIZE = 24`** — the recommended depth cadence for reconstruct-and-render apps (Recorder, PhysicsDemo), the depth-side counterpart of the `DEFAULT_OCCUPANCY_*` constants; one source so both apps build the mesh at the same speed (2026-07-16 field feedback: the demo on the bare fallback drifted from the recorder). Values from the maintainer's 2026-07-16 evening on-device framerate/mesh trade-off pass — the same-day ground-truth density/cadence sweep picked 500 ms × 64 for mesh speed, but its flagged open question (frame-time cost) resolved against the dense/fast end on-device; the sweep still says gridSize (not the interval) is the knob to raise first when devices allow. Opt-in named constants — the library fallback stays 16×16 @ 1 Hz so non-reconstruction consumers (MinimalExample/AnchorStarter) are not silently re-tuned.
+
 ### `DepthSampler` (class)
 
 - **`constructor(callbacks: DepthSamplerCallbacks, config?: Partial<DepthSamplerConfig>)`** — creates a sampler with event callbacks and optional config overrides. The initial config is routed through the same validation as `updateConfig`, so invalid overrides (non-finite/non-positive `intervalMs`, fractional `gridSize`) are ignored at construction exactly as at runtime — the constructor cannot seat a value `updateConfig` would refuse.
@@ -15,11 +19,11 @@ Samples sparse depth points from the WebXR depth sensing API at a configurable i
 - **`getSampleCount(): number`** — number of samples captured since last `start()`.
 - **`getConfig(): DepthSamplerConfig`** — returns a copy of the current config.
 - **`updateConfig(config: Partial<DepthSamplerConfig>): void`** — applies partial overrides (the plumbing seam for the user's `depth.*` recording options, called by `startDepthCapture(config)`). Invalid values (non-finite, non-positive, fractional `gridSize`) are ignored defensively.
-- **`onFrame(timestamp: number, depthInfo: DepthInfo | null): void`** — call once per XR frame. Throttles sampling to `intervalMs`.
+- **`onFrame(timestamp: number, acquireDepthInfo: () => DepthInfo | null): void`** — call once per XR frame with a LAZY provider (quality-review E-4, 2026-07-10: the caller used to acquire+wrap depth every frame while ~59/60 acquisitions were thrown away at the interval check; the provider is now invoked only when a sample is due). Throttles sampling to `intervalMs`. Unavailability detection is preserved: `lastSampleTime` only advances on emitted samples, so while depth is unavailable the sampler stays due and probes every frame.
 
 ### `wrapXRDepthInfo(raw, projectionMatrix)` (function)
 
-Wraps a raw browser `XRDepthInformation` object into a `DepthInfo`: copies `width`/`height`, binds `getDepthInMeters` to the source object (browser implementations are this-sensitive), and defensively copies the capturing view's projection matrix (`XRView.projectionMatrix`) into a plain serializable 16-tuple. Invalid matrix input (missing, wrong length, non-finite entries) yields a `DepthInfo` without a matrix — never an error. It additionally preserves the **live-occluder metadata** when the source carries it: `data` (the raw `XRCPUDepthInformation` buffer) by **live reference** (NOT cloned — too large; valid only this frame), `rawValueToMeters` only when finite, and `normDepthBufferFromNormView.matrix` copied + validated exactly like `projectionMatrix`. The sparse sampler ignores all three; sources lacking them wrap exactly as before. Live-occluder Iter 1 ([2026-06-14-webxr-depth-occlusion-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-14-webxr-depth-occlusion-plan.md) §2). Called by `webxr-session.ts` in the frame loop.
+Wraps a raw browser `XRDepthInformation` object into a `DepthInfo`: copies `width`/`height`, binds `getDepthInMeters` to the source object (browser implementations are this-sensitive), and defensively copies the capturing view's projection matrix (`XRView.projectionMatrix`) into a plain serializable 16-tuple. Invalid matrix input (missing, wrong length, non-finite entries) yields a `DepthInfo` without a matrix — never an error. It additionally preserves the **live-occluder metadata** when the source carries it: `data` (the raw `XRCPUDepthInformation` buffer) by **live reference** (NOT cloned — too large; valid only this frame), `rawValueToMeters` only when finite, and `normDepthBufferFromNormView.matrix` copied + validated exactly like `projectionMatrix`. The sparse sampler ignores all three; sources lacking them wrap exactly as before. Live-occluder Iter 1 ([2026-06-14-0009-webxr-depth-occlusion-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-14-0009-webxr-depth-occlusion-plan.md) §2). Called by `webxr-session.ts` in the frame loop.
 
 ### Interfaces
 
@@ -47,7 +51,9 @@ const sampler = new DepthSampler({
 });
 sampler.start();
 // In XR frame loop:
-sampler.onFrame(xrFrame.predictedDisplayTime, depthInfo);
+sampler.onFrame(xrFrame.predictedDisplayTime, () =>
+  getDepthInfoFromFrame(frame, pose)
+);
 ```
 
 ## Tests

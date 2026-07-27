@@ -26,7 +26,7 @@
  *
  * @see ./coverage-backfill.ts.md
  * @see GpsPlusSlamJs_AppFramework/src/storage/zip-coverage-embed.ts (B3 primitive)
- * @see GpsPlusSlamJs_Docs/docs/2026-06-14-followup-progressive-map-browser-indexing-and-backfill.md (B1/B2/B4)
+ * @see GpsPlusSlamJs_Docs/docs/2026-06-14-1924-progressive-map-browser-indexing-and-backfill-followup.md (B1/B2/B4)
  */
 
 import { embedCoverageInSessionJson } from 'gps-plus-slam-app-framework/storage/zip-coverage-embed';

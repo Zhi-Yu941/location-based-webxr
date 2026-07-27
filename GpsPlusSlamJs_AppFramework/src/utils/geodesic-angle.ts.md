@@ -20,7 +20,7 @@
     the near-identical `NaN` case into `0`.
 
 - **Consumers (do not re-derive `acos` elsewhere):**
-  - `ar/qr-pose-aggregation.ts` — inlier/spread angles.
+  - `ar/qr/qr-pose-aggregation.ts` — inlier/spread angles.
   - `state/tracking-quality.ts` `matrixDelta` — rotation delta term (was a raw
     `quat.getAngle` + explicit NaN guard).
   - `ar/pose-motion.ts` — capture motion-gate angular velocity.
@@ -42,5 +42,5 @@
   that re-pointing the two original call sites preserved behaviour.
 
 - **Related docs:**
-  `GpsPlusSlamJs_Docs/docs/2026-06-23-followup-consolidate-geodesic-angle-kernel.md`,
-  `GpsPlusSlamJs_Docs/docs/2026-06-23-blurry-frame-motion-gating-plan.md` (§4.1).
+  `GpsPlusSlamJs_Docs/docs/2026-06-23-2120-consolidate-geodesic-angle-kernel-followup.md`,
+  `GpsPlusSlamJs_Docs/docs/2026-06-23-2105-blurry-frame-motion-gating-plan.md` (§4.1).

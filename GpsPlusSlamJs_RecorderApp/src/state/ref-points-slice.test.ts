@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { RawGpsPoint } from './recorder-store';
+import type { RawGpsPoint } from 'gps-plus-slam-app-framework/state';
 import {
   addRefPointEntry,
   refPointsReducer,

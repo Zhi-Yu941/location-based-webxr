@@ -15,7 +15,6 @@ import {
   initialSetupState,
   setupReducer,
   canPlaceAnchor,
-  isBusy,
   type SetupState,
 } from "./setup-state-machine.js";
 
@@ -103,7 +102,6 @@ describe("setupReducer — cache-miss placement branch", () => {
   it("PLACE_REQUESTED moves into the saving in-progress phase", () => {
     const s = setupReducer(boot(false), { type: "PLACE_REQUESTED" });
     expect(s.phase).toBe("saving");
-    expect(isBusy(s)).toBe(true);
     // While saving, no second placement may be dispatched.
     expect(canPlaceAnchor(s)).toBe(false);
   });
@@ -112,7 +110,6 @@ describe("setupReducer — cache-miss placement branch", () => {
     let s = setupReducer(boot(false), { type: "PLACE_REQUESTED" });
     s = setupReducer(s, { type: "PLACE_SUCCEEDED" });
     expect(s.phase).toBe("saved");
-    expect(isBusy(s)).toBe(false);
   });
 
   it("PLACE_FAILED reverts saving → placeable phase and surfaces the error", () => {
@@ -126,7 +123,6 @@ describe("setupReducer — cache-miss placement branch", () => {
     s = setupReducer(s, { type: "PLACE_FAILED", message: "disk full" });
     expect(s.phase).toBe("ready-to-place");
     expect(s.errorMessage).toBe("disk full");
-    expect(isBusy(s)).toBe(false);
   });
 
   it("PLACE_FAILED reverts to awaiting-tracking when tracking was not ready", () => {
@@ -154,7 +150,6 @@ describe("setupReducer — cache-miss placement branch", () => {
     });
     expect(s.phase).toBe("awaiting-tracking");
     expect(s.errorMessage).toBe("point at the ground");
-    expect(isBusy(s)).toBe(false);
   });
 
   it("PLACE_BLOCKED is a no-op once a save is in flight (cannot clobber saving)", () => {

@@ -19,10 +19,15 @@ const entryFiles = [
 
   // ar/
   'src/ar/index.ts',
+  'src/ar/ar-crash-isolation.ts',
   'src/ar/bresenham3d.ts',
   'src/ar/camera-blit-capture.ts',
   'src/ar/capability-checker.ts',
   'src/ar/capture-failure-tracker.ts',
+  // Motion-filter config types + defaults — deep-imported by the recorder's
+  // recording-options catalog (G-1 move); the `./ar/*` exports wildcard
+  // advertises this subpath, so it must be built per-file.
+  'src/ar/capture-motion-gate.ts',
   'src/ar/chromium-camera-access-workaround.ts',
   'src/ar/depth-grid-lookup.ts',
   'src/ar/depth-sampler.ts',
@@ -39,30 +44,39 @@ const entryFiles = [
   'src/ar/occlusion-mesh-worker.ts',
   'src/ar/enable-gps-ar.ts',
   'src/ar/frame-loop.ts',
+  // Shared hit-test reticle driver (2026-07-18 promotion of the three
+  // app-local copies) — deep-imported by consumer apps via the `./ar/*`
+  // wildcard, so it must be a per-file dist entry.
+  'src/ar/hit-test-reticle-driver.ts',
   'src/ar/image-capture.ts',
   // Pure blur/blackness metrics + verdict policy — deep-imported by the
   // recorder's image-quality.worker.ts (NOT via the `/ar` barrel). The `./ar/*`
   // exports wildcard advertises this subpath, so it must be built per-file.
   'src/ar/image-quality.ts',
-  // QR detection + derive-on-read + debug viz — deep-imported by the recorder's
-  // live-QR modules (NOT via the `/ar` barrel, which eagerly pulls
-  // permission-checker into partially-mocked wiring tests). The `./ar/*` exports
-  // wildcard already advertises these subpaths, so they must be built per-file.
-  'src/ar/planar-pnp.ts',
-  'src/ar/qr-debug-view.ts',
-  'src/ar/qr-derived-pose.ts',
-  'src/ar/qr-detection-controller.ts',
-  'src/ar/qr-frontend.ts',
-  'src/ar/qr-pose.ts',
-  'src/ar/qr-size-depth-context.ts',
-  'src/ar/qr-size-measurer.ts',
   'src/ar/replay-scene.ts',
   'src/ar/scene-node-names.ts',
   'src/ar/webxr-nue-basis.ts',
   'src/ar/webxr-session.ts',
+  'src/ar/webxr-support-probe.ts',
   'src/ar/xr-camera-texture.ts',
   'src/ar/xr-error-handler.ts',
   'src/ar/xr-frame-loop.ts',
+
+  // ar/qr/ (QR cluster — sub-barrel + per-file entries)
+  'src/ar/qr/index.ts',
+  // QR detection + derive-on-read + debug viz — deep-imported by the recorder's
+  // live-QR modules (NOT via the `/ar` barrel, which eagerly pulls
+  // permission-checker into partially-mocked wiring tests). The `./ar/*` exports
+  // wildcard matches multi-segment subpaths, so `./ar/qr/<file>` is already
+  // advertised and each must be built per-file.
+  'src/ar/qr/planar-pnp.ts',
+  'src/ar/qr/qr-debug-view.ts',
+  'src/ar/qr/qr-derived-pose.ts',
+  'src/ar/qr/qr-detection-controller.ts',
+  'src/ar/qr/qr-frontend.ts',
+  'src/ar/qr/qr-pose.ts',
+  'src/ar/qr/qr-size-depth-context.ts',
+  'src/ar/qr/qr-size-measurer.ts',
 
   // core/ (curated re-export of gps-plus-slam-js for app consumers)
   'src/core/index.ts',
@@ -95,9 +109,14 @@ const entryFiles = [
   // Deep-imported by the recorder's qr-debug-controller (selectDerivedQrPlacement)
   // — same barrel-avoidance rationale as the ar/qr-* entries above.
   'src/state/qr-detected-slice.ts',
-  'src/state/recording-options.ts',
   'src/state/recording-replayer.ts',
   'src/state/replay-engine.ts',
+  // Desktop-replay composer + its occupancy subscriber (2026-07-15 replay-harness
+  // Part A) — deep-imported by consumer apps (PhysicsDemo) via the `./state/*`
+  // wildcard, so each must be a per-file dist entry (missing entry breaks Vite
+  // resolution at runtime; see 2026-04-29-recorder-e2e-import-resolution doc).
+  'src/state/replay-session.ts',
+  'src/state/replay-occupancy-subscriber.ts',
   'src/state/store-subscribers.ts',
   'src/state/subscribe-to-selector.ts',
 
@@ -143,6 +162,13 @@ const entryFiles = [
   'src/visualization/gps-compass-cubes.ts',
   'src/visualization/gps-event-markers.ts',
   'src/visualization/occlusion-mesh.ts',
+  // Instanced debug-cube visualizer of the occupancy grid — promoted from the
+  // recorder (2026-07-15 replay-harness Part A) so every consumer gets both
+  // mesh styles. Deep-imported by the recorder (main.ts / replay-mode.ts) and
+  // the PhysicsDemo via the `./visualization/*` wildcard, so it must be a
+  // per-file dist entry (a missing entry breaks Vite resolution at runtime —
+  // see 2026-04-29-recorder-e2e-import-resolution-failure.md).
+  'src/visualization/occupancy-cubes-visualizer.ts',
   // Main-thread driver for the occluder Web Worker offload — deep-imported by
   // the recorder's worker client, so it must be a dist entry.
   'src/visualization/occluder-mesh-driver.ts',
@@ -150,10 +176,25 @@ const entryFiles = [
   'src/visualization/leaflet-map-overlay.ts',
   'src/visualization/lerp-utils.ts',
   'src/visualization/map-data.ts',
-  'src/visualization/map-overlay.ts',
   'src/visualization/map-overlay-draw.ts',
+  // Engine-free desktop pointer raycast helper (2026-07-15 replay-harness Part B)
+  // — deep-imported by consumer apps (PhysicsDemo) via `./visualization/*`.
+  'src/visualization/pointer-picking.ts',
+  // Shared Stats.js perf overlay (2026-07-17 promotion of the recorder +
+  // PhysicsDemo copies) — deep-imported by both via `./visualization/*`, so it
+  // must be a per-file dist entry (a missing entry breaks Vite resolution at
+  // runtime — see 2026-04-29-recorder-e2e-import-resolution-failure.md).
+  'src/visualization/perf-stats-overlay.ts',
+  // Shared canvas-text sprite helper (2026-07-17 wayfinding graduation).
+  'src/visualization/text-sprite.ts',
   'src/visualization/three-dispose.ts',
   'src/visualization/vis-colors.ts',
+  // Wayfinding HUD presenter + pure placement seam (2026-07-17 graduation) —
+  // deep-imported by consumer apps (WayfindingHudDemo) via `./visualization/*`,
+  // so each must be a per-file dist entry (a missing entry breaks Vite
+  // resolution at runtime — see 2026-04-29-recorder-e2e-import-resolution-failure.md).
+  'src/visualization/wayfinding-hud.ts',
+  'src/visualization/wayfinding-placement.ts',
 ];
 
 export default defineConfig({

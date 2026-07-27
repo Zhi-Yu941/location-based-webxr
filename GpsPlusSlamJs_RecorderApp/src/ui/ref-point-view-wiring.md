@@ -5,7 +5,7 @@
 AR-scoped owner of BOTH ref-point view wirers — the 3D sphere visualizer
 subscription (`wireRefPointSubscribers`) and the live-map marker wirer
 (`wireRefPointMapMarkers`). Round-3 feedback (2026-07-05,
-`gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-05-recorder-ar-ready-ref-point-views-user-feedback.md`):
+`gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-05-2349-recorder-ar-ready-ref-point-views-user-feedback.md`):
 these used to be wired per recording session, so a folder import finishing in
 the AR_READY phase filled the Redux store with no view subscribed — nothing
 appeared on the map or in 3D until the first recording.

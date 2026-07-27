@@ -9,7 +9,7 @@ and a reticle tracks real-world surfaces under the screen centre.
 It is a structural port of the stock three.js `webxr_ar_hittest` example
 (button → AR session → reticle → tap-to-place), adapted for the GPS-aligned
 framework. The full design rationale lives in the plan doc
-[2026-06-03-threejs-arbutton-minimal-ar-example-user-feedback.md](../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-03-threejs-arbutton-minimal-ar-example-user-feedback.md).
+[2026-06-03-0553-threejs-arbutton-minimal-ar-example-user-feedback.md](../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-03-0553-threejs-arbutton-minimal-ar-example-user-feedback.md).
 
 ## The two framework deltas (what a porting developer must not get wrong)
 
@@ -72,11 +72,12 @@ with an explanatory label.
 
 - [index.html](index.html) — bare entry: status panel, AR container
   (`#ar-root`) and the "Enable GPS AR" button.
-- [src/main.ts](src/main.ts) — WebXR glue: button wiring over the controller,
-  hit-test source + reticle loop (verified manually on-device).
-- Reticle view-model: the framework's `hit-test-reticle.ts`
-  (`createReticleMesh` / `updateReticle`, imported from
-  `gps-plus-slam-app-framework/visualization`).
+- [src/main.ts](src/main.ts) — WebXR glue: button wiring over the controller
+  and the tap decision (verified manually on-device).
+- Reticle: the framework owns both halves — the view-model
+  (`visualization/hit-test-reticle.ts`) and the per-frame driver loop
+  (`startHitTestReticle` from `gps-plus-slam-app-framework/ar`, which also
+  reports taps via its `onSelect` callback).
 - [src/placement.ts](src/placement.ts) — pure tap-to-place view-model: the GPS
   gate + the deliberate scene-root floater (unit-tested in
   [src/placement.test.ts](src/placement.test.ts)).

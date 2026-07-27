@@ -6,7 +6,7 @@ A tiny app-level registry holding a reference to the single live
 `OccupancyGrid` for the current AR session, so consumers other than the cube
 visualizer can read it without threading a one-off reference. First consumer:
 the COLMAP ZIP contributor (Iter 3). See
-[2026-06-13-colmap-export-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-colmap-export-plan.md)
+[2026-06-13-1205-colmap-export-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-1205-colmap-export-plan.md)
 Q2 / Iter 2.5.
 
 ## Public API

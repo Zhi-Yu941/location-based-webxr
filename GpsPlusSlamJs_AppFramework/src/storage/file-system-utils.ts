@@ -39,7 +39,7 @@ export function formatFrameFilename(index: number): string {
  * is a textbook COLMAP tree (`images/frame-NNNNNN.jpg` next to `sparse/0/`).
  * Both the OPFS write path and the recorder's persisted `imageFile` value must
  * use THIS constant so a recording stays self-consistent (COLMAP export plan
- * Q5, gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-colmap-export-plan.md).
+ * Q5, gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-1205-colmap-export-plan.md).
  */
 export const SESSION_IMAGES_DIR = 'images';
 

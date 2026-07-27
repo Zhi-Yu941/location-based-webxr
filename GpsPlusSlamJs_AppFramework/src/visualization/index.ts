@@ -67,11 +67,23 @@ export {
 export { GpsEventVisualizer, gpsEventVisualizer } from './gps-event-markers.js';
 
 // --- occlusion-mesh (persistent depth-only occluder of the occupancy grid) ---
-export { type OcclusionMeshOptions, OcclusionMesh } from './occlusion-mesh.js';
+export {
+  type OcclusionMeshOptions,
+  type OccluderDebugStyle,
+  OCCLUDER_DEBUG_STYLES,
+  OcclusionMesh,
+} from './occlusion-mesh.js';
+
+// --- occupancy-cubes-visualizer (instanced debug cubes of the occupancy grid) ---
+export {
+  type OccupancyGridSource,
+  type ViewerPose,
+  type OccupancyCubesVisualizerOptions,
+  OccupancyCubesVisualizer,
+  pickNearestSubset,
+} from './occupancy-cubes-visualizer.js';
 
 // --- leaflet-map-overlay ---
-// NOTE: DEFAULT_ZOOM and DEFAULT_HEIGHT_OFFSET also exist in map-overlay;
-// import directly from the specific module if you need the leaflet variants.
 export {
   DEFAULT_LEAFLET_MAP_SIZE_PX,
   DEFAULT_WORLD_SIZE,
@@ -85,6 +97,23 @@ export { DEFAULT_LERP_RATE, clampedAlpha } from './lerp-utils.js';
 
 // --- map-data (shared trajectory model) ---
 export { type MapData, type MapDataInput, buildMapData } from './map-data.js';
+
+// --- pointer-picking (engine-free desktop raycast helper) ---
+export {
+  type Ndc,
+  type ElementRect,
+  pointerToNdc,
+  raycastPointer,
+  pickWorldPoint,
+} from './pointer-picking.js';
+
+// --- perf-stats-overlay (shared Stats.js FPS/MS/MB panel row) ---
+export {
+  type PerfStatsInstance,
+  type PerfStatsOverlayOptions,
+  type PerfStatsOverlayHandle,
+  createPerfStatsOverlay,
+} from './perf-stats-overlay.js';
 
 // --- accuracy-circles (shared per-event GPS accuracy circles) ---
 export {
@@ -108,17 +137,34 @@ export {
   drawMapData,
 } from './map-overlay-draw.js';
 
-// --- map-overlay ---
+// --- text-sprite ---
 export {
-  DEFAULT_ZOOM,
-  DEFAULT_MAP_SIZE,
-  DEFAULT_HEIGHT_OFFSET,
-  type TextureLoaderInterface,
-  type MapOverlayOptions,
-  latLonToTileXY,
-  tileXYToLatLon,
-  MapOverlay,
-} from './map-overlay.js';
+  type TextSprite,
+  type TextSpriteOptions,
+  createTextSprite,
+} from './text-sprite.js';
+
+// --- wayfinding-hud (frustum-locked target indicators as camera children) ---
+export {
+  type WayfindingHud,
+  type WayfindingHudOptions,
+  DEFAULT_WAYFINDING_HUD,
+  createWayfindingHud,
+  validateWayfindingHudOptions,
+} from './wayfinding-hud.js';
+
+// --- wayfinding-placement (pure seam of the wayfinding HUD) ---
+export {
+  type TargetPlacement,
+  type TargetPlacementInput,
+  type TargetPlacementState,
+  type ArrowPlacement,
+  type CirclePlacement,
+  type HiddenPlacement,
+  computeTargetPlacement,
+  formatDistanceLabel,
+  getHudFrustumExtents,
+} from './wayfinding-placement.js';
 
 // --- three-dispose ---
 export {

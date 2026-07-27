@@ -543,6 +543,52 @@ describe('ref-point-loader', () => {
       expect(updated!.observations[1]).toEqual(observation);
     });
 
+    /**
+     * Why this test matters (indoor-loop enablement follow-up, 2026-07-12):
+     * the existing append test mixes two SESSIONS; the loop-recording
+     * protocol appends repeated observations within ONE session (re-marking
+     * the same corner per pass). A dedupe keyed on sessionId — or any
+     * "one observation per session" assumption — would silently collapse
+     * within-recording re-marks, which are the P3/P6 ground truth.
+     */
+    it('appends repeated SAME-session observations (within-recording re-marks)', async () => {
+      const sessionId = 'recording-2026-07-11_12-44-19utc';
+      const obsAt = (timestamp: number): RefPointObservation => ({
+        sessionId,
+        timestamp,
+        arPose: { position: [1, 2, 3], rotation: [0, 0, 0, 1] },
+        gpsPoint: mockGpsPoint,
+      });
+
+      await saveRefPointObservation(
+        scenarioHandle,
+        'cornerA1',
+        'Corner A1',
+        obsAt(1_000)
+      );
+      await saveRefPointObservation(
+        scenarioHandle,
+        'cornerA1',
+        'Corner A1',
+        obsAt(16_000)
+      );
+      await saveRefPointObservation(
+        scenarioHandle,
+        'cornerA1',
+        'Corner A1',
+        obsAt(31_000)
+      );
+
+      const saved = await loadRefPoint(scenarioHandle, 'cornerA1');
+      expect(saved!.observations).toHaveLength(3);
+      expect(saved!.observations.map((o) => o.timestamp)).toEqual([
+        1_000, 16_000, 31_000,
+      ]);
+      for (const o of saved!.observations) {
+        expect(o.sessionId).toBe(sessionId);
+      }
+    });
+
     it('should create refPoints directory if it does not exist', async () => {
       const scenarioWithoutRefPoints = new MockFSDirectoryHandle(
         'New Scenario'

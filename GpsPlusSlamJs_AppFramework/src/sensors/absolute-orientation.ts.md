@@ -6,7 +6,7 @@ Phase 1 capture of the browser **`AbsoluteOrientationSensor`** (Generic Sensor
 API): a magnetometer-fused device→ENU quaternion recorded per GPS event as a
 GPS-independent north reference. Passive instrumentation — no production
 behaviour change. See
-[2026-06-25-absolute-orientation-sensor-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-25-absolute-orientation-sensor-plan.md)
+[2026-06-25-0543-absolute-orientation-sensor-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-25-0543-absolute-orientation-sensor-plan.md)
 §5.1.
 
 ## Public API

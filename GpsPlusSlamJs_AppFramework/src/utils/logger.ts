@@ -145,11 +145,18 @@ function serializeArg(arg: unknown): string {
 }
 
 /**
+ * Serialize a log call's arguments once (quality-review C-5 — the buffer,
+ * breadcrumb, and Sentry-message paths each used to re-serialize the same
+ * args, i.e. 2–3× per log call). All downstream consumers take the string.
+ */
+function serializeArgs(args: unknown[]): string {
+  return args.map((arg) => serializeArg(arg)).join(' ');
+}
+
+/**
  * Add an entry to the log buffer and notify subscribers
  */
-function addToBuffer(level: LogLevel, tag: string, args: unknown[]): void {
-  const message = args.map((arg) => serializeArg(arg)).join(' ');
-
+function addToBuffer(level: LogLevel, tag: string, message: string): void {
   const entry: LogEntry = {
     timestamp: Date.now(),
     level,
@@ -264,12 +271,8 @@ function toSentryLevel(
  * Add a Sentry breadcrumb for debugging context.
  * Breadcrumbs are attached to future exceptions, helping trace what happened before an error.
  */
-function addSentryBreadcrumb(
-  level: LogLevel,
-  tag: string,
-  args: unknown[]
-): void {
-  const message = `[${tag}] ${args.map((arg) => serializeArg(arg)).join(' ')}`;
+function addSentryBreadcrumb(level: LogLevel, tag: string, body: string): void {
+  const message = `[${tag}] ${body}`;
   Sentry.addBreadcrumb({
     category: 'log',
     level: toSentryLevel(level),
@@ -321,9 +324,8 @@ function toFingerprintTemplate(body: string): string {
 function captureLogMessage(
   level: 'warning' | 'error',
   tag: string,
-  args: unknown[]
+  body: string
 ): void {
-  const body = args.map((arg) => serializeArg(arg)).join(' ');
   const message = `[${tag}] ${body}`;
   Sentry.captureMessage(message, {
     level,
@@ -336,8 +338,8 @@ function captureLogMessage(
  * Called for log.warn() so warnings are independently visible in the
  * Sentry dashboard, not only as breadcrumbs attached to later exceptions.
  */
-function reportWarningToSentry(tag: string, args: unknown[]): void {
-  captureLogMessage('warning', tag, args);
+function reportWarningToSentry(tag: string, body: string): void {
+  captureLogMessage('warning', tag, body);
 }
 
 /**
@@ -353,7 +355,11 @@ function reportWarningToSentry(tag: string, args: unknown[]): void {
  * Issues when an Error is present, and groups via the same normalized template
  * fingerprint as warnings (see {@link captureLogMessage}).
  */
-function reportErrorsToSentry(tag: string, args: unknown[]): void {
+function reportErrorsToSentry(
+  tag: string,
+  args: unknown[],
+  body: string
+): void {
   let capturedError = false;
   for (const arg of args) {
     if (arg instanceof Error) {
@@ -362,7 +368,7 @@ function reportErrorsToSentry(tag: string, args: unknown[]): void {
     }
   }
   if (!capturedError) {
-    captureLogMessage('error', tag, args);
+    captureLogMessage('error', tag, body);
   }
 }
 
@@ -378,34 +384,38 @@ export function createLogger(tag: string): Logger {
   // This provides debugging context when exceptions are captured.
   return {
     debug: (...args: unknown[]): void => {
-      addToBuffer(LogLevel.DEBUG, tag, args);
-      addSentryBreadcrumb(LogLevel.DEBUG, tag, args);
+      const body = serializeArgs(args);
+      addToBuffer(LogLevel.DEBUG, tag, body);
+      addSentryBreadcrumb(LogLevel.DEBUG, tag, body);
       if (globalLogLevel <= LogLevel.DEBUG) {
         console.log(prefix, ...args);
       }
     },
     info: (...args: unknown[]): void => {
-      addToBuffer(LogLevel.INFO, tag, args);
-      addSentryBreadcrumb(LogLevel.INFO, tag, args);
+      const body = serializeArgs(args);
+      addToBuffer(LogLevel.INFO, tag, body);
+      addSentryBreadcrumb(LogLevel.INFO, tag, body);
       if (globalLogLevel <= LogLevel.INFO) {
         console.log(prefix, ...args);
       }
     },
     warn: (...args: unknown[]): void => {
-      addToBuffer(LogLevel.WARN, tag, args);
-      addSentryBreadcrumb(LogLevel.WARN, tag, args);
+      const body = serializeArgs(args);
+      addToBuffer(LogLevel.WARN, tag, body);
+      addSentryBreadcrumb(LogLevel.WARN, tag, body);
       // Report warnings as standalone Sentry messages for dashboard visibility
-      reportWarningToSentry(tag, args);
+      reportWarningToSentry(tag, body);
       if (globalLogLevel <= LogLevel.WARN) {
         console.warn(prefix, ...args);
       }
     },
     error: (...args: unknown[]): void => {
-      addToBuffer(LogLevel.ERROR, tag, args);
-      addSentryBreadcrumb(LogLevel.ERROR, tag, args);
+      const body = serializeArgs(args);
+      addToBuffer(LogLevel.ERROR, tag, body);
+      addSentryBreadcrumb(LogLevel.ERROR, tag, body);
       // Report Error objects to Sentry for visibility in dashboard.
       // String-only errors fall back to captureMessage (see reportErrorsToSentry).
-      reportErrorsToSentry(tag, args);
+      reportErrorsToSentry(tag, args, body);
       if (globalLogLevel <= LogLevel.ERROR) {
         console.error(prefix, ...args);
       }

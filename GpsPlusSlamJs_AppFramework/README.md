@@ -262,19 +262,19 @@ that guard's `APP_OVERLAY_CONTRACTS` list.
 
 WebXR session lifecycle, Three.js renderer setup, image/depth capture, replay scene management.
 
-| Export                                         | Description                                                                                                                                                                                                                                                             |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `initAR(container, isolation?, features?)`     | Start a WebXR AR session with Three.js rendering. `features.requestHitTest` opts the session into the WebXR `hit-test` feature                                                                                                                                          |
-| `endARSession()`                               | End the active XR session                                                                                                                                                                                                                                               |
-| `createEnableGpsArController()`                | Headless "Enable GPS AR" orchestration (support check + permission bundling + sensor watches + `initAR`) with observable state; the app renders its own button over it                                                                                                  |
-| `registerXrFrameUpdate(cb)`                    | Per-frame access to the live `XRFrame` + reference space + session (valid only synchronously inside the callback). Enables app-side hit-test / other WebXR features                                                                                                     |
-| `isFullySupported(s)` / `capabilityMessage(s)` | WebXR + geolocation capability gating + a user-facing message                                                                                                                                                                                                           |
-| `startImageCapture()` / `stopImageCapture()`   | Toggle camera frame capture                                                                                                                                                                                                                                             |
-| `ImageCaptureManager`                          | Configurable camera frame capture pipeline                                                                                                                                                                                                                              |
-| `DepthSampler`                                 | Depth buffer sampling with configurable grids                                                                                                                                                                                                                           |
-| `CameraBlitCapture`                            | GPU blit-based camera capture                                                                                                                                                                                                                                           |
-| `initReplayScene(container)`                   | Create a 3D replay scene with orbit/FPS controls                                                                                                                                                                                                                        |
-| `applyChromiumProjectionLayerWorkaround`       | Chromium camera-access tab-crash workaround. Always deletes projection-layer hooks (forces `XRWebGLLayer`; required on every affected build incl. Chrome 150) and additionally persists `baseLayer` only on the affected Chrome window (148.0.7778.12 up to 149.0.7821) |
+| Export                                                 | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `initAR(container, isolation?, features?, callbacks?)` | Start a WebXR AR session with Three.js rendering. `features.requestHitTest` opts the session into the WebXR `hit-test` feature. `callbacks` (`ArSessionCallbacks`) carries ALL per-session host callbacks — `imageCapture`, `tracking` (store + callbacks together), `depth`, `cameraFrame`, `onFrame`, `onSessionEnd` — replacing the former pre-init setter exports; re-pass it with each session (cleared at session end). `rebindTrackingStore(store)` remains for the one mid-session need (swapping the tracking store per recording) |
+| `endARSession()`                                       | End the active XR session                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `createEnableGpsArController()`                        | Headless "Enable GPS AR" orchestration (support check + permission bundling + sensor watches + `initAR`) with observable state; the app renders its own button over it                                                                                                                                                                                                                                                                                                                                                                      |
+| `registerXrFrameUpdate(cb)`                            | Per-frame access to the live `XRFrame` + reference space + session (valid only synchronously inside the callback). Enables app-side hit-test / other WebXR features                                                                                                                                                                                                                                                                                                                                                                         |
+| `isFullySupported(s)` / `capabilityMessage(s)`         | WebXR + geolocation capability gating + a user-facing message                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `startImageCapture()` / `stopImageCapture()`           | Toggle camera frame capture                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `ImageCaptureManager`                                  | Configurable camera frame capture pipeline                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `DepthSampler`                                         | Depth buffer sampling with configurable grids                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `CameraBlitCapture`                                    | GPU blit-based camera capture                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `initReplayScene(container)`                           | Create a 3D replay scene with orbit/FPS controls                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `applyChromiumProjectionLayerWorkaround`               | Chromium camera-access tab-crash workaround. Always deletes projection-layer hooks (forces `XRWebGLLayer`; required on every affected build incl. Chrome 150) and additionally persists `baseLayer` only on the affected Chrome window (148.0.7778.12 up to 149.0.7821)                                                                                                                                                                                                                                                                     |
 
 ### `sensors/` — GPS & Permissions
 
@@ -291,19 +291,18 @@ WebXR session lifecycle, Three.js renderer setup, image/depth capture, replay sc
 
 ### `state/` — Store & Recording
 
-| Export                                              | Description                                                    |
-| --------------------------------------------------- | -------------------------------------------------------------- |
-| `createSlamAppStore(options)`                       | Composable store factory (see options table above).            |
-| `recordingReducer`                                  | Recording lifecycle slice (built into the factory).            |
-| `startSession()` / `endSession()`                   | Recording lifecycle actions.                                   |
-| `recordGpsEvent(payload)`                           | Record a paired AR+GPS observation.                            |
-| `createGpsPositionHandler(config)`                  | Factory that adapts `GeolocationPosition` to a store dispatch. |
-| `captureGpsAnchorSample(options)`                   | Sample a paired AR pose + GPS point for anchoring.             |
-| `loadRecordingOptions()` / `saveRecordingOptions()` | Persist user-controlled recording settings.                    |
-| `replayRecording(store, blob)`                      | Replay a ZIP recording into a store.                           |
-| `ReplayEngine`                                      | Lower-level timed action playback with pause/resume/speed.     |
-| `createPersistenceMiddleware(options)`              | Middleware factory used internally by `createSlamAppStore`.    |
-| `wireStoreSubscribers(store, deps)`                 | Bridge store state → visualization updates.                    |
+| Export                                 | Description                                                    |
+| -------------------------------------- | -------------------------------------------------------------- |
+| `createSlamAppStore(options)`          | Composable store factory (see options table above).            |
+| `recordingReducer`                     | Recording lifecycle slice (built into the factory).            |
+| `startSession()` / `endSession()`      | Recording lifecycle actions.                                   |
+| `recordGpsEvent(payload)`              | Record a paired AR+GPS observation.                            |
+| `createGpsPositionHandler(config)`     | Factory that adapts `GeolocationPosition` to a store dispatch. |
+| `captureGpsAnchorSample(options)`      | Sample a paired AR pose + GPS point for anchoring.             |
+| `replayRecording(store, blob)`         | Replay a ZIP recording into a store.                           |
+| `ReplayEngine`                         | Lower-level timed action playback with pause/resume/speed.     |
+| `createPersistenceMiddleware(options)` | Middleware factory used internally by `createSlamAppStore`.    |
+| `wireStoreSubscribers(store, deps)`    | Bridge store state → visualization updates.                    |
 
 ### `storage/` — OPFS, ZIP, File System
 
@@ -312,7 +311,7 @@ WebXR session lifecycle, Three.js renderer setup, image/depth capture, replay sc
 | `StorageBackend`                               | Abstract storage interface (implement your own).        |
 | `OpfsStorageBackend`                           | OPFS-based `StorageBackend`.                            |
 | `NullStorageBackend`                           | No-op backend for tests and replay.                     |
-| `initOpfsStorage()` / `initStorage(backend)`   | Initialize the file-system layer.                       |
+| `initOpfsStorage()`                            | Initialize the OPFS file-system layer.                  |
 | `createSession()` / `listSessions()`           | Session lifecycle on disk.                              |
 | `exportSessionAsZip(handle, { contributors })` | Export a recording session as a ZIP blob.               |
 | `ZipExportContributor`                         | Hook for adding your own ZIP subdirectories on export.  |
@@ -341,7 +340,6 @@ H3-based proximity matching for GPS-anchored points (renamed from `ref-points/` 
 | Export                         | Description                                            |
 | ------------------------------ | ------------------------------------------------------ |
 | `LeafletMapOverlay`            | 2D Leaflet map integrated via CSS3D into a 3D scene.   |
-| `MapOverlay`                   | Tile-based 3D map overlay (no Leaflet dependency).     |
 | `GpsEventVisualizer`           | Three.js spheres for GPS event positions.              |
 | `createAlignmentLerper()`      | Smooth alignment matrix interpolation.                 |
 | `createCameraFollower()`       | Camera that tracks a moving target.                    |
@@ -392,6 +390,7 @@ pnpm run build     # build with tsdown
 ```
 src/
 ├── ar/             # WebXR session, capture, replay scene
+│   └── qr/         # QR detection, pose (planar PnP), size-from-depth, GPS vote
 ├── sensors/        # GPS, orientation, permissions
 ├── state/          # createSlamAppStore, recording, replay, persistence middleware
 ├── storage/        # OPFS, ZIP export/import, StorageBackend

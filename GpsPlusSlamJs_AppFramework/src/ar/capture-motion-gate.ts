@@ -16,7 +16,7 @@
  * maxLinear / maxWaitMs (plan §5.1). Keeping the stateful policy here (not in a
  * speculative framework-wide service) matches the plan's §4.1 scope note.
  *
- * @see GpsPlusSlamJs_Docs/docs/2026-06-23-blurry-frame-motion-gating-plan.md §4.2-4.4
+ * @see GpsPlusSlamJs_Docs/docs/2026-06-23-2105-blurry-frame-motion-gating-plan.md §4.2-4.4
  */
 
 /** Default number of recent frames the gate judges motion over (~50 ms @ 60fps). */
@@ -75,7 +75,7 @@ export interface MotionFilterConfig {
  * — demoting the (weak-at-scanning-distance) linear signal to a gross-motion
  * safety net and letting the well-behaved angular gate be the primary blur
  * selector. See
- * `GpsPlusSlamJs_Docs/docs/2026-07-02-image-capture-rate-motion-gate-finding.md`.
+ * `GpsPlusSlamJs_Docs/docs/2026-07-02-0117-image-capture-rate-motion-gate-finding.md`.
  *
  * `maxAngularVelocity` remains a PLACEHOLDER pending on-device field tuning
  * (plan §7). `maxWaitMs` of 4000 ms is 2× the default 2000 ms image interval.

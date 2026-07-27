@@ -566,7 +566,7 @@ describe('wireStoreSubscribers', () => {
     // the fix. Centering must consume the rebuilt MapData's userPosition —
     // one source of truth, no duplicated fused conversion. With alignment
     // present, that is the fused tip, NOT the raw fix. See
-    // gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-06-recorder-live-map-user-dot-fused-pose-user-feedback.md.
+    // gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-06-1526-recorder-live-map-user-dot-fused-pose-user-feedback.md.
     const gpsPoint = {
       id: 'gps-1',
       zeroRef: { lat: 50, lon: 8 },

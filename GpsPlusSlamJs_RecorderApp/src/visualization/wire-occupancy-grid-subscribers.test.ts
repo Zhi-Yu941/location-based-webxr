@@ -17,18 +17,18 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
 import { NullStorageBackend } from 'gps-plus-slam-app-framework/storage/null-storage-backend';
+import { createRecorderStore } from '../state/recorder-store';
 import {
-  createRecorderStore,
   recordDepthSample,
   recordWriteFailure,
-  type DepthSample,
-} from '../state/recorder-store';
+} from 'gps-plus-slam-app-framework/state/recording-slice';
+import type { DepthSample } from 'gps-plus-slam-app-framework/types/ar-types';
 import { createStoreRef } from '../state/store-ref';
 import {
   wireOccupancyGridSubscribers,
   type OccupancyGridSink,
 } from './wire-occupancy-grid-subscribers';
-import type { ViewerPose } from './occupancy-cubes-visualizer';
+import type { ViewerPose } from 'gps-plus-slam-app-framework/visualization/occupancy-cubes-visualizer';
 
 function makeSample(
   timestamp = 1000,

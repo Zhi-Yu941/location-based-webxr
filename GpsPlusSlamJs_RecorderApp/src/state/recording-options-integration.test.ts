@@ -15,14 +15,13 @@ import {
   DEFAULT_RECORDING_OPTIONS,
   cloneRecordingOptions,
   type RecordingOptions,
-} from 'gps-plus-slam-app-framework/state/recording-options';
+} from './recording-options';
+import { createRecorderStore, type RecorderStore } from './recorder-store';
 import {
-  createRecorderStore,
   startSession,
   recordDepthSample,
-  add2dImage,
-  type RecorderStore,
-} from './recorder-store';
+} from 'gps-plus-slam-app-framework/state/recording-slice';
+import { add2dImage } from 'gps-plus-slam-app-framework/state';
 
 // Mock the persistence write path (ScenarioWrappingStorageBackend → opfs-storage)
 // to avoid actual file operations; partial mock keeps the rest of opfs-storage real.
@@ -127,8 +126,11 @@ describe('Recording Options Integration', () => {
         })
       );
 
-      const saved =
-        store.getState().recording.sessionMetadata?.recordingOptions;
+      // The framework stores recordingOptions OPAQUELY (Record<string,
+      // unknown> on SessionMetadata since the 2026-07-11 G-1 move); the
+      // recorder owns the concrete type and narrows on read.
+      const saved = store.getState().recording.sessionMetadata
+        ?.recordingOptions as RecordingOptions | undefined;
       expect(saved?.depth.intervalMs).toBe(1500);
       expect(saved?.depth.gridSize).toBe(7);
       expect(saved?.images.enabled).toBe(false);

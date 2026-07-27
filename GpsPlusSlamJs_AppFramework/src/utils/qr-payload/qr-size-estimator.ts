@@ -1,6 +1,6 @@
 /**
  * QR size estimator — the metric of the QR payload-compression benchmark
- * (gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-05-qr-payload-compression-benchmark-plan.md §3).
+ * (gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-05-0611-qr-payload-compression-benchmark-plan.md §3).
  *
  * Given a payload string and an error-correction level it returns the QR
  * bit-stream size after OPTIMAL mode segmentation, the minimum QR version

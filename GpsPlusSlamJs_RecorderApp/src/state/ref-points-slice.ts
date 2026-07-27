@@ -19,7 +19,7 @@
 
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { createSelector, createSlice } from '@reduxjs/toolkit';
-import type { RawGpsPoint } from './recorder-store';
+import type { RawGpsPoint } from 'gps-plus-slam-app-framework/state';
 import type { Vector3, Quaternion } from 'gps-plus-slam-app-framework/core';
 import { type KnownGeoAnchor } from 'gps-plus-slam-app-framework/geo/h3-proximity';
 

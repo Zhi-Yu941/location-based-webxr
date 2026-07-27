@@ -16,7 +16,7 @@
  * makes correct use the easy path and stashing the awkward one. Do NOT retain
  * `ctx` or its fields beyond the callback's synchronous execution.
  *
- * See `2026-06-03-threejs-arbutton-minimal-ar-example-user-feedback.md`
+ * See `2026-06-03-0553-threejs-arbutton-minimal-ar-example-user-feedback.md`
  * §6.2/§6.3 (option H-A2) for the design rationale.
  */
 

@@ -6,7 +6,9 @@
  * for integration testing and parameter optimization.
  *
  * ARCHITECTURE NOTE: See docs/architecture-ar-gps-pose-separation.md
- * and docs/issue-library-integration.md
+ * and docs/issue-library-integration.md. Action formats must stay
+ * coordinated with gps-plus-slam/GpsPlusSlamJs/src/utils/replayLoader.ts
+ * (the library-side replay reader in the sibling repo).
  *
  * The recordGpsEvent action uses the LIBRARY's format with:
  * - odomPosition/odomRotation (AR pose as tuples)
@@ -16,17 +18,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { LatLong } from 'gps-plus-slam-app-framework/core';
 import type { RecordedAction } from 'gps-plus-slam-app-framework/storage/zip-reader';
+import { createRecorderStore, type RecorderStore } from './recorder-store';
 import {
-  createRecorderStore,
   startSession,
+  recordDepthSample,
+  type SessionMetadata,
+} from 'gps-plus-slam-app-framework/state/recording-slice';
+import {
   setZeroPos,
   recordGpsEvent,
-  recordDepthSample,
   type RecordGpsEventPayload,
-  type SessionMetadata,
-  type RecorderStore,
-  type DepthSample,
-} from './recorder-store';
+} from 'gps-plus-slam-app-framework/state';
+import type { DepthSample } from 'gps-plus-slam-app-framework/types/ar-types';
 
 // Mock opfs-storage's writeAction to capture what would be written
 // (ScenarioWrappingStorageBackend → opfs-storage; partial mock keeps the rest real).

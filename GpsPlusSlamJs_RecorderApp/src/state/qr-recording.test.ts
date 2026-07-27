@@ -10,20 +10,22 @@
  * non-whitelisted control action is never written; (4) the recorder opts into
  * the longer live history cap without persisting that setup action.
  *
- * @see docs 2026-06-17-recorder-live-qr-detection-recording-plan.md (WS-1).
+ * @see docs 2026-06-17-1914-recorder-live-qr-detection-recording-plan.md (WS-1).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { RecordedAction } from 'gps-plus-slam-app-framework/storage/zip-reader';
 import {
   createRecorderStore,
-  startSession,
-  recordQrDetection,
-  selectLatestQrDetection,
   RECORDER_QR_MAX_HISTORY,
   type RecorderStore,
-  type QrDetectionEntry,
 } from './recorder-store';
+import { startSession } from 'gps-plus-slam-app-framework/state/recording-slice';
+import {
+  recordQrDetection,
+  selectLatestQrDetection,
+  type QrDetectionEntry,
+} from 'gps-plus-slam-app-framework/state';
 
 const writtenActions: unknown[] = [];
 let pendingWrites: Promise<void>[] = [];

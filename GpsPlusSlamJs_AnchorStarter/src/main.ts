@@ -30,8 +30,11 @@ import {
   selectZeroReference,
 } from "gps-plus-slam-app-framework/state";
 import { NullStorageBackend } from "gps-plus-slam-app-framework/storage";
-import { applyChromiumProjectionLayerWorkaround } from "gps-plus-slam-app-framework/ar/chromium-camera-access-workaround";
 import { getCurrentArPose } from "gps-plus-slam-app-framework/ar/webxr-session";
+import {
+  isFullySupported,
+  capabilityMessage,
+} from "gps-plus-slam-app-framework/ar/capability-checker";
 import {
   stopGpsWatch,
   stopOrientationWatch,
@@ -39,7 +42,7 @@ import {
 } from "gps-plus-slam-app-framework/sensors";
 import {
   type GpsAnchor,
-  worldNueToGps,
+  type WayfindingHud,
 } from "gps-plus-slam-app-framework/visualization";
 import type { LatLong, LatLongAlt } from "gps-plus-slam-app-framework/core";
 import { odometryTrackingRestarted } from "gps-plus-slam-app-framework/core";
@@ -59,11 +62,11 @@ import {
 } from "./url-anchor-state.js";
 import { toGuidanceView } from "./guidance-view.js";
 import { toPlacementView } from "./placement-view.js";
-import { isFullySupported, capabilityMessage } from "./capability.js";
 import { getSeams } from "./seams.js";
 import { decideAnchorPlacement } from "./placement-decision.js";
 import { coldStartOverrideEnabledFromSearch } from "./cold-start-override-flag.js";
-import { type ReticleHandle } from "./reticle-hit-test.js";
+import { hudTargetsFromMarker, type HudTargetMarker } from "./hud-targets.js";
+import { type HitTestReticleHandle } from "gps-plus-slam-app-framework/ar/hit-test-reticle-driver";
 // --- your content here -----------------------------------------------------
 import { type MarkerOptions } from "./marker.js";
 // ---------------------------------------------------------------------------
@@ -104,9 +107,20 @@ type AppStore = ReturnType<typeof createSlamAppStore>;
 let store: AppStore | null = null;
 let setupState: SetupState = initialSetupState;
 let anchor: GpsAnchor | null = null;
-let reticleHandle: ReticleHandle | null = null;
+let reticleHandle: HitTestReticleHandle | null = null;
 let lastGps: LatLongAlt | null = null;
 let lastTrackingReady = false;
+let wayfindingHud: WayfindingHud | null = null;
+let hudMarker: HudTargetMarker | null = null;
+
+/**
+ * Wayfinding HUD deadband (F2, decision D2.2 "show when far"): the indicator
+ * activates once the anchor is at least HUD_DISTANCE_MAX_M away and hides
+ * again below HUD_DISTANCE_MIN_M ("arrived") — the gap is the anti-flicker
+ * hysteresis. Values carried over from the field-validated prototype.
+ */
+const HUD_DISTANCE_MIN_M = 1.5;
+const HUD_DISTANCE_MAX_M = 3.0;
 
 /** Idle label for the copy-link button; must match the text in index.html. */
 const COPY_LINK_IDLE_LABEL = "Copy link";
@@ -114,14 +128,14 @@ const COPY_LINK_IDLE_LABEL = "Copy link";
 let copyLinkRevertTimer: number | null = null;
 
 /**
- * Run a framework selector against the live store. Each selector is typed
- * against a slightly different internal root shape; only the slices it reads
- * exist at runtime, so the cast through `unknown` is safe (same pattern as
- * the MinimalExample).
+ * Run a framework selector against the live store (throws before init —
+ * the null-guard is the reason this helper survives). Since quality-review
+ * G-2 the framework selectors accept any store that carries the slice they
+ * read, so the former cast-through-`unknown` is gone.
  */
-function sel<S, R>(selector: (state: S) => R): R {
+function sel<R>(selector: (state: ReturnType<AppStore["getState"]>) => R): R {
   if (!store) throw new Error("store not initialised");
-  return selector(store.getState() as unknown as S);
+  return selector(store.getState());
 }
 
 function toLatLongAlt(pos: GpsPosition): LatLongAlt {
@@ -147,14 +161,30 @@ function currentAlignment(): ReturnType<
 // Rendering — copy the tested view-models onto the DOM (no logic here)
 // ---------------------------------------------------------------------------
 
-function renderGuidance(): void {
-  const report = store ? sel(getSeams().selectTrackingQuality) : null;
-  const view = toGuidanceView(computeOnboardingGuidance(report));
+/**
+ * Last tracking-quality report identity the guidance rendered from
+ * (quality-review F-7): the framework's listener only publishes a NEW report
+ * reference when it meaningfully changed (epsilon-gated `reportUpdated`), so
+ * reference identity is the change signal. `undefined` (never a selector
+ * result) forces the first render.
+ */
+let lastRenderedGuidanceReport: unknown = undefined;
+
+function applyGuidance(
+  guidance: ReturnType<typeof computeOnboardingGuidance>,
+): void {
+  const view = toGuidanceView(guidance);
   dom.guidanceTitle.textContent = view.title;
   dom.guidanceBarFill.style.width = `${view.barWidthPct}%`;
   dom.guidanceBarFill.className = `tone-${view.tone}`;
   dom.guidancePercent.textContent = view.percentText;
   dom.guidanceHint.textContent = view.hint;
+}
+
+function renderGuidance(): void {
+  const report = store ? sel(getSeams().selectTrackingQuality) : null;
+  lastRenderedGuidanceReport = report;
+  applyGuidance(computeOnboardingGuidance(report));
 }
 
 function renderPlacement(): void {
@@ -185,20 +215,27 @@ function dispatchSetup(event: SetupEvent): void {
   render();
 }
 
-/** Translate the onboarding guidance into the FSM's trackingReady flag. */
-function syncTrackingReady(): void {
+/**
+ * Per-dispatch store subscriber. Skips all work while the tracking-quality
+ * report reference is unchanged (quality-review F-7 — this used to recompute
+ * the guidance twice and issue 5 unconditional DOM writes on EVERY store
+ * dispatch, i.e. every XR frame, defeating the framework's epsilon-gated
+ * report publishing). On a real report change, the single guidance
+ * computation feeds both the FSM flag and the DOM.
+ */
+function onStoreChanged(): void {
   if (!store) return;
   const report = sel(getSeams().selectTrackingQuality);
-  const ready = computeOnboardingGuidance(report).phase === "ready";
+  if (report === lastRenderedGuidanceReport) return;
+  lastRenderedGuidanceReport = report;
+
+  const guidance = computeOnboardingGuidance(report);
+  const ready = guidance.phase === "ready";
   if (ready !== lastTrackingReady) {
     lastTrackingReady = ready;
     dispatchSetup({ type: "TRACKING_READY_CHANGED", ready });
   }
-}
-
-function onStoreChanged(): void {
-  syncTrackingReady();
-  renderGuidance();
+  applyGuidance(guidance);
 }
 
 // ---------------------------------------------------------------------------
@@ -240,20 +277,14 @@ function spawnAnchor(
     );
   }
 
-  // Bootstrap source: the marker's own GPS-world (NUE) world pose, converted
-  // via `worldNueToGps` — NOT the phone's GPS fix. This pins the anchor to the
-  // reticle point the user aimed at, not the device, and only works because
-  // `enableArWorldGroupAlignment` makes the marker's world position GPS-world
-  // NUE. Skipped entirely for the cache-hit `skipBootstrap` path (no sampling).
-  const sampleScratch = new Vector3();
-  const sampleWorldPoseAsGps = (): LatLongAlt | null => {
-    const zero = sel(selectZeroReference);
-    const alignment = sel(getSeams().selectAlignmentMatrix);
-    // No GPS-world frame yet — skip this bootstrap tick (mirrors "no fix").
-    if (zero === null || alignment === null) return null;
-    return worldNueToGps(marker.getWorldPosition(sampleScratch), zero);
-  };
-
+  // Bootstrap source: the marker's own GPS-world (NUE) world pose — the
+  // framework anchor's built-in object-pose sampler since quality-review G-6
+  // (the hand-built closure this app carried is now the default; it reads
+  // through the seam-based getAlignmentMatrix/getGpsZeroRef below, so the
+  // e2e fakes keep driving it). This pins the anchor to the reticle point
+  // the user aimed at, not the device, and only works because
+  // `enableArWorldGroupAlignment` makes the marker's world position
+  // GPS-world NUE. Skipped entirely for the cache-hit `skipBootstrap` path.
   let gpsAnchor: GpsAnchor;
   try {
     gpsAnchor = seams.createGpsAnchor({
@@ -264,7 +295,6 @@ function spawnAnchor(
       skipBootstrap,
       getAlignmentMatrix: () => sel(getSeams().selectAlignmentMatrix),
       getGpsZeroRef: (): LatLong | null => sel(selectZeroReference),
-      getCurrentGpsPoint: sampleWorldPoseAsGps,
       ...(options.onBootstrapComplete
         ? { onBootstrapComplete: options.onBootstrapComplete }
         : {}),
@@ -300,15 +330,40 @@ function spawnAnchor(
     }
   }
 
+  // F2 wayfinding HUD — guide the user to the (possibly off-screen / far)
+  // anchor. The target feed reuses the marker's visibility gate, so the
+  // hidden cache-hit marker yields no target until the first alignment.
+  // Auxiliary by design: a HUD failure must never break the anchor flow.
+  wayfindingHud?.dispose();
+  wayfindingHud = null;
+  hudMarker = marker;
+  try {
+    wayfindingHud = seams.createWayfindingHud({
+      camera,
+      getTargets: () => hudTargetsFromMarker(hudMarker),
+      distanceMin: HUD_DISTANCE_MIN_M,
+      distanceMax: HUD_DISTANCE_MAX_M,
+    });
+  } catch (err) {
+    console.error(
+      "[anchor-starter] wayfinding HUD failed to start; continuing without it.",
+      err,
+    );
+  }
+
   // The framework's `dispose()` only unregisters the anchor from the frame
   // loop; it deliberately does NOT detach the marker from the scene graph
   // (see gps-anchor.ts). Wrap it so disposing the anchor also removes its
-  // marker — making `anchor.dispose()` a complete teardown for every caller
-  // (placement retry, boot rollback, beforeunload).
+  // marker and the marker's wayfinding HUD — making `anchor.dispose()` a
+  // complete teardown for every caller (placement retry, boot rollback,
+  // beforeunload).
   const disposeAnchor = gpsAnchor.dispose.bind(gpsAnchor);
   gpsAnchor.dispose = (): void => {
     disposeAnchor();
     unsubReveal?.();
+    wayfindingHud?.dispose();
+    wayfindingHud = null;
+    hudMarker = null;
     arWorldGroup.remove(marker);
   };
   return gpsAnchor;
@@ -496,21 +551,6 @@ async function startAr(): Promise<void> {
   });
   store.subscribe(onStoreChanged);
 
-  // Tracking-state pipeline must be wired before initAR. The framework's
-  // per-frame `updateTrackingState()` only dispatches `poseReceived`/`poseLost`
-  // into the store when BOTH a store is injected AND a tracking-restart
-  // callback is registered — otherwise it silently no-ops, `tracking.phase`
-  // never leaves `initializing`, and the tracking-quality report (and thus the
-  // onboarding guidance) stays pinned to "AR tracking lost" with no progress.
-  // The callback also re-bases odometry after an origin reset so alignment
-  // continues correctly across tracking restarts (same contract as the
-  // recorder). Routed through the seam so the e2e suite can assert the wiring
-  // actually happens (the fakes record both calls).
-  getSeams().setTrackingStore(store);
-  getSeams().setTrackingCallbacks((payload) => {
-    store?.dispatch(odometryTrackingRestarted(payload));
-  });
-
   const appContainer = el("app");
   try {
     // This example places its anchor under a screen-centre hit-test reticle —
@@ -520,6 +560,17 @@ async function startAr(): Promise<void> {
     // each frame, but DO request `hit-test` so the cache-miss reticle works.
     // `dom-overlay` and the CSS3D renderer stay on so the overlay UI still
     // composites in AR.
+    //
+    // Tracking-state pipeline: the store + restart callback ride into initAR
+    // as its `callbacks.tracking` group (they arrive TOGETHER since the
+    // framework's setter fold). Without the group the framework's per-frame
+    // `updateTrackingState()` silently no-ops, `tracking.phase` never leaves
+    // `initializing`, and the tracking-quality report (and thus the onboarding
+    // guidance) stays pinned to "AR tracking lost" with no progress. The
+    // onRestarted callback re-bases odometry after an origin reset so
+    // alignment continues correctly across tracking restarts (same contract as
+    // the recorder). Routed through the seam so the e2e suite can assert the
+    // wiring actually happens (the fake initAR records the group).
     await getSeams().initAR(
       appContainer,
       {
@@ -528,6 +579,14 @@ async function startAr(): Promise<void> {
         enableCameraTextureAcquisition: false,
       },
       { requestHitTest: true },
+      {
+        tracking: {
+          store,
+          onRestarted: (payload) => {
+            store?.dispatch(odometryTrackingRestarted(payload));
+          },
+        },
+      },
     );
   } catch (err) {
     await failStart(err, "Failed to start the AR session.");
@@ -563,8 +622,7 @@ async function startAr(): Promise<void> {
       });
     }
 
-    // GPS → store (+ remember the latest fix for the anchor's
-    // getCurrentGpsPoint).
+    // GPS → store (+ remember the latest fix for anchor seeding).
     const gpsHandler = createGpsPositionHandler({
       store,
       getArPose: getCurrentArPose,
@@ -626,12 +684,9 @@ async function startAr(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
-  // Apply the Chromium WebXR camera-access tab-crash workaround before any
-  // session setup. It always forces the XRWebGLLayer fallback (required on
-  // every affected Chrome build, incl. Chrome 150) and additionally persists
-  // the baseLayer only on the affected Chrome window, so calling it
-  // unconditionally here is safe.
-  applyChromiumProjectionLayerWorkaround();
+  // NOTE: the Chromium WebXR camera-access tab-crash workaround is applied
+  // by the framework's initAR() itself since quality-review G-7 (default-on
+  // via isolationOptions) — no manual bootstrap call needed here any more.
 
   render();
 
@@ -649,7 +704,10 @@ async function main(): Promise<void> {
     // E1: honest, capability-gated message instead of a crash.
     dom.startButton.disabled = true;
     dom.capabilityMessage.hidden = false;
-    dom.capabilityMessage.textContent = capabilityMessage(support) ?? "";
+    dom.capabilityMessage.textContent =
+      capabilityMessage(support, {
+        contextLabel: "the persistent-anchor flow",
+      }) ?? "";
     return;
   }
 

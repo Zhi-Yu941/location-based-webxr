@@ -25,7 +25,7 @@ seam (`window.__anchorStarterSeams`, installed by `fakes.js` and statically
 stripped from production): boot → onboarding guidance → soft-gated placement →
 the `?show=` URL round-trip → copy-link success/failure. See the plan and its
 tiers in
-[2026-06-01-anchor-starter-e2e-test-plan.md](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-01-anchor-starter-e2e-test-plan.md).
+[2026-06-01-0447-anchor-starter-e2e-test-plan.md](../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-01-0447-anchor-starter-e2e-test-plan.md).
 
 ## Files
 

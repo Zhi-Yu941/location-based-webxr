@@ -11,8 +11,8 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { DEFAULT_RECORDING_OPTIONS } from 'gps-plus-slam-app-framework/state/recording-options';
-import type { OccupancyOptions } from 'gps-plus-slam-app-framework/state/recording-options';
+import { DEFAULT_RECORDING_OPTIONS } from '../state/recording-options';
+import type { OccupancyOptions } from '../state/recording-options';
 import { createOccluderSink } from './occluder-sink';
 
 function makeOccupancy(overrides: Partial<OccupancyOptions>): OccupancyOptions {

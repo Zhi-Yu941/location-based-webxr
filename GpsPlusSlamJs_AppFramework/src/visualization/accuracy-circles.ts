@@ -31,7 +31,7 @@ import L from 'leaflet';
  * @deprecated Stroke-only since 2026-06-28 (Finding 1) — accuracy circles no
  * longer render a fill, so this opacity is unused. Retained as an exported
  * constant only to preserve the published API surface; do not pass it to
- * `L.circle`. See `2026-06-28-map-rings-transparency-and-view-direction-user-feedback.md`.
+ * `L.circle`. See `2026-06-28-1822-map-rings-transparency-and-view-direction-user-feedback.md`.
  */
 export const ACCURACY_CIRCLE_FILL_OPACITY = 0.12;
 export const ACCURACY_CIRCLE_STROKE_OPACITY = 0.5;

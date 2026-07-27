@@ -3,7 +3,7 @@
 - **Purpose:** Playwright runner config for the persistent-anchor starter's
   end-to-end tests. Currently scopes the **Tier 0** smoke + capability-gate
   suite (see
-  [2026-06-01-anchor-starter-e2e-test-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-01-anchor-starter-e2e-test-plan.md)).
+  [2026-06-01-0447-anchor-starter-e2e-test-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-01-0447-anchor-starter-e2e-test-plan.md)).
 - **Key settings:**
   - `testDir: '.'` — specs live next to this config in `playwright-tests/`.
   - **Chromium only** — WebXR is Chrome-focused; other engines add no signal.

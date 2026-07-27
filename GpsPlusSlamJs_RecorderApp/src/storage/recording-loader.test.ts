@@ -319,13 +319,123 @@ describe('readSidecarRefPoints — deep observation validation', () => {
 });
 
 /**
+ * Within-recording re-mark round trip (indoor-loop enablement follow-up,
+ * 2026-07-12).
+ *
+ * Why this test matters: the loop-recording field protocol re-marks the
+ * same corner on every pass, so one recording zip legitimately carries
+ * SEVERAL `refPoints/addRefPointEntry` actions of the same id AND a
+ * sidecar with several same-session observations. This is the read half
+ * of the end-to-end promise (the write half is pinned in
+ * recorder-store.test.ts / ref-points-zip-contributor.test.ts /
+ * ref-point-loader.test.ts): `loadRecording` must surface ALL of them —
+ * a first-wins dedupe in the action stream or an observation merge in the
+ * sidecar path would silently destroy the re-observation ground truth the
+ * investigations consume.
+ */
+describe('loadRecording — within-recording re-marks survive the zip round trip', () => {
+  const CORNER_ID = '8b1fa0a4970afff';
+  const SESSION = 'recording-2026-07-11_12-44-19utc';
+  const TIMESTAMPS = [1_700_000_001_000, 1_700_000_016_000, 1_700_000_031_000];
+
+  function markAction(timestamp: number): RecordedAction {
+    return {
+      type: 'refPoints/addRefPointEntry',
+      payload: {
+        id: CORNER_ID,
+        timestamp,
+        name: 'Corner A1',
+        rawGpsPoint: {
+          id: `gps-${timestamp}`,
+          latitude: 50.776,
+          longitude: 6.083,
+          timestamp,
+        },
+        position: [1, 2, 3],
+        rotation: [0, 0, 0, 1],
+      },
+    };
+  }
+
+  async function buildLoopZip(): Promise<Uint8Array> {
+    const zipWriter = new ZipWriter(new BlobWriter('application/zip'), {
+      level: 0,
+    });
+    await zipWriter.add(
+      'session.json',
+      new TextReader(
+        JSON.stringify({
+          version: 1,
+          startedAt: new Date(TIMESTAMPS[0]!).toISOString(),
+          endedAt: new Date(TIMESTAMPS[2]!).toISOString(),
+          scenarioName: 'LoopScenario',
+          actionCount: 4,
+          frameCount: 0,
+          userAgent: 'test',
+        })
+      )
+    );
+    const actions: RecordedAction[] = [
+      {
+        type: 'recording/startSession',
+        payload: { sessionName: SESSION, startTime: TIMESTAMPS[0] },
+      },
+      ...TIMESTAMPS.map(markAction),
+    ];
+    for (let i = 0; i < actions.length; i++) {
+      await zipWriter.add(
+        `actions/${String(i + 1).padStart(6, '0')}.json`,
+        new TextReader(JSON.stringify(actions[i]))
+      );
+    }
+    await zipWriter.add(
+      `refPoints/${CORNER_ID}.json`,
+      new TextReader(
+        JSON.stringify({
+          id: CORNER_ID,
+          name: 'Corner A1',
+          createdAt: TIMESTAMPS[0],
+          observations: TIMESTAMPS.map((t) => ({
+            sessionId: SESSION,
+            timestamp: t,
+            arPose: { position: [1, 2, 3], rotation: [0, 0, 0, 1] },
+            gpsPoint: { latitude: 50.776, longitude: 6.083 },
+          })),
+        })
+      )
+    );
+    const blob = await zipWriter.close();
+    return new Uint8Array(await blob.arrayBuffer());
+  }
+
+  it('surfaces all three same-id actions AND all three sidecar observations', async () => {
+    const loaded = await loadRecording(await buildLoopZip());
+
+    // Action stream: every re-mark survives, in order, none deduped.
+    const marks = loaded.actions.filter(
+      (e) => e.action.type === 'refPoints/addRefPointEntry'
+    );
+    expect(marks).toHaveLength(3);
+    expect(
+      marks.map((e) => (e.action.payload as { timestamp: number }).timestamp)
+    ).toEqual(TIMESTAMPS);
+
+    // Sidecar path: one definition carrying ALL observations.
+    const def = loaded.refPoints.find((d) => d.id === CORNER_ID);
+    expect(def).toBeDefined();
+    expect(def!.observations).toHaveLength(3);
+    expect(def!.observations.map((o) => o.timestamp)).toEqual(TIMESTAMPS);
+  });
+});
+
+/**
  * Lazy ZipSource Reader input — full-chain equivalence.
  *
  * Why this test matters: the Investigation corpus gate validates 100+
  * recording zips (2.4 GB total) and must not read whole archives into memory
  * just to check a few KB of JSON — that breached its 60 s regression budget
  * (gps-plus-slam repo:
- * GpsPlusSlamJs_Investigation/docs/2026-07-09-regression-gate-budget-breach-followup.md).
+ * GpsPlusSlamJs_Investigation/docs/2026-07-09-1944-regression-gate-budget-breach-followup.md).
  * loadRecording therefore accepts any zip.js Reader. This test proves the
  * full lazy chain (fd-backed ranged Reader → framework zip helpers →
  * loadRecording) yields a LoadedRecording identical to the Uint8Array path,

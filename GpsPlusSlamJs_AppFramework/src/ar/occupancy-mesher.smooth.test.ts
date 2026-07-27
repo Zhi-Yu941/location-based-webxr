@@ -21,7 +21,9 @@
  *  2. consumes getCellPoint — vertices are pulled onto the measured surface (a
  *     uniform sub-cell offset shifts every vertex by that offset);
  *  3. welded + watertight on a closed (thick) region (even-edge-cover = 0);
- *  4. one AABB per occupied cell; back-compat `greedy:true` shim.
+ *  4. one AABB per occupied cell; `'greedy'` output stays distinct from
+ *     `'smooth'` (the residual assertion of the removed `greedy:true` shim
+ *     test — the shim itself was dropped 2026-07-10, quality-review C-3).
  */
 
 import { describe, it, expect } from 'vitest';
@@ -140,7 +142,7 @@ describe("occupancy mesher — 'smooth' surface-nets (dual contouring)", () => {
     // triangle COUNT but ZERO total area, i.e. they were invisible to the
     // (default-on) occluder. Count-only assertions can never catch that, so
     // this area assertion is the permanent regression gate (see
-    // 2026-07-01-followup-smooth-mesher-single-corner-degeneracy.md).
+    // 2026-07-01-1455-smooth-mesher-single-corner-degeneracy-followup.md).
     // Guaranteed: non-zero total area (the n === 1 end/corner vertices spread
     // apart). NOT guaranteed, by design: interior shaft segments of a 1×1×N
     // feature stay degenerate — their n === 2 rings are locally
@@ -264,15 +266,18 @@ describe("occupancy mesher — 'smooth' surface-nets (dual contouring)", () => {
     expect(aabbs.length).toBe(3);
   });
 
-  it("back-compat: greedy:true still maps to the 'greedy' mode, distinct from smooth", () => {
+  it("'greedy' mode output stays distinct from 'smooth' on the same cells", () => {
+    // Why this test matters: when the deprecated `greedy:true` boolean shim
+    // was removed (2026-07-10, quality-review C-3) this test degenerated into
+    // comparing two identical `{ mode: 'greedy' }` calls (PR #177 review).
+    // The assertion worth keeping is that the merged greedy path remains
+    // selectable and produces a different mesh than dual-contouring smooth.
     const cells = raggedFloor();
-    const greedyBool = meshOccupiedCells(cells, CELL, { greedy: true });
-    const greedyMode = meshOccupiedCells(cells, CELL, { mode: 'greedy' });
-    expect(greedyMode.indices.length).toBe(greedyBool.indices.length);
+    const greedy = meshOccupiedCells(cells, CELL, { mode: 'greedy' });
     const smooth = meshOccupiedCells(cells, CELL, {
       mode: 'smooth',
       getCellPoint: centroidProvider(cells),
     });
-    expect(smooth.indices.length).not.toBe(greedyBool.indices.length);
+    expect(smooth.indices.length).not.toBe(greedy.indices.length);
   });
 });

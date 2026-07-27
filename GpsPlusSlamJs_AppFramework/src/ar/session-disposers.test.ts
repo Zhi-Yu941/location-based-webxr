@@ -9,7 +9,7 @@
  * exactly once. The contract below (run-once, clear-on-run, deregister,
  * isolation) is what `enableArWorldGroupAlignment` relies on to be safe without
  * any per-app bookkeeping. See
- * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-08-arworldgroup-alignment-session-scoped-disposal.md.
+ * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-08-2149-arworldgroup-alignment-session-scoped-disposal.md.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {

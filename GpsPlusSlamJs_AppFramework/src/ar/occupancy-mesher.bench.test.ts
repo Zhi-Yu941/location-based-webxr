@@ -68,7 +68,7 @@ describe.skipIf(!RUN)('occupancy mesher — perf benchmark', () => {
         opts: MeshOccupiedCellsOptions | undefined;
       }[] = [
         { name: 'per-face', opts: undefined },
-        { name: 'greedy', opts: { greedy: true } },
+        { name: 'greedy', opts: { mode: 'greedy' } },
         { name: 'smooth', opts: { mode: 'smooth', getCellPoint } },
         { name: 'corner-fit', opts: { mode: 'corner-fit', getCellPoint } },
       ];
@@ -113,7 +113,7 @@ describe.skipIf(!RUN)('occupancy mesher — perf benchmark', () => {
         meshOccupiedCells(cells, cellSizeM, undefined)
       );
       const greedyMs = timeMs(RUNS, () =>
-        meshOccupiedCells(cells, cellSizeM, { greedy: true })
+        meshOccupiedCells(cells, cellSizeM, { mode: 'greedy' })
       );
       const smoothMs = timeMs(RUNS, () =>
         meshOccupiedCells(cells, cellSizeM, { mode: 'smooth', getCellPoint })

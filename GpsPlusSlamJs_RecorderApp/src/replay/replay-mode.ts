@@ -38,7 +38,6 @@ import type { Map as LeafletMap } from 'leaflet';
 import { gpsEventVisualizer } from 'gps-plus-slam-app-framework/visualization/gps-event-markers';
 import { refPointVisualizer } from '../visualization/ref-point-visualizer';
 import {
-  getArPose,
   nuePositionToWebXR,
   nueQuaternionToWebXR,
 } from 'gps-plus-slam-app-framework/ar/webxr-session';
@@ -49,8 +48,8 @@ import { FrameTileVisualizer } from '../visualization/frame-tile-visualizer';
 import { decodeFrameTexture } from '../visualization/frame-texture-decoder';
 import { wireFrameTileSubscribers } from '../visualization/wire-frame-tile-subscribers';
 import { OccupancyGrid } from 'gps-plus-slam-app-framework/ar/occupancy-grid';
-import { loadRecordingOptions } from 'gps-plus-slam-app-framework/state/recording-options';
-import { OccupancyCubesVisualizer } from '../visualization/occupancy-cubes-visualizer';
+import { loadRecordingOptions } from '../state/recording-options';
+import { OccupancyCubesVisualizer } from 'gps-plus-slam-app-framework/visualization/occupancy-cubes-visualizer';
 import {
   createOccluderSink,
   type OccluderSink,
@@ -59,9 +58,9 @@ import {
 import { wireOccupancyGridSubscribers } from '../visualization/wire-occupancy-grid-subscribers';
 import { createZipFrameBlobSource } from '../storage/zip-frame-blob-source';
 import {
-  createStatsOverlay,
-  type StatsOverlayHandle,
-} from '../ui/stats-overlay';
+  createPerfStatsOverlay,
+  type PerfStatsOverlayHandle,
+} from 'gps-plus-slam-app-framework/visualization/perf-stats-overlay';
 import * as THREE from 'three';
 
 const log = createLogger('ReplayMode');
@@ -148,13 +147,19 @@ export async function startReplayMode(
   // Compass opt-ins are DISABLED for replay: the framework would otherwise
   // re-derive them from its defaults (cold-start override defaults ON) and
   // auto-dispatch `setColdStartOverrideEnabled(true)` on the first replayed
-  // `setZeroPos`. But only ENABLED opt-ins are persisted as actions, so a
-  // recording captured with the override OFF (e.g. a §6a calibration capture)
-  // carries no opt-in action — re-deriving the default would enable an override
-  // the session was recorded WITHOUT. Replay's source of truth is the recorded
-  // action stream alone (a session recorded WITH the override on already carries
-  // the `setColdStartOverrideEnabled(true)` action, which replay re-applies), so
-  // disabling the auto-apply makes both cases replay faithfully.
+  // `setZeroPos`, enabling an override a §6a calibration capture was recorded
+  // WITHOUT. Replay's source of truth is the recorded action stream alone: a
+  // session recorded WITH the override on carries the
+  // `setColdStartOverrideEnabled(true)` action, which replay re-applies AFTER the
+  // `false` below (the framework's opt-in fires on the first `setZeroPos`, the
+  // recorded action comes later in the stream), so both cases replay faithfully.
+  //
+  // The `false` is load-bearing and must stay explicit. Since gps-plus-slam-js
+  // 1.16.0 the LIBRARY default is `true`, so "pass nothing" no longer means off —
+  // and until 2026-07-26 the framework only dispatched on `true`, which made this
+  // `false` a silent no-op that replayed old captures WITH an override they never
+  // had. The framework now dispatches the value explicitly; see the invariant in
+  // `create-slam-app-store.ts.md`.
   const store = createRecorderStore({
     storageBackend: new NullStorageBackend(),
     enableCompassColdStartOverride: false,
@@ -165,6 +170,17 @@ export async function startReplayMode(
   // Initialize Three.js replay scene (no WebXR)
   const replaySceneState = initReplayScene(config.container);
   log.info('Replay scene initialized');
+
+  // The replay scene OWNS its scene graph (surface-reduction step 2 — the
+  // old webxr-session setScene/setArWorldGroup injection is gone), so the
+  // scene-reading singleton visualizers wired below must be pointed at the
+  // replay references explicitly. dispose() restores the live-session
+  // defaults so a later AR session parents markers correctly again.
+  gpsEventVisualizer.setSceneSource({
+    getScene: () => replaySceneState.scene,
+    getArWorldGroup: () => replaySceneState.arWorldGroup,
+  });
+  refPointVisualizer.setSceneSource(() => replaySceneState.scene);
 
   // F3.5 — wire frame-tile visualization for add2dImage actions so the
   // 2D camera frames recorded during the original session reappear as
@@ -225,8 +241,12 @@ export async function startReplayMode(
     // validated default on any storage error), so this stays best-effort.
     const replayOptions = loadRecordingOptions();
     const occupancyOptions = replayOptions.occupancy;
+    // Confidence-guarded carving at the same minConfidence floor as live
+    // (main.ts): a voxel solid enough to be rendered can no longer be erased
+    // by a single deeper reading (2026-07-16 synthetic-scene investigation).
     const occupancyGrid = new OccupancyGrid({
       cellSizeM: occupancyOptions.cellSizeM,
+      carveConfidenceThreshold: occupancyOptions.minConfidence,
     });
     // Same noise filter as live (main.ts): render only voxels seen ≥
     // minConfidence times, re-quantizable per replay like cellSizeM.
@@ -287,11 +307,11 @@ export async function startReplayMode(
   // panels are advanced by their own rAF loop — rAF fires once per browser
   // frame, so the measured cadence equals the replay render cadence.
   // Best-effort like the visualizers above.
-  let statsOverlay: StatsOverlayHandle | null = null;
+  let statsOverlay: PerfStatsOverlayHandle | null = null;
   let statsRafId: number | null = null;
   try {
     if (loadRecordingOptions().visualization.statsOverlay) {
-      statsOverlay = createStatsOverlay(config.container);
+      statsOverlay = createPerfStatsOverlay(config.container);
       const statsTick = (): void => {
         statsOverlay?.update();
         statsRafId = requestAnimationFrame(statsTick);
@@ -333,25 +353,22 @@ export async function startReplayMode(
     // 6.2: Update arpose Object3D with recorded odom pose during replay.
     // The arpose node sits between arWorldGroup and camera; writing the
     // recorded pose here makes the camera follow the recorded trajectory
-    // while user controls only affect the camera's local offset.
-    onNewOdomPose: (() => {
-      return (
-        odomPosition: readonly number[],
-        odomRotation: readonly number[]
-      ) => {
-        const arpose = getArPose();
-        if (!arpose) {
-          return;
-        }
-        // Convert NUE→WebXR so (alignment × W2N) × WebXR_pos = alignment × NUE_pos
-        const webxrPos = nuePositionToWebXR(odomPosition);
-        arpose.position.fromArray(webxrPos);
-        // Rotation is now NUE in state — convert back to WebXR for arpose
-        // (arpose sits below basisChangeNode in WebXR-local space)
-        const webxrRot = nueQuaternionToWebXR(odomRotation);
-        arpose.quaternion.fromArray(webxrRot);
-      };
-    })(),
+    // while user controls only affect the camera's local offset. The node is
+    // the replay scene's OWN arpose (initReplayScene return) — webxr-session's
+    // getArPose was deleted with the rest of the replay injection surface.
+    onNewOdomPose: (
+      odomPosition: readonly number[],
+      odomRotation: readonly number[]
+    ) => {
+      const arpose = replaySceneState.arpose;
+      // Convert NUE→WebXR so (alignment × W2N) × WebXR_pos = alignment × NUE_pos
+      const webxrPos = nuePositionToWebXR(odomPosition);
+      arpose.position.fromArray(webxrPos);
+      // Rotation is now NUE in state — convert back to WebXR for arpose
+      // (arpose sits below basisChangeNode in WebXR-local space)
+      const webxrRot = nueQuaternionToWebXR(odomRotation);
+      arpose.quaternion.fromArray(webxrRot);
+    },
     // Issue #3: Update orbit target when alignment snapshots are created.
     // The snapshot NUE position is in scene-root space (A_k × p_k), so it
     // can be passed directly to updateOrbitTarget.
@@ -453,6 +470,11 @@ export async function startReplayMode(
         statsRafId = null;
       }
       statsOverlay?.dispose();
+      // Restore the live-session scene sources BEFORE the replay scene is
+      // torn down so no visualizer can parent a marker into a disposed scene,
+      // and a later live AR session gets the default wiring back.
+      gpsEventVisualizer.setSceneSource(null);
+      refPointVisualizer.setSceneSource(null);
       disposeReplayScene();
       log.info('Replay mode disposed');
     },

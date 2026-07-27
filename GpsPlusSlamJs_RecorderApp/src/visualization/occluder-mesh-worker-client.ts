@@ -6,7 +6,7 @@
  * actual `Worker`, adapts it to the driver's {@link MeshWorkerPoster} seam, and
  * degrades to the driver's **synchronous fallback** if a worker can't be
  * constructed (unsupported env / test). See
- * `2026-07-01-occluder-worker-and-chunked-remesh-plan.md`.
+ * `2026-07-01-0733-occluder-worker-and-chunked-remesh-plan.md`.
  */
 
 import {

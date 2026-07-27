@@ -4,7 +4,7 @@
 
 One-line: the one-time, opt-in upgrade that embeds each legacy recording's H3 coverage into its own `session.json` (O3 — in-zip rewrite), so legacy recordings index instantly on every future open in this app **and any other reader**.
 
-The coverage cells are already derived in memory while the map browser streams its index (Slice A) — this step only **writes** them; it never re-reads GPS paths. See the plan: `GpsPlusSlamJs_Docs/docs/2026-06-14-followup-progressive-map-browser-indexing-and-backfill.md` (B1/B2/B4) and the B3 primitive `GpsPlusSlamJs_AppFramework/src/storage/zip-coverage-embed.ts`.
+The coverage cells are already derived in memory while the map browser streams its index (Slice A) — this step only **writes** them; it never re-reads GPS paths. See the plan: `GpsPlusSlamJs_Docs/docs/2026-06-14-1924-progressive-map-browser-indexing-and-backfill-followup.md` (B1/B2/B4) and the B3 primitive `GpsPlusSlamJs_AppFramework/src/storage/zip-coverage-embed.ts`.
 
 ## Public API
 

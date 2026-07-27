@@ -26,6 +26,10 @@ import type {
 import { recordGpsEvent, setZeroPos } from 'gps-plus-slam-js';
 import type { GpsPosition, RawDeviceOrientation } from '../sensors/gps';
 import {
+  getLastDeviceOrientation,
+  resetDeviceOrientationCache,
+} from '../sensors/device-orientation-cache';
+import {
   getLatestAbsoluteOrientation,
   type AbsoluteOrientationReading,
 } from '../sensors/absolute-orientation';
@@ -33,7 +37,8 @@ import { createLogger } from '../utils/logger';
 
 const log = createLogger('RecordingCoordinator');
 import type { ARPose } from '../types/ar-types';
-import type { Vector3, Quaternion, RawGpsPoint } from 'gps-plus-slam-js';
+import { extractOdomPosition, extractOdomRotation } from '../types/ar-types';
+import type { RawGpsPoint } from 'gps-plus-slam-js';
 import { getZeroReference, getOdometryPositions } from 'gps-plus-slam-js';
 
 /** Counter for generating unique GPS point IDs */
@@ -49,27 +54,14 @@ export interface RecordingCoordinatorConfig {
   getArPose: () => ARPose | null;
 }
 
-/**
- * State for device orientation (captured separately from GPS)
- */
-let lastDeviceOrientation: RawDeviceOrientation | null = null;
-
-/**
- * Update the cached device orientation.
- * Called by orientation watch, used when GPS event arrives.
- */
-export function updateDeviceOrientation(
-  orientation: RawDeviceOrientation
-): void {
-  lastDeviceOrientation = orientation;
-}
-
-/**
- * Get the current cached device orientation.
- */
-export function getLastDeviceOrientation(): RawDeviceOrientation | null {
-  return lastDeviceOrientation;
-}
+// Device-orientation cache moved to `sensors/device-orientation-cache.ts`
+// (quality-review G-8 — it is a sensor concern; ar/webxr-session consumed it
+// through this state module, an ar→state inversion). Re-exported so the
+// published API is unchanged.
+export {
+  updateDeviceOrientation,
+  getLastDeviceOrientation,
+} from '../sensors/device-orientation-cache';
 
 // eulerToQuaternion imported from library; re-export for backward compatibility
 export { eulerToQuaternion } from 'gps-plus-slam-js';
@@ -78,34 +70,13 @@ export { eulerToQuaternion } from 'gps-plus-slam-js';
  * Clear cached state (for testing or session reset)
  */
 export function resetCoordinatorState(): void {
-  lastDeviceOrientation = null;
+  resetDeviceOrientationCache();
   gpsEventCounter = 0;
 }
 
-/**
- * Extract raw odometry position tuple from ARPose.
- *
- * Returns the raw WebXR position without coordinate conversion.
- * The reducer applies the WebXR→NUE transform when storing into state
- * (raw-storage pattern, see docs/2026-04-09-raw-storage-convert-on-read.md).
- *
- * WebXR local-floor frame: X=East, Y=Up, Z=South (toward viewer / backward).
- */
-export function extractOdomPosition(arPose: ARPose): Vector3 {
-  return [arPose.position.x, arPose.position.y, arPose.position.z];
-}
-
-/**
- * Extract odometry rotation tuple from ARPose.
- */
-export function extractOdomRotation(arPose: ARPose): Quaternion {
-  return [
-    arPose.orientation.x,
-    arPose.orientation.y,
-    arPose.orientation.z,
-    arPose.orientation.w,
-  ];
-}
+// Pure ARPose accessors moved next to the type (`types/ar-types.ts`,
+// quality-review G-8). Re-exported so the published API is unchanged.
+export { extractOdomPosition, extractOdomRotation } from '../types/ar-types';
 
 /**
  * Build a RawGpsPoint from GPS position data.
@@ -246,7 +217,7 @@ export function createGpsPositionHandler(
     const payload = buildRecordGpsEventPayload(
       position,
       arPose,
-      lastDeviceOrientation,
+      getLastDeviceOrientation(),
       getLatestAbsoluteOrientation()
     );
     store.dispatch(recordGpsEvent(payload));

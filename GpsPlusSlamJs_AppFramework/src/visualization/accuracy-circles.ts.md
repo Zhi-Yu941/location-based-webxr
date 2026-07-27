@@ -38,7 +38,7 @@ happen here.
   opacity over N overlaps and paint the basemap solid on dense recordings. An
   outline never accumulates an opaque interior, so the basemap shows through at
   any overlap density. This is the locked decision of Finding 1
-  (`GpsPlusSlamJs_Docs/docs/2026-06-28-map-rings-transparency-and-view-direction-user-feedback.md`).
+  (`GpsPlusSlamJs_Docs/docs/2026-06-28-1822-map-rings-transparency-and-view-direction-user-feedback.md`).
 
 ## Examples
 

@@ -168,8 +168,3 @@ export function canPlaceAnchor(state: SetupState): boolean {
     state.phase === "awaiting-tracking" || state.phase === "ready-to-place"
   );
 }
-
-/** Is an async operation (the anchor save) currently in progress? */
-export function isBusy(state: SetupState): boolean {
-  return state.phase === "saving";
-}

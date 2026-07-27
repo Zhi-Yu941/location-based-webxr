@@ -13,17 +13,18 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createRecorderStore, type RecorderStore } from './recorder-store';
 import {
-  createRecorderStore,
   startSession,
   endSession,
+  recordWriteFailure,
+} from 'gps-plus-slam-app-framework/state/recording-slice';
+import {
   setZeroPos,
   recordGpsEvent,
-  recordWriteFailure,
-  setCurrentScenarioName,
-  type RecorderStore,
   type RawGpsPoint,
-} from './recorder-store';
+} from 'gps-plus-slam-app-framework/state';
+import { setCurrentScenarioName } from './scenario-slice';
 import { addRefPointEntry, type RefPointEntry } from './ref-points-slice';
 import { navigateTo } from './routing-slice';
 import { NullStorageBackend } from 'gps-plus-slam-app-framework/storage/null-storage-backend';
@@ -378,6 +379,79 @@ describe('Recorder Store', () => {
       );
     });
 
+    /**
+     * Why this test matters (indoor-loop enablement follow-up, 2026-07-12):
+     * the field protocol for loop recordings is "re-mark every corner on
+     * every pass WITHIN one recording" — multiple `addRefPointEntry`
+     * dispatches of the SAME id in one session. Every prior test dispatched
+     * a single mark, so a middleware regression that dedupes, drops, or
+     * mis-indexes repeated same-id actions would pass unnoticed and starve
+     * the investigation ground truth exactly like the 2026-07-11 session.
+     * This wires the REAL slice + REAL middleware and pins that all three
+     * re-marks persist, each with its own incrementing index and its own
+     * payload (none merged away).
+     */
+    it('persists EVERY re-observation of the same ref-point id with incrementing indices', async () => {
+      const { writeAction } =
+        await import('gps-plus-slam-app-framework/storage/opfs-storage');
+
+      store.dispatch(
+        startSession({
+          scenarioName: 'Test',
+          sessionName: 'recording-loop-session',
+          startTime: Date.now(),
+        })
+      );
+      vi.mocked(writeAction).mockClear();
+
+      const baseTs = 1_700_000_000_000;
+      const markOf = (timestamp: number): RefPointEntry => ({
+        id: '8b1fa0a4970afff', // one physical corner, re-marked per loop pass
+        timestamp,
+        rawGpsPoint: {
+          id: `gps-${timestamp}`,
+          latitude: 50.123,
+          longitude: 6.789,
+          timestamp,
+        },
+      });
+
+      // Three marks of the same corner, ≥10 s apart (past the UI cooldown).
+      store.dispatch(addRefPointEntry(markOf(baseTs)));
+      store.dispatch(addRefPointEntry(markOf(baseTs + 15_000)));
+      store.dispatch(addRefPointEntry(markOf(baseTs + 30_000)));
+
+      // Writes flow through the middleware's async WriteQueue — rapid
+      // successive dispatches are queued, not written synchronously, so the
+      // assertion must wait for the queue to drain (this is also why the
+      // single-mark tests above never noticed: their one write starts on
+      // the first microtask).
+      const getMarkWrites = () =>
+        vi
+          .mocked(writeAction)
+          .mock.calls.filter(
+            ([action]) =>
+              (action as { type?: string }).type ===
+              'refPoints/addRefPointEntry'
+          );
+      await vi.waitFor(() => expect(getMarkWrites()).toHaveLength(3));
+      const markWrites = getMarkWrites();
+      // Each write keeps its own payload — nothing deduped or overwritten.
+      expect(
+        markWrites.map(
+          ([action]) =>
+            (action as { payload: { timestamp: number } }).payload.timestamp
+        )
+      ).toEqual([baseTs, baseTs + 15_000, baseTs + 30_000]);
+      // Indices increment strictly (distinct actions/NNNNNN.json files).
+      const indices = markWrites.map(([, index]) => index);
+      expect(indices[1]).toBe(indices[0]! + 1);
+      expect(indices[2]).toBe(indices[1]! + 1);
+
+      // The REAL slice appends all three (pure append, no dedupe).
+      expect(store.getState().refPoints.entries).toHaveLength(3);
+    });
+
     it('should NOT persist actions when not recording', async () => {
       const { writeAction } =
         await import('gps-plus-slam-app-framework/storage/opfs-storage');
@@ -486,7 +560,32 @@ describe('Recorder Store', () => {
       }
     });
 
-    it('should use per-instance action indices, not shared across stores (Bug 10)', () => {
+    it('forwards the 2026-07-19 field-test opt-ins to the framework store (experiment + Robust-solver comparison)', async () => {
+      // Why: the recorder settings toggles reach the solve only through this
+      // forwarding chain (compassDebug → createRecorderStore →
+      // createSlamAppStore → recorded gpsData actions). Pin that both new
+      // options arrive on the gpsData slice — a dropped forward would make the
+      // settings toggle silently inert on device.
+      const s = createRecorderStore({
+        storageBackend: new NullStorageBackend(),
+        enableDevChecks: false,
+        enableCompassExperiment: true,
+        enableRobustSolverComparison: true,
+        compassVoteWeight: 0.1,
+      });
+      s.dispatch(setZeroPos({ lat: 48.8566, lon: 2.3522 }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const gpsData = s.getState().gpsData as {
+        compassExperimentEnabled?: boolean;
+        robustSolverComparisonEnabled?: boolean;
+        compassVoteWeight?: number;
+      } | null;
+      expect(gpsData?.compassExperimentEnabled).toBe(true);
+      expect(gpsData?.robustSolverComparisonEnabled).toBe(true);
+      expect(gpsData?.compassVoteWeight).toBe(0.1);
+    });
+
+    it('should use per-instance action indices, not shared across stores (Bug 10)', async () => {
       /**
        * Why this test matters:
        * actionIndex was a module-level variable shared across all store
@@ -500,8 +599,13 @@ describe('Recorder Store', () => {
       const store1 = createRecorderStore({
         storageBackend: spyBackend1,
         enableDevChecks: false,
-        // Keep the action stream focused on the indexing concern: the default-on
-        // Stage-0 opt-in would inject an extra setColdStartOverrideEnabled action.
+        // `false` no longer SUPPRESSES the Stage-0 opt-in action — since
+        // gps-plus-slam-js 1.16.0 the library default is `true`, so the framework
+        // must record an explicit `setColdStartOverrideEnabled(false)` or the
+        // opt-out does nothing. There is therefore no way to get a compass-free
+        // action stream any more, which is why the assertions below match a
+        // SPECIFIC call instead of the last one: the subject here is the
+        // per-instance index counter, not the exact contents of the stream.
         enableCompassColdStartOverride: false,
       });
 
@@ -521,7 +625,7 @@ describe('Recorder Store', () => {
 
       // setZeroPos = index 2
       store1.dispatch(setZeroPos({ lat: 0, lon: 0 }));
-      expect(writeSpy1).toHaveBeenLastCalledWith(
+      expect(writeSpy1).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'gpsData/setZeroPos' }),
         2
       );
@@ -534,11 +638,24 @@ describe('Recorder Store', () => {
         enableCompassColdStartOverride: false,
       });
 
-      // Dispatch on store1 again — index must continue at 3, not restart at 1
+      // Dispatch on store1 again - the index must CONTINUE, not restart at 1.
+      // Three changes from the original assertion, all downstream of the
+      // framework now recording an explicit Stage-0 opt-out (see the note above):
+      //  - index 4, not 3: the stream is startSession(1), setZeroPos(2),
+      //    setColdStartOverrideEnabled(false)(3), setZeroPos(4).
+      //  - a SPECIFIC call, not the last one: this setZeroPos is an origin jump,
+      //    which rebuilds gpsData; the rebuild clears the flag, so the opt-in
+      //    re-applies and the LAST write is that re-apply.
+      //  - it must AWAIT the drain hook. The write queue caps concurrency at 3
+      //    (MAX_CONCURRENT_WRITES), so the 4th write is queued and writeAction is
+      //    NOT called synchronously. This test passed before only because it
+      //    happened to stay under the cap - a latent fragility the extra action
+      //    exposed rather than caused.
       store1.dispatch(setZeroPos({ lat: 1, lon: 1 }));
-      expect(writeSpy1).toHaveBeenLastCalledWith(
+      await store1.flushPendingActionWrites();
+      expect(writeSpy1).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'gpsData/setZeroPos' }),
-        3
+        4
       );
     });
   });
@@ -843,8 +960,10 @@ describe('Recorder Store', () => {
       const backend = new NullStorageBackend();
       const spy = vi.spyOn(backend, 'writeAction');
 
-      // Stage-0 opt-in off: this test counts the two persisted actions, and the
-      // default-on opt-in would add a third (setColdStartOverrideEnabled).
+      // Stage-0 opt-in explicitly OFF. Since gps-plus-slam-js 1.16.0 that no
+      // longer means "no compass action": the library default is ON, so the
+      // framework MUST record setColdStartOverrideEnabled(false) or the opt-out
+      // is a no-op. Hence three persisted actions, not two.
       const replayStore = createRecorderStore({
         storageBackend: backend,
         enableCompassColdStartOverride: false,
@@ -860,7 +979,7 @@ describe('Recorder Store', () => {
       replayStore.dispatch(setZeroPos({ lat: 50.0, lon: 8.0 }));
 
       // NullStorageBackend is called (it's the backend) but does nothing
-      expect(spy).toHaveBeenCalledTimes(2);
+      expect(spy).toHaveBeenCalledTimes(3);
       // State is still updated correctly
       expect(replayStore.getState().gpsData).not.toBeNull();
       expect(replayStore.getState().recording.isRecording).toBe(true);

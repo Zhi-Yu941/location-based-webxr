@@ -6,8 +6,8 @@
  * `depthWrite = true`), drawn before virtual content (low `renderOrder`) so real
  * geometry the camera saw earlier hides virtual objects placed behind it —
  * including out-of-view surfaces a single-frame live depth occluder cannot
- * remember (2026-06-13-occupancy-mesh-options-plan.md §4; complements the live
- * occluder in 2026-06-14-webxr-depth-occlusion-plan.md).
+ * remember (2026-06-13-0004-occupancy-mesh-options-plan.md §4; complements the live
+ * occluder in 2026-06-14-0009-webxr-depth-occlusion-plan.md).
  *
  * Reusable across consumer apps (AnchorStarter / MinimalExample want occlusion
  * too); the recorder only owns the off-by-default toggle + scene wiring.
@@ -34,7 +34,33 @@ import {
 } from '../ar/occupancy-mesher.js';
 import { WEBXR_TO_NUE } from '../ar/webxr-nue-basis.js';
 import type { Vector3 } from 'gps-plus-slam-js';
-import type { OccluderDebugStyle } from '../state/recording-options.js';
+
+/**
+ * Debug-visualization style for the **persistent occluder** mesh (2026-07-02
+ * debug-viz-styles plan) — which visible debug skin(s) `OcclusionMesh` renders
+ * on top of the invisible depth-only occluder:
+ * - `'off'` — no debug rendering (the shipped default; occlusion is invisible).
+ * - `'matcap'` — the original shiny semi-transparent cyan skin.
+ * - `'depth-shaded'` — matcap + camera-distance fade + white fresnel rim, so
+ *   overlapping near/far surfaces read as separate shells.
+ * - `'wireframe'` — the raw triangulation as GL lines (mesh-structure
+ *   inspection: triangle density, mesher seams, degenerate spots).
+ * - `'depth-shaded-wireframe'` — both of the above composed.
+ *
+ * Owned here since the 2026-07-11 G-1 move (this module is the consumer; it
+ * previously lived in the recorder settings catalog). The values array is
+ * exported so the recorder's `occluderDebugStyle` validator can enum-check
+ * persisted values; the settings `<select>` options are hardcoded in the
+ * recorder's `index.html`.
+ */
+export const OCCLUDER_DEBUG_STYLES = [
+  'off',
+  'matcap',
+  'depth-shaded',
+  'wireframe',
+  'depth-shaded-wireframe',
+] as const;
+export type OccluderDebugStyle = (typeof OCCLUDER_DEBUG_STYLES)[number];
 
 const MESH_NAME = 'occupancy-occluder';
 const DEBUG_MESH_NAME = 'occupancy-occluder-debug';
@@ -288,6 +314,33 @@ export class OcclusionMesh {
   }
 
   /**
+   * The underlying `THREE.Mesh` (the depth-only occluder geometry), for a
+   * pointer-raycast layer to target the real occluder surface (2026-07-15
+   * replay-harness Part B). The mesh's `colorWrite:false` invisibility does NOT
+   * affect `THREE.Raycaster`, and `frustumCulled:false` is fine for raycasting.
+   * Treat it as read-only — re-mesh via {@link update} / restyle via
+   * {@link setDebugStyle} instead of mutating the returned object.
+   */
+  getMesh(): THREE.Mesh {
+    return this.mesh;
+  }
+
+  /**
+   * Show or hide the WHOLE occluder — the depth-only mesh AND any active debug
+   * skins. Hiding stops the depth mesh writing depth, so a co-located visualizer
+   * (e.g. the occupancy cubes at the same surface) is no longer occluded by the
+   * otherwise-invisible occluder. Independent of {@link setDebugStyle}: a later
+   * `setDebugStyle` re-adds skins as visible, so re-apply `setVisible` after a
+   * style change if you need them hidden (a mesh-view controller does exactly this).
+   */
+  setVisible(visible: boolean): void {
+    if (this.disposed) return;
+    this.mesh.visible = visible;
+    if (this.shadedSkin) this.shadedSkin.visible = visible;
+    if (this.wireframeSkin) this.wireframeSkin.visible = visible;
+  }
+
+  /**
    * Re-mesh from a fresh occupied-cell snapshot. Pass
    * `grid.getOccupiedCells(occupancy.minConfidence)` so the occluder shares the
    * same noise floor as the cubes and the COLMAP export.
@@ -305,7 +358,7 @@ export class OcclusionMesh {
     if (this.disposed) return;
     const meshOptions: MeshOccupiedCellsOptions = this.mode
       ? { mode: this.mode, getCellPoint }
-      : { greedy: this.greedy };
+      : { mode: this.greedy ? 'greedy' : 'per-face' };
     const { positions, indices, aabbs } = meshOccupiedCells(
       cells,
       cellSizeM,
@@ -435,17 +488,6 @@ export class OcclusionMesh {
       this.arSpaceNode.remove(this.wireframeSkin);
       this.wireframeSkin = null;
     }
-  }
-
-  /**
-   * Toggle the matcap debug rendering of the occluder mesh.
-   *
-   * @deprecated Superseded by {@link setDebugStyle} (2026-07-02) — this is a
-   * thin wrapper mapping `enabled ? 'matcap' : 'off'`, kept so existing
-   * consumers of the boolean API keep working unchanged.
-   */
-  setDebugVisualization(enabled: boolean): void {
-    this.setDebugStyle(enabled ? 'matcap' : 'off');
   }
 
   /** A debug skin mesh sharing the occluder's geometry, transform and culling

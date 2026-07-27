@@ -65,9 +65,7 @@ const {
   mockExtractOdomRotation: vi
     .fn<(pose: ARPose) => Quaternion>()
     .mockReturnValue([0, 0, 0, 1] as Quaternion),
-  mockRefPointVisualizer: {
-    addCurrentRefPoint: vi.fn(),
-  },
+  mockRefPointVisualizer: {},
   mockShowError: vi.fn(),
   mockUpdateStatus: vi.fn(),
   mockShowToast: vi.fn(),
@@ -194,14 +192,29 @@ function importedToEntry(rp: ImportedRefPoint, ts: number): RefPointEntry {
   };
 }
 
+/**
+ * Flip the `recording.isRecording` flag of the store created by the most
+ * recent `createMockStore()` call — lets async mocks (e.g. the picker)
+ * simulate the recording ending MID-flow (the stop-window race).
+ */
+let setLastStoreRecordingActive: (active: boolean) => void = () => {};
+
 function createMockStore(
   gpsPositions: GpsPoint[] = [],
-  options?: { alignmentMatrix?: number[] }
+  options?: { alignmentMatrix?: number[]; isRecording?: boolean }
 ): RecorderStore {
   let refPointsState = refPointsReducer(undefined, { type: '@@INIT' });
+  // Production state always carries the recording slice; the persistence
+  // middleware (and the handler's stop-window guard) read
+  // `recording.isRecording`, so the mock must model it.
+  let isRecordingFlag = options?.isRecording ?? true;
+  setLastStoreRecordingActive = (active) => {
+    isRecordingFlag = active;
+  };
 
   const store = {
     getState: vi.fn().mockImplementation(() => ({
+      recording: { isRecording: isRecordingFlag },
       gpsData: {
         zero: { lat: 49.0, lng: 8.0 },
         gpsEvents: {
@@ -887,6 +900,97 @@ describe('handleMarkRefPoint — full flow', () => {
 
     const payload = getLastV2Payload(mockStore);
     expect(payload?.gpsPoint).toBeUndefined();
+  });
+});
+
+// ============================================================================
+// handleMarkRefPoint — recording ends mid-flow (stop-window race)
+// ============================================================================
+
+describe('handleMarkRefPoint — recording ends mid-flow (stop-window race)', () => {
+  // Why these tests matter: root cause of the 2026-07-11 zip-1 lost "A3"
+  // action (indoor-loop enablement, sidecar cross-check §3.5 of the
+  // implementation summary). The new-point picker can stay open across
+  // Stop (user stop or system session end); the persistence middleware
+  // gates `actions/` writes on `recording.isRecording`, so a post-stop
+  // dispatch silently never reaches the recording while the ungated OPFS
+  // sidecar write succeeds and the toast claimed plain success. The
+  // handler must detect the ended recording, skip the dead dispatch, keep
+  // the durable scenario-level observation, and tell the truth in the
+  // toast (UI-feedback rule: the final state must reflect the durable end
+  // state — which here is "scenario only, not in the recording").
+  let handlers: RefPointHandlers;
+  let mockStore: RecorderStore;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockIsRefPointPickerVisible.mockReturnValue(false);
+    mockGetCurrentArPose.mockReturnValue(createMockArPose());
+    mockGetCurrentScenarioHandle.mockReturnValue(createMockScenarioHandle());
+    mockListRefPointIds.mockResolvedValue([]);
+    mockExtractOdomPosition.mockReturnValue([1, 2, 3] as Vector3);
+    mockExtractOdomRotation.mockReturnValue([0, 0, 0, 1] as Quaternion);
+    mockStore = createMockStore([createMockGpsPoint()]);
+    handlers = createRefPointHandlers(
+      createDefaultDeps({ getStore: () => mockStore })
+    );
+  });
+
+  it('new-point path: recording stops while the picker is open → no dispatch, sidecar kept, honest warning toast', async () => {
+    mockShowRefPointPicker.mockImplementation(() => {
+      setLastStoreRecordingActive(false); // Stop happened while picker open
+      return Promise.resolve({ id: 'A3', isNew: true });
+    });
+
+    await handlers.handleMarkRefPoint();
+
+    // The action can never reach the stopped recording — dispatching it
+    // would only feign success; it must be skipped.
+    expectMarkDispatchedTimes(mockStore, 0);
+    // The scenario-level observation is durable, session-independent data
+    // (zip-1's lost A3 became the cross-session anchor) — it must be kept.
+    expect(mockSaveRefPointObservation).toHaveBeenCalledTimes(1);
+    // The final toast must name the partial outcome, not claim plain success.
+    const lastToast = mockShowToast.mock.calls.at(-1)!;
+    expect(lastToast[0]).toContain('A3');
+    expect(lastToast[0]).toMatch(/recording/i);
+    expect(lastToast[0]).not.toBe('Marked "A3"');
+    expect(lastToast[1]).toMatchObject({ severity: 'warning' });
+  });
+
+  it('re-observe path: recording already ended at tap time → no dispatch, sidecar kept, honest warning toast', async () => {
+    // Known anchor at the GPS position ⇒ single-tap re-observe (no picker).
+    seedImportedRefPoints([
+      {
+        id: 'A1',
+        name: 'A1',
+        lat: 49.0,
+        lon: 8.0,
+        alt: 100,
+        sourceZipName: 'earlier-session.zip',
+      },
+    ]);
+    setLastStoreRecordingActive(false);
+
+    await handlers.handleMarkRefPoint();
+
+    expectMarkDispatchedTimes(mockStore, 0);
+    expect(mockSaveRefPointObservation).toHaveBeenCalledTimes(1);
+    const lastToast = mockShowToast.mock.calls.at(-1)!;
+    expect(lastToast[0]).toMatch(/^Re-observed "A1"/);
+    expect(lastToast[0]).toMatch(/recording/i);
+    expect(lastToast[1]).toMatchObject({ severity: 'warning' });
+  });
+
+  it('regression: while recording, the plain success toast and the dispatch are unchanged', async () => {
+    mockShowRefPointPicker.mockResolvedValue({ id: 'bench', isNew: true });
+
+    await handlers.handleMarkRefPoint();
+
+    expectMarkDispatchedTimes(mockStore, 1);
+    const lastToast = mockShowToast.mock.calls.at(-1)!;
+    expect(lastToast[0]).toBe('Marked "bench"');
+    expect(lastToast[1]).toMatchObject({ severity: 'info' });
   });
 });
 

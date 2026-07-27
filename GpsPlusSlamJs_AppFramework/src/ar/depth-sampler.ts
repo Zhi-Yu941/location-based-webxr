@@ -10,7 +10,7 @@
 import type { Matrix4 } from 'gps-plus-slam-js';
 import type { ARPose, DepthPoint, DepthSample } from '../types/ar-types';
 import type { RgbLookup } from './depth-rgb-lookup';
-import { extractOdomPosition } from '../state/gps-event-coordinator';
+import { extractOdomPosition } from '../types/ar-types';
 
 export type { DepthSample } from '../types/ar-types';
 
@@ -79,7 +79,7 @@ export interface DepthInfo {
    * the matrices: the per-frame buffer is too large to clone and the live
    * depth occluder uploads it synchronously). Absent when the source carries
    * no `data` (e.g. the sparse-only path). Plumbed for the live depth occluder
-   * (2026-06-14-webxr-depth-occlusion-plan.md §2); the sparse sampler ignores it.
+   * (2026-06-14-0009-webxr-depth-occlusion-plan.md §2); the sparse sampler ignores it.
    */
   data?: ArrayBuffer;
   /**
@@ -171,12 +171,40 @@ export function wrapXRDepthInfo(
   return wrapped;
 }
 
+/**
+ * Recommended depth-sampling cadence for apps that RECONSTRUCT-and-render an
+ * occupancy mesh (the Recorder, the PhysicsDemo) — the depth-side counterpart
+ * of `DEFAULT_OCCUPANCY_CELL_SIZE_M`/`DEFAULT_OCCUPANCY_MIN_OBSERVATIONS`
+ * (occupancy-grid.ts): one framework-level source of truth so both apps build
+ * the mesh at the same speed (2026-07-16 field feedback: the demo relied on
+ * the conservative fallback below — 16×16 @ 1 Hz, 8× fewer points/s than the
+ * recorder — and reconstructed visibly slower).
+ *
+ * Tuning (2026-07-16 EVENING, maintainer's on-device framerate/mesh trade-off
+ * passes — supersedes the same-day sweep-derived 500 ms × 64): 200 ms × 24×24.
+ * The ground-truth density/cadence sweep
+ * (GpsPlusSlamJs_Investigation test-results/synthetic-density-cadence-sweep.txt)
+ * showed density is the more point-efficient mesh-speed lever, but its
+ * flagged open question — on-device frame-time cost — resolved against LARGE
+ * per-sample batches: 64² @ 2 Hz (8192 points/s) visibly hurt the framerate,
+ * while many SMALL samples (24² @ 5 Hz, ~2880 points/s) keep the per-frame
+ * work chunk tiny and rendering smooth at good mesh build-up. If devices get
+ * faster, the sweep says gridSize (not the interval) is the knob to raise
+ * first.
+ *
+ * Deliberately OPT-IN named constants, NOT a change to the fallback below:
+ * bumping the fallback would silently re-tune consumers that are not
+ * reconstruction apps (MinimalExample / AnchorStarter).
+ */
+export const DEFAULT_RECONSTRUCTION_DEPTH_INTERVAL_MS = 200;
+export const DEFAULT_RECONSTRUCTION_DEPTH_GRID_SIZE = 24;
+
 // Library-level fallback used by consumers that do NOT supply a config
-// (MinimalExample / AnchorStarter). Intentionally NOT synced to the recorder's
-// 2026-06-30 re-tune (intervalMs 500 / gridSize 24) — those denser defaults are
-// a recorder-specific decision sourced from DEFAULT_RECORDING_OPTIONS; bumping
-// this library default would silently re-tune unrelated apps. See
-// recording-options.ts.md (F1) for the rationale.
+// (MinimalExample / AnchorStarter). Intentionally NOT synced to the
+// reconstruction constants above — bumping this default would silently
+// re-tune unrelated apps. See the recorder's recording-options.ts.md (F1)
+// for the tuning history (the catalog moved app-side on 2026-07-11:
+// GpsPlusSlamJs_RecorderApp/src/state/).
 const DEFAULT_CONFIG: DepthSamplerConfig = {
   intervalMs: 1000,
   gridSize: 16,
@@ -291,17 +319,32 @@ export class DepthSampler {
   }
 
   /**
-   * Called each frame with depth information.
+   * Called each frame with a LAZY depth provider (quality-review E-4: the
+   * caller used to acquire + wrap the depth info every frame while this
+   * method threw ~59 of 60 acquisitions away at the interval check — the
+   * provider is now invoked only when a sample is due).
+   *
+   * Unavailability detection is preserved by construction:
+   * `lastSampleTime` only advances when a sample is EMITTED, so while depth
+   * is unavailable the sampler stays "due" and probes the provider every
+   * frame — exactly the cadence the old per-frame acquisition gave
+   * `checkDepthUnavailability` (Field Test Readiness Issue #8).
    *
    * @param timestamp - Current frame timestamp in milliseconds
-   * @param depthInfo - WebXR depth information, or null if unavailable
+   * @param acquireDepthInfo - Returns the frame's depth info, or null if
+   *   unavailable. Only invoked when a sample is due.
    */
-  onFrame(timestamp: number, depthInfo: DepthInfo | null): void {
+  onFrame(timestamp: number, acquireDepthInfo: () => DepthInfo | null): void {
     if (!this.running) {
       return;
     }
 
-    // Check if depth data is unavailable
+    // Interval gate FIRST — skip the acquisition entirely between samples.
+    if (timestamp - this.lastSampleTime < this.config.intervalMs) {
+      return;
+    }
+
+    const depthInfo = acquireDepthInfo();
     if (!depthInfo) {
       // Check if we should fire the unavailable callback
       // (Field Test Readiness Issue #8: Depth sensing not confirmed)
@@ -311,11 +354,6 @@ export class DepthSampler {
 
     // Mark that we've received depth data
     this.depthReceived = true;
-
-    // Check interval
-    if (timestamp - this.lastSampleTime < this.config.intervalMs) {
-      return;
-    }
 
     // Get current pose
     const pose = this.callbacks.getCurrentPose();

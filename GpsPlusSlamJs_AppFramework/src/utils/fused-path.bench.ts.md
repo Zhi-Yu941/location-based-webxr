@@ -26,7 +26,7 @@ pnpm bench
 
 - [fused-path.ts](fused-path.ts) / [fused-path.ts.md](fused-path.ts.md) — the code under measurement
 - [../../config/vitest.bench.config.ts.md](../../config/vitest.bench.config.ts.md) — the bench harness config
-- `GpsPlusSlamJs_Docs/docs/2026-07-09-bench-infra-plan.md` — plan and decisions
+- `GpsPlusSlamJs_Docs/docs/2026-07-09-0936-bench-infra-plan.md` — plan and decisions
 
 ## Tests
 

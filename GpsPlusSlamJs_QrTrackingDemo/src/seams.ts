@@ -16,8 +16,8 @@
  * The PROD frame/depth source is the **on-device-verified layer** (the §5 gate
  * is manual, exactly as the parent QR plan defers the Recorder's live camera
  * wiring): it uses the framework's public **camera-frame RGBA** capture
- * (`setCameraFrameCallback` + `startCameraFrameCapture`, B2 — top-left RGBA at
- * the detection cadence, no JPEG
+ * (initAR `callbacks.cameraFrame` + `startCameraFrameCapture`, B2 — top-left
+ * RGBA at the detection cadence, no JPEG
  * round-trip) and the depth capture callback. The tested demo logic + the faked
  * e2e do not depend on its runtime behaviour. `startFrameSource` stays as the
  * e2e frame-injection seam; in PROD its body just points the framework QR
@@ -28,10 +28,8 @@ import {
   initAR,
   endARSession,
   getArWorldGroup,
-  setCameraFrameCallback,
   startCameraFrameCapture,
   stopCameraFrameCapture,
-  setDepthCaptureCallback,
   startDepthCapture,
   stopDepthCapture,
 } from "gps-plus-slam-app-framework/ar/webxr-session";
@@ -82,8 +80,8 @@ let latestDepthSample: DepthSample | null = null;
 
 /**
  * The active QR-frame consumer (the controller's `offerFrame`), set by
- * `startFrameSource`. The framework QR callback (registered in `initAR`, before
- * the framework `initAR` runs — it must be set first, like the depth callback)
+ * `startFrameSource`. The framework QR callback (passed to the framework
+ * `initAR` as its `callbacks.cameraFrame` group, like the depth callback)
  * forwards each throttled RGBA frame here. `null` when no source is running.
  */
 let qrFrameConsumer: ((image: RgbaImage) => void) | null = null;
@@ -108,19 +106,30 @@ export const realSeams: QrDemoSeams = {
     return { webxr: xr.supported, depthSensing: xr.supported };
   },
   async initAR(container: HTMLElement): Promise<void> {
-    // Depth + QR-frame callbacks must both be registered BEFORE initAR (the
-    // framework creates the depth sampler and the QR frame source inside it).
-    setDepthCaptureCallback((sample) => {
-      latestDepthSample = sample;
-    });
-    // The framework now delivers top-left RGBA directly (B2) — no JPEG
-    // round-trip. Forward each throttled frame to the active consumer.
-    setCameraFrameCallback((image) => qrFrameConsumer?.(image));
-    await initAR(container, {
-      enableCameraAccess: true,
-      enableDepthSensingFeature: true,
-      enableCameraTextureAcquisition: true,
-    });
+    // Depth + QR-frame callbacks ride into the framework initAR as its
+    // `callbacks` groups (the framework creates the depth sampler and the QR
+    // frame source inside it). The camera-frame path delivers top-left RGBA
+    // directly (B2) — no JPEG round-trip; each throttled frame is forwarded
+    // to the active consumer.
+    await initAR(
+      container,
+      {
+        enableCameraAccess: true,
+        enableDepthSensingFeature: true,
+        enableCameraTextureAcquisition: true,
+      },
+      {},
+      {
+        depth: {
+          onCaptured: (sample) => {
+            latestDepthSample = sample;
+          },
+        },
+        cameraFrame: {
+          onFrame: (image) => qrFrameConsumer?.(image),
+        },
+      },
+    );
     startDepthCapture(QR_DEPTH_CONFIG);
   },
   async endARSession(): Promise<void> {

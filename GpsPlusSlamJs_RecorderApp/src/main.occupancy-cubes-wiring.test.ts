@@ -120,9 +120,12 @@ vi.mock('gps-plus-slam-app-framework/ar/xr-frame-loop', () => ({
 vi.mock('gps-plus-slam-app-framework/ar/occupancy-grid', () => ({
   OccupancyGrid: mockOccupancyGridCtor,
 }));
-vi.mock('./visualization/occupancy-cubes-visualizer', () => ({
-  OccupancyCubesVisualizer: mockVisualizerCtor,
-}));
+vi.mock(
+  'gps-plus-slam-app-framework/visualization/occupancy-cubes-visualizer',
+  () => ({
+    OccupancyCubesVisualizer: mockVisualizerCtor,
+  })
+);
 vi.mock('./visualization/wire-occupancy-grid-subscribers', () => ({
   wireOccupancyGridSubscribers: mockWireOccupancyGridSubscribers,
 }));
@@ -145,18 +148,11 @@ vi.mock('gps-plus-slam-app-framework/ar/webxr-session', () => ({
   isWebXRSupported: vi.fn().mockResolvedValue(true),
   getCurrentArPose: vi.fn().mockReturnValue(null),
   applyAlignmentMatrix: vi.fn(),
-  setImageCaptureCallback: vi.fn(),
   startImageCapture: vi.fn(),
   stopImageCapture: vi.fn(),
-  setDepthCaptureCallback: vi.fn(),
   startDepthCapture: vi.fn(),
   stopDepthCapture: vi.fn(),
-  setFrameCallback: vi.fn(),
-  setTrackingLostCallback: vi.fn(),
-  setTrackingCallbacks: vi.fn(),
-  setTrackingRecoveredCallback: vi.fn(),
-  setTrackingStore: vi.fn(),
-  setSessionEndCallback: vi.fn(),
+  rebindTrackingStore: vi.fn(),
   getScene: mockGetScene,
   getCamera: mockGetCamera,
   getArWorldGroup: mockGetArWorldGroup,
@@ -202,7 +198,6 @@ vi.mock('./ui/hud', () => ({
   validateEnterButton: vi.fn(),
   updatePermissionStatus: vi.fn(),
   setPermissionsReady: vi.fn(),
-  setFolderSelected: vi.fn(),
   setSaveLocationSelected: vi.fn(),
   setFolderImportExpanded: vi.fn(),
   setFolderImportProgress: vi.fn(),
@@ -332,11 +327,21 @@ vi.mock('./state/recorder-store', () => ({
     // handleImageCaptured persists the frame blob through store.writeFrame
     writeFrame: vi.fn().mockResolvedValue(undefined),
   }),
-  startSession: vi.fn(),
-  endSession: vi.fn(),
-  add2dImage: vi.fn(),
-  recordDepthSample: vi.fn(),
 }));
+// Spy on the action creators main.ts dispatches for captured images / depth
+// samples, at their true sources (post-barrel-removal import paths). Spread
+// the actual modules so every other symbol stays real.
+vi.mock('gps-plus-slam-app-framework/state', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  add2dImage: vi.fn(),
+}));
+vi.mock(
+  'gps-plus-slam-app-framework/state/recording-slice',
+  async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    recordDepthSample: vi.fn(),
+  })
+);
 vi.mock('gps-plus-slam-app-framework/state/store-subscribers', () => ({
   wireStoreSubscribers: vi.fn().mockReturnValue(() => {}),
 }));
@@ -347,7 +352,10 @@ vi.mock('gps-plus-slam-app-framework/state/gps-event-coordinator', () => ({
   extractOdomPosition: vi.fn().mockReturnValue([0, 0, 0]),
   extractOdomRotation: vi.fn().mockReturnValue([0, 0, 0, 1]),
 }));
-vi.mock('gps-plus-slam-app-framework/state/recording-options', () => ({
+vi.mock('./state/recording-options', () => ({
+  // main.ts also consumes the pure compassStoreOptions mapping — stubbed
+  // inert here; its real logic is unit-tested in recording-options.test.ts.
+  compassStoreOptions: () => ({}),
   loadRecordingOptions: vi.fn().mockReturnValue({
     qr: { enabled: false, intervalMs: 125, captureSize: 1024 },
     images: { enabled: false, intervalMs: 1000, quality: 0.8 },
@@ -399,16 +407,6 @@ vi.mock('gps-plus-slam-app-framework/visualization/reference-points', () => ({
 }));
 vi.mock('gps-plus-slam-app-framework/visualization/gps-event-markers', () => ({
   gpsEventVisualizer: { setVisible: vi.fn(), clearAll: vi.fn() },
-}));
-vi.mock('gps-plus-slam-app-framework/visualization/map-overlay', () => ({
-  MapOverlay: vi.fn().mockImplementation(() => ({
-    isVisible: vi.fn().mockReturnValue(false),
-    toggle: vi.fn(),
-    updatePosition: vi.fn(),
-    setGpsPosition: vi.fn(),
-    getGpsPosition: vi.fn().mockReturnValue(null),
-    dispose: vi.fn(),
-  })),
 }));
 vi.mock(
   'gps-plus-slam-app-framework/visualization/leaflet-map-overlay',
@@ -512,18 +510,15 @@ import {
   resetMainState,
   setRecordingOptionsForTesting,
 } from './main';
-import { loadRecordingOptions } from 'gps-plus-slam-app-framework/state/recording-options';
+import { loadRecordingOptions } from './state/recording-options';
 import { getOccupancyGrid } from './state/occupancy-grid-provider';
 import {
-  setDepthCaptureCallback,
-  setImageCaptureCallback,
+  initAR,
   type CapturedImage,
 } from 'gps-plus-slam-app-framework/ar/webxr-session';
-import {
-  add2dImage,
-  recordDepthSample,
-  type DepthSample,
-} from './state/recorder-store';
+import { add2dImage } from 'gps-plus-slam-app-framework/state';
+import { recordDepthSample } from 'gps-plus-slam-app-framework/state/recording-slice';
+import type { DepthSample } from 'gps-plus-slam-app-framework/types/ar-types';
 
 describe('Occupancy-grid cube wiring in live AR', () => {
   beforeEach(() => {
@@ -550,7 +545,14 @@ describe('Occupancy-grid cube wiring in live AR', () => {
     expect(mockOccupancyGridCtor).toHaveBeenCalledTimes(1);
     // Voxel size flows from the recorder setting (occupancy.cellSizeM) into the
     // grid constructor — 2026-06-13 occupancy-grid-settings review, item 1.
-    expect(mockOccupancyGridCtor).toHaveBeenCalledWith({ cellSizeM: 0.15 });
+    // Confidence-guarded carving is tied to the SAME noise floor the renderers
+    // use (occupancy.minConfidence): any voxel solid enough to be shown can no
+    // longer be erased by one deeper reading (2026-07-16 synthetic-scene
+    // investigation — eliminates silhouette churn + occluded-background loss).
+    expect(mockOccupancyGridCtor).toHaveBeenCalledWith({
+      cellSizeM: 0.15,
+      carveConfidenceThreshold: 3,
+    });
     expect(mockVisualizerCtor).toHaveBeenCalledTimes(1);
     // The visualizer must hang off arWorldGroup, NOT the scene root: the
     // grid's cells are raw-WebXR coordinates that only register with the
@@ -773,7 +775,7 @@ describe('Occupancy-grid cube wiring in live AR', () => {
   });
 
   /**
-   * Why this test matters (2026-06-12-payload-rebuild-field-drop-audit.md F1):
+   * Why this test matters (2026-06-12-1130-payload-rebuild-field-drop-audit.md F1):
    * handleDepthSampleCaptured used to re-create the recordDepthSample
    * payload field-by-field, silently dropping the optional
    * projectionMatrix — the camera intrinsics the occupancy grid needs to
@@ -783,7 +785,8 @@ describe('Occupancy-grid cube wiring in live AR', () => {
   it('forwards captured depth samples to recordDepthSample unmodified', async () => {
     await handleEnterARForTesting();
 
-    const handler = vi.mocked(setDepthCaptureCallback).mock.calls[0]?.[0];
+    // Since the setter fold, the depth handler rides into initAR's callbacks.
+    const handler = vi.mocked(initAR).mock.calls[0]?.[3]?.depth?.onCaptured;
     expect(handler).toBeDefined();
 
     const sample: DepthSample = {
@@ -802,7 +805,7 @@ describe('Occupancy-grid cube wiring in live AR', () => {
   });
 
   /**
-   * Why this test matters (2026-06-12-payload-rebuild-field-drop-audit.md F2):
+   * Why this test matters (2026-06-12-1130-payload-rebuild-field-drop-audit.md F2):
    * handleImageCaptured rebuilds the add2dImage payload field-by-field — the
    * same seam shape as the F1 depth bug above. When CapturedImage gains a
    * persistable field it can be silently dropped before persistence with no
@@ -816,7 +819,9 @@ describe('Occupancy-grid cube wiring in live AR', () => {
   it('forwards every persistable CapturedImage field into the add2dImage payload', async () => {
     await handleEnterARForTesting();
 
-    const handler = vi.mocked(setImageCaptureCallback).mock.calls[0]?.[0];
+    // Since the setter fold, the image handler rides into initAR's callbacks.
+    const handler =
+      vi.mocked(initAR).mock.calls[0]?.[3]?.imageCapture?.onCaptured;
     expect(handler).toBeDefined();
 
     const image: CapturedImage = {

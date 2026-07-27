@@ -8,7 +8,7 @@
  * occludes per-pixel against the surface currently in view (sharp, registration-
  * free, no memory). They **compose** — both depth-only under `arWorldGroup`, the
  * live occluder wins where this frame has depth, the mesh fills out-of-view / depth
- * holes (2026-06-14-webxr-depth-occlusion-plan.md §5).
+ * holes (2026-06-14-0009-webxr-depth-occlusion-plan.md §5).
  *
  * **Two layers, two confidence levels:**
  *  - The **pure occlusion math** (this file's exported functions) is the CI-tested

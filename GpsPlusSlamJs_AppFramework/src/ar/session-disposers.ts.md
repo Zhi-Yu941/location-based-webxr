@@ -55,4 +55,4 @@
   `ar/webxr-session.ts` (`resetWebXRState` flushes this),
   `visualization/ar-world-group-alignment.ts` (the first consumer), and the plan
   at
-  `gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-08-arworldgroup-alignment-session-scoped-disposal.md`.
+  `gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-08-2149-arworldgroup-alignment-session-scoped-disposal.md`.

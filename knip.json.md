@@ -27,10 +27,9 @@ entirely after confirming they were only transitively pulled in.
 - `dependencies`, `files`, `unlisted`, `duplicates`, `binaries`,
   `unresolved`, `enumMembers`, `classMembers`: knip default (`error`).
   These are CI gates.
-- `exports`, `types`: `warn`. These surface in the report but do not
-  fail CI today. Pre-existing findings are tracked in
-  [GpsPlusSlamJs_Docs/docs/2026-04-28-knip-unused-exports-followup.md](../GpsPlusSlamJs_Docs/docs/2026-04-28-knip-unused-exports-followup.md).
-  Once that follow-up lands, flip these back to `error`.
+- `exports`, `types`: `error` — unused exported symbols and types fail the
+  gate (flipped from the interim `warn` after the 2026-04-28 unused-exports
+  follow-up landed).
 
 ## Per-workspace configuration notes
 
@@ -49,7 +48,17 @@ entirely after confirming they were only transitively pulled in.
   and would otherwise flag them as unused files (an `error`-severity
   gate). There is intentionally **no** `src/ref-points/index.ts` entry —
   that module does not exist in this package; a stale entry produced a
-  "no matches" configuration hint.
+  "no matches" configuration hint. `dpdm` is in `ignoreDependencies` because the framework's
+  `check:cycles` command moved from an inline package.json script into
+  `scripts/test-timing/projects.mjs` (2026-07-21 gate wiring), where
+  knip's package.json-script analysis cannot see it — the standard
+  treatment documented in the projects.mjs header, matching every app
+  package. `redux` is in `ignoreDependencies`:
+  no source file imports it directly, but it must be a **direct**
+  dependency so tsdown externalizes redux types in the built d.ts
+  instead of bundling them into a private, non-`exports`-reachable
+  chunk (TS2883 in `composite` consumers). Pinned by
+  [tests/repo-config/framework-dts-portability.test.js](tests/repo-config/framework-dts-portability.test.js).
 - **GpsPlusSlamJs_RecorderApp** — main entry is auto-detected from
   `package.json` "main"/"module"; we explicitly list `src/global.d.ts`,
   `playwright-tests/**`, and the stylelint config. Non-source tooling
@@ -69,6 +78,10 @@ entirely after confirming they were only transitively pulled in.
   `@carlosjeurissen/stylelint-csstree-validator`) are ignored because
   knip cannot trace them through the stylelint config, mirroring the
   RecorderApp treatment.
+- **GpsPlusSlamJs_Landing** — same shape as the AnchorStarter: Vite
+  plugin auto-detects `src/main.ts` from `index.html`; explicit entries
+  for the stylelint config and `playwright-tests/**` (the e2e smoke
+  suite); the three stylelint tooling packages ignored.
 
 ## Tests
 

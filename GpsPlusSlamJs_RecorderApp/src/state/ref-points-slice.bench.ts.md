@@ -27,7 +27,7 @@ pnpm bench
 
 - [ref-points-slice.ts.md](ref-points-slice.ts.md) — the slice under measurement
 - [../../config/vitest.bench.config.ts.md](../../config/vitest.bench.config.ts.md) — the bench harness config
-- `GpsPlusSlamJs_Docs/docs/2026-07-09-bench-infra-plan.md` — plan and decisions
+- `GpsPlusSlamJs_Docs/docs/2026-07-09-0936-bench-infra-plan.md` — plan and decisions
 
 ## Tests
 

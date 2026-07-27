@@ -2,7 +2,7 @@
  * Unit tests for the true-north user-heading kernel.
  *
  * Why this test matters:
- * Finding 2 of 2026-06-28-map-rings-transparency-and-view-direction-user-feedback.md
+ * Finding 2 of 2026-06-28-1822-map-rings-transparency-and-view-direction-user-feedback.md
  * replaces the live-overlay blue dot with a dot + a thin blue line pointing in
  * the user's absolute (true-geographic-north) view direction. This kernel turns
  * the latest AR camera rotation (a NUE quaternion, as stored in

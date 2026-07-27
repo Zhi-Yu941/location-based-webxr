@@ -7,7 +7,7 @@ genuinely new piece WS-5 needs. Keeps a bounded history of recorded depth sample
 and answers `resolveDepthAt(timestamp)` with the depth context active at that
 detection's timestamp (the sample whose `timestamp` is the latest `≤` the query),
 which is exactly what the derive-on-read size join
-(`gps-plus-slam-app-framework/ar/qr-derived-pose`) needs.
+(`gps-plus-slam-app-framework/ar/qr/qr-derived-pose`) needs.
 
 ## Public API
 
@@ -45,4 +45,4 @@ which is exactly what the derive-on-read size join
 ## Related
 
 - [qr-debug-controller.ts.md](qr-debug-controller.ts.md) — drives `append` + renders.
-- `gps-plus-slam-app-framework/ar/qr-derived-pose` — consumer of `resolveDepthAt`.
+- `gps-plus-slam-app-framework/ar/qr/qr-derived-pose` — consumer of `resolveDepthAt`.

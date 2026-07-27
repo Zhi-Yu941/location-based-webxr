@@ -6,7 +6,7 @@ Recorder-side `ZipExportContributor` that derives a COLMAP `sparse/0/` model
 from the live recording state and writes it into the exported ZIP. The
 integration seam tying together Iter 1 (conversions), Iter 2 (serializers) and
 Iter 2.5 (grid accessor). See
-[2026-06-13-colmap-export-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-colmap-export-plan.md)
+[2026-06-13-1205-colmap-export-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-13-1205-colmap-export-plan.md)
 Iter 3.
 
 ## Public API
@@ -45,7 +45,7 @@ Iter 3.
   `occupancy.minConfidence` lever the voxel view uses, applied here so
   single-frame depth noise — in particular **behind-surface** phantoms that
   free-space carving can never clear — is kept out of the reconstruction. See
-  [2026-06-22-occupancy-grid-behind-surface-noise-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-22-occupancy-grid-behind-surface-noise-plan.md).
+  [2026-06-22-2146-occupancy-grid-behind-surface-noise-plan.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-22-2146-occupancy-grid-behind-surface-noise-plan.md).
 - **World frame:** points are run through `webxrToColmapWorldPoint` (the
   `G = diag(1,−1,−1)` world basis change — negate Y,Z) before `points3D`, the
   SAME `G` folded into the camera extrinsics by `webxrToColmapPose`. This flips

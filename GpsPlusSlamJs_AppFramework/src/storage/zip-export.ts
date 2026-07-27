@@ -18,6 +18,7 @@
 
 import { BlobWriter, ZipWriter, BlobReader } from '@zip.js/zip.js';
 import { createLogger } from '../utils/logger';
+import { getSessionsRootHandle } from './opfs-storage';
 
 const log = createLogger('ZipExport');
 
@@ -98,12 +99,19 @@ export interface ExportSessionAsZipOptions {
 // ============================================================================
 
 /**
- * Get the OPFS sessions directory handle (flat layout).
+ * Get the OPFS sessions directory handle from the layout owner
+ * (quality-review G-9 — this used to re-derive the
+ * `'gps-plus-slam'/'sessions'` path itself, so a root re-nesting in
+ * `opfs-storage.ts` would have silently broken export only).
  */
-async function getSessionsHandle(): Promise<FileSystemDirectoryHandle> {
-  const opfsRoot = await navigator.storage.getDirectory();
-  const gpsPlusSlamDir = await opfsRoot.getDirectoryHandle('gps-plus-slam');
-  return gpsPlusSlamDir.getDirectoryHandle('sessions');
+function getSessionsHandle(): FileSystemDirectoryHandle {
+  const sessions = getSessionsRootHandle();
+  if (!sessions) {
+    throw new Error(
+      'OPFS storage not initialized — call initOpfsStorage() before exporting'
+    );
+  }
+  return sessions;
 }
 
 /**
@@ -172,7 +180,7 @@ export async function exportSessionAsZip(
 ): Promise<ZipExportResult> {
   log.info(`Exporting session: ${sessionName}`);
 
-  const sessionsDir = await getSessionsHandle();
+  const sessionsDir = getSessionsHandle();
   let sessionHandle: FileSystemDirectoryHandle;
   try {
     sessionHandle = await sessionsDir.getDirectoryHandle(sessionName);

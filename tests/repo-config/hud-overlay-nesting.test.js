@@ -15,7 +15,7 @@
 //
 // A new app added to this repo should be appended to APP_OVERLAY_CONTRACTS so
 // it inherits the same protection. See
-// GpsPlusSlamJs_Docs/docs/2026-06-05-cross-app-alignment-smoothing-hud-stacking-and-recorder-setup-ux-user-feedback.md
+// GpsPlusSlamJs_Docs/docs/2026-06-05-0534-cross-app-alignment-smoothing-hud-stacking-and-recorder-setup-ux-user-feedback.md
 // (Finding 3 / Decision D3) and the AppFramework README "DOM-Overlay / HUD
 // stacking convention".
 //
@@ -61,6 +61,18 @@ const APP_OVERLAY_CONTRACTS = [
   {
     name: 'QrTrackingDemo',
     htmlPath: 'GpsPlusSlamJs_QrTrackingDemo/index.html',
+    containerId: 'app',
+    overlayIds: ['overlay'],
+  },
+  {
+    name: 'PhysicsDemo',
+    htmlPath: 'GpsPlusSlamJs_PhysicsDemo/index.html',
+    containerId: 'app',
+    overlayIds: ['overlay'],
+  },
+  {
+    name: 'WayfindingHudDemo',
+    htmlPath: 'GpsPlusSlamJs_WayfindingHudDemo/index.html',
     containerId: 'app',
     overlayIds: ['overlay'],
   },

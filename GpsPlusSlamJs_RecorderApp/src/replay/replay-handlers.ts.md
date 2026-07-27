@@ -40,7 +40,7 @@ Factory that creates replay handlers with injected dependencies.
 - `handleStartReplay` calls `deps.setStore()` after creating the `ReplayModeController`, ensuring the caller's store reference is updated before playback begins.
 - `reset()` does **not** call `setStore` — the caller is responsible for store lifecycle. It **does** destroy any active preview map.
 - `handleReplaySessionSelect` loads GPS coordinates from the selected session's zip file via `loadGpsPathFromBlob()`, destroys any previous preview map, and renders a new one using `createPreviewMap()`. If GPS extraction yields no points, the preview container is hidden.
-- `handleReplayMapToggle` lazily creates a `MapOverlay` on first call, using `getReplayState()` for scene/camera and `getCameraFollower()` for `mapParent`. It also calls `controller.setMapOverlay()` so the store-subscriber proxy forwards GPS updates to the overlay.
+- `handleReplayMapToggle` lazily creates a `LeafletMapOverlay` on first call, using `getReplayState()` for scene/camera and `getCameraFollower()` for `mapParent`. It also calls `controller.setMapOverlay()` so the store-subscriber proxy forwards GPS updates to the overlay.
 
 ## Examples
 

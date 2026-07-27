@@ -14,6 +14,7 @@ import {
   LogLevel,
   type LogEntry,
 } from 'gps-plus-slam-app-framework/utils/logger';
+import { getRequiredElement } from '../utils/dom-helpers';
 
 /** Cached DOM elements */
 let panelElement: HTMLElement | null = null;
@@ -137,15 +138,10 @@ function appendEntry(entry: LogEntry): void {
  * @throws Error if required DOM elements are not found
  */
 export function initLogPanel(): void {
-  panelElement = document.getElementById('log-panel');
-  if (!panelElement) {
-    throw new Error('log-panel element not found');
-  }
-
-  statusElement = document.getElementById('status');
-  if (!statusElement) {
-    throw new Error('status element not found');
-  }
+  // Required-element lookups via the shared helper (quality-review A-8 —
+  // this used to hand-roll the getElementById-or-throw pattern next to it).
+  panelElement = getRequiredElement('log-panel', 'the log panel markup');
+  statusElement = getRequiredElement('status', 'the status bar markup');
 
   contentElement = document.getElementById('log-panel-content');
   closeButton = document.getElementById('log-panel-close');

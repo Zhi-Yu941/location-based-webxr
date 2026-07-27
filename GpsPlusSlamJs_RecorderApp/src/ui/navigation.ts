@@ -107,7 +107,7 @@ let modalStatePushed = false;
  * `modalStatePushed` is already false, so without the guard the handler
  * misclassified the programmatic cleanup as a user back gesture and (during
  * recording) opened the "Stop recording?" confirm on every ref-point confirm.
- * F4 in docs/2026-07-04-ar-clipping-planes-and-lifecycle-user-feedback.md.
+ * F4 in docs/2026-07-04-1626-ar-clipping-planes-and-lifecycle-user-feedback.md.
  *
  * Invariant: programmatic history cleanup never re-enters screen-back logic.
  * Known accepted edge: a real user back landing in the microsecond window

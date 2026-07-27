@@ -5,7 +5,7 @@
 Pure, browser-free capability gating for GPS+AR demos: decide whether the demo
 can run (WebXR + geolocation both available) and build the honest "why it can't
 run" message. Promoted from `AnchorStarter/src/capability.ts` (§6.4 of
-`2026-06-03-threejs-arbutton-minimal-ar-example-user-feedback.md`) so the minimal
+`2026-06-03-0553-threejs-arbutton-minimal-ar-example-user-feedback.md`) so the minimal
 AR example and AnchorStarter share the decision and message without sharing
 app-specific copy.
 

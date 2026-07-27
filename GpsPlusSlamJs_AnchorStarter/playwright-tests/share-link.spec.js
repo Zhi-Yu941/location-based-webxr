@@ -9,7 +9,7 @@ import {
  * Tier 1 copy-link (share) e2e for the persistent-anchor starter.
  *
  * Why this suite matters (see
- * GpsPlusSlamJs_Docs/docs/2026-06-01-anchor-starter-e2e-test-plan.md §6 Tier 1):
+ * GpsPlusSlamJs_Docs/docs/2026-06-01-0447-anchor-starter-e2e-test-plan.md §6 Tier 1):
  * Once an anchor is saved into `?show=`, the user shares the page link to open
  * the same anchor on another device (decision F1). The copy-link button is the
  * only async-UX affordance in the app that has a real success/failure label
@@ -98,7 +98,7 @@ test.describe("Anchor starter — Tier 1 copy-link sharing", () => {
     // end-to-end — the placed `altitude` is encoded into `?show=` (so the copied
     // link carries it) and, when that link is loaded on the cache-hit path, the
     // anchor is re-created with the same altitude (so it applies on load). See
-    // GpsPlusSlamJs_Docs/docs/2026-06-06-anchor-starter-cachehit-jump-investigation.md.
+    // GpsPlusSlamJs_Docs/docs/2026-06-06-1210-anchor-starter-cachehit-jump-investigation.md.
     await installAnchorStarterFakes(page);
     await placeAndSave(page); // SAMPLE_FIX.altitude = 171
 

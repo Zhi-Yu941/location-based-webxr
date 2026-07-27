@@ -4,7 +4,7 @@
 
 Pure logic for the map-centric recording browser, kept free of Leaflet/DOM so it is fully unit-testable. Decides the H3 clustering resolution for a map zoom, groups recordings into the tiles they cross, answers "which tours cross this tile?", and applies the D5 name-search filter. The Leaflet wiring on top (`map-browser.ts`) is thin and covered by Playwright e2e.
 
-See the plan: `GpsPlusSlamJs_Docs/docs/2026-06-14-map-centric-recording-browser-and-h3-index-user-feedback.md` (D3 tile selection, D5 name search).
+See the plan: `GpsPlusSlamJs_Docs/docs/2026-06-14-1048-map-centric-recording-browser-and-h3-index-user-feedback.md` (D3 tile selection, D5 name search).
 
 ## Public API
 

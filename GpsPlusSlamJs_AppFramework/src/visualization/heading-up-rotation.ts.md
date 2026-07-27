@@ -5,7 +5,7 @@
 Compute the three.js `CSS3DObject` quaternion that rotates the flat live minimap
 so a given user heading points "up/forward" (heading-up mode), instead of the
 fixed north-up baseline. See the
-[heading-up plan](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-29-heading-up-minimap-rotation-plan.md).
+[heading-up plan](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-29-0752-heading-up-minimap-rotation-plan.md).
 
 ## Public API
 

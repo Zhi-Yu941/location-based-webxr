@@ -1,6 +1,6 @@
 /**
  * Test seam (DEV-only) — see
- * GpsPlusSlamJs_Docs/docs/2026-06-01-anchor-starter-e2e-test-plan.md §5 (Option A).
+ * GpsPlusSlamJs_Docs/docs/2026-06-01-0447-anchor-starter-e2e-test-plan.md §5 (Option A).
  *
  * The starter is glue-only: `main.ts` imports the AR/GPS framework functions
  * and calls them inside `startAr()` / `main()`. In a desktop Playwright browser
@@ -26,8 +26,6 @@ import {
   endARSession,
   getArWorldGroup,
   getCamera,
-  setTrackingStore,
-  setTrackingCallbacks,
 } from "gps-plus-slam-app-framework/ar/webxr-session";
 import {
   startGpsWatch,
@@ -40,38 +38,46 @@ import {
 } from "gps-plus-slam-app-framework/sensors";
 import {
   createGpsAnchor,
+  createWayfindingHud,
   enableArWorldGroupAlignment,
 } from "gps-plus-slam-app-framework/visualization";
 
+import { startHitTestReticle } from "gps-plus-slam-app-framework/ar/hit-test-reticle-driver";
+
 import { createAnchorMarker } from "./marker.js";
-import { startReticleHitTest } from "./reticle-hit-test.js";
 
 /** The framework/marker functions a Playwright e2e fake may override. */
 export interface AnchorStarterSeams {
   checkWebXRSupport: typeof checkWebXRSupport;
   checkGeolocationPermission: typeof checkGeolocationPermission;
+  /**
+   * Since the framework's pre-init setter fold, the tracking store + restart
+   * callback ride into `initAR` as its `callbacks.tracking` group (they arrive
+   * TOGETHER — without the group the framework's per-frame
+   * `updateTrackingState()` never dispatches `poseReceived`/`poseLost`,
+   * leaving `tracking.phase` stuck at `initializing` and the onboarding
+   * guidance pinned to "AR tracking lost"). The e2e fake asserts the group is
+   * present on the `initAR` call it intercepts.
+   */
   initAR: typeof initAR;
   endARSession: typeof endARSession;
   getArWorldGroup: typeof getArWorldGroup;
   getCamera: typeof getCamera;
-  /**
-   * Inject the tracking store + register the tracking-restart callback. Both
-   * MUST be wired before `initAR` or the framework's per-frame
-   * `updateTrackingState()` never dispatches `poseReceived`/`poseLost`, leaving
-   * `tracking.phase` stuck at `initializing` and the onboarding guidance pinned
-   * to "AR tracking lost". Exposed through the seam (rather than imported
-   * directly) so the e2e suite can assert the wiring actually happens.
-   */
-  setTrackingStore: typeof setTrackingStore;
-  setTrackingCallbacks: typeof setTrackingCallbacks;
   startGpsWatch: typeof startGpsWatch;
   startOrientationWatch: typeof startOrientationWatch;
   requestDeviceOrientationPermission: typeof requestDeviceOrientationPermission;
   createGpsAnchor: typeof createGpsAnchor;
+  createWayfindingHud: typeof createWayfindingHud;
   enableArWorldGroupAlignment: typeof enableArWorldGroupAlignment;
   selectTrackingQuality: typeof selectTrackingQuality;
   selectAlignmentMatrix: typeof selectAlignmentMatrix;
-  startReticleHitTest: typeof startReticleHitTest;
+  /**
+   * The framework's shared hit-test reticle driver (`startHitTestReticle`,
+   * promoted 2026-07-18 from this app's former local `reticle-hit-test.ts`).
+   * The seam keeps its historical name so the Playwright fake — which swaps
+   * the whole driver out (no WebXR on desktop) — is unaffected.
+   */
+  startReticleHitTest: typeof startHitTestReticle;
   createAnchorMarker: typeof createAnchorMarker;
 }
 
@@ -90,16 +96,15 @@ export const realSeams: AnchorStarterSeams = {
   endARSession,
   getArWorldGroup,
   getCamera,
-  setTrackingStore,
-  setTrackingCallbacks,
   startGpsWatch,
   startOrientationWatch,
   requestDeviceOrientationPermission,
   createGpsAnchor,
+  createWayfindingHud,
   enableArWorldGroupAlignment,
   selectTrackingQuality,
   selectAlignmentMatrix,
-  startReticleHitTest,
+  startReticleHitTest: startHitTestReticle,
   createAnchorMarker,
 };
 

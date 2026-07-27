@@ -116,23 +116,12 @@ export {
   captureGpsAnchorSample,
 } from './gps-ar-pose-sampler.js';
 
-// --- recording-options ---
-export {
-  type RecordingOptionsInput,
-  type DepthCaptureOptions,
-  type ImageCaptureOptions,
-  STORAGE_KEY,
-  DEFAULT_RECORDING_OPTIONS,
-  DEPTH_CONSTRAINTS,
-  IMAGE_CONSTRAINTS,
-  validateDepthOptions,
-  validateImageOptions,
-  validateRecordingOptions,
-  loadRecordingOptions,
-  saveRecordingOptions,
-  resetRecordingOptions,
-  cloneRecordingOptions,
-} from './recording-options.js';
+// --- recording-options — moved to the recorder app (2026-07-11 G-1 move,
+//     `2026-07-11-1445-recording-options-altitude-move-plan.md`): the settings
+//     catalog lives in `GpsPlusSlamJs_RecorderApp/src/state/recording-options.ts`.
+//     The framework keeps only the pieces it consumes itself:
+//     `ar/ar-crash-isolation.ts` and `visualization/occlusion-mesh.ts`
+//     (`OCCLUDER_DEBUG_STYLES` / `OccluderDebugStyle`). ---
 
 // --- recording-replayer ---
 export { replayRecording } from './recording-replayer.js';
@@ -174,6 +163,14 @@ export {
   type StoreSubscriberDeps,
   wireStoreSubscribers,
 } from './store-subscribers.js';
+
+// --- replay-session (desktop-replay composer for consumer apps) ---
+// Deliberately NOT re-exported from this barrel: replay-session transitively
+// imports gps-event-markers → webxr-session (getScene), so barrelling it would
+// force every state-barrel importer to eagerly evaluate the heavy AR/scene stack
+// — breaking recorder tests that partially mock webxr-session. Consumers deep-
+// import it instead: `gps-plus-slam-app-framework/state/replay-session`
+// (and `.../state/replay-occupancy-subscriber`).
 
 // --- subscribe-to-selector ---
 export { subscribeToSelector } from './subscribe-to-selector.js';

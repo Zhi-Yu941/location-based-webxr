@@ -19,7 +19,7 @@ Factory function. Returns a handlers object that owns the recording lifecycle.
 | `createNewStore`          | `() => RecorderStore`                                    | Create a fresh store for each recording   |
 | `getCurrentScenarioName`  | `() => string`                                           | Read current scenario name                |
 | `getRecordingOptions`     | `() => RecordingOptions`                                 | Read capture settings (depth, interval)   |
-| `getMapOverlay`           | `() => MapOverlay \| null`                               | Access the map overlay                    |
+| `getMapOverlay`           | `() => LeafletMapOverlay \| null`                        | Access the map overlay                    |
 | `clearRefPointUsage`      | `() => void`                                             | Reset ref-point tracking for new session  |
 | `getSessionNotes`         | `() => string`                                           | Read session notes from UI                |
 | `waitForZeroReference`    | `(timeoutMs?) => Promise<LatLong \| null>`               | Wait for GPS zero reference               |

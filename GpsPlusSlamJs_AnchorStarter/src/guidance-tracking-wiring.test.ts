@@ -8,12 +8,12 @@
  * `tracking.phase !== 'tracking'` (see the framework's `tracking-quality.ts`).
  *
  * The framework's WebXR session only forwards per-frame poses into the store
- * when BOTH `setTrackingStore(store)` AND `setTrackingCallbacks(...)` were wired
- * before `initAR()` (its `updateTrackingState()` early-returns otherwise). The
- * starter originally wired only the former, so no `poseReceived` ever reached
- * the store, `tracking.phase` stayed `initializing`, and the guidance widget was
- * pinned to "AR tracking lost" forever with no progress — exactly the reported
- * symptom.
+ * when `initAR()` receives its `callbacks.tracking` group (store + callbacks
+ * arrive TOGETHER since the setter fold; `updateTrackingState()` early-returns
+ * otherwise). Under the old two-setter API the starter originally wired only
+ * the store, so no `poseReceived` ever reached the store, `tracking.phase`
+ * stayed `initializing`, and the guidance widget was pinned to "AR tracking
+ * lost" forever with no progress — exactly the reported symptom.
  *
  * This test pins the contract `main.ts` must satisfy: the guidance is stuck at
  * `ar-lost` while no pose flows in, and only advances once poses are dispatched.
@@ -73,13 +73,13 @@ describe("onboarding guidance is driven by AR pose flow", () => {
     expect(guidancePhase(store)).toBe("ar-lost");
   });
 
-  it("leaves 'ar-lost' as soon as AR poses are dispatched (what setTrackingCallbacks enables)", () => {
+  it("leaves 'ar-lost' as soon as AR poses are dispatched (what the initAR tracking group enables)", () => {
     const store = makeStore();
     store.dispatch(poseLost());
     expect(guidancePhase(store)).toBe("ar-lost");
 
     // Dispatching poses is exactly what the framework's updateTrackingState does
-    // per frame once setTrackingStore + setTrackingCallbacks are both wired.
+    // per frame once initAR received its `callbacks.tracking` group.
     store.dispatch(
       poseReceived({
         pose: SAMPLE_POSE,

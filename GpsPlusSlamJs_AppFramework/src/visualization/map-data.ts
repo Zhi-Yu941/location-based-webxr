@@ -45,7 +45,7 @@ export interface MapData {
    * (GPS-converted tip of `fusedPath`), so the dot keeps moving indoors where
    * the raw fix freezes; the last raw GPS fix is only the pre-alignment
    * fallback. See
-   * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-06-recorder-live-map-user-dot-fused-pose-user-feedback.md.
+   * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-06-1526-recorder-live-map-user-dot-fused-pose-user-feedback.md.
    */
   userPosition: GpsCoord | null;
   /** Raw GPS samples (yellow polyline + per-event accuracy circles). */
@@ -59,7 +59,7 @@ export interface MapData {
    * north, `[0, 360)`) for the user-position heading line, or null when
    * undefined (no rotation/alignment yet, or camera near-vertical). See
    * Finding 2 of
-   * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-28-map-rings-transparency-and-view-direction-user-feedback.md.
+   * gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-28-1822-map-rings-transparency-and-view-direction-user-feedback.md.
    *
    * Optional only so pre-existing direct `MapData` literals (e.g. the static
    * summary map, which is out of scope and draws no heading line) keep

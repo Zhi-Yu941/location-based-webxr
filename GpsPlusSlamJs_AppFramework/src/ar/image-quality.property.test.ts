@@ -15,7 +15,11 @@
 
 import { describe, it, expect } from 'vitest';
 import * as fc from 'fast-check';
-import { sharpnessScore, meanLuminance } from './image-quality.js';
+import {
+  sharpnessScore,
+  highFrequencyEnergyRatio,
+  meanLuminance,
+} from './image-quality.js';
 
 /** Arbitrary small grayscale image as a plain number[] (avoids byte clamping). */
 const arbGray = fc
@@ -110,6 +114,71 @@ describe('meanLuminance — properties', () => {
           meanLuminance(rgba) - 1e-9
         );
       })
+    );
+  });
+});
+
+/** Arbitrary grayscale image with dims >= 8 (the FFT crop minimum). */
+const arbGray8 = fc
+  .tuple(fc.integer({ min: 8, max: 16 }), fc.integer({ min: 8, max: 16 }))
+  .chain(([w, h]) =>
+    fc
+      .array(fc.double({ min: 0, max: 100, noNaN: true }), {
+        minLength: w * h,
+        maxLength: w * h,
+      })
+      .map((gray) => ({ w, h, gray }))
+  );
+
+describe('highFrequencyEnergyRatio - properties', () => {
+  // Why this matters: the toggleable second gate metric must be a true
+  // ratio - bounded, exposure-invariant, and contrast-invariant - for ANY
+  // pixels, or the relative gate rule would mean different things for the
+  // two metrics.
+
+  it('is within [0, 1] for any image', () => {
+    fc.assert(
+      fc.property(arbGray8, ({ w, h, gray }) => {
+        const r = highFrequencyEnergyRatio(gray, w, h);
+        expect(r).toBeGreaterThanOrEqual(0);
+        expect(r).toBeLessThanOrEqual(1);
+      })
+    );
+  });
+
+  it('is invariant to a uniform brightness offset (DC is excluded)', () => {
+    fc.assert(
+      fc.property(
+        arbGray8,
+        fc.double({ min: -50, max: 50, noNaN: true }),
+        ({ w, h, gray }, offset) => {
+          const base = highFrequencyEnergyRatio(gray, w, h);
+          const shifted = highFrequencyEnergyRatio(
+            gray.map((v) => v + offset),
+            w,
+            h
+          );
+          expect(Math.abs(shifted - base)).toBeLessThanOrEqual(1e-6);
+        }
+      )
+    );
+  });
+
+  it('is invariant to contrast scaling (it is an energy ratio)', () => {
+    fc.assert(
+      fc.property(
+        arbGray8,
+        fc.double({ min: 0.1, max: 2, noNaN: true }),
+        ({ w, h, gray }, s) => {
+          const base = highFrequencyEnergyRatio(gray, w, h);
+          const scaled = highFrequencyEnergyRatio(
+            gray.map((v) => v * s),
+            w,
+            h
+          );
+          expect(Math.abs(scaled - base)).toBeLessThanOrEqual(1e-6);
+        }
+      )
     );
   });
 });

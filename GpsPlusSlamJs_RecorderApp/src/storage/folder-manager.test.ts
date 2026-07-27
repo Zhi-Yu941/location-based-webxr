@@ -74,9 +74,7 @@ vi.mock('gps-plus-slam-app-framework/geo/h3-proximity', () => ({
 }));
 
 vi.mock('gps-plus-slam-app-framework/visualization/reference-points', () => ({
-  refPointVisualizer: {
-    displayPriorRefPoints: vi.fn(),
-  },
+  refPointVisualizer: {},
 }));
 
 vi.mock('gps-plus-slam-app-framework/utils/logger', () => ({
@@ -160,7 +158,6 @@ function createDefaultDeps(
     showError: vi.fn(),
     updateStatus: vi.fn(),
     populateScenarios: vi.fn(),
-    setFolderSelected: vi.fn(),
     setSaveLocationSelected: vi.fn(),
     setFolderImportExpanded: vi.fn(),
     validateEnterButton: vi.fn(),
@@ -415,7 +412,6 @@ describe('createFolderManager', () => {
 
       await manager.handleOpenFolder();
 
-      expect(deps.setFolderSelected).toHaveBeenCalledWith(true);
       expect(deps.validateEnterButton).toHaveBeenCalled();
     });
 
@@ -1186,8 +1182,8 @@ describe('createFolderManager', () => {
     /**
      * Why this test matters:
      * D1 — the whole point of this slice: picking the folder must start the
-     * indexing pass immediately, while Enter AR validation (setFolderSelected
-     * + validateEnterButton) happens FIRST so the pass never delays the gate
+     * indexing pass immediately, while Enter AR validation
+     * (validateEnterButton) happens FIRST so the pass never delays the gate
      * (non-blocking constraint, 2026-06-05 D5).
      */
     it('starts indexing immediately on folder pick, after Enter AR validation, forwarding progress', async () => {
@@ -1209,7 +1205,6 @@ describe('createFolderManager', () => {
       );
 
       // Enter AR gate was validated before the pass settled.
-      expect(deps.setFolderSelected).toHaveBeenCalledWith(true);
       expect(deps.validateEnterButton).toHaveBeenCalled();
 
       const [handleArg, optsArg] = vi.mocked(indexRefPointDefinitionsFromFolder)

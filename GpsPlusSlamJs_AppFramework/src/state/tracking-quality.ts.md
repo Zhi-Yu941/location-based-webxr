@@ -88,15 +88,27 @@ receive — copies are taken before sorting or sliding-window operations.
   `reportUpdated` (and re-render the HUD) at frame rate. The gate compares
   against the last _dispatched_ report, so slow real drift still triggers an
   update once it crosses a tolerance — it cannot accumulate indefinitely.
+- **Pose-action phase gate (quality-review E-1, 2026-07-10):** on
+  `tracking/poseReceived`/`poseLost` the listener skips the whole O(history)
+  recompute (incl. `computeCoverage`'s walk + sort) when the tracking phase
+  is unchanged since the last pose-action recompute AND a report already
+  exists — the phase is the only report input pose actions carry. Phase
+  transitions and the first pose after a reset always recompute (pinned by
+  tests). This also makes the §4.8 holdoff genuinely per-observation (below).
 - Reset triggers (`recording/startSession`, `tracking/resetTracking`) clear
   both the matrix buffer, the cached report, and the `degradedConsecutiveCount`.
 - §4.8 hysteresis: the `ok → degraded` transition is held off for
   `degradedHoldoff` (default 3) consecutive sub-threshold observations.
   `degraded → ok` is immediate. `ar-lost` bypasses holdoff entirely.
+  (Before E-1 the counter actually advanced per FRAME, collapsing the
+  holdoff to ~50 ms; the pose-action phase gate restored the documented
+  per-observation cadence.)
 - §4.8b EMA-smoothed convergence (Finding 4): the convergence sub-score
   reported by `computeTrackingQualityReport` is blended with the previously
   persisted `smoothedConvergence` using `α = convergenceEmaAlpha`
-  (default `0.3`). On the first observation (`smoothedConvergence === null`)
+  (default `0.25` — re-tuned from `0.3` with E-1, since the EMA now advances
+  per observation instead of per frame; the F4 indoor-corpus range < 0.2
+  acceptance still holds). On the first observation (`smoothedConvergence === null`)
   the filter is seeded with the raw value. The listener middleware
   dispatches `smoothedConvergenceUpdated` after every aggregator pass so
   the next pass can blend against the latest value. `α = 1.0` disables

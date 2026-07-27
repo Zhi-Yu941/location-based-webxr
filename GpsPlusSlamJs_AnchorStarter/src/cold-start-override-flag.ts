@@ -7,7 +7,7 @@
  * The value is passed to `createSlamAppStore({ enableCompassColdStartOverride })`
  * (the framework option dispatches the library's `setColdStartOverrideEnabled`
  * once a GPS fix establishes the `gpsData` slice). See
- * GpsPlusSlamJs_Docs/docs/2026-06-26-stage0-field-collection-and-enablement.md.
+ * GpsPlusSlamJs_Docs/docs/2026-06-26-0701-stage0-field-collection-and-enablement.md.
  */
 
 /**

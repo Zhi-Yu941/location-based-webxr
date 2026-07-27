@@ -15,7 +15,7 @@
  * protocol around it.
  *
  * @see ./zip-coverage-embed.ts.md
- * @see GpsPlusSlamJs_Docs/docs/2026-06-14-followup-progressive-map-browser-indexing-and-backfill.md (B3)
+ * @see GpsPlusSlamJs_Docs/docs/2026-06-14-1924-progressive-map-browser-indexing-and-backfill-followup.md (B3)
  */
 
 import {

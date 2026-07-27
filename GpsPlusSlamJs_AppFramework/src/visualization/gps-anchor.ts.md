@@ -47,9 +47,14 @@ consulted.
   `getCurrentGpsPoint`. Optional: `skipBootstrap`, `onBootstrapComplete`,
   `mode`, `floorY`,
   `distanceThreshold` (default 2 m), `angleThresholdInDegrees`
-  (default 15°), `targetPosRefreshRateInSec` (default 3 s),
+  (default 15°),
   `secondsToAccumulateGpsPose` (default 7 samples at 1 Hz),
   `settlingSeconds` (default 0), `heightAboveGround`.
+  (The declared-but-never-wired `targetPosRefreshRateInSec` option was
+  removed 2026-07-10, quality-review E-3 — the steady-state target is now
+  cached on the `(zeroRef, alignmentMatrix, gpsPoint)` reference identities,
+  so the geo trig + inversion run only when an input actually changes,
+  with no refresh timer needed.)
 - `createGpsAnchor(options) → GpsAnchor` — the factory.
 - `interface GpsAnchor` — `phase`, `isFullyAnchored`, `gpsPoint`,
   `markMovedExternally()`, `setGpsPoint(point)`, `dispose()`.
@@ -109,7 +114,7 @@ object as an `@internal` testing seam in lieu of pumping the global
   (instantly). A previous per-anchor lerp (`lerpCorrections` /
   `correctionLerpRate`, D1′) was removed once alignment was lerped at
   `arWorldGroup` — see
-  `gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-05-gps-anchor-frame-architecture-bug-and-plan.md`.
+  `gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-05-0650-gps-anchor-frame-architecture-bug-and-plan.md`.
 - **`snap-when-offscreen` corrections fire only off-screen — except the first
   placement**: a correction is suppressed while the object is inside the camera
   frustum, so the user never sees a jump. The lone exception is the **one-time
@@ -123,7 +128,7 @@ object as an `@internal` testing seam in lieu of pumping the global
   that the whole frame rides one lerped `arWorldGroup.matrix`, a large jump is
   absorbed smoothly for the entire view, so a per-anchor on-screen snap only
   manufactured the AnchorStarter cache-hit hard-jump — see
-  `gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-06-anchor-starter-cachehit-jump-investigation.md`.
+  `gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-06-1210-anchor-starter-cachehit-jump-investigation.md`.
 
 ## Examples
 

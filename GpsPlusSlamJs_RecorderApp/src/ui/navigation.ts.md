@@ -28,7 +28,7 @@ and prevents accidental page exits during recording.
 - `pushModalState` is idempotent — duplicate calls are ignored.
 - `popModalState` is a no-op when no state was pushed.
 - **Programmatic history cleanup never re-enters screen-back logic** (F4,
-  [2026-07-04 user feedback](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-04-ar-clipping-planes-and-lifecycle-user-feedback.md)):
+  [2026-07-04 user feedback](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-04-1626-ar-clipping-planes-and-lifecycle-user-feedback.md)):
   `popModalState()` arms a one-shot `suppressNextPopstate` guard right before
   its `history.back()`; the handler consumes the guard as Priority 0 and
   ignores exactly that self-induced popstate. Accepted edge: a real user back

@@ -2,7 +2,7 @@
 
 A standalone QR-tracking **debug/demo** app consuming
 `gps-plus-slam-app-framework`. It is the realization of **Note 4** of the
-[QR-tracking follow-up plan](../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-followup-qr-tracking-generalization-overlay-and-north.md)
+[QR-tracking follow-up plan](../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-15-1219-qr-tracking-generalization-overlay-and-north-followup.md)
 and the desktop stand-in for the mandatory, manual **§5 on-device verification
 gate** ("green axis-overlay glued to a printed code").
 
@@ -28,7 +28,7 @@ for the auto-size path; without it the app degrades to a manual size.
 - **Tested pure logic** (`src/*.ts` + colocated `*.test.ts`): `capability`,
   `hud-view`, `demo-store`, `demo-controller`, `seams`.
 - **Shared debug overlay** — the axis+cube view is the framework's
-  `gps-plus-slam-app-framework/ar/qr-debug-view` (the same one the Recorder
+  `gps-plus-slam-app-framework/ar/qr/qr-debug-view` (the same one the Recorder
   renders), imported by `main.ts`. It is NOT a local module, so the demo and
   Recorder cannot drift apart in how a detected QR is visualized.
 - **`main.ts`** — glue only (capability gate → boot → per-frame

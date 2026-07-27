@@ -81,14 +81,18 @@ content (replace)**:
     [`placement-view.ts`](src/placement-view.ts.md) — pure view-models that
     map the framework metric + FSM to render-ready strings (the async-UX
     in-progress → final contract is tested here).
-  - [`capability.ts`](src/capability.ts.md) — the E1 decision + message.
+  - The E1 capability decision + message come from the framework's
+    [`ar/capability-checker`](../GpsPlusSlamJs_AppFramework/src/ar/capability-checker.ts.md)
+    (promoted from this app; `main.ts` supplies the app-specific
+    `contextLabel`).
   - [`placement-decision.ts`](src/placement-decision.ts.md) — the pure
     surface/alignment gate for the Place press (places only when a reticle
     surface AND a GPS alignment are present, else returns an actionable hint).
 - **Glue:** [`main.ts`](src/main.ts.md) — composes the seams with `initAR`,
   `createGpsPositionHandler`, `createGpsAnchor`, GPS/orientation watches, and
-  the hit-test reticle ([`reticle-hit-test.ts`](src/reticle-hit-test.ts.md),
-  which reuses the framework's `hit-test-reticle` view-model). Same placement
+  the framework's shared hit-test reticle driver
+  ([`ar/hit-test-reticle-driver`](../GpsPlusSlamJs_AppFramework/src/ar/hit-test-reticle-driver.ts.md),
+  promoted from this app's former local copy). Same placement
   model as the MinimalExample (place under the AR cursor), plus URL persistence.
 - **Your content here:** [`marker.ts`](src/marker.ts.md) — the **single**
   place to edit. Swap `createAnchorMarker()` for your own `THREE.Object3D`

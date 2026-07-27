@@ -2,7 +2,7 @@
  * Pose-motion helpers — stateless angular/linear velocity from two AR poses.
  *
  * The capture motion gate (blurry-frame skipping, see
- * `GpsPlusSlamJs_Docs/docs/2026-06-23-blurry-frame-motion-gating-plan.md` §4.1)
+ * `GpsPlusSlamJs_Docs/docs/2026-06-23-2105-blurry-frame-motion-gating-plan.md` §4.1)
  * rejects frames whose device motion is too fast to yield a sharp image. Motion
  * is derived from consecutive WebXR poses — cheaper than any image-content
  * metric because it needs no GPU readback.
@@ -20,14 +20,24 @@ import { quat } from 'gl-matrix';
 import type { WebXRQuaternion, WebXRVec3 } from '../types/ar-types.js';
 import { geodesicAngleRad } from '../utils/geodesic-angle.js';
 
+// Module-level scratch quats (quality-review E-8): `angularVelocity` runs per
+// XR frame during capture and used to allocate two Float32Array quats per
+// call. Same convention as `camera-follower.ts`/`frame-conversions.ts`;
+// single-threaded, values fully consumed within the call.
+const _scratchQuatPrev = quat.create();
+const _scratchQuatCur = quat.create();
+
 /**
- * Convert a WebXR object-form quaternion to a normalized gl-matrix quaternion.
- * Normalizing defends against slightly non-unit inputs (the gate must not throw
- * on imperfect tracking data).
+ * Write a WebXR object-form quaternion into `out`, normalized. Normalizing
+ * defends against slightly non-unit inputs (the gate must not throw on
+ * imperfect tracking data).
  */
-function toGlQuat(q: WebXRQuaternion): ReturnType<typeof quat.create> {
-  const g = quat.fromValues(q.x, q.y, q.z, q.w);
-  return quat.normalize(g, g);
+function toGlQuat(
+  q: WebXRQuaternion,
+  out: ReturnType<typeof quat.create>
+): ReturnType<typeof quat.create> {
+  quat.set(out, q.x, q.y, q.z, q.w);
+  return quat.normalize(out, out);
 }
 
 /**
@@ -47,7 +57,10 @@ export function angularVelocity(
   dtSeconds: number
 ): number {
   if (!(dtSeconds > 0)) return 0;
-  const angle = geodesicAngleRad(toGlQuat(qPrev), toGlQuat(qCur));
+  const angle = geodesicAngleRad(
+    toGlQuat(qPrev, _scratchQuatPrev),
+    toGlQuat(qCur, _scratchQuatCur)
+  );
   return angle / dtSeconds;
 }
 

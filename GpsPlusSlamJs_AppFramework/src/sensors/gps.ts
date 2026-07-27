@@ -5,6 +5,7 @@
  */
 
 import { createLogger } from '../utils/logger';
+import { requestOrientationPermission as requestOrientationPermissionStatus } from './permission-checker.js';
 
 const log = createLogger('GPS');
 
@@ -135,25 +136,16 @@ export function stopOrientationWatch(): void {
 }
 
 /**
- * Request permission for device orientation (required on iOS 13+)
+ * Request permission for device orientation (required on iOS 13+).
+ *
+ * Boolean-contract wrapper around the permission-checker's
+ * `requestOrientationPermission` superset (quality-review A-4 — the two
+ * public implementations had already drifted once; this one lacked the
+ * missing-API guard and threw a ReferenceError where `DeviceOrientationEvent`
+ * does not exist). `true` only for an explicit grant (or the non-iOS
+ * no-permission-needed case); denied, failed, or unsupported → `false`.
  */
 export async function requestOrientationPermission(): Promise<boolean> {
-  // Check for iOS-specific permission API
-  const DeviceOrientationEventWithPermission =
-    DeviceOrientationEvent as unknown as {
-      requestPermission?: () => Promise<string>;
-    };
-  if (
-    typeof DeviceOrientationEventWithPermission.requestPermission === 'function'
-  ) {
-    try {
-      const permission =
-        await DeviceOrientationEventWithPermission.requestPermission();
-      return permission === 'granted';
-    } catch {
-      return false;
-    }
-  }
-  // Not iOS or permission not required
-  return true;
+  const status = await requestOrientationPermissionStatus();
+  return status.granted === true;
 }

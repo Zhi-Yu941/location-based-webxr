@@ -4,7 +4,7 @@
 
 Wires the AR-space occupancy grid (framework `OccupancyGrid`) to the recorder store: observes `state.recording.latestDepthSample` by reference comparison, folds each new depth sample into the injected grid, and refreshes the injected cube visualizer on a throttle. The throttle delay is supplied by the call sites as `refreshIntervalMs` — sourced from `depth.intervalMs` so the cube view tracks the sample cadence instead of a fixed ~1 Hz (Issue A). Also remembers the **latest sample's head pose** and forwards it to `visualizer.refresh(grid, viewerPose)` so an over-cap refresh can draw the cells nearest the user (Issue B1). Follows `wire-frame-tile-subscribers.ts` (action stream = persisted source of truth, grid = derived state outside Redux) and the F1 `StoreRef` store-swap pattern.
 
-Plan: `GpsPlusSlamJs_Docs/docs/2026-06-11-depth-occupancy-grid-port-plan.md` §3/Iter 4; refresh cadence + viewer pose pass-through: `GpsPlusSlamJs_Docs/docs/2026-06-22-occupancy-cubes-rendering-cadence-and-locality-plan.md` (Issues A + B1).
+Plan: `GpsPlusSlamJs_Docs/docs/2026-06-11-2134-depth-occupancy-grid-port-plan.md` §3/Iter 4; refresh cadence + viewer pose pass-through: `GpsPlusSlamJs_Docs/docs/2026-06-22-2251-occupancy-cubes-rendering-cadence-and-locality-plan.md` (Issues A + B1).
 
 ## Public API
 
@@ -16,7 +16,7 @@ Plan: `GpsPlusSlamJs_Docs/docs/2026-06-11-depth-occupancy-grid-port-plan.md` §3
   - `refreshIntervalMs?` — minimum delay between refreshes; default 1000. Live and replay both pass `depth.intervalMs` here (Issue A).
   - `onError?(err)` — receives grid/visualizer failures; the subscription itself never breaks — even when `onError` **itself throws** (the handler is isolated; a broken error handler is swallowed, 2026-07-04).
   - `refreshOnCameraMoveM?` — **Step 2 revision-guard fix**: with camera-relative windows (cubes radius / occluder radius), the correct visible set changes when the CAMERA moves even on a settled grid. When set, the unchanged-revision skip additionally requires the camera to be within this distance (meters) of the last-rendered position (both call sites pass one chunk edge, `16 · cellSizeM` = 2.4 m at defaults). Unset = legacy pure-revision skip — correct for unbounded consumers, whose output is camera-independent. Trade-off: smaller ε → fresher windows but fewer settled-skips; ε is deliberately coarse so standing still stays free.
-  - `onGridSize?(cells)` — grid-size telemetry (Step 0 of `GpsPlusSlamJs_Docs/docs/2026-07-03-long-session-fps-and-voxel-grid-scaling-plan.md`): called with `grid.size` for the first folded sample (t0 baseline) and then at most once per ~30 s, so a log export correlates cells-over-time with the stats overlay's fps-over-time. Needs the sink to expose `size`; best-effort (a throwing callback goes to `onError`). The cadence resets on store swap so a new session logs from t0 again.
+  - `onGridSize?(cells)` — grid-size telemetry (Step 0 of `GpsPlusSlamJs_Docs/docs/2026-07-03-1344-long-session-fps-and-voxel-grid-scaling-plan.md`): called with `grid.size` for the first folded sample (t0 baseline) and then at most once per ~30 s, so a log export correlates cells-over-time with the stats overlay's fps-over-time. Needs the sink to expose `size`; best-effort (a throwing callback goes to `onError`). The cadence resets on store swap so a new session logs from t0 again.
 - **`OccupancyGridSink`** — the grid surface this wirer needs (`addSample`, `clear`, optional `getRevision` and optional O(1) `size`).
 
 ## Invariants & Assumptions

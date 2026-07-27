@@ -14,10 +14,11 @@ Visualizes GPS events as 3D markers during recording and replay. Shows three typ
 
 - `GpsEventVisualizer` — class that manages GPS event marker visualization.
 - `GpsEventAccuracy` — optional `{ horizontal?: number; vertical?: number }` hint used by `addGpsEvent` to render the raw-GPS marker as a non-uniform-scaled ellipsoid (replay mode).
+- `GpsMarkerSceneSource` — `{ getScene: () => THREE.Scene | null; getArWorldGroup: () => THREE.Group | null }`: where the visualizer resolves its scene graph from (see `setSceneSource`).
 
 ### GpsEventVisualizer Class
 
-- `setZeroRef(zero: LatLong): void` — record that a GPS origin exists. This is a **readiness gate only**: `addGpsEvent` refuses to add markers until a zero is set. It is **NOT** used for any coordinate math — `gpsCoords` arrive already converted to metres-from-origin by the library reducer (`rawGpsPointToGpsPoint` → `calcRelativeCoordsInMeters`), frozen at record time. Consequently a stale or changed zero on this visualizer can **not** offset existing markers (contrast `RefPointVisualizer`, whose `zeroRef` IS load-bearing for lat/lon → metres conversion). See the [state-outside-store audit](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-18-state-outside-store-audit.md) F2.
+- `setZeroRef(zero: LatLong): void` — record that a GPS origin exists. This is a **readiness gate only**: `addGpsEvent` refuses to add markers until a zero is set. It is **NOT** used for any coordinate math — `gpsCoords` arrive already converted to metres-from-origin by the library reducer (`rawGpsPointToGpsPoint` → `calcRelativeCoordsInMeters`), frozen at record time. Consequently a stale or changed zero on this visualizer can **not** offset existing markers (contrast `RefPointVisualizer`, whose `zeroRef` IS load-bearing for lat/lon → metres conversion). See the [state-outside-store audit](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-18-1846-state-outside-store-audit.md) F2.
 - `getZeroRef(): LatLong | null` — return the readiness-gate value (null until set).
 - `addGpsEvent(gpsCoords: [x,y,z], odomPos: [x,y,z], accuracy?: GpsEventAccuracy): void` — add markers for a GPS event.
   - When `accuracy` is omitted (recording mode), the yellow raw-GPS marker is a fixed 4 cm sphere at opacity 0.3 (legacy behaviour, all existing call sites unchanged).
@@ -29,6 +30,7 @@ Visualizes GPS events as 3D markers during recording and replay. Shows three typ
 - `setVisible(visible: boolean): void` — show/hide **all** debug markers (raw + fused + snapshot) and remember the state so markers added later inherit it. Backs the recorder's `visualization.gpsAlignmentMarkers` opt-out (Finding B), read once at Enter-AR (live only — replay keeps markers visible). Affects rendering only: capture, GPS-event recording, counts, and snapshot positions are unchanged. Default visible; `clearAll()` resets it to visible so a live opt-out never leaks into a subsequent replay on the shared singleton.
 - `clearAll(): void` — remove all markers (including snapshots), reset counters/zero-ref, and restore visibility to the default (visible).
 - `getCounts(): { raw, fused, snapshots }` — get marker counts including alignment snapshots.
+- `setSceneSource(source: GpsMarkerSceneSource | null): void` — point the visualizer at a non-live scene graph (desktop replay, offline e2e fixture); `null` restores the live-session default (`webxr-session`'s `getScene`/`getArWorldGroup`). Introduced by the 2026-07-11 webxr-session surface-reduction plan, step 2 — replay used to inject its scene into the webxr-session singleton (the deleted Risk R1 `setScene`/`setArWorldGroup` exports) so this visualizer would find it; now the replay orchestrator points the visualizer at the replay scene explicitly and restores the default on dispose. Not reset by `clearAll()` — the overriding owner restores it.
 - `getRawMarkerWorldSizes(): Array<{ x, y, z }>` — diagnostic accessor returning the world-space bounding-box size (`THREE.Box3.setFromObject`) of each raw-GPS marker in insertion order. Used by the §3c Playwright spec to verify accuracy-ellipsoid scaling.
 
 ### Exported Singleton
@@ -40,8 +42,8 @@ export const gpsEventVisualizer: GpsEventVisualizer;
 ## Invariants & Assumptions
 
 1. **Zero reference must be set** before adding GPS events — but purely as a readiness gate (see `setZeroRef` above); marker positions come from the pre-computed `gpsCoords`, not from this field.
-2. **Scene must be available** (from `getScene()`) for raw GPS markers to be created
-3. **arWorldGroup must be available** (from `getArWorldGroup()`) for fused markers; if unavailable, only raw GPS marker is created
+2. **Scene must be available** (from the current scene source — the live `getScene()` by default) for raw GPS markers to be created
+3. **arWorldGroup must be available** (from the current scene source — the live `getArWorldGroup()` by default) for fused markers; if unavailable, only raw GPS marker is created
 4. **Raw GPS markers are immutable** — they never move after creation (scene root)
 5. **Fused markers move automatically** when `applyAlignmentMatrix()` updates `arWorldGroup.matrix` — no manual repositioning needed
 6. **No gl-matrix dependency** — alignment is handled entirely by Three.js scene-graph propagation
@@ -56,7 +58,7 @@ export const gpsEventVisualizer: GpsEventVisualizer;
 
 ## Marker Sizing
 
-> **Sizes halved 2026-06-16 (D5).** The raw-GPS / fused / snapshot debug spheres were shrunk (`GPS_MARKER_RADIUS` 0.08 → **0.04**, `SNAPSHOT_MARKER_RADIUS` 0.1 → **0.05**) so they stop cluttering the AR scene and hiding the ref-point markers — which, in the RecorderApp, grow to double instead (`ref-point-visualizer.ts`). This framework constant renders in **both live recording and replay**, so replays of older recordings also show the smaller debug spheres (intended and accepted; a plain constant change, no live-vs-replay flag). See [`2026-06-16-user-feedback-team1.md`](../../../GpsPlusSlamJs_Docs/docs/2026-06-16-user-feedback-team1.md) D5.
+> **Sizes halved 2026-06-16 (D5).** The raw-GPS / fused / snapshot debug spheres were shrunk (`GPS_MARKER_RADIUS` 0.08 → **0.04**, `SNAPSHOT_MARKER_RADIUS` 0.1 → **0.05**) so they stop cluttering the AR scene and hiding the ref-point markers — which, in the RecorderApp, grow to double instead (`ref-point-visualizer.ts`). This framework constant renders in **both live recording and replay**, so replays of older recordings also show the smaller debug spheres (intended and accepted; a plain constant change, no live-vs-replay flag). See [`2026-06-16-2053-team1-user-feedback.md`](../../../GpsPlusSlamJs_Docs/docs/2026-06-16-2053-team1-user-feedback.md) D5.
 
 - **Cyan fused** and **red snapshot** spheres: fixed radius (4 cm / 5 cm), identity scale, opacity 0.3 / 0.5. Geometry is `SphereGeometry` with 12 segments; `MeshBasicMaterial` is transparent with `depthWrite: false` to prevent z-fighting.
 - **Yellow raw-GPS** sphere has two rendering modes:
@@ -105,10 +107,11 @@ unsubscribeStore = wireStoreSubscribers(store, {
 Unit tests in `gps-event-markers.test.ts`:
 
 - `setZeroRef / getZeroRef` — verify zero reference storage.
+- `setSceneSource` — markers land in the override scene while the live getters are null (replay), `null` restores the live default, `clearAll` removes from the override scene.
 - `addGpsEvent` — marker creation, colors, placement, guard checks.
 - `addGpsEvent accuracy-aware ellipsoid (§3)` — non-uniform scale on the raw marker, defensive fallback on missing/non-positive accuracy, lowered opacity, `renderOrder = -1`, cyan/red unaffected. See [`2026-05-19-investigate-rec31-altitude-drop.md`](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-05-19-investigate-rec31-altitude-drop.md) §3 for the motivation.
 - `scene-graph propagation` — world position via `arWorldGroup.matrix`.
-- `setVisible` — hides/shows all three marker types, later-added markers inherit the state, and `clearAll` restores visibility (replay safety). See [`2026-06-14-followup-frame-tile-legacy-aspect-and-live-toggle.md`](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-14-followup-frame-tile-legacy-aspect-and-live-toggle.md) (Finding B / Slice 3).
+- `setVisible` — hides/shows all three marker types, later-added markers inherit the state, and `clearAll` restores visibility (replay safety). See [`2026-06-14-0012-frame-tile-legacy-aspect-and-live-toggle-followup.md`](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-14-0012-frame-tile-legacy-aspect-and-live-toggle-followup.md) (Finding B / Slice 3).
 - `clearAll` — cleanup and disposal.
 - `getCounts` — counter functionality.
 - `marker sizing` — verify legacy 4 cm radius on default code path.

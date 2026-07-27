@@ -1,7 +1,7 @@
 /**
  * Occupancy mesh — real-recording integration + performance probe.
  *
- * Why this test matters (2026-06-13-occupancy-mesh-options-plan.md §8 "Test
+ * Why this test matters (2026-06-13-0004-occupancy-mesh-options-plan.md §8 "Test
  * data strategy"): the pure mesher's correctness is pinned by synthetic fixtures
  * + property tests (`occupancy-mesher.*.test.ts` in the framework). THIS test is
  * the *second* layer — it runs a real recorded session through the EXISTING
@@ -110,7 +110,7 @@ describe.skipIf(!HAS_ZIP)(
 
         const t1 = performance.now();
         const greedy = meshOccupiedCells(cells, grid.cellSizeM, {
-          greedy: true,
+          mode: 'greedy',
         });
         const tGreedy = performance.now() - t1;
 

@@ -3,8 +3,10 @@
 - **Purpose:** main-thread client for the off-thread blur/blackness gate. Owns
   the init/ready handshake, id-correlated async `analyze` calls, and disposal —
   the shape the (removed) QR demo's `worker-pnp-client` had. The returned
-  `analyze` is injected into the framework via `setImageQualityAnalyzer`, which
-  forwards it to `ImageCaptureManager` as the `analyzeFrame` callback.
+  `analyze` is injected through the recording-session-handlers' `setImageQualityAnalyzer` dep
+  (main.ts stores it behind the stable `imageCapture.qualityAnalyzer` wrapper it
+  passes to `initAR`), which forwards it to `ImageCaptureManager` as the
+  `analyzeFrame` callback.
 
 - **Public API:**
   - `WorkerLike` — the minimal `Worker` surface used (`postMessage`, `terminate`,
@@ -38,4 +40,4 @@ import.meta.url), { type:'module' })`) and wraps it. NOT unit-tested.
 
 - **Related docs:** `image-quality.worker.ts.md`, `image-quality-protocol.ts.md`,
   `recording-session-handlers.ts.md`,
-  `GpsPlusSlamJs_Docs/docs/2026-06-24-image-quality-gate-plan.md` (§3, §8).
+  `GpsPlusSlamJs_Docs/docs/2026-06-24-1057-image-quality-gate-plan.md` (§3, §8).

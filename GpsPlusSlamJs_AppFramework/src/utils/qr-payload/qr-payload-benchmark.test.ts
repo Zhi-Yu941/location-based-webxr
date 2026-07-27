@@ -16,12 +16,12 @@ import { encodeBinaryAnchorPayload } from './codec-binary-anchor';
 
 /**
  * P4/P5 of the QR payload-compression benchmark
- * (gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-05-qr-payload-compression-benchmark-plan.md):
+ * (gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-05-0611-qr-payload-compression-benchmark-plan.md):
  * the EXECUTABLE DOCUMENTATION of the payload decision. After P5 this file
  * is TRIMMED to the winners plus their baselines — the full A0–A7 matrix
  * (including deflate/gzip/base45, all pruned) and the original H1–H5
  * verdicts live in the results doc
- * `2026-07-05-qr-payload-compression-benchmark-results.md`.
+ * `2026-07-05-2027-qr-payload-compression-benchmark-results.md`.
  *
  * What ships (P5 decision, EC Q metric per decision D2):
  * - pointer `?qr=`: A4 dictionary (v7 on C1/C2 vs raw's v8), raw URL stays

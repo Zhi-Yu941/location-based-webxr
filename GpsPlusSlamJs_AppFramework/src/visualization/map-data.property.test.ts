@@ -96,7 +96,7 @@ describe('buildMapData — property: default userPosition is the fused tip (2026
   // conversion that could drift. Strict value equality over arbitrary rigid
   // matrices and odometry pins "no drift between dot and fused line", with a
   // raw fix present to prove fused always wins over raw. See
-  // gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-06-recorder-live-map-user-dot-fused-pose-user-feedback.md.
+  // gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-06-1526-recorder-live-map-user-dot-fused-pose-user-feedback.md.
   it('equals fusedPath[last] for any rigid matrix and non-empty odometry', () => {
     fc.assert(
       fc.property(arbRigidAlignment, arbOdomNonEmpty, (matrix, odom) => {

@@ -37,7 +37,7 @@ import {
   h3CellsMatch,
 } from 'gps-plus-slam-app-framework/geo/h3-proximity';
 import { createLogger } from 'gps-plus-slam-app-framework/utils/logger';
-import { setCurrentScenarioName } from '../state/recorder-store';
+import { setCurrentScenarioName } from '../state/scenario-slice';
 import { setImportedRefPointEntries } from '../state/ref-points-slice';
 import type { RecorderStore } from '../state/recorder-store';
 
@@ -105,8 +105,6 @@ export interface FolderManagerDeps {
   updateStatus: (msg: string) => void;
   /** UI: populate scenario dropdown. */
   populateScenarios: (scenarios: string[]) => void;
-  /** UI: mark folder as selected in the HUD. */
-  setFolderSelected: (selected: boolean) => void;
   /** UI: mark save location as selected in the HUD. */
   setSaveLocationSelected: (selected: boolean) => void;
   /**
@@ -281,7 +279,6 @@ export function createFolderManager(deps: FolderManagerDeps): FolderManager {
       const msg = `✅ ${result.folderName}${scenarioLabel ? ` (${scenarioLabel})` : ''}`;
       log.info(msg);
       deps.updateFolderStatus(msg);
-      deps.setFolderSelected(true);
       deps.validateEnterButton();
     } catch (err) {
       log.error('Unexpected error during folder scan:', err);

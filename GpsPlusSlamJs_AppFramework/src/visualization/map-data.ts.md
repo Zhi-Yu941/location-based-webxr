@@ -44,7 +44,7 @@ helper, keeping the framework ref-point-agnostic and the dependency direction
   conversion, so dot and line can never drift apart) → else the last
   `rawGpsPath` entry (pre-alignment fallback so the dot stays visible during
   startup) → else `null`. See
-  [2026-07-06-recorder-live-map-user-dot-fused-pose-user-feedback.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-06-recorder-live-map-user-dot-fused-pose-user-feedback.md).
+  [2026-07-06-1526-recorder-live-map-user-dot-fused-pose-user-feedback.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-07-06-1526-recorder-live-map-user-dot-fused-pose-user-feedback.md).
 - **`userHeadingDeg` (Finding 2):** the absolute view-direction bearing for the
   overlay's heading line, computed by
   [`computeUserHeadingDeg`](../utils/user-heading.ts) from the LATEST
@@ -53,7 +53,7 @@ helper, keeping the framework ref-point-agnostic and the dependency direction
   ONLY so pre-existing direct literals (e.g. the static summary map, out of
   scope) keep compiling; `drawMapData` treats a missing value exactly like
   `null` (no line). See
-  [2026-06-28-map-rings-transparency-and-view-direction-user-feedback.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-28-map-rings-transparency-and-view-direction-user-feedback.md).
+  [2026-06-28-1822-map-rings-transparency-and-view-direction-user-feedback.md](../../../../gps-plus-slam/GpsPlusSlamJs_Docs/docs/2026-06-28-1822-map-rings-transparency-and-view-direction-user-feedback.md).
 
 ## Examples
 

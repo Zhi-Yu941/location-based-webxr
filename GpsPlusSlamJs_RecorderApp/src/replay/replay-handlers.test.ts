@@ -105,10 +105,6 @@ const { mockMapOverlay, MockMapOverlayConstructor } = vi.hoisted(() => {
   return { mockMapOverlay: overlay, MockMapOverlayConstructor: MockMapOverlay };
 });
 
-vi.mock('gps-plus-slam-app-framework/visualization/map-overlay', () => ({
-  MapOverlay: MockMapOverlayConstructor,
-}));
-
 vi.mock(
   'gps-plus-slam-app-framework/visualization/leaflet-map-overlay',
   () => ({

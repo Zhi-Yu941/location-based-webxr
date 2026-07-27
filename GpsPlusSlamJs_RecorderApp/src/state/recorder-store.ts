@@ -112,12 +112,32 @@ export interface RecorderStoreOptions {
    * operator toggles them in the recorder settings. Defaults follow the framework:
    * **Stage 0 (`enableCompassColdStartOverride`) defaults ON** (field-validated),
    * Stage C + the consistency gate default OFF (field-gated). NB: the resulting
-   * `gpsData` actions persist into the recording (replay re-enables them) — turn
+   * `gpsData` actions persist into the recording (replay re-applies them) — turn
    * Stage 0 OFF for §6a calibration captures so the compass behaviour is unmodified.
+   * Since gps-plus-slam-js 1.16.0 the framework dispatches **Stage 0's** value
+   * explicitly, `false` included, because the library's own default for that flag
+   * is now `true` and an absent action would therefore mean "on". So a calibration
+   * capture records `setColdStartOverrideEnabled(false)` and replays faithfully.
+   * Stage C and the consistency gate are unchanged — still dispatch-on-`true`,
+   * since their library defaults are `false` and "absent ⇒ off" still holds.
    */
   enableCompassColdStartOverride?: boolean;
   enableCompassRotationPrior?: boolean;
   enableCompassWebXRConsistency?: boolean;
+  /**
+   * 2026-07-19 field-test opt-ins (enablement plan): the compass experiment
+   * combo (rotation prior + trust tolerance 15° + C′ pair selection) and the
+   * alternative robust-solver comparison arm. Sourced from
+   * `RecordingOptions.compassDebug.{experiment,robustSolverComparison}`; default OFF.
+   */
+  enableCompassExperiment?: boolean;
+  enableRobustSolverComparison?: boolean;
+  /**
+   * Steady-state compass vote weight ∈ [0,1] (the settings slider). Absent ⇒
+   * library default. Only consulted while the experiment / rotation prior is
+   * active. Sourced from `RecordingOptions.compassDebug.voteWeight`.
+   */
+  compassVoteWeight?: number;
 }
 
 /**
@@ -138,6 +158,9 @@ export function createRecorderStore(
     enableCompassColdStartOverride: options.enableCompassColdStartOverride,
     enableCompassRotationPrior: options.enableCompassRotationPrior,
     enableCompassWebXRConsistency: options.enableCompassWebXRConsistency,
+    enableCompassExperiment: options.enableCompassExperiment,
+    enableRobustSolverComparison: options.enableRobustSolverComparison,
+    compassVoteWeight: options.compassVoteWeight,
     // Persist the recorder-owned refPoints slice and the framework qrDetected
     // slice. Derived from each slice's own action type (never a literal) so a
     // rename can't silently drop data from recordings — see the 2026-05-28

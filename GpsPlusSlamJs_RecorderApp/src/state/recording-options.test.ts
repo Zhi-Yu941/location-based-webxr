@@ -10,6 +10,10 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
+  DEFAULT_RECONSTRUCTION_DEPTH_GRID_SIZE,
+  DEFAULT_RECONSTRUCTION_DEPTH_INTERVAL_MS,
+} from 'gps-plus-slam-app-framework/ar/depth-sampler';
+import {
   loadRecordingOptions,
   saveRecordingOptions,
   resetRecordingOptions,
@@ -19,6 +23,7 @@ import {
   validateFrameTileDisplayOptions,
   validateVisualizationOptions,
   validateCompassDebugOptions,
+  compassStoreOptions,
   validateLoopClosureDebugOptions,
   validateQrOptions,
   validateMotionFilterOptions,
@@ -37,6 +42,10 @@ import {
   type RecordingOptions,
   type OccupancyOptions,
 } from './recording-options';
+import {
+  DEFAULT_OCCUPANCY_CELL_SIZE_M,
+  DEFAULT_OCCUPANCY_MIN_OBSERVATIONS,
+} from 'gps-plus-slam-app-framework/ar/occupancy-grid';
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -114,9 +123,37 @@ describe('recording-options', () => {
       expect(validateDepthOptions({ rgb: false }).rgb).toBe(false);
     });
 
+    it('defaults to the framework reconstruction cadence (200 ms × gridSize 24)', () => {
+      // Why this test matters: both reconstruction apps must share ONE depth
+      // tuning source or they visibly drift apart (the demo-vs-recorder speed
+      // gap, 2026-07-16). Values from the maintainer's 2026-07-16 on-device
+      // framerate/mesh trade-off pass — the sweep-derived 500 ms × 64 hurt
+      // the framerate (8192 points/s); 24² @ 2 s keeps rendering smooth.
+      expect(DEFAULT_RECORDING_OPTIONS.depth.intervalMs).toBe(
+        DEFAULT_RECONSTRUCTION_DEPTH_INTERVAL_MS
+      );
+      expect(DEFAULT_RECORDING_OPTIONS.depth.gridSize).toBe(
+        DEFAULT_RECONSTRUCTION_DEPTH_GRID_SIZE
+      );
+      expect(DEFAULT_RECORDING_OPTIONS.depth.gridSize).toBe(24);
+      expect(DEFAULT_RECORDING_OPTIONS.depth.intervalMs).toBe(200);
+    });
+
     it('clamps intervalMs below minimum to minimum', () => {
-      const result = validateDepthOptions({ intervalMs: 100 });
+      const result = validateDepthOptions({ intervalMs: 30 });
       expect(result.intervalMs).toBe(DEPTH_CONSTRAINTS.intervalMs.min);
+    });
+
+    it('accepts dense-capture intervals down to 100 ms unclamped', () => {
+      // Why this test matters (2026-07-16 superset-capture strategy): dense
+      // validation recordings are captured at high rate + high gridSize and
+      // DECIMATED in replay to simulate every slower configuration — a
+      // recording can only ever be thinned, never densified. The old 500 ms
+      // floor made such supersets impossible; 100 and 250 must now pass
+      // through validation verbatim (the sampler emits at most once per XR
+      // frame, so an over-ambitious interval degrades gracefully on-device).
+      expect(validateDepthOptions({ intervalMs: 100 }).intervalMs).toBe(100);
+      expect(validateDepthOptions({ intervalMs: 250 }).intervalMs).toBe(250);
     });
 
     it('clamps intervalMs above maximum to maximum', () => {
@@ -454,13 +491,13 @@ describe('recording-options', () => {
      * recorder setting (2026-06-22 behind-surface-noise plan). It is forwarded
      * to `getOccupiedCells(minObservations)`, which expects a positive integer,
      * so validation must round, clamp to 1–10, and reject garbage to the
-     * default (default 3, not 1 — the filter is on out of the box; set to 3 in
-     * the 2026-07-01 fast-reconstruction tuning: the fastest noise floor that
-     * still suppresses behind-surface phantoms, ~1.5s dwell before a surface
-     * meshes vs 2.5s at 5).
+     * default (default 2, not 1 — the filter is on out of the box; lowered
+     * 3 → 2 in the 2026-07-16 evening on-device trade-off pass: the decay
+     * carve guard neutralizes mc 2's floater cost, and the lower floor
+     * meshes surfaces after ~half the dwell).
      */
-    it('defaults minConfidence to 3 for an empty object', () => {
-      expect(validateOccupancyOptions({}).minConfidence).toBe(3);
+    it('defaults minConfidence to 2 for an empty object', () => {
+      expect(validateOccupancyOptions({}).minConfidence).toBe(2);
     });
 
     it('preserves a valid in-range minConfidence', () => {
@@ -794,6 +831,12 @@ describe('recording-options', () => {
         coldStartOverride: true,
         rotationPrior: false,
         webXRConsistency: false,
+        experiment: false,
+        robustSolverComparison: false,
+        // 0.1 = the census-optimal weight (2026-07-19 sweep; developer
+        // decision 2026-07-20, settings-clarity follow-up §4.6 — mirrors the
+        // library default).
+        voteWeight: 0.1,
       });
     });
 
@@ -803,17 +846,24 @@ describe('recording-options', () => {
           coldStartOverride: false,
           rotationPrior: true,
           webXRConsistency: true,
+          experiment: true,
+          robustSolverComparison: true,
+          voteWeight: 0.1,
         })
       ).toEqual({
         coldStartOverride: false,
         rotationPrior: true,
         webXRConsistency: true,
+        experiment: true,
+        robustSolverComparison: true,
+        voteWeight: 0.1,
       });
     });
 
     it('falls back to each field default for non-boolean values', () => {
       // Stage 0 falls back to its default-ON; the experimental flags fall back
-      // OFF — a garbage persisted value never silently enables Stage C / gate.
+      // OFF — a garbage persisted value never silently enables Stage C / gate /
+      // the 2026-07-19 field-test experiments.
       expect(
         validateCompassDebugOptions({
           coldStartOverride: 'no' as unknown as boolean,
@@ -823,6 +873,97 @@ describe('recording-options', () => {
         validateCompassDebugOptions({ rotationPrior: 1 as unknown as boolean })
           .rotationPrior
       ).toBe(false);
+      expect(
+        validateCompassDebugOptions({
+          experiment: 'yes' as unknown as boolean,
+        }).experiment
+      ).toBe(false);
+      expect(
+        validateCompassDebugOptions({
+          robustSolverComparison: 1 as unknown as boolean,
+        }).robustSolverComparison
+      ).toBe(false);
+    });
+
+    it('voteWeight clamps to [0,1] and falls back to 0.1 for non-finite values', () => {
+      // Why: the vote weight feeds straight into the steady-state compass
+      // blend — a garbage persisted value must neither crash the library
+      // action (which throws outside [0,1]) nor silently distort the solve.
+      // The fallback matches the 0.1 default (census optimum, 2026-07-20).
+      expect(validateCompassDebugOptions({ voteWeight: 0.3 }).voteWeight).toBe(
+        0.3
+      );
+      expect(validateCompassDebugOptions({ voteWeight: 1.5 }).voteWeight).toBe(
+        1
+      );
+      expect(validateCompassDebugOptions({ voteWeight: -0.2 }).voteWeight).toBe(
+        0
+      );
+      expect(
+        validateCompassDebugOptions({ voteWeight: Number.NaN }).voteWeight
+      ).toBe(0.1);
+      expect(
+        validateCompassDebugOptions({
+          voteWeight: 'high' as unknown as number,
+        }).voteWeight
+      ).toBe(0.1);
+    });
+
+    // Why these tests matter: this mapping was an inline conditional in
+    // main.ts `createNewStore` and was UNTESTED (settings-clarity follow-up
+    // §3.4/§4.1c). The load-bearing rule: the vote weight is forwarded ONLY
+    // when a rotation prior can consume it (experiment or Stage C on) — a
+    // Stage-0-only session must not record a dead setCompassVoteWeight action.
+    describe('compassStoreOptions', () => {
+      it('maps each flag 1:1 onto the store option names', () => {
+        expect(
+          compassStoreOptions({
+            coldStartOverride: true,
+            rotationPrior: true,
+            webXRConsistency: true,
+            experiment: true,
+            robustSolverComparison: true,
+            voteWeight: 0.25,
+          })
+        ).toEqual({
+          enableCompassColdStartOverride: true,
+          enableCompassRotationPrior: true,
+          enableCompassWebXRConsistency: true,
+          enableCompassExperiment: true,
+          enableRobustSolverComparison: true,
+          compassVoteWeight: 0.25,
+        });
+      });
+
+      it('omits the vote weight when neither experiment nor rotation prior is on (Stage-0-only default state)', () => {
+        const stage0Only = compassStoreOptions(
+          DEFAULT_RECORDING_OPTIONS.compassDebug
+        );
+        expect(stage0Only.enableCompassColdStartOverride).toBe(true);
+        expect(stage0Only.compassVoteWeight).toBeUndefined();
+      });
+
+      it('forwards the vote weight when the experiment OR the rotation prior is on', () => {
+        const base = {
+          ...DEFAULT_RECORDING_OPTIONS.compassDebug,
+          voteWeight: 0.2,
+        };
+        expect(
+          compassStoreOptions({ ...base, experiment: true }).compassVoteWeight
+        ).toBe(0.2);
+        expect(
+          compassStoreOptions({ ...base, rotationPrior: true })
+            .compassVoteWeight
+        ).toBe(0.2);
+      });
+
+      // Why toStrictEqual({}): `{}` vs explicit-undefined keys is load-bearing
+      // — spreading explicit-undefined keys over the framework's defaults
+      // would clobber them, while `{}` preserves them. toEqual cannot tell
+      // the two shapes apart; toStrictEqual pins the no-explicit-keys shape.
+      it('returns an empty object (no explicit keys) when no compassDebug options exist yet (boot before load)', () => {
+        expect(compassStoreOptions(undefined)).toStrictEqual({});
+      });
     });
 
     it('validateRecordingOptions + cloneRecordingOptions carry compassDebug (deep-cloned)', () => {
@@ -833,6 +974,9 @@ describe('recording-options', () => {
         coldStartOverride: true,
         rotationPrior: false,
         webXRConsistency: false,
+        experiment: false,
+        robustSolverComparison: false,
+        voteWeight: 0.1,
       });
       const clone = cloneRecordingOptions(opts);
       expect(clone.compassDebug).not.toBe(opts.compassDebug); // no aliasing
@@ -1510,32 +1654,41 @@ describe('recording-options', () => {
     });
 
     it('has reasonable default intervals', () => {
-      expect(DEFAULT_RECORDING_OPTIONS.depth.intervalMs).toBe(500);
+      expect(DEFAULT_RECORDING_OPTIONS.depth.intervalMs).toBe(200);
       expect(DEFAULT_RECORDING_OPTIONS.images.intervalMs).toBe(2000);
     });
 
     /**
-     * Why this matters: the 2026-07-01 param-sweep (on a real recording) tuned
-     * the depth/occupancy defaults for FAST mesh reconstruction — surfaces
-     * should mesh ASAP. These pin that decision: intervalMs 500 (min cadence),
-     * gridSize 32 (max points/sample ⇒ cells confirm fastest), minConfidence 3
-     * (fastest noise floor that still suppresses phantoms — ~1.5s dwell),
-     * cellSizeM 0.15 (detail). See
-     * GpsPlusSlamJs_Docs/docs/2026-06-30-0829-occluder-tuning-followups.md (Round 6).
+     * Why this matters: these pin the maintainer's 2026-07-16 EVENING
+     * on-device framerate/mesh trade-off (screenshot-documented settings pass):
+     * depth 2000 ms × 24×24, voxel 16 cm, minConfidence 2. The same-day
+     * sweep-derived 500 ms × 64 delivered the fastest mesh on ground truth but
+     * visibly hurt the on-device framerate — the sweep's flagged open
+     * question. mc 2's floater cost under legacy carving is neutralized by the
+     * decay carve guard (real pillar A/B: guarded mc 2 ≈ mc 3 isolation).
+     * All four values come from framework constants so the PhysicsDemo shares
+     * them.
      */
     it('uses the fast-reconstruction depth/occupancy defaults', () => {
-      expect(DEFAULT_RECORDING_OPTIONS.depth.intervalMs).toBe(500);
-      expect(DEFAULT_RECORDING_OPTIONS.depth.gridSize).toBe(32);
-      expect(DEFAULT_RECORDING_OPTIONS.occupancy.minConfidence).toBe(3);
-      expect(DEFAULT_RECORDING_OPTIONS.occupancy.cellSizeM).toBe(0.15);
+      expect(DEFAULT_RECORDING_OPTIONS.depth.intervalMs).toBe(200);
+      expect(DEFAULT_RECORDING_OPTIONS.depth.gridSize).toBe(24);
+      expect(DEFAULT_RECORDING_OPTIONS.occupancy.minConfidence).toBe(2);
+      expect(DEFAULT_RECORDING_OPTIONS.occupancy.cellSizeM).toBe(0.16);
     });
 
     it('has resolutionDivisor defaulting to 1 (full resolution)', () => {
       expect(DEFAULT_RECORDING_OPTIONS.images.resolutionDivisor).toBe(1);
     });
 
-    it('has occupancy cell size defaulting to 0.15 m (OccupancyGrid parity)', () => {
-      expect(DEFAULT_RECORDING_OPTIONS.occupancy.cellSizeM).toBe(0.15);
+    it('inherits its occupancy voxel size + noise floor from the framework defaults', () => {
+      // Single source of truth: both the recorder and the PhysicsDemo read these
+      // framework constants, so this pins the inheritance (not just the number).
+      expect(DEFAULT_RECORDING_OPTIONS.occupancy.cellSizeM).toBe(
+        DEFAULT_OCCUPANCY_CELL_SIZE_M
+      );
+      expect(DEFAULT_RECORDING_OPTIONS.occupancy.minConfidence).toBe(
+        DEFAULT_OCCUPANCY_MIN_OBSERVATIONS
+      );
     });
 
     it('has frame-tile display divisor defaulting to 2 (half resolution)', () => {

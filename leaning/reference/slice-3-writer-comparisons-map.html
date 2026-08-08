@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Slice 3 writer and comparison map</title>
+    <link rel="stylesheet" href="../assets/lesson.css" />
+  </head>
+  <body>
+    <main class="compact">
+      <header>
+        <div class="eyebrow">Quick reference · Slice 3</div>
+        <h1>Canonical writer and comparison map</h1>
+        <p class="lede">
+          The exact output rules and the boundary between semantic equivalence
+          and exact no-op preservation.
+        </p>
+      </header>
+
+      <h2>Writer pipeline</h2>
+      <div class="flow" aria-label="COLMAP writer flow">
+        <span class="step">typed model</span><span class="arrow">→</span>
+        <span class="step">validate all</span><span class="arrow">→</span>
+        <span class="step">three byte arrays</span>
+      </div>
+      <ul class="checklist">
+        <li>Validate the complete model before generating output.</li>
+        <li>
+          Preserve array order, IDs, references, names, and quaternion sign.
+        </li>
+        <li>Use exact headers, one ASCII space, LF, and a final LF.</li>
+        <li>Use round-trip-safe base-10 strings; never fixed decimals.</li>
+        <li>Emit both <code>0</code> and <code>-0</code> as <code>0</code>.</li>
+        <li>Emit one empty observation line after every image pose.</li>
+        <li>Recompute counts and produce identical bytes on repeated calls.</li>
+      </ul>
+
+      <h2>Two predicates</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Property</th>
+            <th>Semantic equality</th>
+            <th>Exact preservation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Counts, order, IDs, names, references</td>
+            <td>Exact</td>
+            <td>Exact</td>
+          </tr>
+          <tr>
+            <td>Dimensions and RGB</td>
+            <td>Exact</td>
+            <td>Exact</td>
+          </tr>
+          <tr>
+            <td>Approved floating fields</td>
+            <td>Absolute/relative tolerance</td>
+            <td><code>===</code>, with zero signs equal</td>
+          </tr>
+          <tr>
+            <td>Quaternion</td>
+            <td><code>q</code> and <code>-q</code> equivalent</td>
+            <td>Original component sign required</td>
+          </tr>
+          <tr>
+            <td>Source comments/whitespace</td>
+            <td>Not model data</td>
+            <td>Not model data</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Approved floating predicate</h2>
+      <pre><code>abs(a - b) &lt;=
+  max(1e-12, 1e-12 * max(abs(a), abs(b)))</code></pre>
+      <p>
+        Apply it only to intrinsics, quaternion/translation components, point
+        XYZ, and point error. Never apply it to IDs, dimensions, RGB, names,
+        references, counts, or order.
+      </p>
+
+      <h2>Quaternion decision</h2>
+      <ol class="sequence">
+        <li>Both quaternions have already passed model validation.</li>
+        <li>Compute their dot product.</li>
+        <li>
+          If the dot is negative, compare the right quaternion after sign
+          reversal.
+        </li>
+        <li>Compare aligned components with the semantic float predicate.</li>
+      </ol>
+      <p>
+        Semantic comparison accepts a pure sign flip. Exact preservation reports
+        that same case as <code>quaternion-sign</code>. A genuinely different
+        rotation reports <code>quaternion-orientation</code>.
+      </p>
+
+      <h2>Deterministic failure order</h2>
+      <ol class="checklist">
+        <li>Camera collection, records, then fields.</li>
+        <li>Image collection, records, then fields.</li>
+        <li>Point collection, records, then fields.</li>
+        <li>Return immediately on the first difference.</li>
+      </ol>
+      <p>
+        Paths use stable zero-based notation such as
+        <code>images[2].pose.qvec[0]</code>. Return
+        <code>{ equal: true }</code> only after every required field passes.
+      </p>
+
+      <h2>Do not add</h2>
+      <p>
+        No ZIP handling, filesystem access, arbitrary deep-equality library,
+        configurable tolerance system, accumulated diff report, pose conversion,
+        or comparison of original text formatting.
+      </p>
+
+      <footer>
+        Study with
+        <a href="../lessons/0004-slice-3-writer-and-comparisons.html"
+          >Lesson 4: write and compare without hiding changes</a
+        >. Primary JavaScript references:
+        <a
+          href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Equality_comparisons_and_sameness"
+          >equality and sameness</a
+        >
+        and
+        <a
+          href="https://www.typescriptlang.org/docs/handbook/2/narrowing.html#discriminated-unions"
+          >TypeScript discriminated unions</a
+        >.
+      </footer>
+    </main>
+  </body>
+</html>

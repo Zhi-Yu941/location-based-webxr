@@ -145,7 +145,7 @@ Task2_Goal1A/
   package.json
 ```
 
-Tests are colocated as `*.test.ts` files under `Task2_Goal1A/src/colmap/`. The private package builds and tests the same `./colmap` public boundary intended for final integration. It MUST NOT import AppFramework or RecorderApp implementation modules. Adding the package to `pnpm-workspace.yaml` and its lockfile importer is the one-time repository-level setup; ordinary 1A implementation stays inside `Task2_Goal1A/`.
+Tests are colocated as `*.test.ts` files under `Task2_Goal1A/src/colmap/`. The private package builds a local `./colmap`-shaped entry without changing the upstream package boundary; the permanent public-export regression test is added during final AppFramework integration in slice 9. It MUST NOT import AppFramework or RecorderApp implementation modules. Adding the package to `pnpm-workspace.yaml` and its lockfile importer is the one-time repository-level setup; ordinary 1A implementation stays inside `Task2_Goal1A/`.
 
 The local development CLI lives at `Task2_Goal1A/scripts/colmap-round-trip.mjs`, imports the compiled `../dist/colmap/index.js` entry, and is invoked as:
 
@@ -751,7 +751,7 @@ Every implementation slice starts with a failing test for its next behavior. Tes
 - emitted bytes are reopened and verified before success;
 - each of the three emitted sparse payloads equals the actual serializer output, including for the noncanonical input case;
 - CLI path handling is the only Node-specific layer;
-- the built `./colmap` package export loads successfully and no file under `Task2_Goal1A/src/colmap/` imports `node:*`, uses `Buffer`, or accesses filesystem/process APIs;
+- no file under `Task2_Goal1A/src/colmap/` imports `node:*`, uses `Buffer`, or accesses filesystem/process APIs;
 - errors produce a non-zero exit and no final output path;
 - successful output is moved into place only after verification.
 
@@ -803,7 +803,7 @@ The order below minimizes rework and keeps every slice independently reviewable.
 |---|---|---|---:|---|
 | 0. Approve and recheck | Filip and Mingna approve this plan, recheck both fixture hashes, and record any contradiction. | Section 18 is complete and no verified fixture fact contradicts the model. | 0.5 | Accepted plan and fixture expectations only. |
 | 0A. ZIP feasibility spike | In a disposable test/spike inside `Task2_Goal1A`, use the installed zip.js version to open a synthetic ZIP, snapshot every archive entry payload, replace one selected entry, write bytes, reopen, and compare. Do not promote spike code automatically. | The chosen zip.js APIs work in the browser-compatible package target and preserve decompressed bytes and directory records; otherwise revise the adapter plan before model work. Re-estimate slices 1-9 here. | 0.5 | No production commit unless rewritten test-first. |
-| 1. Public surface, model, and validation | Complete the scaffolded `model.ts`, `index.ts`, private-package `./colmap` build, public-export/portability tests, then validator tests and implementation. | The built public subpath loads; valid and invalid synthetic models behave as section 8 requires. | 1 | Package surface + typed model + validator + tests. |
+| 1. Model and validation | Complete `model.ts`, the private-package portability tests, then validator tests and implementation. | The isolated core remains browser-compatible; valid and invalid synthetic models behave as section 8 requires. | 1 | Typed model + validator + portability and validation tests. |
 | 2. Text reader | Add known-record, malformed-record, encoding, empty-observation/track, sparse-ID, and pose tests; then implement candidate parsing and validation. | All three files parse into the validated ordered model with contextual failures. | 1-1.5 | Parser + parser/pose tests. |
 | 3. Text writer and comparisons | Add exact canonical output, semantic round-trip, exact no-op, noncanonical-input, quaternion-sign, and golden-format tests; then implement serialization/comparison. | All codec guarantees in section 10 pass without fixed-decimal rounding. | 1-1.5 | Writer/comparators + tests. |
 | 4. Archive adapter | Hand-build synthetic ZIP fixtures; test inventory, path rules, image resolution, copy-through, and selected replacement before implementation. | One adapter preserves all untouched entries and replaces only the three serializer outputs. | 1-1.5 | ZIP adapter + archive tests. |
@@ -811,7 +811,7 @@ The order below minimizes rework and keeps every slice independently reviewable.
 | 6. Node CLI | Build first; test exact arguments, path policy, exit status, image ID `1`, temporary cleanup, delayed final rename, and output formatting; then implement the `.mjs` wrapper and `colmap:roundtrip` script. | The subprocess test uses the built public core; local CLI produces only a verified output and prints the assignment summary. | 0.5-1 | CLI + CLI tests + package script. |
 | 7. Real fixture replay | Run the complete path on the first Task 1 ZIP, then the second if needed by section 13.6; fix contract violations rather than weakening assertions silently. | Required local replay passes and evidence is retained. | 0.5-1 | Fixture-driven corrections only, separate from unrelated refactors. |
 | 8. External smoke | Run one final emitted ZIP through LichtFeld and record the result. | Section 14 passes. | 0.5 active work | Evidence record only. |
-| 9. AppFramework integration | Stop feature work; move the accepted source/tests and CLI into AppFramework, add its `./colmap` export and tsdown entry, remove the temporary package/workspace entry, and rerun local gates. | Only one implementation remains, AppFramework builds the public subpath, all 1A tests still pass, and the fixture output remains semantically and archive equivalent. | 0.5-1 | One mechanical integration commit, separate from behavior changes. |
+| 9. AppFramework integration | Stop feature work; move the accepted source/tests and CLI into AppFramework, add its `./colmap` export, tsdown entry, and permanent public-export regression test, remove the temporary package/workspace entry, and rerun local gates. | Only one implementation remains, AppFramework builds and loads the public subpath, all 1A tests still pass, and the fixture output remains semantically and archive equivalent. | 0.5-1 | One mechanical integration commit, separate from behavior changes. |
 
 Revised initial total: approximately **eight to eleven focused pair sessions**, including final integration. The spike, real fixture, smoke, or an upstream integration conflict may justify a new estimate; optional generalization does not.
 

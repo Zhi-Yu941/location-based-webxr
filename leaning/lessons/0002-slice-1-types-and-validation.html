@@ -14,8 +14,8 @@
         <h1>Connect Slice 1's TypeScript blocks</h1>
         <p class="lede">
           Learn what each file and helper is responsible for, why the pieces
-          stay separate, and how to assemble them test-first without receiving
-          a finished validator.
+          stay separate, and how to assemble them test-first from small usable
+          examples without receiving a finished validator.
         </p>
       </header>
 
@@ -53,6 +53,13 @@
         quaternion norm. Slice 1 needs both layers.
       </p>
 
+      <pre><code>type CameraId = number;
+
+const cameraId: CameraId = -4; // The type allows this number.
+
+Number.isSafeInteger(cameraId) &amp;&amp; cameraId &gt; 0;
+// Runtime validation decides whether it is acceptable.</code></pre>
+
       <section class="quiz" data-quiz>
         <h3>Retrieval check</h3>
         <p>Which layer proves that camera ID 3 is a positive safe integer?</p>
@@ -87,6 +94,13 @@
         still allow one numeric alias where another number is expected.
       </p>
 
+      <pre><code>type CameraId = number;
+type Vector3 = readonly [number, number, number];
+type QuaternionWxyz = readonly [number, number, number, number];
+
+const translation: Vector3 = [0, 1.5, -2];
+const rotation: QuaternionWxyz = [1, 0, 0, 0];</code></pre>
+
       <h3>Readonly tuples</h3>
       <p>
         A tuple such as <code>readonly [number, number, number]</code> fixes the
@@ -109,6 +123,15 @@
         deliberately instead of weakening today's contract.
       </p>
 
+      <pre><code>interface PinholeCamera {
+  readonly cameraId: CameraId;
+  readonly model: "PINHOLE";
+  readonly width: number;
+  readonly height: number;
+}
+
+type ColmapCamera = PinholeCamera;</code></pre>
+
       <h3>Pose meaning is part of the type name</h3>
       <p>
         <code>WorldToCameraPose</code> prevents a dangerous conceptual shortcut.
@@ -124,6 +147,15 @@
         of order. Therefore, an image's <code>cameraId</code> is resolved by
         membership in a camera-ID set—not by using the ID as an array index.
       </p>
+
+      <pre><code>const cameraIds = new Set(
+  model.cameras.map((camera) =&gt; camera.cameraId),
+);
+
+for (const image of model.images) {
+  const cameraExists = cameraIds.has(image.cameraId);
+  // A false result becomes a reference error.
+}</code></pre>
 
       <div class="practice">
         <h3>Connect-it-yourself prompt</h3>
@@ -158,6 +190,14 @@
         checked that <code>kind</code> and <code>field</code> stay accurate.
       </p>
 
+      <pre><code>function isPositiveSafeInteger(value: number): boolean {
+  return Number.isSafeInteger(value) &amp;&amp; value &gt; 0;
+}
+
+function isRgbChannel(value: number): boolean {
+  return Number.isInteger(value) &amp;&amp; value &gt;= 0 &amp;&amp; value &lt;= 255;
+}</code></pre>
+
       <h3>Why <code>Number.isSafeInteger</code>?</h3>
       <p>
         JavaScript numbers cannot represent every large integer exactly.
@@ -180,6 +220,10 @@
         check, not an invitation to normalize. Rejecting exposes bad input;
         repairing would hide it.
       </p>
+
+      <pre><code>const [qw, qx, qy, qz] = pose.qvec;
+const norm = Math.hypot(qw, qx, qy, qz);
+const isUnitQuaternion = Math.abs(norm - 1) &lt;= 1e-6;</code></pre>
 
       <section class="quiz" data-quiz>
         <h3>Retrieval check</h3>
@@ -214,6 +258,13 @@
         primarily exercises <code>validation</code>,
         <code>reference</code>, and <code>unsupported-profile</code>.
       </p>
+
+      <pre><code>if (camera.width &lt;= 0) {
+  throw new ColmapError("Camera width must be positive", {
+    kind: "validation",
+    field: "width",
+  });
+}</code></pre>
       <p>
         Tests should assert the class and structured properties. Exact full
         messages are deliberately not the contract, so wording can improve
@@ -254,6 +305,43 @@
         single cause and keeps the validator's growth visible.
       </p>
 
+      <pre><code>function makeValidModel(): RecorderColmapModel {
+  return {
+    cameras: [
+      {
+        cameraId: 1,
+        model: "PINHOLE",
+        width: 823,
+        height: 1920,
+        intrinsics: {
+          fx: 1254.38,
+          fy: 1254.17,
+          cx: 411.5,
+          cy: 960,
+        },
+      },
+    ],
+    images: [
+      {
+        imageId: 1,
+        cameraId: 1,
+        name: "frame-000001.jpg",
+        pose: {
+          qvec: [1, 0, 0, 0],
+          tvec: [0, 0, 0],
+        },
+        observations: [],
+      },
+    ],
+    points3D: [],
+  };
+}</code></pre>
+
+      <p>
+        Start with this single fixture function. Split out camera or image
+        helpers only if repetition later makes them useful.
+      </p>
+
       <div class="block-grid">
         <article class="block-card">
           <h3>Happy path</h3>
@@ -286,12 +374,44 @@
         that path.
       </div>
 
+      <pre><code>const base = makeValidModel();
+const camera = base.cameras[0]!;
+
+const invalid = {
+  ...base,
+  cameras: [
+    {
+      ...camera,
+      intrinsics: { ...camera.intrinsics, fx: 0 },
+    },
+  ],
+};</code></pre>
+
+      <p class="note">
+        The <code>!</code> tells TypeScript that this test fixture definitely
+        has a first camera. It is needed because this project enables
+        <code>noUncheckedIndexedAccess</code>. Do not use it for genuinely
+        untrusted array access inside the validator.
+      </p>
+
       <p>
         For thrown errors, capture the error once and inspect
         <code>instanceof</code>, <code>kind</code>, and
         <code>field</code>. Avoid calling the validator repeatedly in separate
         assertions, because each assertion should describe the same failure.
       </p>
+
+      <pre><code>try {
+  validateRecorderColmapModel(invalid);
+  throw new Error("Expected validation to fail");
+} catch (error) {
+  expect(error).toBeInstanceOf(ColmapError);
+
+  if (error instanceof ColmapError) {
+    expect(error.kind).toBe("validation");
+    expect(error.field).toBe("fx");
+  }
+}</code></pre>
 
       <div class="practice">
         <h3>Test-design drill</h3>
@@ -311,6 +431,14 @@
         from JavaScript; <code>ColmapError</code> remains because consumers need
         the runtime class for <code>instanceof</code>.
       </p>
+
+      <pre><code>export type {
+  RecorderColmapModel,
+  ColmapCamera,
+  ColmapImage,
+} from "./model.js";
+
+export { ColmapError } from "./validate.js";</code></pre>
       <p>
         The supplied Slice 1 brief says the low-level validator stays internal
         and unfinished operations should not be exported. A public API test

@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lesson 4 — Write and compare without hiding changes</title>
+    <link rel="stylesheet" href="../assets/lesson.css" />
+    <script src="../assets/quiz.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Lesson 4 · about 25 minutes</div>
+        <h1>Write and compare without hiding changes</h1>
+        <p class="lede">
+          Slice 3 finishes the text boundary. Learn how to emit exact canonical
+          COLMAP bytes, compare models by meaning, and separately prove that an
+          unchanged model lost nothing.
+        </p>
+      </header>
+
+      <div class="goal">
+        <strong>Your tangible win:</strong> explain why one round trip needs two
+        comparison results and sketch the writer/comparator blocks without
+        receiving a finished implementation.
+      </div>
+
+      <h2>1. Slice 3 has three outputs</h2>
+      <div class="block-grid">
+        <article class="block-card">
+          <h3>Canonical text</h3>
+          <p>
+            One deterministic representation of the validated model as three
+            <code>Uint8Array</code> payloads.
+          </p>
+        </article>
+        <article class="block-card">
+          <h3>Semantic result</h3>
+          <p>
+            Whether two models mean the same thing under approved floating
+            tolerance and quaternion sign equivalence.
+          </p>
+        </article>
+        <article class="block-card">
+          <h3>Exact result</h3>
+          <p>
+            Whether an unchanged model preserved every represented value,
+            including the chosen quaternion sign.
+          </p>
+        </article>
+      </div>
+
+      <p class="warning">
+        A single “close enough” comparator cannot prove a no-op. It could accept
+        a small drift or quaternion sign change and hide a writer bug.
+      </p>
+
+      <h2>2. Block A — validate before generating anything</h2>
+      <p>
+        The writer receives a TypeScript model, but runtime callers can still
+        supply invalid values. Reuse the Slice 1 validator before building any
+        output text. Do not validate file-by-file after some bytes already
+        exist.
+      </p>
+
+      <pre><code>validate complete model
+→ build all canonical strings
+→ encode all three strings
+→ return all three payloads</code></pre>
+
+      <p>
+        This preserves the all-or-nothing boundary. The validator rejects
+        rounding candidates, RGB values that would need clamping, non-unit
+        quaternions, populated observations, and populated tracks. The writer
+        does not repair any of them.
+      </p>
+
+      <h2>3. Block B — make one field string, then one record line</h2>
+      <p>
+        After validation, JavaScript's ordinary base-10 number string is the
+        required numeric representation. Do not use <code>toFixed</code> or
+        <code>toPrecision</code>: choosing a decimal width introduces rounding
+        that the contract does not permit.
+      </p>
+
+      <pre><code>String(1254.3877251148224) // round-trip-safe decimal
+String(-0)                 // "0"
+
+fieldStrings.join(" ")     // exactly one ASCII space</code></pre>
+
+      <p>
+        Build camera, image, and point lines from their fields in contract
+        order. Keep the existing model-array order; never sort by ID. Sparse IDs
+        are identifiers, not array indexes.
+      </p>
+
+      <section class="quiz" data-quiz>
+        <h3>Retrieval check</h3>
+        <p>Which formatting operation belongs in this writer?</p>
+        <div class="quiz-options">
+          <button
+            type="button"
+            data-correct="true"
+            data-success="Correct. Normal conversion preserves the Number value."
+            data-retry="Try again: fixed width can change the stored number."
+          >
+            Normal conversion
+          </button>
+          <button
+            type="button"
+            data-correct="false"
+            data-success=""
+            data-retry="No. Fixed decimals can round the supplied value."
+          >
+            Fixed conversion
+          </button>
+          <button
+            type="button"
+            data-correct="false"
+            data-success=""
+            data-retry="No. Locale output can change separators and grouping."
+          >
+            Locale conversion
+          </button>
+        </div>
+        <p class="feedback" data-feedback aria-live="polite"></p>
+      </section>
+
+      <h2>4. Block C — assemble exact physical lines</h2>
+      <p>
+        Treat each output file as an ordered array of physical lines. Start with
+        the exact required header lines, append data records, join with LF, then
+        append one final LF.
+      </p>
+
+      <pre><code>lines.join("\n") + "\n"</code></pre>
+
+      <p>
+        For every image, append both the pose line and an empty string. That
+        empty element becomes the required observation line. The last image
+        still needs that structural empty line plus the file's final line
+        ending. With zero points, <code>points3D.txt</code> contains only its
+        three headers and final LF.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Preserve</th>
+            <th>Canonicalize</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Record order, IDs, names, references</td>
+            <td>Headers and count text</td>
+          </tr>
+          <tr>
+            <td>Numeric values and quaternion representative</td>
+            <td>Spaces, numeric lexemes, and line endings</td>
+          </tr>
+          <tr>
+            <td>Empty observation/track meaning</td>
+            <td>Final LF and empty image lines</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>5. Block D — prove the writer ran</h2>
+      <p>
+        A round trip that returns the original text bytes could pass many model
+        checks while never exercising the writer. Use one valid but noncanonical
+        input: different comments, CRLF, extra accepted spacing, or an alternate
+        valid numeric lexeme such as exponent notation.
+      </p>
+
+      <pre><code>noncanonical bytes
+→ parse model
+→ serialize model
+→ canonical bytes
+
+original bytes !== canonical bytes</code></pre>
+
+      <p>
+        Then compare the canonical bytes against one complete golden string for
+        each file. Partial <code>contains</code> assertions are too weak for
+        headers, blank lines, field order, and final LF.
+      </p>
+
+      <h2>6. Block E — use the existing discriminated result</h2>
+      <p>
+        <code>ModelComparison</code> uses <code>equal</code> as a discriminant.
+        When it is false, TypeScript exposes the stable <code>path</code> and
+        <code>reason</code>. No exception is needed: unequal models are an
+        expected verification result, not a malformed-input failure.
+      </p>
+
+      <pre><code>if (comparison.equal) {
+  // Only the success variant exists here.
+} else {
+  comparison.path;
+  comparison.reason;
+}</code></pre>
+
+      <p>
+        Keep these as pure exports from <code>model-comparison.ts</code>, not
+        methods on the codec. The codec transforms text and models; the
+        comparators answer questions about two models.
+      </p>
+
+      <h2>7. Block F — compare structure in one fixed order</h2>
+      <p>
+        Compare cameras first, then images, then points. Within each collection,
+        compare record count, source order, and fields in a documented order.
+        Return immediately on the first difference.
+      </p>
+
+      <pre><code>{ equal: false,
+  path: "images[2].pose.qvec[0]",
+  reason: "quaternion-orientation" }</code></pre>
+
+      <p>
+        Stable zero-based paths make tests and later CLI diagnostics useful.
+        They are model paths, not text line numbers. A text parser error says
+        where input syntax failed; a comparison result says where two valid
+        models diverged.
+      </p>
+
+      <div class="practice">
+        <h3>Choose the first failure</h3>
+        <p>
+          If the right model has one fewer image and a different point value,
+          which difference must be returned? Explain why deterministic early
+          return matters for repeatable tests.
+        </p>
+      </div>
+
+      <h2>8. Block G — exact fields stay exact</h2>
+      <p>
+        Both comparison strategies require exact counts, order, identifiers,
+        camera model, dimensions, image names, camera references, RGB, and empty
+        observation/track state. Floating tolerance must never leak into integer
+        or identity fields.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Difference</th>
+            <th>Example reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Collection length</td>
+            <td><code>record-count</code></td>
+          </tr>
+          <tr>
+            <td>Same records in another sequence</td>
+            <td><code>record-order</code></td>
+          </tr>
+          <tr>
+            <td>Changed record ID</td>
+            <td><code>identifier</code></td>
+          </tr>
+          <tr>
+            <td>Changed filename</td>
+            <td><code>string-value</code></td>
+          </tr>
+          <tr>
+            <td>Changed width or RGB</td>
+            <td><code>integer-value</code></td>
+          </tr>
+          <tr>
+            <td>Changed camera reference</td>
+            <td><code>reference</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p class="note">
+        To distinguish reordered records from changed IDs, first establish equal
+        counts and compare the identifier sequence or membership. Do not sort
+        before comparing: sorting would erase the source-order guarantee you are
+        trying to test.
+      </p>
+
+      <h2>9. Block H — semantic floating comparison</h2>
+      <p>
+        Approved floating fields use a combined absolute and relative tolerance:
+      </p>
+
+      <pre><code>Math.abs(a - b) &lt;=
+  Math.max(1e-12, 1e-12 * Math.max(Math.abs(a), Math.abs(b)))</code></pre>
+
+      <p>
+        The absolute floor handles values near zero. The relative part scales
+        with larger magnitudes. Apply it only to intrinsics, pose components,
+        point XYZ, and point error. Slice 1 validation already rejects NaN and
+        infinity, so this helper does not need to invent behavior for them.
+      </p>
+
+      <section class="quiz" data-quiz>
+        <h3>Retrieval check</h3>
+        <p>Which field may use the semantic tolerance?</p>
+        <div class="quiz-options">
+          <button
+            type="button"
+            data-correct="true"
+            data-success="Correct. Point coordinates are approved floating fields."
+            data-retry="Try again: only approved floating model values use it."
+          >
+            Point coordinate
+          </button>
+          <button
+            type="button"
+            data-correct="false"
+            data-success=""
+            data-retry="No. Identifiers always compare exactly."
+          >
+            Point identifier
+          </button>
+          <button
+            type="button"
+            data-correct="false"
+            data-success=""
+            data-retry="No. RGB channels always compare exactly."
+          >
+            Point RGB value
+          </button>
+        </div>
+        <p class="feedback" data-feedback aria-live="polite"></p>
+      </section>
+
+      <h2>10. Block I — align quaternion signs semantically</h2>
+      <p>
+        A unit quaternion and its negation encode the same rotation. For
+        semantic comparison, use their dot product to choose the right
+        quaternion's sign, then compare aligned components with the floating
+        predicate.
+      </p>
+
+      <pre><code>dot(left, right) &lt; 0
+  ? compare left with -right
+  : compare left with right</code></pre>
+
+      <p>
+        If the aligned components differ, report
+        <code>quaternion-orientation</code>. Do not normalize either input—the
+        validator must already have accepted both. Semantic comparison answers
+        “same rotation?”, not “can these values be repaired?”
+      </p>
+
+      <h2>11. Block J — exact preservation is intentionally stricter</h2>
+      <p>
+        Exact no-op comparison uses exact JavaScript numeric equality for the
+        represented values. Strict equality already treats <code>-0</code> and
+        <code>0</code> as equal, matching the writer's required zero
+        canonicalization. Do not use <code>Object.is</code>, because it
+        distinguishes their signs.
+      </p>
+
+      <p>
+        For quaternions, first ask whether the rotations are semantically equal.
+        If they are equal only after sign reversal, exact preservation fails
+        with
+        <code>quaternion-sign</code>. If they encode different rotations, use
+        <code>quaternion-orientation</code>.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Case</th>
+            <th>Semantic</th>
+            <th>Exact</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>0</code> versus <code>-0</code></td>
+            <td>Equal</td>
+            <td>Equal</td>
+          </tr>
+          <tr>
+            <td>Tiny approved float change within tolerance</td>
+            <td>Equal</td>
+            <td>Different</td>
+          </tr>
+          <tr>
+            <td><code>q</code> versus <code>-q</code></td>
+            <td>Equal</td>
+            <td><code>quaternion-sign</code></td>
+          </tr>
+          <tr>
+            <td>Different quaternion orientation</td>
+            <td><code>quaternion-orientation</code></td>
+            <td><code>quaternion-orientation</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>12. Keep the shared implementation boring</h2>
+      <p>
+        The two public functions traverse the same model structure. A small
+        internal mode can select only the two rules that differ: approved float
+        equality and quaternion sign handling. Do not build a generic deep-diff
+        framework, configurable tolerance registry, or callback system.
+      </p>
+
+      <pre><code>semantic wrapper ─┐
+                  ├→ same deterministic field traversal
+exact wrapper ────┘   with two numeric/quaternion policies</code></pre>
+
+      <p>
+        Straight loops and early returns are valuable here: they visibly encode
+        source order and first-difference priority. Generic recursion would make
+        field-specific reasons and quaternion behavior harder to review.
+      </p>
+
+      <h2>13. Minimum evidence for Slice 3</h2>
+      <ol class="checklist">
+        <li>Golden exact bytes for all three generated files.</li>
+        <li>Zero-point output and an empty observation line per image.</li>
+        <li>Repeated serialization produces identical byte arrays.</li>
+        <li>Noncanonical valid input becomes canonical output.</li>
+        <li>Parse → serialize → parse passes semantic comparison.</li>
+        <li>The unchanged round trip separately passes exact preservation.</li>
+        <li><code>q</code>/<code>-q</code> passes semantic and fails exact.</li>
+        <li>A tiny float change passes semantic and fails exact.</li>
+        <li>
+          Counts, order, IDs, references, integers, and strings fail exactly.
+        </li>
+        <li>The first failure returns its stable path and reason.</li>
+        <li>Formatting, lint, both typechecks, build, and unit tests pass.</li>
+      </ol>
+
+      <div class="practice">
+        <h3>Your first implementation step</h3>
+        <p>
+          Write only the three complete expected output strings for one valid
+          model. Check every header, blank line, field order, and final LF
+          before writing the serializer. Then show them to Mingna for a contract
+          review.
+        </p>
+      </div>
+
+      <div class="goal">
+        <strong>Explain it to Mingna in one sentence:</strong> “The writer emits
+        one canonical representation, semantic comparison allows only approved
+        mathematical equivalence, and exact comparison proves the no-op did not
+        silently change represented data.”
+      </div>
+
+      <h2>Primary sources and next step</h2>
+      <p>
+        Use the official
+        <a href="https://colmap.github.io/format.html">COLMAP output format</a>
+        for field order and pose convention, the
+        <a
+          href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Equality_comparisons_and_sameness"
+          >MDN equality guide</a
+        >
+        for zero-sign behavior, and the
+        <a
+          href="https://www.typescriptlang.org/docs/handbook/2/narrowing.html#discriminated-unions"
+          >TypeScript narrowing guide</a
+        >
+        for consuming <code>ModelComparison</code>. Keep the
+        <a href="../reference/slice-3-writer-comparisons-map.html"
+          >Slice 3 quick reference</a
+        >
+        beside your tests.
+      </p>
+      <p>
+        Ask me about any unclear block before connecting it. The best checkpoint
+        is your golden expected text plus the first semantic/exact comparison
+        table—not a finished implementation dump.
+      </p>
+
+      <footer>
+        Previous:
+        <a href="./0003-slice-2-colmap-text-codec.html"
+          >Lesson 3: the text reader</a
+        >. Course start:
+        <a href="./0001-copy-through-zip-round-trip.html"
+          >Lesson 1: ZIP copy-through</a
+        >.
+      </footer>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Slice 2 text-reader map</title>
+    <link rel="stylesheet" href="../assets/lesson.css" />
+  </head>
+  <body>
+    <main class="compact">
+      <header>
+        <div class="eyebrow">Quick reference · Slice 2</div>
+        <h1>Recorder COLMAP text-reader map</h1>
+        <p class="lede">
+          The narrow parsing rules for the three recorder text payloads. This is
+          a responsibility map, not a finished reader.
+        </p>
+      </header>
+
+      <h2>Pipeline</h2>
+      <div class="flow" aria-label="COLMAP text codec flow">
+        <span class="step">Uint8Array</span><span class="arrow">→</span>
+        <span class="step">strict text</span><span class="arrow">→</span>
+        <span class="step">typed model</span>
+      </div>
+      <p>
+        Bytes → strict decoding → physical lines → exact tokens → private
+        candidates → Slice 1 validator. Canonical writing and model comparisons
+        begin in Slice 3.
+      </p>
+
+      <h2>Supported record shapes</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Data shape</th>
+            <th>Recorder restriction</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>cameras.txt</code></td>
+            <td>8 tokens on one line</td>
+            <td>Exactly one <code>PINHOLE</code> camera</td>
+          </tr>
+          <tr>
+            <td><code>images.txt</code></td>
+            <td>10-token pose line plus one physical observation line</td>
+            <td>The observation line must be empty or ASCII whitespace</td>
+          </tr>
+          <tr>
+            <td><code>points3D.txt</code></td>
+            <td>8 tokens on one line</td>
+            <td>No track tokens</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Decode before parsing</h2>
+      <ul class="checklist">
+        <li>Reject UTF-8 BOM bytes before decoding.</li>
+        <li>Decode with fatal UTF-8 so malformed bytes throw.</li>
+        <li>Reject NUL.</li>
+        <li>Accept LF and CRLF; reject a bare carriage return.</li>
+        <li>Accept an optional final line ending.</li>
+        <li>Keep physical line numbers for contextual errors.</li>
+      </ul>
+
+      <h2>Token grammar</h2>
+      <pre><code>UNSIGNED_INTEGER := 0 | [1-9][0-9]*
+FLOAT := -?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?</code></pre>
+      <p>
+        Match the whole token before calling <code>Number</code>. Therefore
+        <code>+1</code>, <code>.5</code>, <code>1.</code>, <code>01</code>,
+        hexadecimal, <code>NaN</code>, and <code>Infinity</code> fail lexically
+        instead of being partially or broadly converted.
+      </p>
+
+      <h2>Error ownership</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Problem</th>
+            <th>Kind</th>
+            <th>Owner</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Invalid UTF-8, arity, or numeric token</td>
+            <td><code>syntax</code></td>
+            <td>Codec</td>
+          </tr>
+          <tr>
+            <td>Non-empty observations or point tracks</td>
+            <td><code>unsupported-profile</code></td>
+            <td>Codec</td>
+          </tr>
+          <tr>
+            <td>Duplicate ID, invalid range, or non-unit quaternion</td>
+            <td><code>validation</code></td>
+            <td>Slice 1 validator</td>
+          </tr>
+          <tr>
+            <td>Image references an absent camera</td>
+            <td><code>reference</code></td>
+            <td>Slice 1 validator</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Do not mix into Slice 2</h2>
+      <p>
+        Canonical writing, model comparisons, ZIP paths, image bytes, archive
+        copying, image resolution, filesystem access, CLI behavior, LichtFeld,
+        pose refinement, and general COLMAP observations/tracks remain outside
+        the text reader.
+      </p>
+
+      <footer>
+        Study with
+        <a href="../lessons/0003-slice-2-colmap-text-codec.html"
+          >Lesson 3: build the reader from blocks</a
+        >. Primary format source:
+        <a href="https://colmap.github.io/format.html">COLMAP output format</a>.
+      </footer>
+    </main>
+  </body>
+</html>

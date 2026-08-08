@@ -30,6 +30,24 @@
   Documents preservation of original failure context. Use for: the optional cause on `ColmapError`.
 - [Vitest expect API](https://vitest.dev/api/expect.html)
   Official matcher reference. Use for: asserting error class and structured fields without coupling tests to full message wording.
+- [COLMAP output format](https://colmap.github.io/format.html)
+  The primary description of `cameras.txt`, two-line `images.txt`, `points3D.txt`, sparse identifiers, and world-to-camera poses. Use for: understanding the external text format before applying the narrower recorder profile.
+- [MDN: TextDecoder fatal mode](https://developer.mozilla.org/en-US/docs/Web/API/TextDecoder/fatal)
+  Explains why malformed UTF-8 should throw instead of silently becoming replacement characters. Use for: the byte-to-text boundary.
+- [MDN: TextDecoder constructor](https://developer.mozilla.org/en-US/docs/Web/API/TextDecoder/TextDecoder)
+  Documents browser-native decoding options, including BOM handling. Use for: strict browser-compatible decoding.
+- [MDN: Number.prototype.toString](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/toString)
+  Documents base-10 number formatting and that both zero signs stringify as `0`. Use for: deterministic round-trip-safe generated numeric text.
+- [Vitest: parameterized tests](https://vitest.dev/api/test#test-each)
+  Official `test.each` reference. Use for: checking many invalid numeric lexemes against the same parser rule.
+- [TypeScript Handbook: narrowing and discriminated unions](https://www.typescriptlang.org/docs/handbook/2/narrowing.html#discriminated-unions)
+  Explains how a literal discriminant narrows a union. Use for: consuming `ModelComparison` safely through its `equal` property.
+- [MDN: equality comparisons and sameness](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Equality_comparisons_and_sameness)
+  Distinguishes strict equality from `Object.is`, especially for positive and negative zero. Use for: implementing exact no-op numeric checks with the contract's `-0` rule.
+- [MDN: Math.abs](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/abs)
+  Browser-standard absolute value. Use for: the approved absolute/relative floating comparison.
+- [MDN: Math.max](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/max)
+  Browser-standard maximum selection. Use for: scaling the semantic floating tolerance.
 
 ## Wisdom (Communities)
 

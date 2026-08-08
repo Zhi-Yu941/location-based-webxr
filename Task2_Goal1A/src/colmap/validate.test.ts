@@ -59,13 +59,13 @@ function expectFailure(
   model: RecorderColmapModel,
   kind: ColmapError['kind'],
   field: string
-): void {
+): ColmapError {
   try {
     validateRecorderColmapModel(model);
   } catch (error) {
     expect(error).toBeInstanceOf(ColmapError);
     expect(error).toMatchObject({ kind, field });
-    return;
+    return error as ColmapError;
   }
 
   throw new Error(`Expected ${kind} failure for ${field}`);
@@ -165,12 +165,6 @@ const invalidCases: InvalidCase[] = [
     (m) => addImage(m, { imageId: 2 }),
     'validation',
     'name',
-  ],
-  [
-    'an unknown camera reference',
-    (m) => Object.assign(m.images[0]!, { cameraId: 2 }),
-    'reference',
-    'cameraId',
   ],
   [
     'a non-finite quaternion',
@@ -279,6 +273,16 @@ const invalidCases: InvalidCase[] = [
 describe('validateRecorderColmapModel', () => {
   it('accepts a valid recorder model', () => {
     expect(() => validateRecorderColmapModel(validModel())).not.toThrow();
+  });
+
+  it('reports the missing camera and affected image', () => {
+    const model = validModel();
+    Object.assign(model.images[0]!, { cameraId: 2 });
+
+    const error = expectFailure(model, 'reference', 'cameraId');
+    expect(error.path).toBe('images[0].cameraId');
+    expect(error.message).toContain('Image 1');
+    expect(error.message).toContain('camera 2');
   });
 
   it.each(invalidCases)('rejects %s', (_name, mutate, kind, field) => {

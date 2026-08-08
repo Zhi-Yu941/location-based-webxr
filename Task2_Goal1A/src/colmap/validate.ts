@@ -40,7 +40,12 @@ export class ColmapError extends Error {
 
 export function validateRecorderColmapModel(model: RecorderColmapModel): void {
   if (model.cameras.length !== 1) {
-    fail('validation', 'cameras', 'Exactly one camera is required');
+    fail(
+      'validation',
+      'cameras',
+      'Exactly one camera is required',
+      model.cameras.length === 0 ? 'cameras' : 'cameras[1]'
+    );
   }
 
   const camera = model.cameras[0]!;
@@ -69,19 +74,36 @@ export function validateRecorderColmapModel(model: RecorderColmapModel): void {
     fail('validation', 'images', 'At least one image is required');
   }
 
-  for (const image of model.images) {
-    requirePositiveSafeInteger(image.imageId, 'imageId');
+  for (const [imageIndex, image] of model.images.entries()) {
+    const imagePath = `images[${imageIndex}]`;
+    requirePositiveSafeInteger(
+      image.imageId,
+      'imageId',
+      `${imagePath}.imageId`
+    );
     if (imageIds.has(image.imageId)) {
-      fail('validation', 'imageId', 'Duplicate image ID');
+      fail(
+        'validation',
+        'imageId',
+        'Duplicate image ID',
+        `${imagePath}.imageId`
+      );
     }
     if (imageNames.has(image.name)) {
-      fail('validation', 'name', 'Duplicate image name');
+      fail('validation', 'name', 'Duplicate image name', `${imagePath}.name`);
     }
     imageIds.add(image.imageId);
     imageNames.add(image.name);
 
     if (image.cameraId !== camera.cameraId) {
-      fail('reference', 'cameraId', 'Referenced camera does not exist');
+      throw new ColmapError(
+        `Image ${image.imageId} references missing camera ${image.cameraId}`,
+        {
+          kind: 'reference',
+          field: 'cameraId',
+          path: `${imagePath}.cameraId`,
+        }
+      );
     }
 
     if (
@@ -95,49 +117,85 @@ export function validateRecorderColmapModel(model: RecorderColmapModel): void {
           `/\\'"`.includes(character)
       )
     ) {
-      fail('validation', 'name', 'Image name is invalid');
+      fail('validation', 'name', 'Image name is invalid', `${imagePath}.name`);
     }
 
     const qvec = image.pose.qvec;
-    requireFiniteArray(qvec, 'pose.qvec');
+    requireFiniteArray(qvec, 'pose.qvec', `${imagePath}.pose.qvec`);
     if (qvec.length !== 4) {
-      fail('validation', 'pose.qvec', 'Quaternion must have length 4');
+      fail(
+        'validation',
+        'pose.qvec',
+        'Quaternion must have length 4',
+        `${imagePath}.pose.qvec`
+      );
     }
     const norm = Math.hypot(...qvec);
     if (Math.abs(norm - 1) > 1e-6) {
-      fail('validation', 'pose.qvec', 'Quaternion must have unit length');
+      fail(
+        'validation',
+        'pose.qvec',
+        'Quaternion must have unit length',
+        `${imagePath}.pose.qvec`
+      );
     }
 
     const tvec = image.pose.tvec;
-    requireFiniteArray(tvec, 'pose.tvec');
+    requireFiniteArray(tvec, 'pose.tvec', `${imagePath}.pose.tvec`);
     if (tvec.length !== 3) {
-      fail('validation', 'pose.tvec', 'Translation vector must have length 3');
+      fail(
+        'validation',
+        'pose.tvec',
+        'Translation vector must have length 3',
+        `${imagePath}.pose.tvec`
+      );
     }
 
     if (image.observations.length !== 0) {
       fail(
         'unsupported-profile',
         'observations',
-        'Image observations are not supported'
+        'Image observations are not supported',
+        `${imagePath}.observations`
       );
     }
   }
 
   const point3DIds = new Set<number>();
-  for (const point3D of model.points3D) {
-    requirePositiveSafeInteger(point3D.point3DId, 'point3DId');
+  for (const [pointIndex, point3D] of model.points3D.entries()) {
+    const pointPath = `points3D[${pointIndex}]`;
+    requirePositiveSafeInteger(
+      point3D.point3DId,
+      'point3DId',
+      `${pointPath}.point3DId`
+    );
     if (point3DIds.has(point3D.point3DId)) {
-      fail('validation', 'point3DId', 'Duplicate point3D ID');
+      fail(
+        'validation',
+        'point3DId',
+        'Duplicate point3D ID',
+        `${pointPath}.point3DId`
+      );
     }
     point3DIds.add(point3D.point3DId);
 
-    requireFiniteArray(point3D.xyz, 'xyz');
+    requireFiniteArray(point3D.xyz, 'xyz', `${pointPath}.xyz`);
     if (point3D.xyz.length !== 3) {
-      fail('validation', 'xyz', 'Point3D coordinates must have length 3');
+      fail(
+        'validation',
+        'xyz',
+        'Point3D coordinates must have length 3',
+        `${pointPath}.xyz`
+      );
     }
-    requireFiniteArray(point3D.rgb, 'rgb');
+    requireFiniteArray(point3D.rgb, 'rgb', `${pointPath}.rgb`);
     if (point3D.rgb.length !== 3) {
-      fail('validation', 'rgb', 'Point3D RGB values must have length 3');
+      fail(
+        'validation',
+        'rgb',
+        'Point3D RGB values must have length 3',
+        `${pointPath}.rgb`
+      );
     }
     if (
       point3D.rgb.some(
@@ -147,29 +205,45 @@ export function validateRecorderColmapModel(model: RecorderColmapModel): void {
       fail(
         'validation',
         'rgb',
-        'Point3D RGB values must be integers in the range [0, 255]'
+        'Point3D RGB values must be integers in the range [0, 255]',
+        `${pointPath}.rgb`
       );
     }
     if (!Number.isFinite(point3D.error) || point3D.error < 0) {
       fail(
         'validation',
         'error',
-        'Point3D error must be a non-negative finite number'
+        'Point3D error must be a non-negative finite number',
+        `${pointPath}.error`
       );
     }
     if (point3D.track.length !== 0) {
-      fail('unsupported-profile', 'track', 'Point3D tracks are not supported');
+      fail(
+        'unsupported-profile',
+        'track',
+        'Point3D tracks are not supported',
+        `${pointPath}.track`
+      );
     }
   }
 }
 
-function fail(kind: ColmapFailureKind, field: string, message: string): never {
-  throw new ColmapError(message, { kind, field });
+function fail(
+  kind: ColmapFailureKind,
+  field: string,
+  message: string,
+  path = field
+): never {
+  throw new ColmapError(message, { kind, field, path });
 }
 
-function requirePositiveSafeInteger(value: number, field: string): void {
+function requirePositiveSafeInteger(
+  value: number,
+  field: string,
+  path = field
+): void {
   if (!Number.isSafeInteger(value) || value <= 0) {
-    fail('validation', field, `${field} must be a positive safe integer`);
+    fail('validation', field, `${field} must be a positive safe integer`, path);
   }
 }
 
@@ -179,8 +253,13 @@ function requirePositiveFiniteNumber(value: number, field: string): void {
   }
 }
 
-function requireFiniteArray(value: unknown, field: string): void {
+function requireFiniteArray(value: unknown, field: string, path = field): void {
   if (!Array.isArray(value) || !value.every(Number.isFinite)) {
-    fail('validation', field, `${field} must be a finite list of numbers`);
+    fail(
+      'validation',
+      field,
+      `${field} must be a finite list of numbers`,
+      path
+    );
   }
 }

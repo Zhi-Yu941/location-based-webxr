@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lesson 3 — Build Slice 2's COLMAP text reader from blocks</title>
+    <link rel="stylesheet" href="../assets/lesson.css" />
+    <script src="../assets/quiz.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Lesson 3 · about 25 minutes</div>
+        <h1>Build the COLMAP text reader from blocks</h1>
+        <p class="lede">
+          Learn the TypeScript ideas behind Slice 2: strict byte decoding, exact
+          token grammar, two-line image records, typed construction, contextual
+          failures, and validated model assembly. You connect the blocks; this
+          lesson does not provide the finished reader.
+        </p>
+      </header>
+
+      <div class="goal">
+        <strong>Your tangible win:</strong> sketch the complete reader and
+        explain exactly where malformed text, unsupported recorder data, invalid
+        models, and pose-mapping mistakes are caught.
+      </div>
+
+      <h2>1. The reader is one trust pipeline</h2>
+      <div class="flow" aria-label="COLMAP parse boundary">
+        <span class="step">text bytes</span><span class="arrow">→</span>
+        <span class="step">candidate records</span><span class="arrow">→</span>
+        <span class="step">validated model</span>
+      </div>
+      <p>
+        The reader proves that bytes obey the supported recorder text grammar,
+        constructs all candidate records, then asks the Slice 1 validator to
+        prove model-level meaning. Canonical writing begins in Slice 3.
+      </p>
+
+      <div class="block-grid">
+        <article class="block-card">
+          <h3>Parser owns</h3>
+          <p>
+            UTF-8, physical lines, comments, token counts, numeric lexemes,
+            file/line/field context, and construction of candidate records.
+          </p>
+        </article>
+        <article class="block-card">
+          <h3>Validator owns</h3>
+          <p>
+            Positive safe IDs, finite values, uniqueness, references, PINHOLE
+            support, quaternion norm, and empty public observations/tracks.
+          </p>
+        </article>
+      </div>
+
+      <p class="warning">
+        Do not let the codec learn ZIP paths or image bytes. It receives three
+        named <code>Uint8Array</code> payloads and returns one validated model.
+        The later adapter owns the archive.
+      </p>
+
+      <h2>2. Block A — strict bytes to trustworthy text</h2>
+      <p>
+        A normal decoder may replace malformed byte sequences with
+        <code>�</code>. That would repair corrupt input silently. Fatal mode
+        makes malformed UTF-8 observable as an error.
+      </p>
+
+      <pre><code>new TextDecoder("utf-8", { fatal: true });
+
+// Before decoding, recognize and reject the three UTF-8 BOM bytes:
+// EF BB BF</code></pre>
+
+      <p>
+        Check the BOM in the original bytes. This is clearer than relying on the
+        decoder's easy-to-misread <code>ignoreBOM</code> option. After decoding,
+        reject NUL and normalize only accepted line endings:
+      </p>
+
+      <ol class="sequence">
+        <li>Convert CRLF pairs to LF.</li>
+        <li>If any carriage return remains, it was bare and must fail.</li>
+        <li>Split on LF while retaining physical line positions.</li>
+        <li>
+          Allow the final empty array item caused by an optional final LF.
+        </li>
+      </ol>
+
+      <p>
+        Wrap a decoder <code>TypeError</code> in <code>ColmapError</code> with
+        <code>kind: "syntax"</code>, the logical file path, and the original
+        error as its cause. Never return text collected before the failure.
+      </p>
+
+      <section class="quiz" data-quiz>
+        <h3>Retrieval check</h3>
+        <p>When must an invalid UTF-8 sequence become visible?</p>
+        <div class="quiz-options">
+          <button
+            type="button"
+            data-correct="true"
+            data-success="Correct. Decoding is the first trust boundary."
+            data-retry="Try again: later stages must never see repaired text."
+          >
+            During decoding
+          </button>
+          <button
+            type="button"
+            data-correct="false"
+            data-success=""
+            data-retry="Too late. Tokenization would receive repaired text."
+          >
+            During tokenization
+          </button>
+          <button
+            type="button"
+            data-correct="false"
+            data-success=""
+            data-retry="Too late. The model must never contain repaired text."
+          >
+            During validation
+          </button>
+        </div>
+        <p class="feedback" data-feedback aria-live="polite"></p>
+      </section>
+
+      <h2>3. Block B — preserve physical lines</h2>
+      <p>
+        Before the first data record, blank lines and comment lines may be
+        ignored. Once data begins, comments are invalid. The important trap is
+        <code>images.txt</code>: each image owns a second physical line, and
+        that line must be empty for the supported recorder profile.
+      </p>
+
+      <pre><code>pose line
+empty observation line
+pose line
+empty observation line</code></pre>
+
+      <p>
+        Therefore, do not start with
+        <code>lines.filter(line =&gt; line.trim() !== "")</code>. It deletes
+        evidence that each image record has its required second line. Instead,
+        skip preamble lines only until the first data line, then let each file
+        parser consume its own physical structure.
+      </p>
+
+      <section class="quiz" data-quiz>
+        <h3>Retrieval check</h3>
+        <p>What does the empty line after an image pose represent?</p>
+        <div class="quiz-options">
+          <button
+            type="button"
+            data-correct="true"
+            data-success="Correct. It is the supported empty observation list."
+            data-retry="Try again: it belongs to the image record itself."
+          >
+            Image structure
+          </button>
+          <button
+            type="button"
+            data-correct="false"
+            data-success=""
+            data-retry="No. Headers end before the first image record."
+          >
+            Header spacing
+          </button>
+          <button
+            type="button"
+            data-correct="false"
+            data-success=""
+            data-retry="No. The codec does not know ZIP metadata."
+          >
+            Archive metadata
+          </button>
+        </div>
+        <p class="feedback" data-feedback aria-live="polite"></p>
+      </section>
+
+      <h2>4. Block C — validate lexemes before converting numbers</h2>
+      <p>
+        JavaScript's converters accept more syntax than this recorder profile.
+        For example, <code>Number("")</code> is zero,
+        <code>Number("0x11")</code> is seventeen, and
+        <code>parseInt("12oops")</code> is twelve. Conversion alone is not
+        grammar validation.
+      </p>
+
+      <pre><code>const unsignedIntegerToken = /^(?:0|[1-9][0-9]*)$/;
+const floatToken =
+  /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$/;</code></pre>
+
+      <p>Each small numeric reader has two stages:</p>
+      <ol class="sequence">
+        <li>Match the complete token against its accepted lexical grammar.</li>
+        <li>Convert with <code>Number</code> and attach field/line context.</li>
+      </ol>
+
+      <p>
+        The Slice 1 validator still checks semantic rules such as safe integer,
+        positivity, finiteness, and RGB range. This is deliberate overlap at two
+        different levels: the codec proves spelling; the validator proves
+        meaning.
+      </p>
+
+      <div class="practice">
+        <h3>Predict before running</h3>
+        <p>
+          Sort these into accepted unsigned integer, accepted float only, or
+          rejected: <code>0</code>, <code>-0</code>, <code>01</code>,
+          <code>1.</code>, <code>1e-3</code>, <code>+1</code>, <code>.5</code>.
+          Then check against the two expressions.
+        </p>
+      </div>
+
+      <h2>5. Block D — exact arity before typed construction</h2>
+      <p>
+        Check token count before reading indexes. This turns a vague
+        <code>undefined</code> conversion into one clear syntax error.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Record</th>
+            <th>Exact tokens</th>
+            <th>Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Camera</td>
+            <td>8</td>
+            <td>ID, model, dimensions, four PINHOLE intrinsics</td>
+          </tr>
+          <tr>
+            <td>Image pose</td>
+            <td>10</td>
+            <td>ID, WXYZ quaternion, translation, camera ID, name</td>
+          </tr>
+          <tr>
+            <td>Point3D</td>
+            <td>8</td>
+            <td>ID, XYZ, RGB, error</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        With <code>noUncheckedIndexedAccess</code>, an indexed token is typed as
+        possibly <code>undefined</code>. A non-null assertion is reasonable only
+        immediately after your exact arity check establishes that the slot
+        exists. It is not a replacement for checking untrusted input.
+      </p>
+
+      <pre><code>if (tokens.length !== expectedCount) {
+  // throw contextual syntax failure
+}
+
+// Only after that check:
+const firstToken = tokens[0]!;</code></pre>
+
+      <h2>6. Block E — one narrow parser per file</h2>
+
+      <h3><code>cameras.txt</code></h3>
+      <p>
+        Read one data line, require eight tokens, retain the model token long
+        enough to distinguish unsupported <code>OPENCV</code> from malformed
+        syntax, then construct the camera candidate. The validator owns the
+        final “exactly one PINHOLE camera” rule.
+      </p>
+
+      <h3><code>images.txt</code></h3>
+      <p>
+        Use a cursor over physical lines. Read a ten-token pose line, then
+        advance exactly once and require an empty or ASCII-whitespace
+        observation line. A non-empty observation line is
+        <code>unsupported-profile</code>, because general COLMAP supports
+        observations but recorder profile 1A does not.
+      </p>
+
+      <h3><code>points3D.txt</code></h3>
+      <p>
+        Require eight base tokens. Extra valid-looking track tokens are
+        <code>unsupported-profile</code>; malformed base fields are
+        <code>syntax</code>. Construct <code>track: []</code> only after the
+        text proves that no track data was supplied.
+      </p>
+
+      <p class="note">
+        Private candidate shapes may be slightly wider than the public model,
+        such as holding a camera model token as <code>string</code>. That lets
+        runtime validation reject untrusted values honestly instead of lying to
+        TypeScript with an early assertion to <code>"PINHOLE"</code>.
+      </p>
+
+      <h2>7. Block F — assemble once, validate once</h2>
+      <p>
+        The public parse facade coordinates the three independent file parsers,
+        assembles one candidate model, calls the existing Slice 1 validator, and
+        returns only after the complete model passes.
+      </p>
+
+      <pre><code>decode each payload
+→ parse cameras, images, points
+→ assemble one candidate model
+→ validate the whole model
+→ return the complete model</code></pre>
+
+      <p>
+        This ordering is why a valid-looking image can still fail with
+        <code>kind: "reference"</code>: only the complete model knows whether
+        its camera ID exists. Do not return partial arrays if a later file
+        fails.
+      </p>
+
+      <h2>8. Block G — protect pose meaning with a non-identity fixture</h2>
+      <p>
+        Identity rotation <code>[1, 0, 0, 0]</code> is too symmetrical. A parser
+        could reorder several zero components and the test would still pass. Use
+        a normalized non-identity WXYZ quaternion and a translation whose
+        components are all different.
+      </p>
+
+      <pre><code>qvec: [0.7071067811865476, 0, 0.7071067811865476, 0]
+tvec: [1, -2, 3]</code></pre>
+
+      <p>
+        Assert that parsing assigns QW, QX, QY, QZ, TX, TY, and TZ to those
+        exact model slots. Slice 2 does not invert poses, compute camera
+        centers, apply WebXR/COLMAP basis conversion, or write the model back to
+        text.
+      </p>
+
+      <div class="practice">
+        <h3>Explain the failure this catches</h3>
+        <p>
+          Why would <code>[1, 0, 0, 0]</code> fail to reveal an accidental
+          WXYZ/XYZW reorder? Say your answer aloud before continuing.
+        </p>
+      </div>
+
+      <h2>9. Test the seams, not private helper choreography</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Test group</th>
+            <th>Main evidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Strict decode</td>
+            <td>Invalid UTF-8, BOM, NUL, bare CR; LF/CRLF accepted</td>
+          </tr>
+          <tr>
+            <td>Lexical grammar</td>
+            <td>Accepted decimals/exponents and rejected broad JS forms</td>
+          </tr>
+          <tr>
+            <td>Camera records</td>
+            <td>Exact arity, PINHOLE layout, contextual failures</td>
+          </tr>
+          <tr>
+            <td>Image records</td>
+            <td>Two physical lines, empty observations, non-identity pose</td>
+          </tr>
+          <tr>
+            <td>Point records</td>
+            <td>Zero/many points, exact base fields, tracks unsupported</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        Use <code>it.each</code> for token spelling cases; keep one readable
+        end-to-end fixture for each file grammar. Assert structured
+        <code>kind</code>, <code>path</code>, <code>line</code>, and
+        <code>field</code> where applicable, not the full prose message.
+      </p>
+
+      <h2>10. A safe assembly order for your session</h2>
+      <ol class="checklist">
+        <li>Write one strict-decode test and the smallest decoder block.</li>
+        <li>Write table-driven integer and float token tests.</li>
+        <li>Parse one valid camera row, then its malformed cases.</li>
+        <li>
+          Parse one valid point row and prove extra tracks are unsupported.
+        </li>
+        <li>Parse one two-line image record with a non-identity pose.</li>
+        <li>Assemble all three parsers and call the Slice 1 validator.</li>
+        <li>Run formatting, lint, both typechecks, build, and unit tests.</li>
+      </ol>
+
+      <div class="goal">
+        <strong>Explain it to Mingna in one sentence:</strong> “The reader
+        proves the spelling and structure of three text payloads, then the
+        existing validator proves the assembled model's meaning before it is
+        returned.”
+      </div>
+
+      <h2>Primary sources and next step</h2>
+      <p>
+        Read the official
+        <a href="https://colmap.github.io/format.html"
+          >COLMAP output-format documentation</a
+        >
+        for the general three-file layout and world-to-camera convention. Then
+        compare it with the narrower
+        <a href="../reference/slice-2-text-codec-map.html"
+          >Slice 2 recorder-profile map</a
+        >. For the browser boundary, review
+        <a
+          href="https://developer.mozilla.org/en-US/docs/Web/API/TextDecoder/fatal"
+          >TextDecoder fatal mode</a
+        >.
+      </p>
+      <p>
+        Start by writing only the strict-decode tests and the accepted/rejected
+        numeric-token table. Send those to me before connecting a record parser,
+        and I will check whether the boundary is narrow enough.
+      </p>
+
+      <footer>
+        Next:
+        <a href="./0004-slice-3-writer-and-comparisons.html"
+          >Lesson 4: writing and comparisons</a
+        >. Previous:
+        <a href="./0002-slice-1-types-and-validation.html"
+          >Lesson 2: types and validation</a
+        >. Course start:
+        <a href="./0001-copy-through-zip-round-trip.html"
+          >Lesson 1: ZIP copy-through</a
+        >. Ask me follow-up questions whenever a block is unclear.
+      </footer>
+    </main>
+  </body>
+</html>

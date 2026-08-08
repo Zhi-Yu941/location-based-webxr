@@ -8,7 +8,7 @@ export interface ColmapTextFiles {
   readonly points3D: Uint8Array;
 }
 
-/** Pure text/model boundary; parsing and serialization are implemented later. */
+/** Pure text/model boundary for the recorder-supported COLMAP profile. */
 export interface RecorderColmapTextCodec {
   parse(files: ColmapTextFiles): RecorderColmapModel;
   serialize(model: RecorderColmapModel): ColmapTextFiles;
@@ -22,6 +22,7 @@ const paths = {
 
 const unsignedIntegerToken = /^(?:0|[1-9][0-9]*)$/;
 const floatToken = /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$/;
+const encoder = new TextEncoder();
 
 interface DecodedText {
   readonly lines: readonly string[];
@@ -49,6 +50,64 @@ export function parseRecorderColmapText(
     rethrowWithSourceLocation(error, source);
   }
   return model;
+}
+
+/** Serialize one validated model to the canonical recorder COLMAP text. */
+export function serializeRecorderColmapText(
+  model: RecorderColmapModel
+): ColmapTextFiles {
+  validateRecorderColmapModel(model);
+
+  const camera = model.cameras[0]!;
+  const cameraLines = [
+    '# Camera list with one line of data per camera:',
+    '#   CAMERA_ID, MODEL, WIDTH, HEIGHT, PARAMS[]',
+    '# Number of cameras: 1',
+    [
+      camera.cameraId,
+      camera.model,
+      camera.width,
+      camera.height,
+      camera.intrinsics.fx,
+      camera.intrinsics.fy,
+      camera.intrinsics.cx,
+      camera.intrinsics.cy,
+    ].join(' '),
+  ];
+  const imageLines = [
+    '# Image list with two lines of data per image:',
+    '#   IMAGE_ID, QW, QX, QY, QZ, TX, TY, TZ, CAMERA_ID, NAME',
+    '#   POINTS2D[] as (X, Y, POINT3D_ID)',
+    `# Number of images: ${model.images.length}, mean observations per image: 0`,
+    ...model.images.flatMap((image) => [
+      [
+        image.imageId,
+        ...image.pose.qvec,
+        ...image.pose.tvec,
+        image.cameraId,
+        image.name,
+      ].join(' '),
+      '',
+    ]),
+  ];
+  const pointLines = [
+    '# 3D point list with one line of data per point:',
+    '#   POINT3D_ID, X, Y, Z, R, G, B, ERROR, TRACK[] as (IMAGE_ID, POINT2D_IDX)',
+    `# Number of points: ${model.points3D.length}, mean track length: 0`,
+    ...model.points3D.map((point) =>
+      [point.point3DId, ...point.xyz, ...point.rgb, point.error].join(' ')
+    ),
+  ];
+
+  return {
+    cameras: encodeLines(cameraLines),
+    images: encodeLines(imageLines),
+    points3D: encodeLines(pointLines),
+  };
+}
+
+function encodeLines(lines: readonly string[]): Uint8Array {
+  return encoder.encode(`${lines.join('\n')}\n`);
 }
 
 function rethrowWithSourceLocation(

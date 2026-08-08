@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseRecorderColmapText, type ColmapTextFiles } from './text-codec.js';
+import {
+  parseRecorderColmapText,
+  serializeRecorderColmapText,
+  type ColmapTextFiles,
+} from './text-codec.js';
+import { exactlyPreserved, semanticallyEqual } from './model-comparison.js';
 import { ColmapError } from './validate.js';
 
 const encoder = new TextEncoder();
+const decoder = new TextDecoder();
 
 const cameraText = `# camera header
 5 PINHOLE 823 1920 1254.3877251148224 1254.169921875 411.5 960
@@ -17,6 +23,27 @@ const imageText = `# image header
 const pointText = `# point header
 12 1.5 -2 3e-1 0 128 255 0.25
 4 -0 2 1E+3 1 2 3 0
+`;
+
+const canonicalCameraText = `# Camera list with one line of data per camera:
+#   CAMERA_ID, MODEL, WIDTH, HEIGHT, PARAMS[]
+# Number of cameras: 1
+5 PINHOLE 823 1920 1254.3877251148224 1254.169921875 411.5 960
+`;
+const canonicalImageText = `# Image list with two lines of data per image:
+#   IMAGE_ID, QW, QX, QY, QZ, TX, TY, TZ, CAMERA_ID, NAME
+#   POINTS2D[] as (X, Y, POINT3D_ID)
+# Number of images: 2, mean observations per image: 0
+9 0.7071067811865476 0 0.7071067811865476 0 1 -2 3 5 frame-9.jpg
+
+2 1 0 0 0 -4 5 -6 5 frame-2.jpg
+
+`;
+const canonicalPointText = `# 3D point list with one line of data per point:
+#   POINT3D_ID, X, Y, Z, R, G, B, ERROR, TRACK[] as (IMAGE_ID, POINT2D_IDX)
+# Number of points: 2, mean track length: 0
+12 1.5 -2 0.3 0 128 255 0.25
+4 0 2 1000 1 2 3 0
 `;
 
 function files(
@@ -223,5 +250,54 @@ describe('parseRecorderColmapText', () => {
 
     expect(error.message).toContain('Image 9');
     expect(error.message).toContain('camera 6');
+  });
+});
+
+describe('serializeRecorderColmapText', () => {
+  it('emits the exact canonical text for all three files', () => {
+    const output = serializeRecorderColmapText(
+      parseRecorderColmapText(files())
+    );
+
+    expect(decoder.decode(output.cameras)).toBe(canonicalCameraText);
+    expect(decoder.decode(output.images)).toBe(canonicalImageText);
+    expect(decoder.decode(output.points3D)).toBe(canonicalPointText);
+  });
+
+  it('emits only the canonical headers for an empty points file', () => {
+    const model = parseRecorderColmapText(
+      files({ points3D: '# no points in this recorder model\n' })
+    );
+
+    expect(decoder.decode(serializeRecorderColmapText(model).points3D)).toBe(
+      `# 3D point list with one line of data per point:\n#   POINT3D_ID, X, Y, Z, R, G, B, ERROR, TRACK[] as (IMAGE_ID, POINT2D_IDX)\n# Number of points: 0, mean track length: 0\n`
+    );
+  });
+
+  it('is deterministic and canonicalizes valid noncanonical input', () => {
+    const before = parseRecorderColmapText(files());
+    const first = serializeRecorderColmapText(before);
+    const second = serializeRecorderColmapText(before);
+
+    expect(first).toEqual(second);
+    expect(decoder.decode(first.cameras)).not.toBe(cameraText);
+    expect(decoder.decode(first.points3D)).not.toBe(pointText);
+
+    const after = parseRecorderColmapText(first);
+    expect(semanticallyEqual(before, after)).toEqual({ equal: true });
+    expect(exactlyPreserved(before, after)).toEqual({ equal: true });
+  });
+
+  it('validates the complete model before writing', () => {
+    const model = parseRecorderColmapText(files());
+    const invalid = {
+      ...model,
+      points3D: [
+        { ...model.points3D[0]!, rgb: [256, 0, 0] as const },
+        ...model.points3D.slice(1),
+      ],
+    };
+
+    expect(() => serializeRecorderColmapText(invalid)).toThrow(ColmapError);
   });
 });

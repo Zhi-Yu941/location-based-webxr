@@ -23,7 +23,11 @@ export {
   type ColmapFailureKind,
 } from './validate.js';
 
-export type { ModelComparison } from './model-comparison.js';
+export {
+  exactlyPreserved,
+  semanticallyEqual,
+  type ModelComparison,
+} from './model-comparison.js';
 
 export type {
   DatasetSummary,

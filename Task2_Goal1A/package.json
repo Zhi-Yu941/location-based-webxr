@@ -13,12 +13,13 @@
     }
   },
   "scripts": {
-    "format": "prettier --write --ignore-unknown src config package.json README.md",
-    "format:check": "prettier --check --ignore-unknown src config package.json README.md",
-    "lint": "eslint src --config config/eslint.config.mjs --max-warnings 0",
+    "format": "prettier --write --ignore-unknown src scripts config package.json README.md",
+    "format:check": "prettier --check --ignore-unknown src scripts config package.json README.md",
+    "lint": "eslint src scripts --config config/eslint.config.mjs --max-warnings 0",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "typecheck:tests": "tsc -p tsconfig.vitest.json --noEmit",
     "build": "tsdown --config config/tsdown.config.ts",
+    "colmap:roundtrip": "pnpm run build && node scripts/colmap-round-trip.mjs",
     "test:unit": "vitest run --config config/vitest.config.ts",
     "test": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run typecheck:tests && pnpm run build && pnpm run test:unit"
   },

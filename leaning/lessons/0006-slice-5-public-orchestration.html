@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lesson 6 — Connect the public round trip</title>
+    <link rel="stylesheet" href="../assets/lesson.css" />
+    <script src="../assets/quiz.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Lesson 6 · about 30 minutes</div>
+        <h1>Connect the public round trip</h1>
+        <p class="lede">
+          Slice 5 does not invent another parser or ZIP writer. It connects the
+          trusted blocks from Slices 1–4, keeps the source archive opaque, and
+          returns success only after reopening and verification.
+        </p>
+      </header>
+
+      <div class="goal">
+        <strong>Your tangible win:</strong> implement the four public functions
+        in <code>round-trip.ts</code> by connecting small responsibility blocks,
+        without receiving a paste-ready implementation.
+      </div>
+
+      <h2>1. Slice 5 is orchestration, not new domain logic</h2>
+      <p>
+        The validator already owns the supported model rules. The codec already
+        owns COLMAP text. The archive adapter already owns ZIP inventory and
+        copy-through. The comparison functions already own model equality. Slice
+        5 decides <em>when</em> those operations run and what must be true
+        before public success is returned.
+      </p>
+
+      <div class="flow" aria-label="Public round-trip flow">
+        <span class="step">ZIP bytes</span><span class="arrow">→</span>
+        <span class="step">dataset</span><span class="arrow">→</span>
+        <span class="step">verified ZIP bytes</span>
+      </div>
+
+      <div class="block-grid">
+        <article class="block-card">
+          <h3>Read</h3>
+          <p>
+            Open, parse, validate, resolve, and retain the source inventory.
+          </p>
+        </article>
+        <article class="block-card">
+          <h3>Summarize</h3>
+          <p>Derive counts and image ID 1 from the typed model only.</p>
+        </article>
+        <article class="block-card">
+          <h3>Write</h3>
+          <p>Validate, resolve, serialize, copy, reopen, and compare.</p>
+        </article>
+        <article class="block-card">
+          <h3>Round trip</h3>
+          <p>Reuse read, summary, and write; add strict no-op evidence.</p>
+        </article>
+      </div>
+
+      <p class="warning">
+        Do not call zip.js or parse text directly from
+        <code>round-trip.ts</code>. Doing so creates a second implementation of
+        a responsibility that already has one owner.
+      </p>
+
+      <h2>2. Understand the two kinds of state in a dataset</h2>
+      <p>
+        <code>RecorderDataset</code> deliberately travels as a pair. The
+        editable <code>model</code> contains understood COLMAP values. The
+        opaque <code>sourceArchive</code> carries everything else needed to
+        preserve the recorder ZIP: images, directories, actions, session data,
+        and unknown files.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Part</th>
+            <th>Consumer may do</th>
+            <th>Consumer must not do</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>model</code></td>
+            <td>Inspect it and later provide an edited valid model.</td>
+            <td>Expect it to contain opaque ZIP entries.</td>
+          </tr>
+          <tr>
+            <td><code>sourceArchive</code></td>
+            <td>Pass it back through the dataset to the writer.</td>
+            <td>Construct, inspect, or rewrite its internal inventory.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        The <code>unique symbol</code> property makes the public source type
+        nominal enough that an ordinary object literal cannot accidentally
+        satisfy it. TypeScript documents that every
+        <a href="https://www.typescriptlang.org/docs/handbook/symbols.html"
+          ><code>unique symbol</code> has its own identity</a
+        >. This is compile-time encapsulation, not a security boundary: a forced
+        type assertion can still bypass it.
+      </p>
+
+      <pre><code>public view:   RecorderArchiveSource
+private view: public brand + OpenedRecorderArchive
+
+read creates the private value
+write unwraps it internally
+package consumers see only the public view</code></pre>
+
+      <p>
+        Keep the assertion, if one is needed to bridge those views, in one tiny
+        private helper. Scattering casts through the workflow would make it
+        unclear which code is allowed to create archive sources.
+      </p>
+
+      <h2>3. Block A — map between two existing representations</h2>
+      <p>
+        The adapter identifies sparse files by full ZIP paths. The codec names
+        its three payloads <code>cameras</code>, <code>images</code>, and
+        <code>points3D</code>. Slice 5 needs two explicit mappings; it does not
+        need a generic mapper or a new abstraction.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Archive key</th>
+            <th>Codec field</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>sparse/0/cameras.txt</code></td>
+            <td><code>cameras</code></td>
+          </tr>
+          <tr>
+            <td><code>sparse/0/images.txt</code></td>
+            <td><code>images</code></td>
+          </tr>
+          <tr>
+            <td><code>sparse/0/points3D.txt</code></td>
+            <td><code>points3D</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        Make the mapping visible and boring. It is only three assignments. A
+        loop that guesses names from strings saves little and makes a typo or
+        later rename harder to notice.
+      </p>
+
+      <h2>4. Block B — read one recorder ZIP</h2>
+      <p>
+        <code>readRecorderZip</code> is a short pipeline. Each call hands its
+        result to the next owner; no step repairs input or catches an expected
+        <code>ColmapError</code> merely to hide it.
+      </p>
+
+      <ol class="sequence">
+        <li>Ask the archive adapter to open and validate the ZIP inventory.</li>
+        <li>Map its three text byte arrays into the codec input shape.</li>
+        <li>
+          Parse them; the codec invokes model validation before returning.
+        </li>
+        <li>Resolve every parsed model image against the opened archive.</li>
+        <li>
+          Return the model plus an opaque wrapper around that same archive.
+        </li>
+      </ol>
+
+      <p>
+        Image resolution belongs in the read operation even when the caller only
+        wants the model. A syntactically valid <code>images.txt</code> that
+        references absent image bytes is not a valid recorder dataset.
+      </p>
+
+      <p class="note">
+        Do not return the resolved-image array publicly. Its successful creation
+        is evidence that every reference exists; the model and source archive
+        are the stable public seam.
+      </p>
+
+      <h2>5. Block C — derive the assignment summary</h2>
+      <p>
+        The summary must come from the typed model, never from comment headers,
+        ZIP order, filenames, or the first image in an array. Validate the
+        public model, then explicitly search for the record whose
+        <code>imageId === 1</code>.
+      </p>
+
+      <pre><code>selected image ≠ images[0]
+selected image ≠ lowest image ID
+selected image = image whose ID is exactly 1</code></pre>
+
+      <p>
+        JavaScript's
+        <a
+          href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/find"
+          ><code>Array.prototype.find</code></a
+        >
+        returns <code>undefined</code> when no record matches. That missing
+        branch must throw <code>ColmapError</code> with
+        <code>kind: "reference"</code> and <code>field: "imageId"</code>; do not
+        silently substitute another image.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Summary field</th>
+            <th>Source of truth</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>imageCount</code></td>
+            <td><code>model.images.length</code></td>
+          </tr>
+          <tr>
+            <td><code>point3DCount</code></td>
+            <td><code>model.points3D.length</code></td>
+          </tr>
+          <tr>
+            <td><code>camera</code></td>
+            <td>The validated single supported camera</td>
+          </tr>
+          <tr>
+            <td><code>image1</code></td>
+            <td>The exact ID-1 record</td>
+          </tr>
+          <tr>
+            <td><code>referencedImageCount</code></td>
+            <td>The validated model image count</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <section class="quiz" data-quiz>
+        <h3>Retrieval check</h3>
+        <p>The model order is IDs 8, 1, 4. Which pose is summarized?</p>
+        <div class="quiz-options">
+          <button
+            type="button"
+            data-correct="true"
+            data-success="Correct. Selection uses identity, never array position."
+            data-retry="Try again: the assignment names one exact identifier."
+          >
+            Find image one
+          </button>
+          <button
+            type="button"
+            data-correct="false"
+            data-success=""
+            data-retry="No. Source order may be sparse and non-numeric."
+          >
+            Use first image
+          </button>
+          <button
+            type="button"
+            data-correct="false"
+            data-success=""
+            data-retry="No. The rule says ID 1, not the lowest ID."
+          >
+            Use lowest image
+          </button>
+        </div>
+        <p class="feedback" data-feedback aria-live="polite"></p>
+      </section>
+
+      <h2>6. Block D — write and verify a supplied model</h2>
+      <p>
+        <code>writeRecorderZip</code> accepts a source dataset and a model as
+        separate values on purpose. A later refiner may provide an edited model
+        while the original source archive still supplies every opaque entry.
+      </p>
+
+      <ol class="sequence">
+        <li>Validate the supplied model at the public boundary.</li>
+        <li>Unwrap the source archive inside the module.</li>
+        <li>Resolve every supplied model image against that source.</li>
+        <li>Serialize all three COLMAP text payloads with the real codec.</li>
+        <li>Map them to the three exact replacement paths.</li>
+        <li>Ask the adapter to copy the complete archive with replacements.</li>
+        <li>Reopen the output through <code>readRecorderZip</code>.</li>
+        <li>Require semantic equality with the model that was supplied.</li>
+        <li>Return bytes only after every previous step succeeds.</li>
+      </ol>
+
+      <p>
+        The equality target is the <em>supplied model</em>, not necessarily
+        <code>source.model</code>. Comparing only with the original would make
+        every legitimate future pose edit fail. The strict unchanged-model check
+        belongs to <code>roundTripRecorderZip</code> instead.
+      </p>
+
+      <p class="warning">
+        Never return bytes before reopening. A writer producing bytes proves
+        neither that the ZIP can be read nor that its generated COLMAP text can
+        be parsed and resolved.
+      </p>
+
+      <h2>7. Block E — turn comparison results into a gate</h2>
+      <p>
+        The comparison functions return a discriminated union. They do not
+        throw. Narrow on <code>equal</code>; only the false branch exposes
+        <code>path</code> and <code>reason</code>. This is the same
+        <a
+          href="https://www.typescriptlang.org/docs/handbook/2/narrowing.html#discriminated-unions"
+          >discriminated-union narrowing</a
+        >
+        used earlier in Slice 3.
+      </p>
+
+      <pre><code>comparison = compare(expected, reopened)
+
+if comparison.equal is false
+  path and reason are available
+  throw the shared contextual error
+
+otherwise
+  the guarantee may be recorded as literal true</code></pre>
+
+      <p>
+        A verification object contains literal <code>true</code> fields because
+        it is returned only after the corresponding checks pass. It is a proof
+        record, not a live collection of uncertain booleans.
+      </p>
+
+      <h2>8. Block F — verify archive preservation by identity</h2>
+      <p>
+        Model comparison cannot prove that <code>actions/</code>, an unknown
+        binary file, or an unreferenced image survived. Compare the private
+        opened inventories from the source and reopened output by exact path.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Entry group</th>
+            <th>Required check</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Every path</td>
+            <td>Same exact path set and same file/directory kind.</td>
+          </tr>
+          <tr>
+            <td>Three sparse text files</td>
+            <td>Bytes equal the corresponding actual serializer payload.</td>
+          </tr>
+          <tr>
+            <td>Every other file</td>
+            <td>Decompressed bytes are exactly equal to source bytes.</td>
+          </tr>
+          <tr>
+            <td>Directories</td>
+            <td>The explicit record still exists with directory kind.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        Index by path so ZIP entry order is irrelevant. Compare
+        <code>Uint8Array</code> contents, not object identity: two arrays may
+        contain identical bytes while <code>left === right</code> is false. A
+        short length check followed by an indexed byte loop is sufficient; no
+        Node <code>Buffer</code> and no deep-equality library are needed.
+      </p>
+
+      <h2>9. Block G — the no-op round-trip demonstration</h2>
+      <p>
+        <code>roundTripRecorderZip</code> must reuse the three public operations
+        instead of recreating their internals. Its special job is to run them
+        with the unchanged model and add stricter acceptance evidence.
+      </p>
+
+      <ol class="sequence">
+        <li>Read the input bytes into one dataset.</li>
+        <li>Summarize that typed model.</li>
+        <li>
+          Write using the same dataset and unchanged <code>dataset.model</code>.
+        </li>
+        <li>Reopen the emitted bytes for verification.</li>
+        <li>Require exact no-op model preservation.</li>
+        <li>Verify path, kind, replacement, and untouched-entry guarantees.</li>
+        <li>Return the dataset, summary, bytes, and all-true proof record.</li>
+      </ol>
+
+      <p>
+        Semantic equality is necessary in general writing. Exact preservation is
+        additionally valid here because this operation intentionally made no
+        model edit. Keep both concepts visible: semantic equality treats
+        <code>q</code> and <code>-q</code> as the same orientation, while the
+        exact no-op check detects a changed quaternion representative.
+      </p>
+
+      <section class="quiz" data-quiz>
+        <h3>Retrieval check</h3>
+        <p>When may the public write operation return successfully?</p>
+        <div class="quiz-options">
+          <button
+            type="button"
+            data-correct="true"
+            data-success="Correct. Success follows reopening and semantic verification."
+            data-retry="Try again: generated bytes alone are not evidence."
+          >
+            Return verified bytes
+          </button>
+          <button
+            type="button"
+            data-correct="false"
+            data-success=""
+            data-retry="No. A partial artifact must never represent success."
+          >
+            Return partial bytes
+          </button>
+          <button
+            type="button"
+            data-correct="false"
+            data-success=""
+            data-retry="No. Closing the writer is only an intermediate step."
+          >
+            Trust writer close
+          </button>
+        </div>
+        <p class="feedback" data-feedback aria-live="polite"></p>
+      </section>
+
+      <h2>10. Tests should prove wiring, not repeat lower-level suites</h2>
+      <p>
+        Keep the Slice 5 test fixture synthetic and complete enough to exercise
+        the real components. You do not need to duplicate every parser token or
+        unsafe-path case from earlier slices.
+      </p>
+
+      <ol class="checklist">
+        <li>
+          <code>readRecorderZip</code> returns the parsed model and rejects a
+          missing referenced image.
+        </li>
+        <li>
+          Summary counts come from model arrays even when ZIP comments or entry
+          order suggest something else.
+        </li>
+        <li>The ID-1 image is selected even when it is not first.</li>
+        <li>Missing image ID 1 produces the required reference failure.</li>
+        <li>
+          A noncanonical valid input emits all three canonical serializer
+          payloads, proving original text was not copied through.
+        </li>
+        <li>The emitted bytes reopen before the write promise resolves.</li>
+        <li>The reopened model is semantically equal to the supplied model.</li>
+        <li>The unchanged round trip is also exactly preserved.</li>
+        <li>
+          Paths and kinds match; all untouched decompressed bytes match; the
+          replacement set is exactly the three sparse text paths.
+        </li>
+        <li>
+          The public <code>./colmap</code> entry exports only the intended
+          public types, functions, error, and comparisons.
+        </li>
+        <li>
+          Core files have no <code>node:*</code>, <code>Buffer</code>,
+          filesystem, or process usage.
+        </li>
+      </ol>
+
+      <p>
+        The strongest “writer really ran” fixture starts with valid but
+        noncanonical sparse text: different comments, spacing, numeric lexemes,
+        or CRLF endings. The parsed meaning stays the same, but each output
+        sparse payload must equal the canonical serializer result and differ
+        from the appropriate original bytes.
+      </p>
+
+      <h2>11. Keep Slice 6 and later work out</h2>
+      <p>
+        Slice 5 remains browser-compatible and entirely in memory. Do not add
+        CLI argument parsing, <code>node:fs</code>, temporary files, final
+        renames, console formatting, real Task 1 fixture replay, LichtFeld, or
+        AppFramework integration. Those have their own slices and failure
+        policies.
+      </p>
+
+      <p class="note">
+        You also do not need dependency injection, a factory, or mock adapter
+        interfaces for this slice. The existing functions and one adapter object
+        already provide the required seams; integration-style synthetic tests
+        are the point.
+      </p>
+
+      <div class="practice">
+        <h3>Your first implementation step</h3>
+        <p>
+          Create <code>round-trip.test.ts</code> with one valid synthetic ZIP.
+          First test only <code>readRecorderZip</code>: assert the known model
+          and prove an unreferenced image does not cause rejection. Then add the
+          summary ID-1 case. Connect writing only after those two blocks are
+          green.
+        </p>
+      </div>
+
+      <div class="goal">
+        <strong>Explain it to Mingna in one sentence:</strong> “Slice 5 exposes
+        the existing model and archive boundaries as four public operations and
+        withholds success until the emitted archive reopens with the requested
+        model and every preservation guarantee intact.”
+      </div>
+
+      <h2>Primary sources and next step</h2>
+      <p>
+        Keep the official
+        <a href="https://www.typescriptlang.org/docs/handbook/symbols.html"
+          >TypeScript symbols guide</a
+        >,
+        <a
+          href="https://www.typescriptlang.org/docs/handbook/2/narrowing.html#discriminated-unions"
+          >narrowing guide</a
+        >, and
+        <a
+          href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/find"
+          >MDN <code>Array.find</code> reference</a
+        >
+        beside the
+        <a href="../reference/slice-5-public-orchestration-map.html"
+          >Slice 5 quick reference</a
+        >.
+      </p>
+      <p>
+        Ask me about any unclear block before connecting it. A useful checkpoint
+        is a passing public read plus exact image-ID summary test, not a
+        complete orchestrator pasted in one attempt.
+      </p>
+
+      <footer>
+        Next:
+        <a href="./0007-slice-6-node-cli.html">Lesson 7: safe Node CLI</a>.
+        Previous:
+        <a href="./0005-slice-4-archive-adapter.html"
+          >Lesson 5: archive adapter</a
+        >. Course start:
+        <a href="./0001-copy-through-zip-round-trip.html"
+          >Lesson 1: ZIP copy-through</a
+        >.
+      </footer>
+    </main>
+  </body>
+</html>

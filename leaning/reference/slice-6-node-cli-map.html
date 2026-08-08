@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Slice 6 Node CLI map</title>
+    <link rel="stylesheet" href="../assets/lesson.css" />
+  </head>
+  <body>
+    <main class="compact">
+      <header>
+        <div class="eyebrow">Quick reference · Slice 6</div>
+        <h1>Safe Node CLI map</h1>
+        <p class="lede">
+          One thin filesystem/process wrapper around the compiled, verified
+          browser-compatible core.
+        </p>
+      </header>
+
+      <h2>Dependency direction</h2>
+      <pre><code>scripts/colmap-round-trip.mjs
+  → ../dist/colmap/index.js
+  → roundTripRecorderZip(Uint8Array)
+
+never import src/*.ts directly
+never parse COLMAP or ZIP inside the CLI</code></pre>
+
+      <h2>Success transaction</h2>
+      <ol class="sequence">
+        <li>Require exactly two user arguments.</li>
+        <li>Resolve input and output to absolute paths.</li>
+        <li>Validate input, output parent, and output absence.</li>
+        <li>Read input bytes.</li>
+        <li>Await the compiled round-trip orchestrator.</li>
+        <li>Write verified bytes to a unique temporary sibling.</li>
+        <li>Rename temporary sibling to the final output.</li>
+        <li>Print summary and resolved output path.</li>
+      </ol>
+
+      <h2>Path policy</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>State</th>
+            <th>Decision</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Input and output resolve to the same path</td>
+            <td>Fail</td>
+          </tr>
+          <tr>
+            <td>Input missing, unreadable, or not a file</td>
+            <td>Fail</td>
+          </tr>
+          <tr>
+            <td>Output parent missing or not a directory</td>
+            <td>Fail; do not create it</td>
+          </tr>
+          <tr>
+            <td>Final output already exists</td>
+            <td>Fail; do not overwrite it</td>
+          </tr>
+          <tr>
+            <td>All checks and in-memory verification pass</td>
+            <td>Publish through sibling rename</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Failure invariant</h2>
+      <ul class="checklist">
+        <li>Input bytes remain unchanged.</li>
+        <li>No successful final output path is created.</li>
+        <li>Known temporary sibling removal is attempted.</li>
+        <li>Cleanup does not hide the original failure.</li>
+        <li>Concise diagnostic goes to stderr.</li>
+        <li><code>process.exitCode</code> becomes non-zero.</li>
+      </ul>
+
+      <h2>Required stdout after rename</h2>
+      <pre><code>Images: &lt;count&gt;
+Camera &lt;id&gt;: PINHOLE &lt;width&gt;x&lt;height&gt; fx=&lt;fx&gt; fy=&lt;fy&gt; cx=&lt;cx&gt; cy=&lt;cy&gt;
+Image 1 world-to-camera qvec: [qw, qx, qy, qz]
+Image 1 world-to-camera tvec: [tx, ty, tz]
+Output ZIP: &lt;resolved path&gt;</code></pre>
+
+      <h2>Subprocess test oracle</h2>
+      <ul class="checklist">
+        <li>Build before launching the CLI.</li>
+        <li>Use <code>process.execPath</code> and an argument array.</li>
+        <li>Keep shell execution disabled.</li>
+        <li>Assert status, stdout, stderr, and filesystem state.</li>
+        <li>Use a unique operating-system temporary test directory.</li>
+        <li>Reopen successful output through the compiled public core.</li>
+        <li>Assert input/existing-output preservation and temp cleanup.</li>
+      </ul>
+
+      <h2>Minimum cases</h2>
+      <p>
+        Wrong argument counts; equal paths; missing/non-file input; missing
+        output parent; existing output; invalid ZIP; missing image ID 1;
+        successful synthetic ZIP; image ID 1 not first; no leftover temporary
+        file.
+      </p>
+
+      <h2>Do not add</h2>
+      <p>
+        No CLI framework, flags, prompts, directory creation, output overwrite,
+        direct source import, duplicate parsing/ZIP logic, real Task 1 fixtures,
+        LichtFeld, progress UI, or AppFramework integration.
+      </p>
+
+      <footer>
+        Study with
+        <a href="../lessons/0007-slice-6-node-cli.html"
+          >Lesson 7: add the safe Node CLI</a
+        >. Primary references:
+        <a href="https://nodejs.org/api/process.html">Node process</a>,
+        <a href="https://nodejs.org/api/fs.html#promises-api"
+          >filesystem promises</a
+        >, <a href="https://nodejs.org/api/path.html">path</a>, and
+        <a href="https://nodejs.org/api/child_process.html">child processes</a>.
+      </footer>
+    </main>
+  </body>
+</html>

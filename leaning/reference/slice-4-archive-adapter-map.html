@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Slice 4 archive-adapter map</title>
+    <link rel="stylesheet" href="../assets/lesson.css" />
+  </head>
+  <body>
+    <main class="compact">
+      <header>
+        <div class="eyebrow">Quick reference · Slice 4</div>
+        <h1>Recorder archive-adapter map</h1>
+        <p class="lede">
+          One in-memory ZIP owner: validate identities, inventory bytes, resolve
+          images, and copy with exactly three replacements.
+        </p>
+      </header>
+
+      <h2>Four operations</h2>
+      <div class="flow" aria-label="Archive adapter flow">
+        <span class="step">ZIP bytes</span><span class="arrow">→</span>
+        <span class="step">validated inventory</span
+        ><span class="arrow">→</span>
+        <span class="step">copied ZIP bytes</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Block</th>
+            <th>Responsibility</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>open</code></td>
+            <td>
+              Read all entries, validate paths/profile, expose three texts.
+            </td>
+          </tr>
+          <tr>
+            <td>Path/profile checks</td>
+            <td>Reject ambiguity; never repair or omit stored names.</td>
+          </tr>
+          <tr>
+            <td><code>resolveImages</code></td>
+            <td>Find exact file key <code>images/&lt;NAME&gt;</code>.</td>
+          </tr>
+          <tr>
+            <td><code>copyWithReplacements</code></td>
+            <td>Copy all entries; replace only three sparse text payloads.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Valid stored path</h2>
+      <ul class="checklist">
+        <li>Non-empty relative POSIX path using <code>/</code> only.</li>
+        <li>
+          No leading slash, drive prefix, UNC form, backslash, or control
+          character.
+        </li>
+        <li>
+          No repeated slash or empty, <code>.</code>, or
+          <code>..</code> segment.
+        </li>
+        <li>File: no trailing slash.</li>
+        <li>Directory: exactly one required trailing slash.</li>
+        <li>Return the original string unchanged after validation.</li>
+      </ul>
+
+      <h2>Collision rule</h2>
+      <pre><code>fold only ASCII A-Z for a lookup key
+keep the original path as the stored identity
+reject exact duplicates and case-only aliases</code></pre>
+      <p>
+        <code>images/A.jpg</code> and <code>images/a.jpg</code> collide for the
+        Windows compatibility workflow. Folding is never an image-resolution or
+        output-rewriting rule.
+      </p>
+
+      <h2>Required recorder profile</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Require exactly once as files</th>
+            <th>Reject if present</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>sparse/0/cameras.txt</code></td>
+            <td><code>sparse/0/cameras.bin</code></td>
+          </tr>
+          <tr>
+            <td><code>sparse/0/images.txt</code></td>
+            <td><code>sparse/0/images.bin</code></td>
+          </tr>
+          <tr>
+            <td><code>sparse/0/points3D.txt</code></td>
+            <td><code>sparse/0/points3D.bin</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Image resolution</h2>
+      <ol class="sequence">
+        <li>Index only validated file entries by their exact original path.</li>
+        <li>For each model image, form <code>images/&lt;NAME&gt;</code>.</li>
+        <li>Look up that exact case-sensitive key.</li>
+        <li>Return matches in model order; fail when one is absent.</li>
+      </ol>
+      <p>
+        Unreferenced image files remain valid opaque entries and must survive
+        copying.
+      </p>
+
+      <h2>Copy-through oracle</h2>
+      <ul class="checklist">
+        <li>Reopen emitted bytes through the adapter.</li>
+        <li>Compare path sets independent of entry order.</li>
+        <li>Compare file/directory kind at every path.</li>
+        <li>Compare supplied bytes at exactly the three replacement paths.</li>
+        <li>Compare original decompressed bytes at every other path.</li>
+        <li>
+          Explicitly cover directories, empty files, binary data, and unknown
+          files.
+        </li>
+      </ul>
+
+      <h2>Error ownership</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Failure</th>
+            <th><code>ColmapError.kind</code></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Unsafe entry, collision, missing text, binary coexistence</td>
+            <td><code>archive</code></td>
+          </tr>
+          <tr>
+            <td>Model image absent at its exact archive path</td>
+            <td><code>reference</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Do not add</h2>
+      <p>
+        No filesystem paths, <code>Buffer</code>, extraction, path repair,
+        COLMAP parsing, serialization, public orchestration, summary, model
+        comparison, CLI, real fixtures, or ZIP metadata guarantees.
+      </p>
+
+      <footer>
+        Study with
+        <a href="../lessons/0005-slice-4-archive-adapter.html"
+          >Lesson 5: build one safe archive adapter</a
+        >. Primary library references:
+        <a
+          href="https://gildas-lormeau.github.io/zip.js/api/classes/ZipReader.html"
+          >ZipReader</a
+        >,
+        <a
+          href="https://gildas-lormeau.github.io/zip.js/api/classes/ZipWriter.html"
+          >ZipWriter</a
+        >, and
+        <a
+          href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map"
+          >Map</a
+        >.
+      </footer>
+    </main>
+  </body>
+</html>

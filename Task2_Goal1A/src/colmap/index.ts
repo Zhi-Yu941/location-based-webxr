@@ -29,10 +29,14 @@ export {
   type ModelComparison,
 } from './model-comparison.js';
 
-export type {
-  DatasetSummary,
-  RecorderArchiveSource,
-  RecorderDataset,
-  RecorderRoundTripResult,
-  RoundTripVerification,
+export {
+  readRecorderZip,
+  roundTripRecorderZip,
+  summarizeRecorderModel,
+  writeRecorderZip,
+  type DatasetSummary,
+  type RecorderArchiveSource,
+  type RecorderDataset,
+  type RecorderRoundTripResult,
+  type RoundTripVerification,
 } from './round-trip.js';

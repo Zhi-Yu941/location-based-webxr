@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lesson 5 — Build one safe archive adapter</title>
+    <link rel="stylesheet" href="../assets/lesson.css" />
+    <script src="../assets/quiz.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Lesson 5 · about 30 minutes</div>
+        <h1>Build one safe archive adapter</h1>
+        <p class="lede">
+          Slice 4 promotes the ZIP feasibility idea into a real boundary. Learn
+          how to inventory untrusted entries, reject ambiguous paths, resolve
+          image assets exactly, and copy everything while changing only three
+          payloads.
+        </p>
+      </header>
+
+      <div class="goal">
+        <strong>Your tangible win:</strong> describe and test the four adapter
+        blocks, then connect them yourself without receiving a finished
+        production implementation.
+      </div>
+
+      <h2>1. The spike proved mechanics; Slice 4 adds policy</h2>
+      <p>
+        Your Slice 0A test already proved that zip.js can open a
+        <code>Uint8Array</code>, expose directory records, return decompressed
+        file bytes, and write another readable archive. Reuse that mental model.
+        Slice 4 adds the rules that make those mechanics safe for recorder data.
+      </p>
+
+      <div class="block-grid">
+        <article class="block-card">
+          <h3>Open</h3>
+          <p>Read every entry into one validated in-memory inventory.</p>
+        </article>
+        <article class="block-card">
+          <h3>Check profile</h3>
+          <p>
+            Reject unsafe names, collisions, missing text, and binary models.
+          </p>
+        </article>
+        <article class="block-card">
+          <h3>Resolve images</h3>
+          <p>Find each model image at one exact case-sensitive path.</p>
+        </article>
+        <article class="block-card">
+          <h3>Copy</h3>
+          <p>Re-add every entry and substitute exactly three text payloads.</p>
+        </article>
+      </div>
+
+      <p class="warning">
+        The adapter does not parse COLMAP, serialize models, calculate poses,
+        summarize datasets, access the filesystem, or know recorder metadata
+        formats. Those responsibilities already have or will get another owner.
+      </p>
+
+      <h2>2. Read the types as promises between blocks</h2>
+      <p>
+        <code>ArchiveEntry</code> is the complete snapshot: stored path, file or
+        directory kind, and decompressed bytes. Its <code>kind</code> field is a
+        discriminant, so TypeScript can narrow a file before code treats its
+        bytes as a replaceable payload.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Promise it makes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>ArchiveEntry</code></td>
+            <td>One validated entry whose original path was not rewritten.</td>
+          </tr>
+          <tr>
+            <td><code>ArchiveFileEntry</code></td>
+            <td>The entry is known to be a file, not merely cast as one.</td>
+          </tr>
+          <tr>
+            <td><code>OpenedRecorderArchive</code></td>
+            <td>
+              All entries passed policy and all three text payloads exist.
+            </td>
+          </tr>
+          <tr>
+            <td><code>RecorderZipAdapter</code></td>
+            <td>
+              One component exclusively owns ZIP reading and reconstruction.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        <code>readonly</code> protects TypeScript callers from accidental
+        assignment; it does not validate bytes arriving from a ZIP. Runtime
+        evidence must be established inside <code>open</code> before returning
+        the stronger archive type.
+      </p>
+
+      <h2>3. Block A — start from an independent synthetic contract</h2>
+      <p>
+        Hand-build one valid recorder-like ZIP in the test. Include the three
+        sparse texts, explicit directories, referenced and unreferenced images,
+        <code>actions/</code>, <code>session.json</code>, an unknown binary
+        file, and at least one empty file. Keep an independent expected
+        inventory so a broken reader cannot define both sides of its own
+        assertion.
+      </p>
+
+      <pre><code>declared expected entries
+        ↓ build ZIP
+raw ZIP bytes
+        ↓ adapter.open
+validated inventory
+        ↓ compare
+declared expected entries</code></pre>
+
+      <p>
+        Then derive each negative fixture from the valid fixture by changing one
+        fact. One failing reason per test makes the policy reviewable and
+        prevents an earlier failure from hiding the behavior you meant to test.
+      </p>
+
+      <h2>4. Block B — open with an all-or-nothing reader lifetime</h2>
+      <p>
+        The read loop resembles the spike: construct a
+        <a
+          href="https://gildas-lormeau.github.io/zip.js/api/classes/ZipReader.html"
+          ><code>ZipReader</code></a
+        >, get every entry, derive the kind from zip.js, and request data only
+        for files. Directory snapshots retain empty bytes because their
+        existence and kind still matter.
+      </p>
+
+      <pre><code>create reader
+try {
+  get all entries
+  validate and snapshot every entry
+  validate complete recorder profile
+} finally {
+  close reader
+}
+return complete opened archive</code></pre>
+
+      <p>
+        Keep the return after <code>finally</code>. A return inside
+        <code>finally</code> would suppress an earlier path, decompression, or
+        profile failure and could return a partial archive. Do not publish the
+        inventory until every entry and profile rule has passed.
+      </p>
+
+      <h2>5. Block C — validate the stored path; never repair it</h2>
+      <p>
+        “Normalized path” in this contract means the original ZIP filename after
+        validation. It does not mean transformed text. Do not replace
+        backslashes, collapse segments, URL-decode, Unicode-normalize, or run
+        the value through filesystem path helpers.
+      </p>
+
+      <ol class="sequence">
+        <li>Check that the stored string is non-empty and relative.</li>
+        <li>
+          Check kind and shape: files have no trailing slash; directories have
+          exactly one.
+        </li>
+        <li>
+          Reject backslashes, drive prefixes, control characters, and NUL.
+        </li>
+        <li>Split the permitted non-trailing portion on <code>/</code>.</li>
+        <li>Reject empty, <code>.</code>, and <code>..</code> segments.</li>
+        <li>
+          Return the same string, unchanged, only after every check passes.
+        </li>
+      </ol>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Stored entry</th>
+            <th>Decision</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>sparse/0/cameras.txt</code>, file</td>
+            <td>Accept unchanged</td>
+          </tr>
+          <tr>
+            <td><code>images/</code>, directory</td>
+            <td>Accept unchanged</td>
+          </tr>
+          <tr>
+            <td><code>/images/a.jpg</code></td>
+            <td>Reject absolute path</td>
+          </tr>
+          <tr>
+            <td><code>C:/images/a.jpg</code></td>
+            <td>Reject drive-qualified path</td>
+          </tr>
+          <tr>
+            <td><code>images\a.jpg</code></td>
+            <td>Reject non-POSIX separator</td>
+          </tr>
+          <tr>
+            <td><code>images//a.jpg</code> or <code>images/../a.jpg</code></td>
+            <td>Reject invalid segment</td>
+          </tr>
+          <tr>
+            <td><code>images/</code>, file</td>
+            <td>Reject kind/path mismatch</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <section class="quiz" data-quiz>
+        <h3>Retrieval check</h3>
+        <p>What should happen to <code>images\frame.jpg</code>?</p>
+        <div class="quiz-options">
+          <button
+            type="button"
+            data-correct="true"
+            data-success="Correct. Rejecting keeps the stored contract unambiguous."
+            data-retry="Try again: the adapter is forbidden to repair names."
+          >
+            Reject the archive
+          </button>
+          <button
+            type="button"
+            data-correct="false"
+            data-success=""
+            data-retry="No. Rewriting would change the stored entry identity."
+          >
+            Rewrite the path
+          </button>
+          <button
+            type="button"
+            data-correct="false"
+            data-success=""
+            data-retry="No. Ignoring an opaque entry breaks preservation."
+          >
+            Ignore the entry
+          </button>
+        </div>
+        <p class="feedback" data-feedback aria-live="polite"></p>
+      </section>
+
+      <h2>6. Block D — detect aliases before building lookups</h2>
+      <p>
+        Two ZIP records must not become one file when materialized on Windows. A
+        <code>Map</code> from an ASCII-folded key to the first original path can
+        detect both exact duplicates and case-only collisions while keeping the
+        original spelling for a useful error.
+      </p>
+
+      <pre><code>ASCII fold only:
+path.replace(/[A-Z]/g, letter =&gt; letter.toLowerCase())
+
+"images/A.jpg" and "images/a.jpg"
+                ↓ same folded key
+             reject archive</code></pre>
+
+      <p>
+        Ordinary <code>toLowerCase()</code> folds more than ASCII, so applying
+        it to the whole path would enforce a broader rule than the accepted
+        contract. Folding is only a collision check; never store or emit the
+        folded string as the entry path.
+      </p>
+
+      <h2>7. Block E — turn a runtime inventory into the required profile</h2>
+      <p>
+        A TypeScript union such as <code>SparseTextPath</code> disappears at
+        runtime. You still need a small runtime list of the three exact paths to
+        check the archive and build <code>colmapText</code>.
+      </p>
+
+      <pre><code>required text paths:
+- sparse/0/cameras.txt
+- sparse/0/images.txt
+- sparse/0/points3D.txt
+
+forbidden model paths:
+- sparse/0/cameras.bin
+- sparse/0/images.bin
+- sparse/0/points3D.bin</code></pre>
+
+      <p>
+        Require one file at every text path. Any missing member means a partial
+        model and fails the whole open. Reject any forbidden binary path even
+        when all three text files also exist; otherwise the output could carry
+        two inconsistent COLMAP models.
+      </p>
+
+      <p class="note">
+        Do not parse the three byte arrays here. The adapter proves that the
+        files exist and returns their bytes; the text codec owns their syntax.
+      </p>
+
+      <h2>8. Block F — resolve model images by exact archive identity</h2>
+      <p>
+        Build an exact path index for file entries after duplicate checks have
+        passed. For each <code>ColmapImage</code>, construct only
+        <code>images/&lt;NAME&gt;</code> and request that exact key. Preserve
+        model order in the returned result.
+      </p>
+
+      <pre><code>model name: frame-000002.jpg
+lookup key: images/frame-000002.jpg</code></pre>
+
+      <p>
+        Do not search by basename, suffix, ZIP order, or case-insensitive match.
+        A missing exact file is a <code>reference</code> failure. An extra image
+        that no model record references is valid and remains in the archive.
+      </p>
+
+      <section class="quiz" data-quiz>
+        <h3>Retrieval check</h3>
+        <p>How should <code>frame.jpg</code> be resolved?</p>
+        <div class="quiz-options">
+          <button
+            type="button"
+            data-correct="true"
+            data-success="Correct. The model name maps to one exact archive key."
+            data-retry="Try again: resolution is case-sensitive and directory-specific."
+          >
+            Exact path lookup
+          </button>
+          <button
+            type="button"
+            data-correct="false"
+            data-success=""
+            data-retry="No. Case folding is only for collision rejection."
+          >
+            Folded path lookup
+          </button>
+          <button
+            type="button"
+            data-correct="false"
+            data-success=""
+            data-retry="No. Matching anywhere could select an unrelated file."
+          >
+            Global name lookup
+          </button>
+        </div>
+        <p class="feedback" data-feedback aria-live="polite"></p>
+      </section>
+
+      <h2>9. Block G — copy the inventory, not the typed model</h2>
+      <p>
+        <code>copyWithReplacements</code> receives the opened inventory and a
+        record containing the three serializer payloads. Iterate over every
+        inventory entry. Recreate directories explicitly; for a file, choose
+        replacement bytes only when its exact path is one of the three sparse
+        text paths.
+      </p>
+
+      <pre><code>for every opened entry
+  directory -&gt; add explicit directory record
+  selected file -&gt; add replacement bytes
+  other file -&gt; add original decompressed bytes
+
+close writer -&gt; output Uint8Array</code></pre>
+
+      <p>
+        This is why the adapter keeps all entries. Reconstructing from the typed
+        COLMAP model would silently lose actions, session data, unknown files,
+        explicit directories, and unreferenced images.
+      </p>
+
+      <h2>10. Reopen the result and compare the right facts</h2>
+      <p>
+        The test must pass produced bytes back through <code>open</code>. A
+        successful <code>ZipWriter.close()</code> only proves that bytes were
+        returned, not that the adapter can read and validate them again.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Compare</th>
+            <th>Ignore</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Exact path set</td>
+            <td>ZIP entry order</td>
+          </tr>
+          <tr>
+            <td>File/directory kind per path</td>
+            <td>Compressed archive bytes</td>
+          </tr>
+          <tr>
+            <td>Replacement bytes at three paths</td>
+            <td>Compression method or level</td>
+          </tr>
+          <tr>
+            <td>Original decompressed bytes everywhere else</td>
+            <td>Timestamps, comments, and extra fields</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        Compare by path, not array position. This makes the test independent of
+        entry order while still proving explicit directories, empty payloads,
+        binary data, unknown files, and unreferenced images survived.
+      </p>
+
+      <h2>11. Errors belong to the shared boundary</h2>
+      <p>
+        Reuse <code>ColmapError</code>. Unsafe ZIP structure, duplicates,
+        collisions, missing sparse texts, and binary coexistence use the
+        <code>archive</code> kind with the relevant stored path. A model image
+        that has no exact file uses <code>reference</code> and identifies the
+        image name or model field. Do not add a second ZIP-specific error tree.
+      </p>
+
+      <p>
+        Expected bad input should reject the promise. The test should assert
+        structured context rather than only a fragile full message. No partial
+        <code>OpenedRecorderArchive</code> and no output bytes represent success
+        after a failure.
+      </p>
+
+      <h2>12. Minimum evidence for Slice 4</h2>
+      <ol class="checklist">
+        <li>
+          A valid synthetic recorder profile opens into the exact inventory.
+        </li>
+        <li>Each missing sparse text fails independently.</li>
+        <li>Any matching sparse binary file fails, including coexistence.</li>
+        <li>
+          Absolute, drive, backslash, control, repeated, dot, and parent paths
+          fail.
+        </li>
+        <li>File/directory path-shape mismatches fail.</li>
+        <li>Exact duplicates and ASCII-case collisions fail.</li>
+        <li>Referenced images resolve exactly and in model order.</li>
+        <li>
+          A missing referenced image fails; an unreferenced image remains valid.
+        </li>
+        <li>Output reopens with the same path and kind set.</li>
+        <li>
+          Exactly three payloads change to the supplied replacement bytes.
+        </li>
+        <li>Every untouched decompressed payload remains byte-identical.</li>
+        <li>Formatting, lint, both typechecks, build, and unit tests pass.</li>
+      </ol>
+
+      <h2>13. Keep later slices out</h2>
+      <p>
+        Do not add <code>readRecorderZip</code>, <code>writeRecorderZip</code>,
+        summary logic, round-trip model comparison, CLI paths, real fixtures, or
+        AppFramework integration. Slice 5 will connect this internal adapter to
+        the codec and public functions. Slice 4 only proves the archive boundary
+        itself.
+      </p>
+
+      <div class="practice">
+        <h3>Your first implementation step</h3>
+        <p>
+          Copy the valid synthetic inventory idea from the feasibility test into
+          a new adapter test helper. Write one failing happy-path
+          <code>open</code> test and one failing unsafe-path test. Implement
+          only enough path validation and inventory building to make those two
+          pass, then add the remaining table rows one behavior at a time.
+        </p>
+      </div>
+
+      <div class="goal">
+        <strong>Explain it to Mingna in one sentence:</strong> “The adapter
+        validates stored ZIP identities without rewriting them, resolves model
+        images exactly, and rebuilds the complete inventory while changing only
+        the three serializer-owned files.”
+      </div>
+
+      <h2>Primary sources and next step</h2>
+      <p>
+        Keep the official
+        <a
+          href="https://gildas-lormeau.github.io/zip.js/api/classes/ZipReader.html"
+          >ZipReader API</a
+        >,
+        <a
+          href="https://gildas-lormeau.github.io/zip.js/api/classes/ZipWriter.html"
+          >ZipWriter API</a
+        >, and
+        <a
+          href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map"
+          >MDN Map reference</a
+        >
+        beside your implementation. Use the
+        <a href="../reference/slice-4-archive-adapter-map.html"
+          >Slice 4 quick reference</a
+        >
+        while writing the tests.
+      </p>
+      <p>
+        Ask me about any unclear block before connecting it. A useful checkpoint
+        is your valid fixture plus path-rejection table, not a finished adapter
+        pasted all at once.
+      </p>
+
+      <footer>
+        Next:
+        <a href="./0006-slice-5-public-orchestration.html"
+          >Lesson 6: public round trip</a
+        >. Previous:
+        <a href="./0004-slice-3-writer-and-comparisons.html"
+          >Lesson 4: writer and comparisons</a
+        >. Course start:
+        <a href="./0001-copy-through-zip-round-trip.html"
+          >Lesson 1: ZIP copy-through</a
+        >.
+      </footer>
+    </main>
+  </body>
+</html>

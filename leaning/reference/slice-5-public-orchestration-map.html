@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Slice 5 public-orchestration map</title>
+    <link rel="stylesheet" href="../assets/lesson.css" />
+  </head>
+  <body>
+    <main class="compact">
+      <header>
+        <div class="eyebrow">Quick reference · Slice 5</div>
+        <h1>Public round-trip map</h1>
+        <p class="lede">
+          Connect the existing owners, preserve the opaque source, and return
+          success only after reopening and verification.
+        </p>
+      </header>
+
+      <h2>Ownership rule</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Slice 5 calls it for</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Validator</td>
+            <td>Trusting public model input.</td>
+          </tr>
+          <tr>
+            <td>Text codec</td>
+            <td>Parsing and serializing the three COLMAP texts.</td>
+          </tr>
+          <tr>
+            <td>ZIP adapter</td>
+            <td>Inventory, image resolution, copying, and replacements.</td>
+          </tr>
+          <tr>
+            <td>Comparisons</td>
+            <td>Semantic write verification and exact no-op verification.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Public operations</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Operation</th>
+            <th>Required sequence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>readRecorderZip</code></td>
+            <td>Open → map texts → parse/validate → resolve → dataset.</td>
+          </tr>
+          <tr>
+            <td><code>summarizeRecorderModel</code></td>
+            <td>Validate → derive counts/camera → find exact image ID 1.</td>
+          </tr>
+          <tr>
+            <td><code>writeRecorderZip</code></td>
+            <td>
+              Validate → resolve → serialize → copy → reopen → semantic check.
+            </td>
+          </tr>
+          <tr>
+            <td><code>roundTripRecorderZip</code></td>
+            <td>
+              Reuse read/summary/write → reopen → exact/archive checks → result.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Dataset seam</h2>
+      <pre><code>RecorderDataset
+├─ model          editable, understood COLMAP values
+└─ sourceArchive  opaque, pass-through archive inventory</code></pre>
+      <p>
+        Only the read operation creates the opaque source. The writer uses it
+        internally so unknown files, images, actions, and directories survive.
+      </p>
+
+      <h2>Three explicit mappings</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ZIP path</th>
+            <th>Codec field</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>sparse/0/cameras.txt</code></td>
+            <td><code>cameras</code></td>
+          </tr>
+          <tr>
+            <td><code>sparse/0/images.txt</code></td>
+            <td><code>images</code></td>
+          </tr>
+          <tr>
+            <td><code>sparse/0/points3D.txt</code></td>
+            <td><code>points3D</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Comparison choice</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Place</th>
+            <th>Expected model</th>
+            <th>Comparison</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>General write</td>
+            <td>Supplied possibly edited model</td>
+            <td>Semantic</td>
+          </tr>
+          <tr>
+            <td>Unchanged round trip</td>
+            <td>Originally read model</td>
+            <td>Semantic plus exact no-op</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Summary source of truth</h2>
+      <ul class="checklist">
+        <li>Counts come from typed model array lengths.</li>
+        <li>Camera comes from the validated single-camera model.</li>
+        <li>Selected pose comes from <code>imageId === 1</code>.</li>
+        <li>Never use comment counts, ZIP order, or array position.</li>
+        <li>Missing ID 1 is a contextual <code>reference</code> failure.</li>
+      </ul>
+
+      <h2>Archive verification</h2>
+      <ul class="checklist">
+        <li>Reopen the produced bytes through the public read path.</li>
+        <li>Same exact entry path set and kind per path.</li>
+        <li>Exactly three replacement paths.</li>
+        <li>Selected bytes equal actual serializer payloads.</li>
+        <li>Every untouched decompressed payload is byte-identical.</li>
+        <li>Compare byte contents, not <code>Uint8Array</code> identity.</li>
+      </ul>
+
+      <h2>Test signal</h2>
+      <p>
+        Use valid noncanonical input text. If the output contains the canonical
+        serializer bytes at all three sparse paths, the public path cannot have
+        passed by copying the original text.
+      </p>
+
+      <h2>Do not add</h2>
+      <p>
+        No second ZIP reader/writer, second text parser, dependency-injection
+        framework, Node filesystem, <code>Buffer</code>, CLI paths, temporary
+        files, real fixtures, LichtFeld, or AppFramework integration.
+      </p>
+
+      <footer>
+        Study with
+        <a href="../lessons/0006-slice-5-public-orchestration.html"
+          >Lesson 6: connect the public round trip</a
+        >. Primary references:
+        <a href="https://www.typescriptlang.org/docs/handbook/symbols.html"
+          >TypeScript symbols</a
+        >,
+        <a
+          href="https://www.typescriptlang.org/docs/handbook/2/narrowing.html#discriminated-unions"
+          >narrowing</a
+        >, and
+        <a
+          href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/find"
+          >Array.find</a
+        >.
+      </footer>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lesson 7 — Add the safe Node CLI</title>
+    <link rel="stylesheet" href="../assets/lesson.css" />
+    <script src="../assets/quiz.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">Lesson 7 · about 30 minutes</div>
+        <h1>Add the safe Node CLI</h1>
+        <p class="lede">
+          Slice 6 gives the verified browser-compatible TypeScript core one
+          local filesystem entry point. Learn to keep the wrapper thin, reject
+          unsafe path situations, publish output only after verification, and
+          test the real process boundary.
+        </p>
+      </header>
+
+      <div class="goal">
+        <strong>Your tangible win:</strong> understand the CLI as seven small
+        blocks, then connect them yourself in the required <code>.mjs</code>
+        wrapper and subprocess test without receiving the finished script.
+      </div>
+
+      <h2>1. This slice is a boundary around TypeScript</h2>
+      <p>
+        The reusable implementation remains the TypeScript code under
+        <code>src/colmap/</code>. The CLI is intentionally a Node ESM
+        <code>.mjs</code> file because its only job is filesystem and process
+        interaction. It imports the <em>compiled</em> public core, never the
+        TypeScript source.
+      </p>
+
+      <pre><code>scripts/colmap-round-trip.mjs
+  → imports ../dist/colmap/index.js
+  → calls roundTripRecorderZip
+
+src/colmap/
+  ✗ no node:fs
+  ✗ no process.argv
+  ✗ no filesystem paths</code></pre>
+
+      <p>
+        This direction proves that package consumers can use the built public
+        entry. Importing <code>../src/colmap/round-trip.ts</code> would test a
+        private development shortcut and could hide a broken build or export.
+      </p>
+
+      <div class="block-grid">
+        <article class="block-card">
+          <h3>Arguments</h3>
+          <p>Require exactly one input path and one output path.</p>
+        </article>
+        <article class="block-card">
+          <h3>Path policy</h3>
+          <p>Resolve paths and reject unsafe filesystem states.</p>
+        </article>
+        <article class="block-card">
+          <h3>Core call</h3>
+          <p>Read bytes and ask the compiled orchestrator to verify them.</p>
+        </article>
+        <article class="block-card">
+          <h3>Publication</h3>
+          <p>Write a temporary sibling and rename only after success.</p>
+        </article>
+        <article class="block-card">
+          <h3>Summary</h3>
+          <p>Print the already-derived typed summary and final path.</p>
+        </article>
+        <article class="block-card">
+          <h3>Failure</h3>
+          <p>Clean up, report concisely, and exit non-zero.</p>
+        </article>
+      </div>
+
+      <h2>2. Block A — parse exactly two user arguments</h2>
+      <p>
+        Node exposes command-line values through
+        <a href="https://nodejs.org/api/process.html#processargv"
+          ><code>process.argv</code></a
+        >. The first item is the Node executable and the second is the script;
+        the CLI's user arguments begin at index two.
+      </p>
+
+      <pre><code>process.argv
+├─ [0] Node executable
+├─ [1] CLI script
+├─ [2] input ZIP
+└─ [3] output ZIP</code></pre>
+
+      <p>
+        Require the sliced array to have length exactly two. Zero, one, or three
+        user arguments all fail with a short usage line. Do not add optional
+        flags, defaults, interactive prompts, or a command-line framework; Slice
+        6 has one fixed invocation.
+      </p>
+
+      <p class="note">
+        Keep paths as separate argument-array elements. A path containing spaces
+        is still one argument when the shell invokes the script correctly; the
+        CLI should not split it again.
+      </p>
+
+      <h2>3. Block B — resolve and check filesystem policy</h2>
+      <p>
+        Use Node's
+        <a href="https://nodejs.org/api/path.html#pathresolvepaths"
+          ><code>path.resolve</code></a
+        >
+        to turn both arguments into absolute paths. From then on, diagnostics,
+        comparisons, temporary-file placement, and the printed output path use
+        those resolved values.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Check</th>
+            <th>Required behavior</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Input and output resolve identically</td>
+            <td>Fail before reading or writing.</td>
+          </tr>
+          <tr>
+            <td>Input is missing or not a file</td>
+            <td>Fail with no output.</td>
+          </tr>
+          <tr>
+            <td>Input cannot be read</td>
+            <td>Let the read failure remain visible.</td>
+          </tr>
+          <tr>
+            <td>Output parent is missing or not a directory</td>
+            <td>Fail; do not create directories.</td>
+          </tr>
+          <tr>
+            <td>Final output already exists</td>
+            <td>Fail; do not overwrite it.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        When checking absence, distinguish <code>ENOENT</code> from every other
+        filesystem error. “Permission denied” does not mean “the path is free.”
+        Catch only the expected missing-path code and rethrow other failures.
+      </p>
+
+      <p class="warning">
+        Never delete the output merely because it exists. It belongs to the
+        user. The contract says to fail, not to make the requested state true by
+        removing something.
+      </p>
+
+      <h2>4. Block C — cross the byte boundary once</h2>
+      <p>
+        Read the entire input ZIP with the promise-based
+        <a href="https://nodejs.org/api/fs.html#fspromisesreadfilepath-options"
+          ><code>node:fs/promises</code> API</a
+        >, then pass those bytes directly to <code>roundTripRecorderZip</code>.
+        Node documents that
+        <a href="https://nodejs.org/api/buffer.html#buffers-and-typedarrays"
+          ><code>Buffer</code> extends <code>Uint8Array</code></a
+        >, so the filesystem result satisfies the browser core's byte-oriented
+        input without converting ZIP data to text.
+      </p>
+
+      <pre><code>filesystem bytes
+  → roundTripRecorderZip(bytes)
+  → verified result containing outputZipBytes and summary</code></pre>
+
+      <p>
+        Do not open zip.js, decode COLMAP text, construct a model, or repeat any
+        verification inside the CLI. The orchestrator already performs the
+        entire read/serialize/reopen/compare flow. The CLI trusts only a
+        fulfilled orchestrator promise.
+      </p>
+
+      <h2>5. Block D — treat output publication as a transaction</h2>
+      <p>
+        A final filename communicates “this operation succeeded.” Writing
+        directly to that path would expose a partial ZIP if the write stops
+        midway. Instead, create a unique temporary filename in the output's
+        existing parent directory.
+      </p>
+
+      <ol class="sequence">
+        <li>Finish all in-memory round-trip verification first.</li>
+        <li>Choose a unique temporary sibling of the final output.</li>
+        <li>
+          Write the verified <code>Uint8Array</code> to that temporary path.
+        </li>
+        <li>Rename the temporary file to the final path.</li>
+        <li>Only then print the successful output location.</li>
+      </ol>
+
+      <pre><code>output parent/
+├─ .result.zip.&lt;unique&gt;.tmp   ← incomplete/private
+└─ result.zip                 ← appears only after success</code></pre>
+
+      <p>
+        Keep the temporary file beside the output, not in a global temporary
+        directory. A sibling rename stays within the same filesystem and is the
+        publication step required by the accepted plan. A standard-library
+        unique value such as <code>randomUUID()</code>, plus exclusive creation,
+        is sufficient; no temporary-file package is needed.
+      </p>
+
+      <p>
+        Write with an exclusive-creation flag so an extremely unlikely temporary
+        name collision fails instead of overwriting somebody else's file. The
+        final output existence check is still separate because the final path
+        must never be intentionally replaced.
+      </p>
+
+      <section class="quiz" data-quiz>
+        <h3>Retrieval check</h3>
+        <p>When may the final output filename appear?</p>
+        <div class="quiz-options">
+          <button
+            type="button"
+            data-correct="true"
+            data-success="Correct. The final name is the success boundary."
+            data-retry="Try again: the final path must imply verified success."
+          >
+            Publish after verification
+          </button>
+          <button
+            type="button"
+            data-correct="false"
+            data-success=""
+            data-retry="No. That could expose incomplete or invalid bytes."
+          >
+            Publish before verification
+          </button>
+          <button
+            type="button"
+            data-correct="false"
+            data-success=""
+            data-retry="No. Existing output belongs to the user."
+          >
+            Overwrite existing output
+          </button>
+        </div>
+        <p class="feedback" data-feedback aria-live="polite"></p>
+      </section>
+
+      <h2>6. Block E — cleanup must not hide the real failure</h2>
+      <p>
+        Track the temporary path before writing it. If writing, renaming, or any
+        later step fails, attempt to remove only that known temporary file. Do
+        not remove the input or final output.
+      </p>
+
+      <pre><code>try
+  write temporary sibling
+  rename temporary → final
+catch original failure
+  attempt temporary cleanup
+  rethrow original failure</code></pre>
+
+      <p>
+        Cleanup is best effort. A cleanup error should not replace the original
+        parsing, verification, or write failure, because that would report the
+        wrong cause. This is the same control-flow lesson as avoiding a return
+        inside <code>finally</code>: lifecycle code must not erase the
+        operation's real result.
+      </p>
+
+      <p class="note">
+        Once rename succeeds, the temporary path no longer exists and the final
+        path is valid output. Do not run failure cleanup against the final path.
+      </p>
+
+      <h2>7. Block F — print values from the returned summary</h2>
+      <p>
+        The CLI formats presentation; it does not calculate domain values. Read
+        counts, intrinsics, and image ID 1's world-to-camera pose from the
+        returned <code>summary</code>. Print at least the exact information
+        below after the final rename succeeds.
+      </p>
+
+      <pre><code>Images: &lt;count&gt;
+Camera &lt;id&gt;: PINHOLE &lt;width&gt;x&lt;height&gt; fx=&lt;fx&gt; fy=&lt;fy&gt; cx=&lt;cx&gt; cy=&lt;cy&gt;
+Image 1 world-to-camera qvec: [qw, qx, qy, qz]
+Image 1 world-to-camera tvec: [tx, ty, tz]
+Output ZIP: &lt;resolved path&gt;</code></pre>
+
+      <p>
+        Joining the tuple components with <code>", "</code> is enough. Do not
+        reformat, round, normalize, invert, or convert the pose. Slice 5 already
+        selected the record whose ID is exactly <code>1</code> and preserved the
+        COLMAP world-to-camera convention.
+      </p>
+
+      <h2>8. Block G — one top-level failure boundary</h2>
+      <p>
+        Let the inner workflow throw naturally. One top-level catch prints a
+        concise error to standard error and sets a non-zero status. Node's
+        process documentation recommends
+        <a href="https://nodejs.org/api/process.html#processexitcode"
+          ><code>process.exitCode</code></a
+        >
+        when the process can finish naturally; immediate
+        <code>process.exit()</code> can truncate pending standard-output or
+        standard-error writes.
+      </p>
+
+      <pre><code>top-level success
+  → final output exists
+  → summary on stdout
+  → natural exit 0
+
+top-level failure
+  → no final output created
+  → concise error on stderr
+  → process.exitCode = 1</code></pre>
+
+      <p>
+        Expected <code>ColmapError</code> values already contain useful context.
+        Filesystem errors have messages and codes. The CLI does not need a new
+        error hierarchy or to convert every unexpected programmer error into a
+        misleading COLMAP failure.
+      </p>
+
+      <section class="quiz" data-quiz>
+        <h3>Retrieval check</h3>
+        <p>How should the CLI signal a handled failure?</p>
+        <div class="quiz-options">
+          <button
+            type="button"
+            data-correct="true"
+            data-success="Correct. This allows pending output and cleanup to finish."
+            data-retry="Try again: avoid terminating pending I/O abruptly."
+          >
+            Set exit code
+          </button>
+          <button
+            type="button"
+            data-correct="false"
+            data-success=""
+            data-retry="No. Immediate termination can truncate pending writes."
+          >
+            Force immediate exit
+          </button>
+          <button
+            type="button"
+            data-correct="false"
+            data-success=""
+            data-retry="No. The calling shell needs a non-zero status."
+          >
+            Ignore the failure
+          </button>
+        </div>
+        <p class="feedback" data-feedback aria-live="polite"></p>
+      </section>
+
+      <h2>9. Test the process, not an extracted imitation</h2>
+      <p>
+        The required <code>scripts/colmap-round-trip.test.mjs</code> is a
+        subprocess test. Build the package first, then launch the actual CLI
+        with the current Node executable and an argument array. Node's
+        <a
+          href="https://nodejs.org/api/child_process.html#child_processspawnsynccommand-args-options"
+          ><code>spawnSync</code></a
+        >
+        is adequate for a small CLI test because it returns status, stdout, and
+        stderr together.
+      </p>
+
+      <pre><code>process.execPath
+  + [absolute CLI script, input path, output path]
+  + shell disabled
+  → status, stdout, stderr</code></pre>
+
+      <p>
+        Passing an argument array instead of constructing a shell command avoids
+        quoting bugs and treats spaces or shell characters in paths as data. A
+        shell is unnecessary here.
+      </p>
+
+      <p>
+        Create each test's files under a unique operating-system temporary
+        directory. The test may hand-build the same small recorder ZIP shape
+        used by earlier slices; it must not use a tracked real Task 1 fixture in
+        Slice 6.
+      </p>
+
+      <h2>10. Minimum subprocess evidence</h2>
+      <ol class="checklist">
+        <li>Zero, one, and three user arguments fail with non-zero status.</li>
+        <li>Resolved identical input and output paths fail.</li>
+        <li>A missing or non-file input fails.</li>
+        <li>A missing output parent fails without creating it.</li>
+        <li>
+          An existing output fails and its original bytes remain unchanged.
+        </li>
+        <li>An invalid recorder archive produces no final output.</li>
+        <li>Failure leaves no temporary sibling behind.</li>
+        <li>A valid synthetic input exits zero and creates one output ZIP.</li>
+        <li>The original input bytes remain unchanged.</li>
+        <li>The output reopens through the compiled public core.</li>
+        <li>
+          Stdout contains all required summary lines and resolved output path.
+        </li>
+        <li>The ID-1 pose is printed even when image ID 1 is not first.</li>
+        <li>Missing image ID 1 fails with no final output.</li>
+      </ol>
+
+      <p>
+        Avoid asserting an entire failure message character-for-character. Test
+        the non-zero status, relevant error fragment, absence of final output,
+        preservation of existing files, and temporary cleanup. Success output
+        has a required presentation contract, so its important lines deserve
+        direct assertions.
+      </p>
+
+      <h2>11. Build and package-script order matter</h2>
+      <p>
+        The wrapper imports <code>dist/colmap/index.js</code>, so stale or
+        absent build output must not accidentally pass. Make the
+        <code>colmap:roundtrip</code> package command perform or require the
+        build before launching the wrapper, and make the subprocess suite run
+        after a package build.
+      </p>
+
+      <pre><code>package build
+  → dist/colmap/index.js
+  → CLI subprocess test
+  → local colmap:roundtrip invocation</code></pre>
+
+      <p>
+        Include <code>scripts/</code> in the relevant formatting and test
+        scopes. The existing Vitest pattern already includes
+        <code>scripts/**/*.test.mjs</code>; confirm the complete package gate
+        actually executes it rather than assuming that a colocated test was
+        discovered.
+      </p>
+
+      <h2>12. Keep later slices out</h2>
+      <p>
+        Slice 6 does not replay the real Task 1 archives, start LichtFeld,
+        create a web page, integrate AppFramework, add progress reporting,
+        accept directories, overwrite output, or introduce configurable flags.
+        It proves one local command around the already accepted public core.
+      </p>
+
+      <div class="practice">
+        <h3>Your first implementation step</h3>
+        <p>
+          Build the package, then create the subprocess test with only two
+          failing cases: wrong argument count and equal resolved paths. Add the
+          thinnest wrapper structure that makes them pass. Next add the valid
+          synthetic ZIP success case, and only then introduce temporary-file
+          publication and its cleanup failure cases.
+        </p>
+      </div>
+
+      <div class="goal">
+        <strong>Explain it to Mingna in one sentence:</strong> “The CLI is the
+        only Node-specific layer: it validates two paths, gives input bytes to
+        the compiled verified core, publishes returned bytes through a temporary
+        sibling rename, and reports success only afterward.”
+      </div>
+
+      <h2>Primary sources and next step</h2>
+      <p>
+        Keep the official Node documentation for
+        <a href="https://nodejs.org/api/process.html#processargv"
+          >arguments and exit status</a
+        >,
+        <a href="https://nodejs.org/api/fs.html#promises-api"
+          >promise-based filesystem operations</a
+        >,
+        <a href="https://nodejs.org/api/path.html#pathresolvepaths"
+          >path resolution</a
+        >, and
+        <a
+          href="https://nodejs.org/api/child_process.html#child_processspawnsynccommand-args-options"
+          >subprocess testing</a
+        >
+        beside the
+        <a href="../reference/slice-6-node-cli-map.html"
+          >Slice 6 quick reference</a
+        >.
+      </p>
+      <p>
+        Ask me about any unclear block before connecting it. A useful checkpoint
+        is a subprocess test proving wrong arguments cannot create an output,
+        not a full CLI pasted all at once.
+      </p>
+
+      <footer>
+        Previous:
+        <a href="./0006-slice-5-public-orchestration.html"
+          >Lesson 6: public round trip</a
+        >. Course start:
+        <a href="./0001-copy-through-zip-round-trip.html"
+          >Lesson 1: ZIP copy-through</a
+        >.
+      </footer>
+    </main>
+  </body>
+</html>

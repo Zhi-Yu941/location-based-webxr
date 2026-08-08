@@ -48,6 +48,24 @@
   Browser-standard absolute value. Use for: the approved absolute/relative floating comparison.
 - [MDN: Math.max](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/max)
   Browser-standard maximum selection. Use for: scaling the semantic floating tolerance.
+- [MDN: Map](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map)
+  Documents keyed lookup with original key identity and insertion order. Use for: archive path indexes, collision detection, and exact image lookup.
+- [MDN: Regular expression character classes](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions/Character_classes)
+  Documents explicit ASCII ranges and control-character matching. Use for: validating stored ZIP names and folding only ASCII uppercase letters.
+- [TypeScript Handbook: Symbols](https://www.typescriptlang.org/docs/handbook/symbols.html)
+  Documents symbol-keyed properties and the distinct identity of `unique symbol` types. Use for: keeping recorder source-archive state opaque at the public boundary.
+- [MDN: Array.prototype.find](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/find)
+  Documents exact predicate-based selection and the `undefined` missing case. Use for: selecting image ID `1` without relying on model order.
+- [Node.js: Process](https://nodejs.org/api/process.html)
+  Documents `process.argv`, standard streams, and graceful non-zero status through `process.exitCode`. Use for: the CLI argument and failure boundary.
+- [Node.js: File system promises](https://nodejs.org/api/fs.html#promises-api)
+  Documents promise-based file reads, writes, status checks, removal, and rename. Use for: verified temporary-file publication and cleanup.
+- [Node.js: Path](https://nodejs.org/api/path.html)
+  Documents platform-aware `resolve`, `dirname`, `basename`, and `join`. Use for: absolute path policy and sibling temporary placement.
+- [Node.js: Buffer and TypedArrays](https://nodejs.org/api/buffer.html#buffers-and-typedarrays)
+  Confirms that `Buffer` extends `Uint8Array`. Use for: passing filesystem bytes into the browser-compatible core without text conversion.
+- [Node.js: Child processes](https://nodejs.org/api/child_process.html)
+  Documents launching a process with a separate argument array and collecting status, stdout, and stderr. Use for: the real CLI subprocess test.
 
 ## Wisdom (Communities)
 

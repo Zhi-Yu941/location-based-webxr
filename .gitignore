@@ -9,3 +9,12 @@ dist-site/
 # but in this repo we keep all auth in ~/.npmrc only and ignore project-level
 # .npmrc as defense-in-depth against accidental `npm config set ... --location=project`.
 .npmrc
+.DS_Store
+
+# Per-developer IDE state (JetBrains) — never commit editor config.
+.idea/
+
+# Scratch file the test-timing gate writes while rewriting docs/test-timings.md.
+# A gate interrupted mid-write leaves it behind; it must never be committed
+# (2026-07-26: one slipped into a commit this way).
+*.md.tmp

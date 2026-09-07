@@ -105,6 +105,13 @@ export {
   registerXrFrameUpdate,
 } from './xr-frame-loop.js';
 
+// --- hit-test-reticle-driver ---
+export {
+  type HitTestReticleHandle,
+  type HitTestReticleArgs,
+  startHitTestReticle,
+} from './hit-test-reticle-driver.js';
+
 // --- enable-gps-ar ---
 export {
   type EnableGpsArStatus,
@@ -187,6 +194,15 @@ export {
   getDepthInfoFromFrame,
   type SessionFeatureOptions,
 } from './webxr-session.js';
+
+// --- webxr-support-probe ---
+export {
+  probeImmersiveArSupport,
+  probeImmersiveArSupportOutcome,
+  WEBXR_SUPPORT_PROBE_TIMEOUT_MS,
+  type ImmersiveArProbeOutcome,
+  type XrSystemLike,
+} from './webxr-support-probe.js';
 
 // --- webxr-nue-basis ---
 export { WEBXR_TO_NUE } from './webxr-nue-basis.js';

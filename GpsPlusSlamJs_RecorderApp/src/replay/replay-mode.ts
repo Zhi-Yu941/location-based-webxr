@@ -49,7 +49,7 @@ import { decodeFrameTexture } from '../visualization/frame-texture-decoder';
 import { wireFrameTileSubscribers } from '../visualization/wire-frame-tile-subscribers';
 import { OccupancyGrid } from 'gps-plus-slam-app-framework/ar/occupancy-grid';
 import { loadRecordingOptions } from '../state/recording-options';
-import { OccupancyCubesVisualizer } from '../visualization/occupancy-cubes-visualizer';
+import { OccupancyCubesVisualizer } from 'gps-plus-slam-app-framework/visualization/occupancy-cubes-visualizer';
 import {
   createOccluderSink,
   type OccluderSink,
@@ -58,9 +58,9 @@ import {
 import { wireOccupancyGridSubscribers } from '../visualization/wire-occupancy-grid-subscribers';
 import { createZipFrameBlobSource } from '../storage/zip-frame-blob-source';
 import {
-  createStatsOverlay,
-  type StatsOverlayHandle,
-} from '../ui/stats-overlay';
+  createPerfStatsOverlay,
+  type PerfStatsOverlayHandle,
+} from 'gps-plus-slam-app-framework/visualization/perf-stats-overlay';
 import * as THREE from 'three';
 
 const log = createLogger('ReplayMode');
@@ -147,13 +147,19 @@ export async function startReplayMode(
   // Compass opt-ins are DISABLED for replay: the framework would otherwise
   // re-derive them from its defaults (cold-start override defaults ON) and
   // auto-dispatch `setColdStartOverrideEnabled(true)` on the first replayed
-  // `setZeroPos`. But only ENABLED opt-ins are persisted as actions, so a
-  // recording captured with the override OFF (e.g. a §6a calibration capture)
-  // carries no opt-in action — re-deriving the default would enable an override
-  // the session was recorded WITHOUT. Replay's source of truth is the recorded
-  // action stream alone (a session recorded WITH the override on already carries
-  // the `setColdStartOverrideEnabled(true)` action, which replay re-applies), so
-  // disabling the auto-apply makes both cases replay faithfully.
+  // `setZeroPos`, enabling an override a §6a calibration capture was recorded
+  // WITHOUT. Replay's source of truth is the recorded action stream alone: a
+  // session recorded WITH the override on carries the
+  // `setColdStartOverrideEnabled(true)` action, which replay re-applies AFTER the
+  // `false` below (the framework's opt-in fires on the first `setZeroPos`, the
+  // recorded action comes later in the stream), so both cases replay faithfully.
+  //
+  // The `false` is load-bearing and must stay explicit. Since gps-plus-slam-js
+  // 1.16.0 the LIBRARY default is `true`, so "pass nothing" no longer means off —
+  // and until 2026-07-26 the framework only dispatched on `true`, which made this
+  // `false` a silent no-op that replayed old captures WITH an override they never
+  // had. The framework now dispatches the value explicitly; see the invariant in
+  // `create-slam-app-store.ts.md`.
   const store = createRecorderStore({
     storageBackend: new NullStorageBackend(),
     enableCompassColdStartOverride: false,
@@ -235,8 +241,12 @@ export async function startReplayMode(
     // validated default on any storage error), so this stays best-effort.
     const replayOptions = loadRecordingOptions();
     const occupancyOptions = replayOptions.occupancy;
+    // Confidence-guarded carving at the same minConfidence floor as live
+    // (main.ts): a voxel solid enough to be rendered can no longer be erased
+    // by a single deeper reading (2026-07-16 synthetic-scene investigation).
     const occupancyGrid = new OccupancyGrid({
       cellSizeM: occupancyOptions.cellSizeM,
+      carveConfidenceThreshold: occupancyOptions.minConfidence,
     });
     // Same noise filter as live (main.ts): render only voxels seen ≥
     // minConfidence times, re-quantizable per replay like cellSizeM.
@@ -297,11 +307,11 @@ export async function startReplayMode(
   // panels are advanced by their own rAF loop — rAF fires once per browser
   // frame, so the measured cadence equals the replay render cadence.
   // Best-effort like the visualizers above.
-  let statsOverlay: StatsOverlayHandle | null = null;
+  let statsOverlay: PerfStatsOverlayHandle | null = null;
   let statsRafId: number | null = null;
   try {
     if (loadRecordingOptions().visualization.statsOverlay) {
-      statsOverlay = createStatsOverlay(config.container);
+      statsOverlay = createPerfStatsOverlay(config.container);
       const statsTick = (): void => {
         statsOverlay?.update();
         statsRafId = requestAnimationFrame(statsTick);

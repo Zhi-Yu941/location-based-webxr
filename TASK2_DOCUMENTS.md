@@ -24,13 +24,20 @@ Recommendations in these files are advisory until accepted outcomes are recorded
 
 ## Accepted decisions
 
-- `OWNER_DECISIONS.md` — the only Task 2 accepted-decision record. **This file is currently missing from the checkout.** Do not infer accepted decisions from proposals, dispositions, comparisons, or call briefs.
+- `OWNER_DECISIONS.md` — the current Task 2 accepted-decision record. Do not infer accepted decisions from proposals, dispositions, comparisons, research inputs, or call briefs.
 
 ## Official plans
 
-No official Task 2 implementation plan has been accepted yet. The `plans/` directory contains no Task 2 Markdown plan.
+- `plans/task2-goal1a-contract.md` — accepted shared contract and implementation plan for Iteration 1A.
 
-When Team 6 accepts a plan, place the current plan under `plans/` and link it here. Do not promote a proposal by renaming it without the review and decision workflow.
+Later Goal 1 plans remain unaccepted until Team 6 completes the same review and decision workflow.
+
+## Current refinement-planning inputs
+
+- `dev/task2-refiner/simon-recommended-colmap-refinement-workflow.pdf` — Simon's recommended COLMAP refinement workflow. Treat it as Product Owner research and direction to compare with the Team 6 drafts; record any accepted scope decision separately in `OWNER_DECISIONS.md`.
+- `Draft/refiner-draft.md` — Mingna's current pose-refiner proposal; not yet an accepted implementation plan.
+- `Draft/measurement-harness.md` — current measurement-harness proposal; not yet an accepted implementation plan.
+- `Draft/training-strategy.md` — current training-strategy proposal; not yet an accepted implementation plan.
 
 ## Historical Filip drafts and reviews
 
@@ -51,10 +58,11 @@ Historical reviews remain evidence even where recommendations were rejected. The
 ## Recommended reading order
 
 1. Read the Team 6 assignment PDF for requirements.
-2. Read `OWNER_DECISIONS.md` for accepted human decisions, when the file exists.
+2. Read `OWNER_DECISIONS.md` for accepted human decisions.
 3. Use `reviews/task2-goal1-requirements.md` as a traceability map, not as authority.
 4. Read `Draft/filip-contract-1a.md` and `Draft/mingna-contract.md` independently.
 5. Read `reviews/task2-goal1a-technical-comparison.md` for the detailed comparison.
 6. Read `reviews/task2-goal1a-simon-brief.md` for the call agenda and proposed outcomes.
-7. Read the current file under `plans/` only after Team 6 has accepted one.
-8. Consult `archive/task2/` only for provenance, rejected alternatives, and review history.
+7. Read `plans/task2-goal1a-contract.md` for the accepted reader/writer baseline.
+8. For refiner planning, compare Simon's workflow with the three current refinement-planning drafts without treating any proposal as already accepted.
+9. Consult `archive/task2/` only for provenance, rejected alternatives, and review history.

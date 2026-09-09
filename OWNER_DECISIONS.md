@@ -6,7 +6,9 @@
 
 - Project: SoftwareLab Task 2, Reality Reconstruction via Gaussian Splats.
 - Decision group: current scope, operating environment, interaction boundary, and future product direction.
-- Recorded: 2026-07-21.
+- Initially recorded: 2026-07-21.
+- Refiner-planning decisions added: 2026-09-08, based on Filip's account of the latest discussion with Simon and Filip's confirmations during the Team 6 merge discussion. The contract review may correct the wording, but must not silently replace these decisions with an AI proposal.
+- Refiner readiness corrections accepted by Filip: 2026-09-08, following `reviews/task2-refiner-plan-readiness-review.md`. They clarify the accepted experiment and do not select a final production refiner.
 - Simon decisions below are based on Filip's account of the Product Owner discussions and the Friday review notes recorded by Mingna. If Simon later corrects the wording, this record must be updated rather than silently reinterpreted.
 - The Team 6 assignment PDF remains the authoritative requirement source.
 
@@ -174,18 +176,100 @@ evaluate(baseline or candidate under a controlled run) -> evaluation report
 
 These declarations do not select or implement a refinement algorithm, raw-signal parser, held-out policy, metric procedure, LichtFeld automation layer, or final synchronous/asynchronous adapter design. Those details must follow the evidence and later review gates. Training-image IDs, optimizer-specific settings, and speculative signal schemas must not become 1A implementation requirements merely because they appeared in one independent proposal.
 
+## OD-013 — Refiner development uses geometric gates before a later LichtFeld comparison
+
+**Status:** Confirmed by Simon
+
+The project outcome remains better visual splats. Simon has verbally confirmed, as reported by Filip, that normal refiner development should not repeatedly invoke LichtFeld because splat training is too slow for ordinary iteration. The first refinement work will therefore use deterministic local geometry checks and will not implement PSNR/SSIM automation.
+
+A candidate that passes those checks is only a **geometrically improved candidate**. It is not described as a proven visual improvement until a later controlled original-versus-refined LichtFeld comparison is performed with the same frozen settings. LichtFeld remains an external checkpoint rather than a runtime dependency of the refiner.
+
+The assignment PDF names held-out PSNR/SSIM as end-to-end evidence. Simon's verbal confirmation records their deferral from the current refiner stage; it does not silently amend the PDF. The contract review must retain this traceability and identify whether the later controlled visual comparison substitutes for, or merely precedes, the assignment's final photometric evidence.
+
+## OD-014 — The first refiner experiment is a bounded offline COLMAP proof
+
+**Status:** Technical decision for Team 6
+
+The first refiner activity is one manual, local, offline COLMAP experiment on a frozen real recording with visible loop overlap and observable drift. It is an investigation, not acceptance of COLMAP as the final production refiner.
+
+The initial workflow is:
+
+```text
+recorder images, intrinsics and poses
+  -> COLMAP SIFT feature extraction
+  -> feature matching
+  -> triangulation from the registered poses
+  -> bundle adjustment
+  -> geometric acceptance checks
+```
+
+The first run uses COLMAP's standard SIFT implementation and attempts exhaustive matching because that requires no custom pair-selection code. Its runtime is measured rather than predicted. If exhaustive matching is impractical, the smallest fallback is a documented set of sequential-neighbour and explicit start/end loop-closure pairs.
+
+Existing Task 1 ZIPs remain compatibility fixtures unless inspection proves that they contain the loop overlap and drift needed for a refinement experiment. Learned matchers, browser inference, custom track construction and a custom optimizer are not part of this first proof.
+
+## OD-015 — The conservative output changes poses only
+
+**Status:** Technical decision for Team 6
+
+The first experiment keeps camera intrinsics, RGB images and the recorder's delivered `points3D` unchanged. Bundle adjustment may optimize camera extrinsics and temporary triangulated working points internally. Those working points are retained as diagnostic evidence but are not copied into the first refined recorder ZIP.
+
+The refined ZIP is a separate artifact. It changes only accepted image poses and preserves every other recorder entry through the accepted archive adapter. The authoritative reference is the input ZIP's exported COLMAP world frame and inherited metric reference, not raw WebXR coordinates. The first run must pin the COLMAP version, document that version's bundle-adjustment gauge behavior, and verify scale, orientation and origin before pose transfer. It must not silently post-align an unsafe result. A gauge mismatch makes the run `Inconclusive`; a separately reviewed similarity-alignment step may be considered only afterward. Translation vectors must never be transformed as though they were camera centres.
+
+A more aggressive future experiment may replace or regenerate `points3D` using triangulated or sensor-fused geometry. That is a separate, deferred variant. It becomes a candidate only if pose-only refinement is insufficient, and it must never silently replace the conservative output.
+
+## OD-016 — Refined poses have explicit safety and geometry verdicts
+
+**Status:** Technical decision for Team 6
+
+Every candidate must receive exactly one verdict: `Accepted candidate`, `Rejected`, or `Inconclusive`. Rejected or inconclusive refinement never replaces the original poses.
+
+Image identity is mapped by exact filename, never by an assumed COLMAP numerical ID. Only images referenced by the recorder model enter the working reconstruction; extra archive images remain opaque preserved assets. The run records original image ID, filename, COLMAP database ID and returned image ID, and requires a complete bijection with no missing, duplicate or unexpected model images.
+
+The refiner acceptance procedure owns the original-versus-candidate comparison; successful reader/writer validation alone is insufficient. Before delivery and again after reopening the emitted ZIP, it permits changes only to image quaternions and translations. Image membership, names, IDs and references, camera intrinsics, original observations, recorder `points3D` and untouched archive contents must remain equivalent under the accepted semantic contract. It also requires finite normalized quaternions and translations, the accepted world-to-camera and `[qw, qx, qy, qz]` conventions, complete identity mapping and preservation of the input ZIP frame and metric reference.
+
+Geometry scoring uses one contract-defined symmetric point-to-line epipolar-error formula in pixels. The fundamental matrix is derived from each model's poses and fixed intrinsics; it is not re-fitted from the matches. The same correspondence identities are evaluated before and after, every declared loop pair is reported separately, and a median of pair medians may be used only as a summary. Required-pair regression can veto acceptance. Minimum usable support and parallax, positive-depth checks, numeric tolerance, inlier threshold and trajectory-sanity limits are frozen before the candidate is inspected. Undefined or degenerate geometry and insufficient evidence are `Inconclusive`, never zero error or a silently omitted pair. A baseline-only preparation pass may inform these limits before bundle adjustment produces the candidate.
+
+For every declared loop pair, the run records initial matches, geometrically verified matches, surviving triangulated cross-loop tracks and observations actually used by bundle adjustment. Registered-image count or low solver cost does not prove that loop constraints reached the optimizer. Missing required loop support makes the result `Inconclusive`, and the first stage that loses support is diagnosed before changing the matcher or adding priors.
+
+An `Accepted candidate` therefore requires complete filename mapping, loop constraints that reached bundle adjustment, pose-only safety checks, verified frame and scale, no vetoing per-pair regression, and aggregate geometry improvement beyond the frozen tolerance. Supporting evidence records 90th-percentile loop error, fixed-threshold inlier count and ratio, inlier coverage, COLMAP reprojection statistics, registered images, triangulated observations, solver termination, pose deltas and sequential trajectory sanity. Epipolar improvement alone cannot accept a candidate because it does not establish translation scale or sign.
+
+The first run is performed on Mingna's computer using the reviewed settings. The retained handoff includes the input hash, COLMAP version, exact commands and non-default settings, selected loop pairs, full logs, runtime, before/after values, refined model or ZIP, and a recording of the run. Filip and Mingna jointly review and fill the result table. This arrangement does not create permanent component ownership; either developer may implement later tasks, with a driver and reviewer selected per slice.
+
+## OD-017 — Automation follows the reviewed manual result
+
+**Status:** Technical decision for Team 6
+
+Team 6 will not build a general refiner framework before the manual COLMAP result is reviewed. If the experiment is accepted, the team automates that exact proven workflow using the existing ZIP reader/writer boundary and the smallest reliable COLMAP invocation. If it is rejected or inconclusive, only the evidenced failing stage is investigated before automation.
+
+The first automated refiner may remain a separate local desktop program and must require no network service after installation. Exact COLMAP CLI commands are preferred before adding a Python/PyCOLMAP environment or other orchestration layer without demonstrated need.
+
+Browser-native refinement and the CSUtils button remain deferred. Recorder ZIP input/output is the required integration seam. The desired future user experience may be a small post-recording action inside CSUtils, but the implementation technology is selected only after useful refinement is demonstrated and the upstream runtime is verified.
+
+## OD-018 — Refinement complexity is added only after a measured failure
+
+**Status:** Technical decision for Team 6
+
+The default path is the standard COLMAP proof. Team 6 introduces at most one additional source of complexity in response to a diagnosed failure:
+
+1. replace exhaustive matching with documented pair selection only if runtime is impractical;
+2. investigate a learned matcher only if standard SIFT does not provide sufficient distributed loop constraints;
+3. investigate pose priors or stronger alignment only if ordinary bundle adjustment produces unsafe pose or gauge changes;
+4. investigate depth, GPS or action-log signals only if the simpler image-based route is insufficient;
+5. investigate regenerated output points only if conservative pose-only refinement passes geometry checks but remains visually insufficient.
+
+LoMa, LightGlue, ONNX/WebGPU, custom track construction, custom PGO, raw-signal fusion and regenerated output geometry are therefore deferred options, not initial implementation requirements. The team stops expanding the pipeline when the smallest safe candidate produces a useful result at the later controlled splat checkpoint.
+
 ## Decisions intentionally not recorded yet
 
 The following remain unresolved and must not be inferred from this file:
 
-- the precise scope and completion gate for the LichtFeld 1B work;
-- the baseline LichtFeld settings and which variables will be frozen;
-- when LichtFeld runs beyond the single 1A compatibility smoke are required and when retained evidence may be reused;
-- the measurement-harness implementation and held-out-view procedure;
+- whether the later controlled LichtFeld visual comparison substitutes for, or precedes, the assignment's final held-out PSNR/SSIM evidence;
+- the exact frozen LichtFeld settings for that later controlled comparison;
+- the detailed measurement-harness implementation and any later held-out-view procedure;
 - use of action logs, depth, GPS, or other recorder-specific signals;
-- selection or implementation of a pose-refinement approach;
+- selection of the final production refinement approach after the bounded COLMAP result is reviewed;
 - the exact production types and asynchronous behavior of the future refinement and measurement interfaces;
-- timeboxes and stop conditions for refinement investigations;
+- numeric tolerance and sanity thresholds that must be frozen before the first candidate is judged;
 - the exact source-module and package locations;
 - the pair-programming implementation sequence;
 - final CSUtils integration and user experience.

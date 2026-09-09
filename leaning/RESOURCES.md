@@ -66,6 +66,10 @@
   Confirms that `Buffer` extends `Uint8Array`. Use for: passing filesystem bytes into the browser-compatible core without text conversion.
 - [Node.js: Child processes](https://nodejs.org/api/child_process.html)
   Documents launching a process with a separate argument array and collecting status, stdout, and stderr. Use for: the real CLI subprocess test.
+- [Node.js: Crypto hashing](https://nodejs.org/api/crypto.html#cryptocreatehashalgorithm-options)
+  Documents standard-library hash creation and digest output. Use for: independently identifying immutable Task 1 fixture and generated output bytes.
+- [Node.js: Operating-system temporary directory](https://nodejs.org/api/os.html#ostmpdir)
+  Documents the platform-specific temporary directory. Use for: keeping replay outputs and raw artifacts outside the repository.
 
 ## Wisdom (Communities)
 

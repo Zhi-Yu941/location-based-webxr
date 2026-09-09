@@ -4,7 +4,7 @@
 
 ## Requirement sources
 
-- **Team 6 SoftwareLab assignment PDF** — authoritative Task 2 requirement source. Its repository path is not available in the current checkout.
+- **Team 6 SoftwareLab assignment PDF** — authoritative Task 2 requirement source. Its repository path is not available in the current checkout; the verified local copy is `C:/Users/filip/Downloads/Team 6 - Reality Reconstruction via Gaussian Splats.pdf`.
 - `AGENTS.md` — repository workflow, source precedence, safety, and document-location guidance; not a substitute for the assignment.
 - `reviews/task2-goal1-requirements.md` — current secondary traceability review derived from the assignment; use it for navigation, then verify disputed wording against the assignment.
 
@@ -19,6 +19,9 @@ These proposals remain separate. Neither is an official plan or accepted decisio
 
 - `reviews/task2-goal1a-technical-comparison.md` — detailed current comparison of overlapping 1A content.
 - `reviews/task2-goal1a-simon-brief.md` — concise pre-call decision brief.
+- `reviews/task2-refiner-technical-comparison.md` — decision-informed merge of the current refiner proposals, Simon's recommended workflow, and the accepted refiner experiment boundary; use it as the input to the bounded refiner contract review.
+- `reviews/task2-refiner-plan-readiness-review.md` — accepted readiness findings that tighten metric definition, frame/scale handling, image identity, pose-only safety checks, and proof that loop constraints reach bundle adjustment.
+- `reviews/task2-refiner-manual-experiment-plan-review.md` — final implementation-readiness review; its two accepted corrections distinguish manifest phases and define fixed populations for inlier coverage and depth/parallax checks.
 
 Recommendations in these files are advisory until accepted outcomes are recorded.
 
@@ -29,6 +32,7 @@ Recommendations in these files are advisory until accepted outcomes are recorded
 ## Official plans
 
 - `plans/task2-goal1a-contract.md` — accepted shared contract and implementation plan for Iteration 1A.
+- `plans/task2-refiner-manual-experiment-plan.md` — accepted bounded manual COLMAP experiment and test-first implementation plan; implementation begins only after its pre-run gates are satisfied.
 
 Later Goal 1 plans remain unaccepted until Team 6 completes the same review and decision workflow.
 

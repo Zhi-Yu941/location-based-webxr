@@ -11,6 +11,7 @@ This folder contains the teaching material for the early browser-compatible COLM
 5. [Slice 4: build the recorder archive adapter](./lessons/0005-slice-4-archive-adapter.html)
 6. [Slice 5: connect the public round trip](./lessons/0006-slice-5-public-orchestration.html)
 7. [Slice 6: add the safe Node CLI](./lessons/0007-slice-6-node-cli.html)
+8. [Slice 7: replay a real recorder fixture](./lessons/0008-slice-7-real-fixture-replay.html)
 
 ## Quick references
 
@@ -21,6 +22,7 @@ This folder contains the teaching material for the early browser-compatible COLM
 - [Slice 4 archive-adapter map](./reference/slice-4-archive-adapter-map.html)
 - [Slice 5 public-orchestration map](./reference/slice-5-public-orchestration-map.html)
 - [Slice 6 Node CLI map](./reference/slice-6-node-cli-map.html)
+- [Slice 7 real-fixture replay map](./reference/slice-7-real-fixture-replay-map.html)
 
 ## Course state
 

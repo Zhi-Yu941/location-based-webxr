@@ -2,7 +2,7 @@
 
 ## Why
 
-Implement and explain the early Task 2 slices: prove in-memory ZIP copy-through, build a trustworthy typed model and validator, parse and serialize the recorder's COLMAP text profile, compare models without hiding meaningful changes, turn the ZIP experiment into one safe archive adapter, connect those owners through the public read/write round trip, and expose that verified core through one safe local Node command.
+Implement and explain the early Task 2 slices: prove in-memory ZIP copy-through, build a trustworthy typed model and validator, parse and serialize the recorder's COLMAP text profile, compare models without hiding meaningful changes, turn the ZIP experiment into one safe archive adapter, connect those owners through the public read/write round trip, expose that verified core through one safe local Node command, and prove the complete path against immutable Task 1 recorder fixtures.
 
 ## Success looks like
 
@@ -33,6 +33,10 @@ Implement and explain the early Task 2 slices: prove in-memory ZIP copy-through,
 - Reject invalid input/output path states without modifying the input, creating directories, or overwriting output.
 - Publish verified ZIP bytes through a unique temporary sibling and final rename, with cleanup on failure.
 - Prove exit status, summary output, delayed publication, and cleanup through a real subprocess test.
+- Recompute fixture identities before relying on reviewed expectations.
+- Assert known real-fixture facts independently from the parser under test.
+- Replay the built CLI into an operating-system temporary output without changing tracked inputs.
+- Retain concise identity, preservation, command, gate, and pair-review evidence without committing generated artifacts.
 
 ## Constraints
 
@@ -46,9 +50,10 @@ Implement and explain the early Task 2 slices: prove in-memory ZIP copy-through,
 - Keep ZIP ownership in one adapter instead of adding a second archive reconstruction path.
 - Keep public orchestration thin: connect existing owners instead of reimplementing their rules.
 - Confine filesystem and process APIs to `scripts/`; keep `src/colmap/` browser-compatible.
+- Treat real fixtures as immutable inputs and fix violated assumptions instead of weakening assertions.
 
 ## Out of scope
 
-- Real fixtures, LichtFeld, bundle adjustment, AppFramework, and RecorderApp integration.
+- LichtFeld, bundle adjustment, AppFramework, and RecorderApp integration.
 - General-purpose deep equality, arbitrary comparison policies, or diff accumulation.
 - Path repair, extraction, URL decoding, Unicode normalization, and ZIP metadata preservation.

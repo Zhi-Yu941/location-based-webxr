@@ -7,6 +7,7 @@ const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export default defineConfig({
   entry: {
     'colmap/index': resolve(projectRoot, 'src/colmap/index.ts'),
+    'refiner-experiment': resolve(projectRoot, 'src/refiner-experiment.ts'),
   },
   tsconfig: resolve(projectRoot, 'tsconfig.app.json'),
   format: ['esm'],

@@ -11,11 +11,16 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
+import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { Uint8ArrayReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 
-import { prepareRun, validateManifest } from './refiner-experiment.js';
+import {
+  handoffRun,
+  prepareRun,
+  validateManifest,
+} from './refiner-experiment.js';
 
 const packageRoot = fileURLToPath(new URL('../', import.meta.url));
 const runsRoot = resolve(packageRoot, 'experiment-runs');
@@ -400,6 +405,393 @@ describe('slice 1 preparation', () => {
     ).toEqual(inputBytes);
   });
 });
+
+describe('slice 2 exact handoff', () => {
+  test('maps shuffled database IDs by filename, preserves W2C poses, and leaves working points empty', async () => {
+    const { dataset } = await prepareRun(manifest, runsRoot);
+    const original = structuredClone(dataset.model);
+    const databasePath = await handoffDatabase();
+    const databaseBefore = hash(await readFile(databasePath));
+    const result = await handoffRun(runDirectory);
+    expect(
+      result.poses.map((row) => [
+        row.originalImageId,
+        row.exactFilename,
+        row.databaseImageId,
+        row.returnedImageId,
+      ])
+    ).toEqual([
+      [9, 'a.jpg', 20, null],
+      [2, 'b.jpg', 5, null],
+      [7, 'c.jpg', 80, null],
+    ]);
+    expect(result.poses.map((row) => row.originalPose)).toEqual(
+      original.images.map((image) => image.pose)
+    );
+    expect(
+      result.poses.every(
+        (row) => row.originalCameraId === 3 && row.databaseCameraId === 41
+      )
+    ).toBe(true);
+    expect(
+      await readFile(join(runDirectory, 'models/known/cameras.txt'), 'utf8')
+    ).toBe('41 PINHOLE 16 12 10 10 8 6\n');
+    expect(
+      await readFile(join(runDirectory, 'models/known/images.txt'), 'utf8')
+    ).toBe(
+      '20 1 0 0 0 0 0 0 41 a.jpg\n\n5 1 0 0 0 1 0 0 41 b.jpg\n\n80 1 0 0 0 2 0 0 41 c.jpg\n\n'
+    );
+    expect(
+      await readFile(join(runDirectory, 'models/known/points3D.txt'), 'utf8')
+    ).toBe('');
+    expect(
+      JSON.parse(await readFile(join(runDirectory, 'poses.json'), 'utf8'))
+    ).toEqual(result.poses);
+    const receipt = JSON.parse(
+      await readFile(join(runDirectory, 'logs/handoff.json'), 'utf8')
+    );
+    expect(receipt.database.sha256).toBe(databaseBefore);
+    expect(receipt.calibration.original[0].intrinsics).toEqual(
+      receipt.calibration.database[0].intrinsics
+    );
+    expect(receipt.returnedExport).toBeNull();
+    expect(hash(await readFile(databasePath))).toBe(databaseBefore);
+    expect(
+      new Uint8Array(await readFile(join(runDirectory, 'input/original.zip')))
+    ).toEqual(inputBytes);
+    expect(dataset.model).toEqual(original);
+    await expect(handoffRun(runDirectory)).rejects.toMatchObject({
+      code: 'EEXIST',
+    });
+  });
+
+  test('rejects missing, duplicate, unexpected and case-changed database filenames before output', async () => {
+    await prepareRun(manifest, runsRoot);
+    const databasePath = await handoffDatabase();
+    for (const names of [
+      ['a.jpg', 'b.jpg'],
+      ['a.jpg', 'b.jpg', 'b.jpg'],
+      ['a.jpg', 'b.jpg', 'extra.jpg'],
+      ['A.jpg', 'b.jpg', 'c.jpg'],
+    ]) {
+      const db = new DatabaseSync(databasePath);
+      try {
+        db.exec('DELETE FROM images');
+        names.forEach((name, i) =>
+          db.prepare('INSERT INTO images VALUES (?, ?, 41)').run(i + 1, name)
+        );
+      } finally {
+        db.close();
+      }
+      await expect(handoffRun(runDirectory)).rejects.toThrow(
+        /database.*case-sensitive/
+      );
+      await expect(
+        readFile(join(runDirectory, 'poses.json'))
+      ).rejects.toMatchObject({ code: 'ENOENT' });
+      await expect(
+        readdir(join(runDirectory, 'models/known'))
+      ).rejects.toMatchObject({ code: 'ENOENT' });
+    }
+  });
+
+  test('rejects wrong database calibration, missing camera references and unsupported schema', async () => {
+    await prepareRun(manifest, runsRoot);
+    const databasePath = await handoffDatabase();
+    for (const sql of [
+      'UPDATE cameras SET model = 0',
+      'UPDATE cameras SET width = 15',
+      'UPDATE cameras SET height = 13',
+      "UPDATE cameras SET params = X'0000'",
+      "UPDATE images SET camera_id = 99 WHERE name = 'a.jpg'",
+      "UPDATE images SET image_id = 0 WHERE name = 'a.jpg'",
+      "UPDATE images SET image_id = 5 WHERE name = 'a.jpg'",
+      'ALTER TABLE cameras RENAME COLUMN params TO unknown',
+    ]) {
+      const db = new DatabaseSync(databasePath);
+      try {
+        db.exec('BEGIN');
+        db.exec(sql);
+        db.exec('COMMIT');
+      } finally {
+        db.close();
+      }
+      await expect(handoffRun(runDirectory)).rejects.toThrow(/database|schema/);
+      await expect(
+        readdir(join(runDirectory, 'models/known'))
+      ).rejects.toMatchObject({ code: 'ENOENT' });
+      await rm(databasePath);
+      await handoffDatabase();
+    }
+    const db = new DatabaseSync(databasePath);
+    try {
+      const params = Buffer.alloc(32);
+      [11, 10, 8, 6].forEach((value, i) => params.writeDoubleLE(value, i * 8));
+      db.prepare('UPDATE cameras SET params = ?').run(params);
+    } finally {
+      db.close();
+    }
+    await expect(handoffRun(runDirectory)).rejects.toThrow(/calibration/);
+  });
+
+  test('does not create a missing database or accept a changed isolated input', async () => {
+    await prepareRun(manifest, runsRoot);
+    await expect(handoffRun(runDirectory)).rejects.toThrow();
+    await expect(
+      readFile(join(runDirectory, 'database/features.db'))
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+    await handoffDatabase();
+    await writeFile(join(runDirectory, 'input/original.zip'), 'changed');
+    await expect(handoffRun(runDirectory)).rejects.toThrow('input.sha256');
+    await expect(
+      readdir(join(runDirectory, 'models/known'))
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  test('maps returned IDs and retains populated working observations without importing them into the recorder', async () => {
+    await prepareRun(manifest, runsRoot);
+    await handoffDatabase();
+    await handoffRun(runDirectory);
+    const exported = await workingExport();
+    const before = hash(await readFile(join(exported, 'images.txt')));
+    const result = await handoffRun(runDirectory, exported);
+    expect(result.poses.map((row) => row.returnedImageId)).toEqual([
+      101, 303, 202,
+    ]);
+    expect(result.poses.map((row) => row.returnedCameraId)).toEqual([
+      12, 12, 12,
+    ]);
+    expect(result.poses[0]!.returnedPose!.tvec).toEqual([0.25, 0, 0]);
+    expect(
+      result.workingImages!.map((image) => image.observations.length)
+    ).toEqual([1, 2, 0]);
+    expect(result.workingImages![1]!.observations).toEqual([
+      [8, 6, 900],
+      [9, 7, -1],
+    ]);
+    expect(hash(await readFile(join(exported, 'images.txt')))).toBe(before);
+    expect(
+      await readFile(join(runDirectory, 'models/known/points3D.txt'), 'utf8')
+    ).toBe('');
+  });
+
+  test('inspects a returned export after initial handoff on the same run without replacing evidence', async () => {
+    await prepareRun(manifest, runsRoot);
+    await handoffDatabase();
+    const initial = await handoffRun(runDirectory);
+    expect(initial.poses.every((row) => row.returnedImageId === null)).toBe(
+      true
+    );
+    const preservedPaths = [
+      'models/known/cameras.txt',
+      'models/known/images.txt',
+      'models/known/points3D.txt',
+      'poses.json',
+      'logs/handoff.json',
+      'input/original.zip',
+      'database/features.db',
+    ];
+    const before = await Promise.all(
+      preservedPaths.map((path) => readFile(join(runDirectory, path)))
+    );
+    const exported = await workingExport();
+    const result = await handoffRun(runDirectory, exported);
+    expect(result.poses.map((row) => row.returnedImageId)).toEqual([
+      101, 303, 202,
+    ]);
+    expect(result.mappingPath).not.toBe(join(runDirectory, 'poses.json'));
+    expect(JSON.parse(await readFile(result.mappingPath, 'utf8'))).toEqual(
+      result.poses
+    );
+    const receiptBytes = await readFile(result.receiptPath);
+    const receipt = JSON.parse(receiptBytes.toString('utf8'));
+    expect(receipt.initialHandoffSha256).toBe(hash(before[4]!));
+    expect(receipt.returnedExport.path).toBe(exported);
+    await expect(handoffRun(runDirectory, exported)).rejects.toMatchObject({
+      code: 'EEXIST',
+    });
+    expect(await readFile(result.receiptPath)).toEqual(receiptBytes);
+    const exportedImages = join(exported, 'images.txt');
+    await writeFile(
+      exportedImages,
+      (await readFile(exportedImages, 'utf8')).replace('0.25', '0.5')
+    );
+    const another = await handoffRun(runDirectory, exported);
+    expect(another.mappingPath).not.toBe(result.mappingPath);
+    expect(another.poses[0]!.returnedPose!.tvec).toEqual([0.5, 0, 0]);
+    expect(JSON.parse(await readFile(result.mappingPath, 'utf8'))).toEqual(
+      result.poses
+    );
+    expect(await readFile(result.receiptPath)).toEqual(receiptBytes);
+    const after = await Promise.all(
+      preservedPaths.map((path) => readFile(join(runDirectory, path)))
+    );
+    expect(after).toEqual(before);
+  });
+
+  test('requires an intact initial handoff before recording a returned mapping', async () => {
+    await prepareRun(manifest, runsRoot);
+    const databasePath = await handoffDatabase();
+    const exported = await workingExport();
+    await expect(handoffRun(runDirectory, exported)).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    await expect(
+      readdir(join(runDirectory, 'models/known'))
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+    await handoffRun(runDirectory);
+    for (const [name, replacement] of [
+      ['poses.json', '[]'],
+      ['logs/handoff.json', '{}'],
+      ['models/known/images.txt', 'changed'],
+    ]) {
+      const path = join(runDirectory, name!);
+      const before = await readFile(path);
+      await writeFile(path, replacement!);
+      await expect(handoffRun(runDirectory, exported)).rejects.toThrow(
+        /handoff|Known model/
+      );
+      await writeFile(path, before);
+    }
+    const db = new DatabaseSync(databasePath);
+    try {
+      db.exec('UPDATE images SET image_id = 81 WHERE image_id = 80');
+    } finally {
+      db.close();
+    }
+    await expect(handoffRun(runDirectory, exported)).rejects.toThrow(
+      'database'
+    );
+    expect(
+      (await readdir(runDirectory)).filter((name) =>
+        name.startsWith('poses-returned-')
+      )
+    ).toEqual([]);
+  });
+
+  test('rejects invalid returned filenames, IDs, calibration and malformed observation rows', async () => {
+    await prepareRun(manifest, runsRoot);
+    await handoffDatabase();
+    await handoffRun(runDirectory);
+    const initialPoses = await readFile(join(runDirectory, 'poses.json'));
+    const exported = await workingExport();
+    const imagesPath = join(exported, 'images.txt');
+    const valid = await readFile(imagesPath, 'utf8');
+    for (const changed of [
+      valid.replace('a.jpg', 'A.jpg'),
+      valid.replace('a.jpg', 'b.jpg'),
+      valid.replace('a.jpg', 'extra.jpg'),
+      valid.replace('303 1 0 0 0 1 0 0 12 b.jpg\n\n', ''),
+      valid.replace('101 1', '202 1'),
+      valid.replace('12 a.jpg', '99 a.jpg'),
+      valid.replace('0.25', 'NaN'),
+      valid.replace('8 6 900 9 7 -1', '8 6'),
+      valid.replace('8 6 900 9 7 -1', '8 6 -2'),
+      valid.trimEnd(),
+    ]) {
+      await writeFile(imagesPath, changed);
+      await expect(handoffRun(runDirectory, exported)).rejects.toThrow(
+        /returned|images.txt/
+      );
+      expect(await readFile(join(runDirectory, 'poses.json'))).toEqual(
+        initialPoses
+      );
+      expect(
+        (await readdir(runDirectory)).filter((name) =>
+          name.startsWith('poses-returned-')
+        )
+      ).toEqual([]);
+    }
+    await writeFile(imagesPath, valid);
+    await writeFile(
+      join(exported, 'cameras.txt'),
+      '12 PINHOLE 16 12 11 10 8 6\n'
+    );
+    await expect(handoffRun(runDirectory, exported)).rejects.toThrow(
+      /calibration/
+    );
+  });
+
+  test('handoff CLI creates the synthetic database/export mapping without running COLMAP', async () => {
+    await prepareRun(manifest, runsRoot);
+    await handoffDatabase();
+    const exported = await workingExport();
+    const initial = spawnSync(
+      process.execPath,
+      [
+        join(packageRoot, 'scripts/refiner-experiment.mjs'),
+        'handoff',
+        runDirectory,
+      ],
+      { encoding: 'utf8', cwd: scratch }
+    );
+    expect(initial.status, initial.stderr).toBe(0);
+    const result = spawnSync(
+      process.execPath,
+      [
+        join(packageRoot, 'scripts/refiner-experiment.mjs'),
+        'handoff',
+        runDirectory,
+        exported,
+      ],
+      { encoding: 'utf8', cwd: scratch }
+    );
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain('Handoff');
+    const mappingPath = result.stdout
+      .split(/\r?\n/)
+      .find((line) => line.startsWith('Pose table: '))!
+      .slice('Pose table: '.length);
+    expect(mappingPath).not.toBe(join(runDirectory, 'poses.json'));
+    expect(
+      JSON.parse(await readFile(mappingPath, 'utf8'))[0].returnedImageId
+    ).toBe(101);
+  });
+});
+
+async function handoffDatabase() {
+  const directory = join(runDirectory, 'database');
+  await mkdir(directory, { recursive: true });
+  const path = join(directory, 'features.db');
+  const db = new DatabaseSync(path);
+  try {
+    // Required COLMAP columns; constraints omitted so corruption can be tested.
+    db.exec(
+      'CREATE TABLE cameras (camera_id INTEGER, model INTEGER, width INTEGER, height INTEGER, params BLOB, prior_focal_length INTEGER); CREATE TABLE images (image_id INTEGER, name TEXT, camera_id INTEGER)'
+    );
+    const params = Buffer.alloc(32);
+    [10, 10, 8, 6].forEach((value, i) => params.writeDoubleLE(value, i * 8));
+    db.prepare('INSERT INTO cameras VALUES (41, 1, 16, 12, ?, 1)').run(params);
+    for (const [id, name] of [
+      [5, 'b.jpg'],
+      [80, 'c.jpg'],
+      [20, 'a.jpg'],
+    ] as const) {
+      db.prepare('INSERT INTO images VALUES (?, ?, 41)').run(id, name);
+    }
+  } finally {
+    db.close();
+  }
+  return path;
+}
+
+async function workingExport() {
+  const directory = join(scratch, 'returned');
+  await mkdir(directory);
+  await writeFile(
+    join(directory, 'cameras.txt'),
+    '# Camera list\n12 PINHOLE 16 12 10 10 8 6\n'
+  );
+  await writeFile(
+    join(directory, 'images.txt'),
+    '# Two lines per image\n202 1 0 0 0 2 0 0 12 c.jpg\n8 6 900\n101 1 0 0 0 0.25 0 0 12 a.jpg\n8 6 900 9 7 -1\n303 1 0 0 0 1 0 0 12 b.jpg\n\n'
+  );
+  await writeFile(
+    join(directory, 'points3D.txt'),
+    '900 1 2 3 4 5 6 0.2 202 0 101 0\n'
+  );
+  return directory;
+}
 
 function preparationManifest() {
   const sequentialPairs = [

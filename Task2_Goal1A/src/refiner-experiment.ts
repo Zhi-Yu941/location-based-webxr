@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname, extname, join, resolve } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 
 import { readRecorderZip } from './colmap/index.js';
 import { recorderZipAdapter } from './colmap/recorder-zip-adapter.js';
@@ -468,6 +469,483 @@ export async function prepareRun(value: unknown, runsRoot: string) {
     { flag: 'wx' }
   );
   return { runDirectory, dataset };
+}
+
+type RecorderModel = Awaited<ReturnType<typeof readRecorderZip>>['model'];
+type HandoffCamera = RecorderModel['cameras'][number];
+type ImageIdentity = Pick<
+  RecorderModel['images'][number],
+  'imageId' | 'cameraId' | 'name'
+>;
+interface WorkingImage extends ImageIdentity {
+  pose: { qvec: number[]; tvec: number[] };
+  observations: [number, number, number][];
+}
+
+/** Create the known model once, or inspect a later TXT export into separate evidence. */
+export async function handoffRun(
+  runDirectory: string,
+  returnedDirectory?: string
+) {
+  const manifest: unknown = JSON.parse(
+    await readFile(join(runDirectory, 'manifest.json'), 'utf8')
+  );
+  validateManifest(manifest, 'preparation');
+  const originalPath = join(runDirectory, 'input/original.zip');
+  const bytes = await readFile(originalPath);
+  if (hash(bytes) !== manifest.input.sha256.toLowerCase()) {
+    invalid('input.sha256', 'isolated original ZIP changed');
+  }
+  const { model } = await readRecorderZip(bytes);
+  sameNames(
+    model.images.map((image) => image.name),
+    manifest.imageNames,
+    'imageNames'
+  );
+  const databasePath = join(runDirectory, 'database/features.db');
+  // Only a closed/checkpointed extraction snapshot has a single-file hash.
+  const wal = await stat(`${databasePath}-wal`).catch(
+    (error: NodeJS.ErrnoException) => {
+      if (error.code !== 'ENOENT') throw error;
+      return undefined;
+    }
+  );
+  if (wal && wal.size > 0)
+    throw new Error('Close and checkpoint the database before handoff');
+  const databaseHash = hash(await readFile(databasePath));
+  const database = await readHandoffDatabase(databasePath);
+  const databaseImages = checkIdentityAndCalibration(
+    model,
+    database,
+    'database'
+  );
+  let returned:
+    | { cameras: HandoffCamera[]; images: WorkingImage[] }
+    | undefined;
+  const exportHashes: Record<string, string> = {};
+  if (returnedDirectory !== undefined) {
+    const cameras = await readFile(
+      join(returnedDirectory, 'cameras.txt'),
+      'utf8'
+    );
+    const images = await readFile(
+      join(returnedDirectory, 'images.txt'),
+      'utf8'
+    );
+    exportHashes['cameras.txt'] = hash(new TextEncoder().encode(cameras));
+    exportHashes['images.txt'] = hash(new TextEncoder().encode(images));
+    returned = {
+      cameras: readWorkingCameras(cameras),
+      images: readWorkingImages(images),
+    };
+    checkIdentityAndCalibration(model, returned, 'returned');
+  }
+  const returnedImages = new Map(
+    returned?.images.map((image) => [image.name, image])
+  );
+  const poses = model.images.map((image) => {
+    const databaseImage = databaseImages.get(image.name)!;
+    const returnedImage = returnedImages.get(image.name);
+    return {
+      originalImageId: image.imageId,
+      exactFilename: image.name,
+      databaseImageId: databaseImage.imageId,
+      returnedImageId: returnedImage?.imageId ?? null,
+      originalCameraId: image.cameraId,
+      databaseCameraId: databaseImage.cameraId,
+      returnedCameraId: returnedImage?.cameraId ?? null,
+      originalPose: image.pose,
+      returnedPose: returnedImage?.pose ?? null,
+    };
+  });
+  const known = {
+    'cameras.txt': database.cameras
+      .map(
+        (camera) =>
+          [
+            camera.cameraId,
+            camera.model,
+            camera.width,
+            camera.height,
+            camera.intrinsics.fx,
+            camera.intrinsics.fy,
+            camera.intrinsics.cx,
+            camera.intrinsics.cy,
+          ].join(' ') + '\n'
+      )
+      .join(''),
+    'images.txt': poses
+      .map(
+        (row) =>
+          [
+            row.databaseImageId,
+            ...row.originalPose.qvec,
+            ...row.originalPose.tvec,
+            row.databaseCameraId,
+            row.exactFilename,
+          ].join(' ') + '\n\n'
+      )
+      .join(''),
+    'points3D.txt': '', // Recorder occupancy points are never triangulation input.
+  };
+  if (
+    hash(await readFile(databasePath)) !== databaseHash ||
+    hash(await readFile(originalPath)) !== hash(bytes)
+  ) {
+    throw new Error('Original ZIP or database changed during handoff');
+  }
+  const knownDirectory = join(runDirectory, 'models/known');
+  const knownHashes: Record<string, string> = {};
+  let initialHandoffSha256: string | undefined;
+  let suffix = '';
+  if (returnedDirectory === undefined) {
+    await mkdir(join(runDirectory, 'models'), { recursive: true });
+    await mkdir(knownDirectory); // Never replace an earlier handoff or its evidence.
+  } else {
+    const initialBytes = await readFile(
+      join(runDirectory, 'logs/handoff.json')
+    );
+    const initial = object(
+      JSON.parse(initialBytes.toString('utf8')),
+      'initial handoff'
+    );
+    if (
+      initial.inputSha256 !== hash(bytes) ||
+      at(initial, 'database.sha256') !== databaseHash ||
+      !isDeepStrictEqual(initial.colmap, manifest.colmap)
+    ) {
+      throw new Error(
+        'Initial handoff input, database or COLMAP identity changed'
+      );
+    }
+    const initialPoses: unknown = JSON.parse(
+      await readFile(join(runDirectory, 'poses.json'), 'utf8')
+    );
+    if (
+      !isDeepStrictEqual(
+        initialPoses,
+        poses.map((row) => ({
+          ...row,
+          returnedImageId: null,
+          returnedCameraId: null,
+          returnedPose: null,
+        }))
+      )
+    ) {
+      throw new Error('Initial handoff pose table changed');
+    }
+    for (const [name, content] of Object.entries(known)) {
+      if (
+        object(initial.knownModelHashes, 'initial handoff knownModelHashes')[
+          name
+        ] !== hash(new TextEncoder().encode(content))
+      ) {
+        throw new Error(`Initial handoff known model changed: ${name}`);
+      }
+    }
+    initialHandoffSha256 = hash(initialBytes);
+    // Distinct exports retain distinct immutable mappings; repeats cannot overwrite.
+    suffix = `-returned-${hash(new TextEncoder().encode(JSON.stringify(exportHashes)))}`;
+  }
+  for (const [name, content] of Object.entries(known)) {
+    const path = join(knownDirectory, name);
+    if (returnedDirectory === undefined) {
+      await writeFile(path, content, { flag: 'wx' });
+    }
+    knownHashes[name] = hash(await readFile(path));
+    if (knownHashes[name] !== hash(new TextEncoder().encode(content)))
+      throw new Error(`Known model mismatch: ${name}`);
+  }
+  const mappingPath = join(runDirectory, `poses${suffix}.json`);
+  const receiptPath = join(runDirectory, `logs/handoff${suffix}.json`);
+  await writeFile(mappingPath, `${JSON.stringify(poses, null, 2)}\n`, {
+    flag: 'wx',
+  });
+  await writeFile(
+    receiptPath,
+    `${JSON.stringify(
+      {
+        inputSha256: hash(bytes),
+        initialHandoffSha256,
+        colmap: manifest.colmap,
+        database: {
+          path: databasePath,
+          sha256: databaseHash,
+          schema: database.schema,
+        },
+        calibration: {
+          original: model.cameras,
+          database: database.cameras,
+          known: database.cameras,
+          returned: returned?.cameras ?? null,
+        },
+        knownModelHashes: knownHashes,
+        returnedExport:
+          returnedDirectory === undefined
+            ? null
+            : { path: resolve(returnedDirectory), hashes: exportHashes },
+      },
+      null,
+      2
+    )}\n`,
+    { flag: 'wx' }
+  );
+  return {
+    poses,
+    workingImages: returned?.images ?? null,
+    mappingPath,
+    receiptPath,
+  };
+}
+
+async function readHandoffDatabase(path: string) {
+  // Consumed schema pinned to COLMAP 3.11.1 scene/database.cc and sensor/models.h:
+  // https://github.com/colmap/colmap/blob/3.11.1/src/colmap/scene/database.cc
+  // PINHOLE = 1; params = four float64 values in fx, fy, cx, cy order.
+  const { DatabaseSync } = await import('node:sqlite');
+  const db = new DatabaseSync(path, { readOnly: true });
+  try {
+    db.exec('BEGIN');
+    const schema: Record<string, unknown> = {};
+    for (const [table, fields] of Object.entries({
+      cameras: {
+        camera_id: 'INTEGER',
+        model: 'INTEGER',
+        width: 'INTEGER',
+        height: 'INTEGER',
+        params: 'BLOB',
+      },
+      images: { image_id: 'INTEGER', name: 'TEXT', camera_id: 'INTEGER' },
+    })) {
+      const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+      schema[table] = columns;
+      for (const [name, type] of Object.entries(fields)) {
+        if (
+          !columns.some(
+            (column) => column.name === name && column.type === type
+          )
+        ) {
+          throw new Error(
+            `Unsupported database schema: ${table}.${name} must be ${type}`
+          );
+        }
+      }
+    }
+    const cameras = db
+      .prepare('SELECT camera_id, model, width, height, params FROM cameras')
+      .all()
+      .map((row) => {
+        if (
+          row.model !== 1 ||
+          !(row.params instanceof Uint8Array) ||
+          row.params.byteLength !== 32
+        ) {
+          throw new Error(
+            `database camera ${row.camera_id}: expected PINHOLE with four float64 parameters`
+          );
+        }
+        const view = new DataView(
+          row.params.buffer,
+          row.params.byteOffset,
+          row.params.byteLength
+        );
+        return handoffCamera(
+          row.camera_id,
+          row.width,
+          row.height,
+          [0, 8, 16, 24].map((offset) => view.getFloat64(offset, true)),
+          'database'
+        );
+      });
+    const images = db
+      .prepare('SELECT image_id, name, camera_id FROM images')
+      .all()
+      .map((row) => {
+        text(row.name, 'database image name');
+        return {
+          imageId: handoffId(row.image_id, 'database image ID', 2147483646),
+          name: row.name,
+          cameraId: handoffId(row.camera_id, 'database camera ID'),
+        };
+      });
+    return { cameras, images, schema };
+  } finally {
+    db.close();
+  }
+}
+
+function checkIdentityAndCalibration(
+  model: RecorderModel,
+  other: { cameras: HandoffCamera[]; images: ImageIdentity[] },
+  field: string
+) {
+  sameNames(
+    model.images.map((image) => image.name),
+    other.images.map((image) => image.name),
+    `${field} filenames`
+  );
+  for (const ids of [
+    other.images.map((image) => image.imageId),
+    other.cameras.map((camera) => camera.cameraId),
+  ]) {
+    if (new Set(ids).size !== ids.length)
+      throw new Error(`${field}: duplicate IDs`);
+  }
+  const images = new Map(other.images.map((image) => [image.name, image]));
+  const associations = new Map<number, number>();
+  for (const image of model.images) {
+    const mapped = images.get(image.name)!;
+    const original = model.cameras.find(
+      (camera) => camera.cameraId === image.cameraId
+    )!;
+    const camera = other.cameras.find(
+      (entry) => entry.cameraId === mapped.cameraId
+    );
+    if (!camera)
+      throw new Error(
+        `${field}: image ${image.name} references missing camera ${mapped.cameraId}`
+      );
+    if (
+      camera.model !== original.model ||
+      camera.width !== original.width ||
+      camera.height !== original.height ||
+      (['fx', 'fy', 'cx', 'cy'] as const).some(
+        (key) => camera.intrinsics[key] !== original.intrinsics[key]
+      )
+    ) {
+      throw new Error(
+        `${field}: calibration differs for image ${image.name}, camera ${camera.cameraId}`
+      );
+    }
+    if (
+      associations.has(image.cameraId) &&
+      associations.get(image.cameraId) !== camera.cameraId
+    ) {
+      throw new Error(
+        `${field}: camera association split for image ${image.name}`
+      );
+    }
+    associations.set(image.cameraId, camera.cameraId);
+  }
+  if (
+    associations.size !== model.cameras.length ||
+    new Set(associations.values()).size !== other.cameras.length ||
+    associations.size !== other.cameras.length
+  ) {
+    throw new Error(
+      `${field}: expected a camera association bijection without extra or merged cameras`
+    );
+  }
+  return images;
+}
+
+function handoffId(
+  value: unknown,
+  field: string,
+  max = Number.MAX_SAFE_INTEGER
+): number {
+  if (
+    typeof value !== 'number' ||
+    !Number.isSafeInteger(value) ||
+    value <= 0 ||
+    value > max
+  ) {
+    throw new Error(`${field}: expected a positive safe ID <= ${max}`);
+  }
+  return value;
+}
+
+function handoffCamera(
+  cameraId: unknown,
+  width: unknown,
+  height: unknown,
+  params: number[],
+  field: string
+): HandoffCamera {
+  if (
+    params.length !== 4 ||
+    params.some((value) => !Number.isFinite(value)) ||
+    params[0]! <= 0 ||
+    params[1]! <= 0
+  ) {
+    throw new Error(`${field}: invalid PINHOLE calibration`);
+  }
+  return {
+    cameraId: handoffId(cameraId, `${field} camera ID`),
+    model: 'PINHOLE',
+    width: handoffId(width, `${field} camera width`),
+    height: handoffId(height, `${field} camera height`),
+    intrinsics: {
+      fx: params[0]!,
+      fy: params[1]!,
+      cx: params[2]!,
+      cy: params[3]!,
+    },
+  };
+}
+
+function readWorkingCameras(source: string): HandoffCamera[] {
+  return source.split(/\r?\n/).flatMap((line, i) => {
+    if (line.trim() === '' || line.trimStart().startsWith('#')) return [];
+    const tokens = line.trim().split(/\s+/);
+    const field = `returned cameras.txt:${i + 1}`;
+    if (tokens.length !== 8 || tokens[1] !== 'PINHOLE')
+      throw new Error(`${field}: expected PINHOLE camera`);
+    return [
+      handoffCamera(
+        Number(tokens[0]),
+        Number(tokens[2]),
+        Number(tokens[3]),
+        tokens.slice(4).map(Number),
+        field
+      ),
+    ];
+  });
+}
+
+/** Only images.txt identity/pose/observation decoding; no recorder validation or track evaluation. */
+function readWorkingImages(source: string): WorkingImage[] {
+  const lines = source.split(/\r?\n/);
+  if (source.endsWith('\n')) lines.pop(); // The split sentinel is not an observation row.
+  const images: WorkingImage[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (line.trim() === '' || line.trimStart().startsWith('#')) continue;
+    const field = `returned images.txt:${i + 1}`;
+    const header = /^\s*((?:\S+\s+){9})(\S.*)$/.exec(line);
+    if (!header)
+      throw new Error(`${field}: expected image identity and W2C pose`);
+    const values = header[1]!.trim().split(/\s+/).map(Number);
+    if (values.some((value) => !Number.isFinite(value)))
+      throw new Error(`${field}: nonfinite pose or ID`);
+    const observationLine = lines[++i];
+    if (observationLine === undefined)
+      throw new Error(`${field}: missing observation row`);
+    const values2D =
+      observationLine.trim() === ''
+        ? []
+        : observationLine.trim().split(/\s+/).map(Number);
+    if (
+      values2D.length % 3 !== 0 ||
+      values2D.some((value) => !Number.isFinite(value))
+    )
+      throw new Error(`${field}: malformed observation row`);
+    const observations: WorkingImage['observations'] = [];
+    for (let j = 0; j < values2D.length; j += 3) {
+      const pointId = values2D[j + 2]!;
+      if (!Number.isSafeInteger(pointId) || pointId < -1)
+        throw new Error(`${field}: invalid observation point ID`);
+      observations.push([values2D[j]!, values2D[j + 1]!, pointId]);
+    }
+    images.push({
+      imageId: handoffId(values[0], `${field} image ID`),
+      cameraId: handoffId(values[8], `${field} camera ID`),
+      name: header[2]!,
+      pose: { qvec: values.slice(1, 5), tvec: values.slice(5, 8) },
+      observations,
+    });
+  }
+  return images;
 }
 
 function invalid(field: string, message: string): never {

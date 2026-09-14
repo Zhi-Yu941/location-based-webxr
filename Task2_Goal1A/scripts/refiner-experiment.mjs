@@ -4,13 +4,28 @@ import { dirname, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, URL } from 'node:url';
 
-import { prepareRun, validateManifest } from '../dist/refiner-experiment.js';
+import {
+  handoffRun,
+  prepareRun,
+  validateManifest,
+} from '../dist/refiner-experiment.js';
 
 async function main() {
   const [stage, run, ...extra] = process.argv.slice(2);
+  // No export: create the initial handoff. With an export: inspect it after
+  // handoff and retain a separate pose table without replacing initial evidence.
+  if (stage === 'handoff' && run !== undefined && extra.length <= 1) {
+    const { poses, mappingPath } = await handoffRun(
+      resolve(run),
+      extra[0] === undefined ? undefined : resolve(extra[0])
+    );
+    console.log(`Handoff: ${resolve(run)} (${poses.length} mapped images)`);
+    console.log(`Pose table: ${mappingPath}`);
+    return;
+  }
   if (stage !== 'prepare' || run === undefined || extra.length !== 0) {
     throw new Error(
-      'Usage: node scripts/refiner-experiment.mjs prepare <run-manifest.json>'
+      'Usage: node scripts/refiner-experiment.mjs prepare <run-manifest.json> | handoff <run-directory> [returned-txt-directory]'
     );
   }
   const manifestPath = resolve(run);

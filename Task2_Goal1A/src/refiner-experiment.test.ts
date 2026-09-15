@@ -19,6 +19,8 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import {
   handoffRun,
   prepareRun,
+  safetyModels,
+  safetyRun,
   scoreModels,
   scoreRun,
   validateManifest,
@@ -342,6 +344,7 @@ describe('slice 1 preparation', () => {
     const receipt = JSON.parse(
       await readFile(join(runDirectory, 'logs/preparation.json'), 'utf8')
     );
+    expect(receipt.manifest).toEqual(manifest);
     expect(receipt.input).toEqual({
       before: manifest.input.sha256,
       copy: manifest.input.sha256,
@@ -1077,6 +1080,585 @@ describe('slice 3 deterministic epipolar scorer', () => {
     expect(await readFile(baselinePath)).toEqual(baselineBytes);
   });
 });
+
+describe('slice 4 gauge and pose safety', () => {
+  test('recovers a known DLT point, W2C depths, centres and ray angle without changing inputs', () => {
+    const model = safetyModel();
+    const matches = safetyMatches();
+    const saved = structuredClone({ model, matches });
+    const result = safetyModels(model, model, null, matches, safetySettings());
+    expect(result.before.passed, JSON.stringify(result.before)).toBe(true);
+    const pair = result.before.pairs[0]!;
+    expect(pair.count).toBe(2);
+    expect(pair.positiveDepthRatio).toBe(1);
+    expect(pair.samples[0]!.point![0]).toBeCloseTo(0, 10);
+    expect(pair.samples[0]!.point![1]).toBeCloseTo(0, 10);
+    expect(pair.samples[0]!.point![2]).toBeCloseTo(5, 10);
+    expect(pair.samples[0]!.depths![0]).toBeCloseTo(5, 10);
+    expect(pair.samples[0]!.depths![1]).toBeCloseTo(5, 10);
+    expect(pair.samples[0]!.parallaxDegrees).toBeCloseTo(
+      (Math.atan(1 / 5) * 180) / Math.PI,
+      10
+    );
+    expect(result.before.poses[1]!.centre).toEqual([-1, 0, 0]);
+    expect(result.before.support.components).toEqual([manifest.imageNames]);
+    expect({ model, matches }).toEqual(saved);
+  });
+
+  test('blocks global translation, rotation, scale and translation-sign changes even with unchanged epipolar scores', () => {
+    const original = safetyModel();
+    for (const kind of ['translation', 'rotation', 'scale', 'sign']) {
+      const candidate = structuredClone(original);
+      candidate.images.forEach((image) => {
+        if (kind === 'translation') image.pose.tvec[1] = 3;
+        if (kind === 'rotation')
+          image.pose.qvec = [Math.SQRT1_2, 0, 0, Math.SQRT1_2];
+        if (kind === 'scale' || kind === 'sign')
+          image.pose.tvec = image.pose.tvec.map(
+            (v) => v * (kind === 'scale' ? 2 : -1)
+          );
+      });
+      const result = safetyModels(
+        original,
+        original,
+        candidate,
+        safetyMatches(),
+        safetySettings()
+      );
+      expect(result.after!.passed, kind).toBe(false);
+      if (kind !== 'sign')
+        expect(result.after!.issues.join(' '), kind).toMatch(/anchor|scale/);
+      if (kind === 'sign')
+        expect(result.after!.pairs[0]!.positiveDepthRatio).toBe(0);
+    }
+  });
+
+  test('triangulates with rotated W2C cameras and unequal intrinsics rather than treating tvec as the centre', () => {
+    const model = safetyModel();
+    const matches = safetyMatches();
+    model.cameras.push({
+      cameraId: 8,
+      model: 'PINHOLE',
+      width: 30,
+      height: 30,
+      intrinsics: { fx: 12, fy: 15, cx: 8, cy: 6 },
+    });
+    const rotated = model.images[1]!;
+    rotated.cameraId = 8;
+    rotated.pose = {
+      qvec: [Math.SQRT1_2, 0, 0, Math.SQRT1_2],
+      tvec: [0, 1, 0],
+    };
+    matches.pairs.forEach((pair) =>
+      pair.matches.forEach((match, k) =>
+        pair.images.forEach((name, side) => {
+          if (name === 'b.jpg') {
+            const xy: [number, number] = [
+              8 - (12 * k * 0.5) / 5,
+              6 + (15 * (1 + k * 0.5)) / 5,
+            ];
+            match.xy[side] = xy;
+            const observation =
+              rotated.observations[match.keypointIndices[side]!]!;
+            observation[0] = xy[0];
+            observation[1] = xy[1];
+          }
+        })
+      )
+    );
+    const result = safetyModels(model, model, null, matches, {
+      ...safetySettings(),
+      sequentialTurnLimits: { max: 91 }, // This fixture deliberately rotates one camera by 90 degrees.
+    });
+    expect(result.before.passed, result.before.issues.join(' ')).toBe(true);
+    expect(result.before.trajectory[0]!.rotationDegrees).toBeCloseTo(90, 10);
+    result.before.pairs.forEach((pair) =>
+      pair.samples.forEach((sample, k) => {
+        expect(sample.point![0]).toBeCloseTo(k * 0.5, 10);
+        expect(sample.point![1]).toBeCloseTo(k * 0.5, 10);
+        expect(sample.point![2]).toBeCloseTo(5, 10);
+        expect(sample.depths![0]).toBeCloseTo(5, 10);
+        expect(sample.depths![1]).toBeCloseTo(5, 10);
+      })
+    );
+    expect(result.before.poses[1]!.centre![0]).toBeCloseTo(-1, 12);
+    expect(result.before.poses[1]!.centre![1]).toBeCloseTo(0, 12);
+  });
+
+  test('rejects invalid quaternion/tvec values without normalization, but accepts quaternion sign equivalence', () => {
+    const model = safetyModel();
+    for (const pose of [
+      { qvec: [2, 0, 0, 0], tvec: [0, 0, 0] },
+      { qvec: [1, 0, 0, 0], tvec: [NaN, 0, 0] },
+      { qvec: [1, 0, 0], tvec: [0, 0, 0] },
+      { qvec: [1, 0, 0, 0], tvec: [0, 0] },
+      { qvec: [0, 0, 0, 1], tvec: [0, 0, 0] }, // XYZW passed as WXYZ.
+    ]) {
+      const candidate = structuredClone(model);
+      candidate.images[0]!.pose = pose;
+      expect(
+        safetyModels(model, model, candidate, safetyMatches(), safetySettings())
+          .after!.passed
+      ).toBe(false);
+      expect(candidate.images[0]!.pose).toEqual(pose);
+    }
+    const equivalent = structuredClone(model);
+    equivalent.images.forEach((image) => {
+      image.pose.qvec = [-1, 0, 0, 0];
+    });
+    expect(
+      safetyModels(model, model, equivalent, safetyMatches(), safetySettings())
+        .after!.passed
+    ).toBe(true);
+  });
+
+  test('retains failed, low-parallax and negative-depth matches in the full denominator and vetoes lost support', () => {
+    const model = safetyModel();
+    const candidate = structuredClone(model);
+    candidate.images[1]!.pose.tvec = [-1, 0, 0];
+    const result = safetyModels(
+      model,
+      model,
+      candidate,
+      safetyMatches(),
+      safetySettings()
+    );
+    expect(result.after!.pairs[0]!.count).toBe(2);
+    expect(result.after!.pairs[0]!.samples).toHaveLength(2);
+    expect(result.after!.pairs[0]!.positiveDepthRatio).toBe(0);
+    expect(result.pairVetoes[0]!.vetoes).toContain(
+      'positive-depth support loss'
+    );
+    for (const xy of [
+      [8, 6],
+      [NaN, 6],
+      [16, 6],
+    ] as [number, number][]) {
+      const matches = safetyMatches();
+      matches.pairs[0]!.matches[0]!.xy[1] = xy;
+      const changed = structuredClone(model);
+      changed.images[1]!.observations[0] = [...xy, 100];
+      const checked = safetyModels(
+        model,
+        changed,
+        null,
+        matches,
+        safetySettings()
+      );
+      expect(checked.before.passed).toBe(false);
+      expect(checked.before.pairs[0]!.count).toBe(2);
+      expect(checked.before.pairs[0]!.positiveDepthRatio).toBe(0.5);
+    }
+    const low = safetyModels(model, model, null, safetyMatches(), {
+      ...safetySettings(),
+      minParallaxDegrees: 80,
+    });
+    expect(low.before.pairs[0]!.parallaxRatio).toBe(0);
+    expect(low.before.passed).toBe(false);
+    const zero = structuredClone(model);
+    zero.images[1]!.pose.tvec = [0, 0, 0];
+    expect(
+      safetyModels(model, zero, null, safetyMatches(), safetySettings()).before
+        .passed
+    ).toBe(false);
+  });
+
+  test('requires reciprocal working tracks and connected support, not just registered images or matches', () => {
+    const model = safetyModel();
+    const disconnected = structuredClone(model);
+    disconnected.tracks = [];
+    disconnected.images.forEach((image) => {
+      image.observations.forEach((observation) => {
+        observation[2] = -1;
+      });
+    });
+    const checked = safetyModels(
+      model,
+      disconnected,
+      null,
+      safetyMatches(),
+      safetySettings()
+    );
+    expect(checked.before.support.components).toHaveLength(3);
+    expect(
+      checked.before.support.pairs.every((pair) => pair.trackCount === 0)
+    ).toBe(true);
+    expect(checked.before.passed).toBe(false);
+    const broken = structuredClone(model);
+    broken.tracks[0]!.observations.pop();
+    expect(() =>
+      safetyModels(model, broken, null, safetyMatches(), safetySettings())
+    ).toThrow(/reciprocal/);
+    const changed = structuredClone(model);
+    changed.images[0]!.observations[0]![0] += 0.1;
+    expect(() =>
+      safetyModels(model, changed, null, safetyMatches(), safetySettings())
+    ).toThrow(/coordinate/);
+    const near = structuredClone(model);
+    near.images[1]!.pose.tvec = [1e-14, 0, 0];
+    expect(
+      safetyModels(model, near, null, safetyMatches(), safetySettings()).before
+        .pairs[0]!.failures
+    ).toBe(2);
+  });
+
+  test('checks all chronological poses for jumps, turns and fixed-pose triangulation drift', () => {
+    const model = safetyModel();
+    const jump = structuredClone(model);
+    jump.images[2]!.pose.tvec = [10, 0, 0];
+    const result = safetyModels(
+      model,
+      model,
+      jump,
+      safetyMatches(),
+      safetySettings()
+    );
+    expect(result.after!.issues.join(' ')).toMatch(/centre delta/);
+    expect(result.after!.issues.join(' ')).toMatch(/sequential step/);
+    const turn = structuredClone(model);
+    turn.images[2]!.pose.tvec = [1, 1, 0];
+    expect(
+      safetyModels(model, model, turn, safetyMatches(), {
+        ...safetySettings(),
+        maxCentreDelta: 10,
+      }).after!.issues.join(' ')
+    ).toMatch(/sequential turn/);
+    const drift = structuredClone(model);
+    drift.images[2]!.pose.tvec[0] = drift.images[2]!.pose.tvec[0]! + 0.01;
+    expect(
+      safetyModels(
+        model,
+        drift,
+        null,
+        safetyMatches(),
+        safetySettings()
+      ).before.issues.join(' ')
+    ).toMatch(/fixed-pose triangulation/);
+  });
+
+  test('safety CLI closes only an evidenced pre-BA gate and preserves its frozen manifest and reports', async () => {
+    const { completed, directory, baselineHashes } = await safetyFixture();
+    const cli = spawnSync(
+      process.execPath,
+      [
+        join(packageRoot, 'scripts/refiner-experiment.mjs'),
+        'safety',
+        runDirectory,
+      ],
+      { cwd: scratch, encoding: 'utf8' }
+    );
+    expect(cli.status, cli.stderr).toBe(0);
+    expect(cli.stdout).toContain('Pre-BA gate: pass');
+    const frozenPath = join(runDirectory, 'metrics/safety-baseline.json');
+    const frozen = await readFile(frozenPath);
+    const report = JSON.parse(frozen.toString('utf8'));
+    expect(report.preBaPassed).toBe(true);
+    expect(report.manifestSha256).toBe(
+      hash(await readFile(join(runDirectory, 'manifest.json')))
+    );
+    expect(report.baseline.hashes).toEqual(baselineHashes);
+    const candidateDirectory = join(scratch, 'safe-candidate');
+    await mkdir(candidateDirectory);
+    for (const name of ['cameras.txt', 'images.txt', 'points3D.txt'])
+      await writeFile(
+        join(candidateDirectory, name),
+        await readFile(join(directory, name))
+      );
+    await writeFile(
+      join(candidateDirectory, 'gauge-evidence.json'),
+      JSON.stringify(gaugeEvidence(completed, baselineHashes, 'adjusted'))
+    );
+    const candidate = await safetyRun(runDirectory, candidateDirectory);
+    expect(candidate.report.passed).toBe(true);
+    expect(await readFile(frozenPath)).toEqual(frozen);
+    await expect(
+      safetyRun(runDirectory, candidateDirectory)
+    ).rejects.toMatchObject({ code: 'EEXIST' });
+    await rm(join(candidateDirectory, 'gauge-evidence.json'));
+    const missing = await safetyRun(runDirectory, candidateDirectory);
+    expect(missing.report.preBaPassed).toBe(true);
+    expect(missing.report.passed).toBe(false);
+    expect(missing.report.evidenceIssues.join(' ')).toContain(
+      'missing gauge evidence'
+    );
+    await writeFile(
+      join(runDirectory, 'manifest.json'),
+      JSON.stringify({ ...completed, maxCentreDelta: 100 })
+    );
+    await expect(safetyRun(runDirectory, candidateDirectory)).rejects.toThrow(
+      /frozen/
+    );
+    expect(await readFile(frozenPath)).toEqual(frozen);
+  });
+
+  test('keeps preparation settings frozen and only completes explicitly pending fields', async () => {
+    const { completed } = await safetyFixture({
+      minParallaxDegrees: 1,
+      gaugeAnchors: {
+        images: ['a.jpg', 'b.jpg'],
+        constrainedQuantities: 'pending',
+      },
+    });
+    const receiptPath = join(runDirectory, 'logs/preparation.json');
+    const receiptBytes = await readFile(receiptPath);
+    const manifestPath = join(runDirectory, 'manifest.json');
+    for (const [field, replacement] of Object.entries({
+      exhaustiveTimeLimit: 999999,
+      siftBackend: 'GPU',
+      resourceLimits: { ...completed.resourceLimits, maxMemoryBytes: 999999 },
+      commands: [{ ...completed.commands[0], args: ['different-command'] }],
+      nonDefaultSettings: { newlyAdded: true },
+      sequentialPairs: [...completed.sequentialPairs].reverse(),
+      minParallaxDegrees: 2,
+      gaugeAnchors: { ...completed.gaugeAnchors, images: ['b.jpg', 'a.jpg'] },
+      undeclaredField: true,
+    })) {
+      await writeFile(
+        manifestPath,
+        JSON.stringify({ ...completed, [field]: replacement })
+      );
+      await expect(safetyRun(runDirectory), field).rejects.toThrow(
+        'frozen preparation'
+      );
+      await expect(scoreRun(runDirectory), field).rejects.toThrow(
+        'frozen preparation'
+      );
+      await expect(handoffRun(runDirectory), field).rejects.toThrow(
+        'frozen preparation'
+      );
+    }
+    await expect(
+      readFile(join(runDirectory, 'metrics/safety-baseline.json'))
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+    await writeFile(manifestPath, JSON.stringify(completed));
+    const result = await safetyRun(runDirectory);
+    expect(result.report.preBaPassed).toBe(true);
+    expect(result.report.preparationSha256).toBe(hash(receiptBytes));
+    expect(await readFile(receiptPath)).toEqual(receiptBytes);
+    const snapshot = JSON.parse(receiptBytes.toString('utf8')).manifest;
+    expect(snapshot.gaugeAnchors.constrainedQuantities).toBe('pending');
+    expect(snapshot.minParallaxDegrees).toBe(1);
+  });
+
+  test('refuses to infer a preparation snapshot for an older or incomplete run', async () => {
+    await safetyFixture();
+    const receiptPath = join(runDirectory, 'logs/preparation.json');
+    const receipt = JSON.parse(await readFile(receiptPath, 'utf8'));
+    delete receipt.manifest;
+    await writeFile(receiptPath, JSON.stringify(receipt));
+    await expect(safetyRun(runDirectory)).rejects.toThrow(
+      /preparation snapshot/
+    );
+    await rm(receiptPath);
+    await expect(safetyRun(runDirectory)).rejects.toThrow(
+      /preparation snapshot/
+    );
+    await expect(
+      readFile(join(runDirectory, 'metrics/safety-baseline.json'))
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(readFile(receiptPath)).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+  });
+
+  test('does not close pre-BA with missing, stale or unsupported gauge evidence or an unverified evidence hash', async () => {
+    const { completed, baselineHashes } = await safetyFixture();
+    const gaugePath = join(runDirectory, 'metrics/gauge-baseline.json');
+    const originalGauge = await readFile(gaugePath);
+    for (const gauge of [
+      {
+        ...gaugeEvidence(completed, baselineHashes, 'triangulated'),
+        verified: false,
+      },
+      {
+        ...gaugeEvidence(completed, baselineHashes, 'triangulated'),
+        exportHashes: {},
+      },
+      {
+        ...gaugeEvidence(completed, baselineHashes, 'triangulated'),
+        constraint: 'unverified-native-default',
+      },
+    ]) {
+      const bytes = Buffer.from(JSON.stringify(gauge));
+      await writeFile(gaugePath, bytes);
+      await writeFile(
+        join(runDirectory, 'manifest.json'),
+        JSON.stringify({
+          ...completed,
+          baselineEvidenceHashes: {
+            ...completed.baselineEvidenceHashes,
+            'metrics/gauge-baseline.json': hash(bytes),
+          },
+        })
+      );
+      const result = await safetyRun(runDirectory);
+      expect(result.report.preBaPassed).toBe(false);
+      expect(result.report.evidenceIssues.join(' ')).toMatch(/gauge/);
+      await expect(
+        readFile(join(runDirectory, 'metrics/safety-baseline.json'))
+      ).rejects.toMatchObject({ code: 'ENOENT' });
+    }
+    await writeFile(gaugePath, originalGauge);
+    await writeFile(
+      join(runDirectory, 'manifest.json'),
+      JSON.stringify(completed)
+    );
+    await rm(gaugePath);
+    const missing = await safetyRun(runDirectory);
+    expect(missing.report.preBaPassed).toBe(false);
+    expect(missing.report.evidenceIssues.join(' ')).toContain(
+      'missing gauge evidence'
+    );
+    await writeFile(gaugePath, originalGauge);
+    await writeFile(
+      join(runDirectory, 'manifest.json'),
+      JSON.stringify({
+        ...completed,
+        intrinsicsByStage: {
+          synthetic: { ...completed.intrinsicsByStage.synthetic, fx: 11 },
+        },
+      })
+    );
+    await expect(safetyRun(runDirectory)).rejects.toThrow(/intrinsics/);
+    await writeFile(
+      join(runDirectory, 'manifest.json'),
+      JSON.stringify(completed)
+    );
+    await writeFile(join(runDirectory, 'evidence/settings.txt'), 'changed');
+    await expect(safetyRun(runDirectory)).rejects.toThrow(/evidence.*hash/i);
+  });
+});
+
+function safetySettings() {
+  return {
+    ...scoringSettings(),
+    minBATracks: 1,
+    minBAObservations: 2,
+    sequentialStepLimits: { max: 2 },
+    sequentialTurnLimits: { max: 30 },
+  };
+}
+
+function safetyMatches() {
+  const names = ['a.jpg', 'b.jpg', 'c.jpg'];
+  return {
+    pairs: [...manifest.sequentialPairs, ...manifest.loopPairs].map(
+      (pair, p) => ({
+        ...pair,
+        matches: [0, 1].map((k) => ({
+          keypointIndices: [p * 2 + k, p * 2 + k],
+          xy: pair.images.map((name) => [
+            8 + 2 * names.indexOf(name) + k,
+            6 + k,
+          ]) as [[number, number], [number, number]],
+        })),
+      })
+    ),
+  };
+}
+
+function safetyModel() {
+  const base = scoringModel();
+  const images = base.images.map((image) => ({
+    ...image,
+    observations: Array.from({ length: 6 }, (): [number, number, number] => [
+      0, 0, -1,
+    ]),
+  }));
+  const tracks = safetyMatches().pairs.flatMap((pair, p) =>
+    pair.matches.map((match, k) => {
+      const pointId = 100 + p * 2 + k;
+      const observations = pair.images.map((name, side): [number, number] => {
+        const image = images.find((entry) => entry.name === name)!;
+        const index = match.keypointIndices[side]!;
+        image.observations[index] = [...match.xy[side]!, pointId];
+        return [image.imageId, index];
+      });
+      return { pointId, observations };
+    })
+  );
+  return { cameras: base.cameras, images, tracks };
+}
+
+function gaugeEvidence(
+  completed: Pick<
+    ReturnType<typeof safetySettings>,
+    'input' | 'colmap' | 'gaugeAnchors'
+  >,
+  exportHashes: Record<string, string>,
+  stage: string
+) {
+  return {
+    inputSha256: completed.input.sha256,
+    colmap: completed.colmap,
+    anchors: completed.gaugeAnchors,
+    stage,
+    exportHashes,
+    verified: true,
+    evidencePaths: ['evidence/settings.txt'],
+    // Supported gauge: first anchor pose plus distances to the other anchors.
+    constraint: 'first-pose-and-anchor-distances',
+  };
+}
+
+async function safetyFixture(preparation: Record<string, unknown> = {}) {
+  await prepareRun({ ...manifest, ...preparation }, runsRoot);
+  const directory = join(runDirectory, 'exports/triangulated');
+  await mkdir(directory, { recursive: true });
+  await mkdir(join(runDirectory, 'metrics'));
+  const model = safetyModel();
+  const contents = {
+    'cameras.txt': '3 PINHOLE 16 12 10 10 8 6\n',
+    'images.txt': model.images
+      .map(
+        (image) =>
+          `${[image.imageId, ...image.pose.qvec, ...image.pose.tvec, image.cameraId, image.name].join(' ')}\n${image.observations.flat().join(' ')}\n`
+      )
+      .join(''),
+    'points3D.txt': model.tracks
+      .map(
+        (track) =>
+          `${track.pointId} 0 0 5 0 0 0 0 ${track.observations.flat().join(' ')}\n`
+      )
+      .join(''),
+  };
+  const baselineHashes: Record<string, string> = {};
+  for (const [name, content] of Object.entries(contents)) {
+    await writeFile(join(directory, name), content);
+    baselineHashes[name] = hash(Buffer.from(content));
+  }
+  const bytes = Buffer.from(JSON.stringify(safetyMatches()));
+  await writeFile(join(runDirectory, 'metrics/correspondences.json'), bytes);
+  const settings = Buffer.from(
+    'Synthetic gauge/settings evidence, not a real COLMAP run.'
+  );
+  await writeFile(join(runDirectory, 'evidence/settings.txt'), settings);
+  const gauge = Buffer.from(
+    JSON.stringify(
+      gaugeEvidence(safetySettings(), baselineHashes, 'triangulated')
+    )
+  );
+  await writeFile(join(runDirectory, 'metrics/gauge-baseline.json'), gauge);
+  const completed = {
+    ...safetySettings(),
+    correspondenceFile: {
+      path: 'metrics/correspondences.json',
+      hash: hash(bytes),
+    },
+    behaviorEvidence: ['evidence/settings.txt'],
+    effectiveSettingsEvidence: ['evidence/settings.txt'],
+    baselineEvidenceHashes: {
+      'evidence/settings.txt': hash(settings),
+      'metrics/gauge-baseline.json': hash(gauge),
+    },
+  };
+  await writeFile(
+    join(runDirectory, 'manifest.json'),
+    JSON.stringify(completed)
+  );
+  await scoreRun(runDirectory);
+  return { completed, directory, baselineHashes };
+}
 
 function scoringModel() {
   return {

@@ -357,7 +357,7 @@ export function validateManifest(
 /** Creates one exclusive workspace. Failed runs are retained for diagnosis. */
 export async function prepareRun(value: unknown, runsRoot: string) {
   validateManifest(value, 'preparation');
-  const manifest = value;
+  const manifest = structuredClone(value);
   const runDirectory = resolve(runsRoot, manifest.runId);
   try {
     execFileSync(
@@ -465,10 +465,60 @@ export async function prepareRun(value: unknown, runsRoot: string) {
   );
   await writeFile(
     join(runDirectory, 'logs/preparation.json'),
-    `${JSON.stringify({ input: { before, copy, after }, images: imageHashes, suitabilityEvidence }, null, 2)}\n`,
+    `${JSON.stringify({ manifest, input: { before, copy, after }, images: imageHashes, suitabilityEvidence }, null, 2)}\n`,
     { flag: 'wx' }
   );
   return { runDirectory, dataset };
+}
+
+/** The write-once preparation receipt, never today's editable manifest, is the reference. */
+async function checkPreparationSnapshot(
+  runDirectory: string,
+  manifest: ExperimentManifest
+) {
+  const bytes = await readFile(
+    join(runDirectory, 'logs/preparation.json')
+  ).catch((error: NodeJS.ErrnoException) => {
+    if (error.code !== 'ENOENT') throw error;
+    throw new Error('Missing preparation snapshot; start a new run');
+  });
+  const receipt = object(
+    JSON.parse(bytes.toString('utf8')),
+    'preparation receipt'
+  );
+  if (!Object.hasOwn(receipt, 'manifest'))
+    throw new Error('Missing preparation snapshot; start a new run');
+  validateManifest(receipt.manifest, 'preparation');
+  const compare = (
+    prepared: unknown,
+    current: unknown,
+    field: string
+  ): void => {
+    if (prepared === 'pending' || isDeepStrictEqual(prepared, current)) return;
+    if (
+      prepared !== null &&
+      current !== null &&
+      typeof prepared === 'object' &&
+      typeof current === 'object' &&
+      Array.isArray(prepared) === Array.isArray(current)
+    ) {
+      const oldKeys = Object.keys(prepared);
+      if (isDeepStrictEqual([...oldKeys].sort(), Object.keys(current).sort())) {
+        for (const key of oldKeys)
+          compare(
+            (prepared as Record<string, unknown>)[key],
+            (current as Record<string, unknown>)[key],
+            `${field}.${key}`
+          );
+        return;
+      }
+    }
+    throw new Error(
+      `Changed frozen preparation field ${field}; start a new run`
+    );
+  };
+  compare(receipt.manifest, manifest, 'manifest');
+  return hash(bytes);
 }
 
 type RecorderModel = Awaited<ReturnType<typeof readRecorderZip>>['model'];
@@ -491,6 +541,7 @@ export async function handoffRun(
     await readFile(join(runDirectory, 'manifest.json'), 'utf8')
   );
   validateManifest(manifest, 'preparation');
+  await checkPreparationSnapshot(runDirectory, manifest);
   const originalPath = join(runDirectory, 'input/original.zip');
   const bytes = await readFile(originalPath);
   if (hash(bytes) !== manifest.input.sha256.toLowerCase()) {
@@ -1355,6 +1406,7 @@ export async function scoreRun(
     await readFile(join(runDirectory, 'manifest.json'), 'utf8')
   );
   validateManifest(manifest, 'preparation');
+  await checkPreparationSnapshot(runDirectory, manifest);
   text(manifest.metricFormula, 'metricFormula');
   text(manifest.pixelConvention, 'pixelConvention');
   const correspondence = object(
@@ -1443,6 +1495,832 @@ export async function scoreRun(
       )
     : baselinePath;
   await mkdir(join(runDirectory, 'metrics'), { recursive: true });
+  await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, {
+    flag: 'wx',
+  });
+  return { report, reportPath };
+}
+
+interface WorkingTrack {
+  pointId: number;
+  observations: [number, number][]; // Exact exported image ID / POINT2D_IDX.
+}
+type SafetyModel = Omit<ScoringModel, 'images'> & {
+  images: WorkingImage[];
+  tracks: WorkingTrack[];
+};
+
+/** Computational gates only. Native gauge behavior requires separately retained evidence.
+ * Angles are degrees, lengths use input-export units, scale tolerance is a ratio.
+ * Supported gauge: first anchor's full pose and its distances to remaining anchors.
+ */
+export function safetyModels(
+  original: Pick<RecorderModel, 'cameras' | 'images'> | ScoringModel,
+  baseline: SafetyModel,
+  candidate: SafetyModel | null,
+  value: unknown,
+  settings: Record<string, unknown>
+) {
+  validateManifest(settings, 'pre-ba');
+  const limit = (name: string) => settings[name] as number;
+  const epsilon = limit('numericEpsilon');
+  const anchors = strings(
+    object(settings.gaugeAnchors, 'gaugeAnchors').images,
+    'gaugeAnchors.images'
+  );
+  const names = original.images.map((image) => image.name);
+  sameNames(names, settings.imageNames, 'imageNames');
+  checkIdentityAndCalibration(original, baseline, 'baseline');
+  if (candidate) checkIdentityAndCalibration(original, candidate, 'candidate');
+  const epipolar = scoreModels(baseline, candidate, value, settings);
+  const frozen = readFrozenPairs(
+    value,
+    names,
+    [...settings.sequentialPairs, ...settings.loopPairs].map((pair) =>
+      pairKey(pair.images)
+    )
+  );
+  const reference = new Map(
+    original.images.map((image) => [
+      image.name,
+      poseFrame(image.pose, limit('quaternionTolerance')),
+    ])
+  );
+  const evaluate = (
+    model: SafetyModel,
+    fixed: boolean,
+    scores: typeof epipolar.before
+  ) => {
+    const issues: string[] = [];
+    const frames = new Map(
+      model.images.map((image) => [
+        image.name,
+        poseFrame(image.pose, limit('quaternionTolerance')),
+      ])
+    );
+    const poses = names.map((name) => {
+      const a = reference.get(name);
+      const b = frames.get(name);
+      if (!a || !b) {
+        issues.push(`${name}: invalid or nonfinite W2C pose`);
+        return {
+          name,
+          centre: null,
+          centreDelta: null,
+          rotationDeltaDegrees: null,
+        };
+      }
+      const centreDelta = distance3(a.centre, b.centre);
+      const rotationDeltaDegrees = rotationDistance(a.rotation, b.rotation);
+      if (centreDelta > limit('maxCentreDelta'))
+        issues.push(`${name}: centre delta exceeds limit`);
+      if (rotationDeltaDegrees > limit('maxRotationDelta'))
+        issues.push(`${name}: rotation delta exceeds limit`);
+      if (fixed && (centreDelta > epsilon || rotationDeltaDegrees > epsilon))
+        issues.push(`${name}: fixed-pose triangulation changed input pose`);
+      if (
+        name === anchors[0] &&
+        (centreDelta > limit('originTolerance') ||
+          rotationDeltaDegrees > limit('orientationTolerance'))
+      )
+        issues.push(`${name}: gauge anchor origin/orientation changed`);
+      return { name, centre: b.centre, centreDelta, rotationDeltaDegrees };
+    });
+    const baselines = names.flatMap((a, i) =>
+      names.slice(i + 1).map((b) => {
+        const originalA = reference.get(a),
+          originalB = reference.get(b);
+        const currentA = frames.get(a),
+          currentB = frames.get(b);
+        const before =
+          originalA && originalB
+            ? distance3(originalA.centre, originalB.centre)
+            : null;
+        const after =
+          currentA && currentB
+            ? distance3(currentA.centre, currentB.centre)
+            : null;
+        const ratio =
+          before !== null && after !== null && before > epsilon
+            ? after / before
+            : null;
+        const anchor =
+          (a === anchors[0] && anchors.includes(b)) ||
+          (b === anchors[0] && anchors.includes(a));
+        if (
+          anchor &&
+          (ratio === null ||
+            !Number.isFinite(ratio) ||
+            Math.abs(ratio - 1) > limit('scaleTolerance'))
+        )
+          issues.push(`${a} / ${b}: degenerate or changed gauge anchor scale`);
+        return { images: [a, b], before, after, ratio };
+      })
+    );
+    const chronology = settings.chronologicalNames.map((name) =>
+      frames.get(name)
+    );
+    const trajectory = settings.chronologicalNames.slice(1).map((name, i) => {
+      const a = chronology[i],
+        b = chronology[i + 1],
+        c = chronology[i + 2];
+      const step = a && b ? distance3(a.centre, b.centre) : null;
+      const rotationDegrees =
+        a && b ? rotationDistance(a.rotation, b.rotation) : null;
+      const turnDegrees =
+        a && b && c
+          ? vectorAngle(
+              subtract3(b.centre, a.centre),
+              subtract3(c.centre, b.centre),
+              epsilon
+            )
+          : null;
+      if (
+        step === null ||
+        !Number.isFinite(step) ||
+        step > Number(at(settings, 'sequentialStepLimits.max'))
+      )
+        issues.push(`${name}: sequential step exceeds limit or is unavailable`);
+      if (
+        rotationDegrees === null ||
+        rotationDegrees > Number(at(settings, 'sequentialTurnLimits.max')) ||
+        (i + 2 < chronology.length &&
+          (turnDegrees === null ||
+            turnDegrees > Number(at(settings, 'sequentialTurnLimits.max'))))
+      )
+        issues.push(`${name}: sequential turn exceeds limit or is unavailable`);
+      return {
+        images: [settings.chronologicalNames[i]!, name],
+        step,
+        rotationDegrees,
+        turnDegrees,
+      };
+    });
+    const geometry = frozen.map((pair, i) => {
+      const images = pair.images.map(
+        (name) => model.images.find((image) => image.name === name)!
+      );
+      const samples = pair.matches.map((match) => {
+        const failed = (
+          failure: string,
+          parallaxDegrees: number | null = null
+        ) => ({
+          keypointIndices: match.keypointIndices,
+          point: null,
+          depths: null,
+          parallaxDegrees,
+          positiveDepth: false,
+          sufficientParallax: false,
+          failure,
+        });
+        const pairFrames = pair.images.map((name) => frames.get(name));
+        if (!pairFrames[0] || !pairFrames[1]) return failed('Invalid W2C pose');
+        const cameras = images.map(
+          (image) =>
+            model.cameras.find((camera) => camera.cameraId === image.cameraId)!
+        );
+        if (
+          match.xy.some(
+            ([u, v], side) =>
+              !Number.isFinite(u) ||
+              !Number.isFinite(v) ||
+              u < 0 ||
+              v < 0 ||
+              u >= cameras[side]!.width ||
+              v >= cameras[side]!.height
+          )
+        )
+          return failed('Nonfinite or out-of-image coordinate');
+        const rays = cameras.map(({ intrinsics: k }, side) =>
+          multiplyVector3(transpose3(pairFrames[side]!.rotation), [
+            (match.xy[side]![0] - k.cx) / k.fx,
+            (match.xy[side]![1] - k.cy) / k.fy,
+            1,
+          ])
+        );
+        const parallaxDegrees = vectorAngle(rays[0]!, rays[1]!, epsilon);
+        if (
+          parallaxDegrees === null ||
+          distance3(pairFrames[0].centre, pairFrames[1].centre) <= epsilon
+        )
+          return failed('Zero/nonfinite baseline or ray', parallaxDegrees);
+        // Four homogeneous pixel projection equations from K[R|t]. One DLT only.
+        const rows = images.flatMap((image, side) => {
+          const { fx, fy, cx, cy } = cameras[side]!.intrinsics;
+          const r = pairFrames[side]!.rotation;
+          const t = image.pose.tvec;
+          const p0 = [...r.slice(0, 3), t[0]!];
+          const p1 = [...r.slice(3, 6), t[1]!];
+          const p2 = [...r.slice(6, 9), t[2]!];
+          const [u, v] = match.xy[side]!;
+          return [
+            p2.map((z, k) => (u - cx) * z - fx * p0[k]!),
+            p2.map((z, k) => (v - cy) * z - fy * p1[k]!),
+          ];
+        });
+        const point = triangulateDLT(rows, epsilon);
+        if (!point)
+          return failed(
+            'Failed/nonfinite DLT point (including point at infinity)',
+            parallaxDegrees
+          );
+        const depths = images.map(
+          (image, side) =>
+            dot3(pairFrames[side]!.rotation.slice(6, 9), point) +
+            image.pose.tvec[2]!
+        );
+        if (depths.some((depth) => !Number.isFinite(depth)))
+          return failed('Nonfinite depth', parallaxDegrees);
+        return {
+          keypointIndices: match.keypointIndices,
+          point,
+          depths,
+          parallaxDegrees,
+          positiveDepth: depths.every((depth) => depth > limit('depthEpsilon')),
+          sufficientParallax: parallaxDegrees >= limit('minParallaxDegrees'),
+          failure: null,
+        };
+      });
+      const count = samples.length;
+      const positiveDepthCount = samples.filter(
+        (sample) => sample.positiveDepth
+      ).length;
+      const parallaxCount = samples.filter(
+        (sample) => sample.sufficientParallax
+      ).length;
+      const usableCount = samples.filter(
+        (sample) => sample.positiveDepth && sample.sufficientParallax
+      ).length;
+      const positiveDepthRatio = count ? positiveDepthCount / count : 0;
+      const parallaxRatio = count ? parallaxCount / count : 0;
+      const failures = samples.filter(
+        (sample) => sample.failure !== null
+      ).length;
+      if (
+        failures > 0 ||
+        count < limit('minVerifiedMatches') ||
+        usableCount < limit('minVerifiedMatches') ||
+        positiveDepthRatio < limit('minPositiveDepthRatio') ||
+        parallaxCount !== count ||
+        scores.pairs[i]!.status !== 'scored'
+      )
+        issues.push(
+          `${pair.images.join(' / ')}: insufficient fixed-population depth/parallax/epipolar support`
+        );
+      return {
+        images: pair.images,
+        count,
+        samples,
+        failures,
+        positiveDepthCount,
+        positiveDepthRatio,
+        parallaxRatio,
+        usableCount,
+      };
+    });
+    const support = workingConnectivity(
+      model,
+      frozen,
+      geometry,
+      scores,
+      settings
+    );
+    if (
+      support.components.length !== 1 ||
+      support.pairs.some((pair) => !pair.usable)
+    )
+      issues.push('Disconnected or insufficient working-track support');
+    return {
+      passed: issues.length === 0,
+      issues,
+      poses,
+      baselines,
+      trajectory,
+      pairs: geometry,
+      support,
+    };
+  };
+  const before = evaluate(baseline, true, epipolar.before);
+  const after = candidate ? evaluate(candidate, false, epipolar.after!) : null;
+  const pairVetoes = after
+    ? before.pairs.map((a, i) => {
+        const b = after.pairs[i]!;
+        const vetoes = [];
+        if (a.positiveDepthRatio - b.positiveDepthRatio > epsilon)
+          vetoes.push('positive-depth support loss');
+        if (a.parallaxRatio - b.parallaxRatio > epsilon)
+          vetoes.push('parallax support loss');
+        if (a.usableCount - b.usableCount > epsilon)
+          vetoes.push('usable fixed-population support loss');
+        return { images: a.images, vetoes };
+      })
+    : [];
+  return {
+    before,
+    after,
+    pairVetoes,
+    epipolar,
+    passed:
+      before.passed &&
+      (after?.passed ?? true) &&
+      pairVetoes.every((pair) => pair.vetoes.length === 0),
+  };
+}
+
+function poseFrame(
+  pose: WorkingImage['pose'] | RecorderModel['images'][number]['pose'],
+  tolerance: number
+) {
+  const rotation = scoringRotation(
+    { qvec: [...pose.qvec], tvec: [...pose.tvec] },
+    tolerance
+  );
+  if (!rotation) return null;
+  const centre = multiplyVector3(transpose3(rotation), [...pose.tvec]).map(
+    (v) => -v || 0
+  );
+  return centre.every(Number.isFinite) ? { rotation, centre } : null;
+}
+function subtract3(a: number[], b: number[]) {
+  return a.map((v, i) => v - b[i]!);
+}
+function distance3(a: number[], b: number[]) {
+  return Math.hypot(...subtract3(a, b));
+}
+function vectorAngle(a: number[], b: number[], epsilon: number): number | null {
+  const na = Math.hypot(...a),
+    nb = Math.hypot(...b);
+  if (
+    !Number.isFinite(na) ||
+    !Number.isFinite(nb) ||
+    na <= epsilon ||
+    nb <= epsilon
+  )
+    return null;
+  return (
+    (Math.acos(
+      Math.max(
+        -1,
+        Math.min(
+          1,
+          dot3(
+            a.map((v) => v / na),
+            b.map((v) => v / nb)
+          )
+        )
+      )
+    ) *
+      180) /
+    Math.PI
+  );
+}
+function rotationDistance(a: number[], b: number[]): number {
+  const r = multiply3(a, transpose3(b));
+  // atan2 avoids acos's loss of precision for the near-zero rotations we gate.
+  return (
+    (Math.atan2(
+      Math.hypot(r[7]! - r[5]!, r[2]! - r[6]!, r[3]! - r[1]!) / 2,
+      (r[0]! + r[4]! + r[8]! - 1) / 2
+    ) *
+      180) /
+    Math.PI
+  );
+}
+
+/** Small one-sided Jacobi SVD of the 4x4 DLT matrix; avoids squaring its condition number. */
+function triangulateDLT(rows: number[][], epsilon: number): number[] | null {
+  const scale = Math.max(...rows.flat().map(Math.abs));
+  if (!Number.isFinite(scale) || scale === 0) return null;
+  const columns = [0, 1, 2, 3].map((i) => rows.map((row) => row[i]! / scale));
+  const vectors: number[][] = [0, 1, 2, 3].map((i) =>
+    [0, 1, 2, 3].map((j) => Number(i === j))
+  );
+  const dot = (a: number[], b: number[]) =>
+    a.reduce((sum, v, i) => sum + v * b[i]!, 0);
+  let converged = false;
+  for (let sweep = 0; sweep < 64; sweep++) {
+    converged = true;
+    for (let p = 0; p < 3; p++)
+      for (let q = p + 1; q < 4; q++) {
+        const a = columns[p]!,
+          b = columns[q]!;
+        const aa = dot(a, a),
+          bb = dot(b, b),
+          ab = dot(a, b);
+        if (
+          Math.sqrt(aa) <= Number.EPSILON * 8 ||
+          Math.sqrt(bb) <= Number.EPSILON * 8
+        )
+          continue;
+        if (Math.abs(ab) <= Number.EPSILON * 8 * Math.sqrt(aa * bb)) continue;
+        converged = false;
+        const tau = (bb - aa) / (2 * ab);
+        const t = (tau >= 0 ? 1 : -1) / (Math.abs(tau) + Math.hypot(1, tau));
+        const c = 1 / Math.hypot(1, t),
+          s = c * t;
+        for (const matrix of [columns, vectors]) {
+          const x = matrix[p]!,
+            y = matrix[q]!;
+          matrix[p] = x.map((v, i) => c * v - s * y[i]!);
+          matrix[q] = x.map((v, i) => s * v + c * y[i]!);
+        }
+      }
+    if (converged) break;
+  }
+  if (!converged) return null;
+  const order = columns
+    .map((column, i) => ({ i, norm: Math.hypot(...column) }))
+    .sort((a, b) => a.norm - b.norm);
+  if (order[1]!.norm - order[0]!.norm <= epsilon * order[3]!.norm) return null; // Non-unique point.
+  const homogeneous = vectors[order[0]!.i]!;
+  if (Math.abs(homogeneous[3]!) <= epsilon) return null;
+  const point = homogeneous.slice(0, 3).map((v) => v / homogeneous[3]!);
+  return point.every(Number.isFinite) ? point : null;
+}
+
+function workingConnectivity(
+  model: SafetyModel,
+  frozen: FrozenPair[],
+  geometry: {
+    samples: { positiveDepth: boolean; sufficientParallax: boolean }[];
+  }[],
+  scores: ReturnType<typeof scoreModels>['before'],
+  settings: Record<string, unknown>
+) {
+  const members = new Map<string, number>();
+  const ids = new Set<number>();
+  for (const track of model.tracks) {
+    handoffId(track.pointId, 'working track ID');
+    if (ids.has(track.pointId) || track.observations.length < 2)
+      throw new Error('Duplicate or incomplete reciprocal working track');
+    ids.add(track.pointId);
+    const images = new Set<number>();
+    for (const [id, index] of track.observations) {
+      const image = model.images.find((image) => image.imageId === id);
+      const key = JSON.stringify([id, index]);
+      if (
+        !Number.isSafeInteger(index) ||
+        index < 0 ||
+        images.has(id) ||
+        members.has(key) ||
+        image?.observations[index]?.[2] !== track.pointId
+      )
+        throw new Error('Working track lacks reciprocal image observation');
+      images.add(id);
+      members.set(key, track.pointId);
+    }
+  }
+  for (const image of model.images)
+    image.observations.forEach((observation, index) => {
+      if (
+        observation[2] !== -1 &&
+        members.get(JSON.stringify([image.imageId, index])) !== observation[2]
+      )
+        throw new Error('Image observation lacks reciprocal working track');
+    });
+  const edges = new Map(
+    model.images.map((image) => [image.name, new Set<string>()])
+  );
+  const supportPairs = frozen.map((pair, i) => {
+    const trackIds = new Set<number>();
+    pair.matches.forEach((match, m) => {
+      const observations = pair.images.map((name, side) => {
+        const image = model.images.find((image) => image.name === name)!;
+        const observation = image.observations[match.keypointIndices[side]!];
+        if (
+          observation &&
+          !isDeepStrictEqual(observation.slice(0, 2), match.xy[side])
+        )
+          throw new Error(
+            `Frozen keypoint coordinate differs in working image ${name}`
+          );
+        return observation;
+      });
+      const a = observations[0],
+        b = observations[1];
+      const sample = geometry[i]!.samples[m]!;
+      const error = scores.pairs[i]!.metrics?.errorsPx[m];
+      if (
+        a &&
+        b &&
+        a[2] !== -1 &&
+        a[2] === b[2] &&
+        sample.positiveDepth &&
+        sample.sufficientParallax &&
+        error !== undefined &&
+        error <= Number(settings.inlierThresholdPx)
+      )
+        trackIds.add(a[2]);
+    });
+    const usable =
+      trackIds.size >= Number(settings.minBATracks) &&
+      trackIds.size * 2 >= Number(settings.minBAObservations);
+    if (usable) {
+      edges.get(pair.images[0])!.add(pair.images[1]);
+      edges.get(pair.images[1])!.add(pair.images[0]);
+    }
+    return {
+      images: pair.images,
+      trackIds: [...trackIds],
+      trackCount: trackIds.size,
+      observationCount: trackIds.size * 2,
+      usable,
+    };
+  });
+  const unseen = new Set(edges.keys());
+  const components: string[][] = [];
+  for (const name of edges.keys()) {
+    if (!unseen.delete(name)) continue;
+    const component = [name];
+    for (const current of component)
+      for (const neighbor of edges.get(current)!)
+        if (unseen.delete(neighbor)) component.push(neighbor);
+    components.push(component);
+  }
+  return {
+    pairs: supportPairs,
+    components,
+    baParticipationEvaluated: false as const,
+  };
+}
+
+/** Only consume exported point/track identities; no recorder point import or BA residual claim. */
+function readWorkingTracks(source: string): WorkingTrack[] {
+  return source.split(/\r?\n/).flatMap((line, i) => {
+    if (!line.trim() || line.trimStart().startsWith('#')) return [];
+    const fields = line.trim().split(/\s+/).map(Number);
+    if (
+      fields.length < 12 ||
+      fields.length % 2 !== 0 ||
+      fields.some((v) => !Number.isFinite(v))
+    )
+      throw new Error(`points3D.txt:${i + 1}: malformed working point/track`);
+    const observations: [number, number][] = [];
+    for (let k = 8; k < fields.length; k += 2)
+      observations.push([
+        handoffId(fields[k], 'track image ID'),
+        fields[k + 1]!,
+      ]);
+    return [{ pointId: handoffId(fields[0], 'track point ID'), observations }];
+  });
+}
+
+/** Baseline gauge receipt: metrics/gauge-baseline.json; candidate: <export>/gauge-evidence.json.
+ * Receipt JSON: {inputSha256,colmap,anchors,stage,exportHashes,verified:true,
+ * constraint:'first-pose-and-anchor-distances',evidencePaths:[retained log paths]}.
+ * This is a human evidence attestation, not inferred native solver behavior.
+ */
+export async function safetyRun(
+  runDirectory: string,
+  candidateDirectory?: string
+) {
+  const manifestBytes = await readFile(join(runDirectory, 'manifest.json'));
+  const manifest: unknown = JSON.parse(manifestBytes.toString('utf8'));
+  validateManifest(manifest, 'pre-ba');
+  const preparationSha256 = await checkPreparationSnapshot(
+    runDirectory,
+    manifest
+  );
+  const manifestSha256 = hash(manifestBytes);
+  const baselinePath = join(runDirectory, 'metrics/safety-baseline.json');
+  if (candidateDirectory !== undefined) {
+    const frozen = object(
+      JSON.parse(await readFile(baselinePath, 'utf8')),
+      'frozen pre-BA gate'
+    );
+    if (
+      frozen.manifestSha256 !== manifestSha256 ||
+      frozen.preparationSha256 !== preparationSha256 ||
+      frozen.preBaPassed !== true
+    )
+      throw new Error(
+        'Completed manifest differs from the closed frozen pre-BA gate'
+      );
+  }
+  const evidenceHashes = object(
+    manifest.baselineEvidenceHashes,
+    'baselineEvidenceHashes'
+  );
+  const evidenceIssues: string[] = [];
+  for (const [path, expected] of Object.entries(evidenceHashes)) {
+    const evidence = await readFile(resolve(runDirectory, path)).catch(
+      (error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') throw error;
+        return null;
+      }
+    );
+    if (evidence === null)
+      evidenceIssues.push(`Missing baseline evidence: ${path}`);
+    else if (hash(evidence) !== String(expected).toLowerCase())
+      throw new Error(`Baseline evidence hash changed: ${path}`);
+  }
+  for (const path of [
+    ...strings(manifest.behaviorEvidence, 'behaviorEvidence'),
+    ...strings(manifest.effectiveSettingsEvidence, 'effectiveSettingsEvidence'),
+    'metrics/gauge-baseline.json',
+  ]) {
+    if (evidenceHashes[path] === undefined)
+      evidenceIssues.push(`Missing frozen evidence hash: ${path}`);
+  }
+  const bytes = await readFile(join(runDirectory, 'input/original.zip'));
+  if (hash(bytes) !== manifest.input.sha256.toLowerCase())
+    invalid('input.sha256', 'isolated original ZIP changed');
+  const { model: original } = await readRecorderZip(bytes);
+  const correspondence = object(
+    manifest.correspondenceFile,
+    'correspondenceFile'
+  );
+  const matchBytes = await readFile(
+    resolve(runDirectory, String(correspondence.path))
+  );
+  if (hash(matchBytes) !== String(correspondence.hash).toLowerCase())
+    invalid('correspondenceFile.hash', 'frozen correspondences changed');
+  const readExport = async (directory: string) => {
+    const cameras = await readFile(join(directory, 'cameras.txt'));
+    const images = await readFile(join(directory, 'images.txt'));
+    const points = await readFile(join(directory, 'points3D.txt'));
+    return {
+      model: {
+        cameras: readWorkingCameras(cameras.toString('utf8')),
+        images: readWorkingImages(images.toString('utf8')),
+        tracks: readWorkingTracks(points.toString('utf8')),
+      },
+      source: {
+        path: resolve(directory),
+        hashes: {
+          'cameras.txt': hash(cameras),
+          'images.txt': hash(images),
+          'points3D.txt': hash(points),
+        },
+      },
+    };
+  };
+  const baseline = await readExport(join(runDirectory, 'exports/triangulated'));
+  for (const [stage, value] of Object.entries(
+    object(manifest.intrinsicsByStage, 'intrinsicsByStage')
+  )) {
+    const camera = object(value, `intrinsicsByStage.${stage}`);
+    if (
+      ![...original.cameras, ...baseline.model.cameras].some(
+        (known) =>
+          known.cameraId === camera.cameraId &&
+          known.width === camera.width &&
+          known.height === camera.height &&
+          (['fx', 'fy', 'cx', 'cy'] as const).every(
+            (key) => known.intrinsics[key] === camera[key]
+          )
+      )
+    ) {
+      throw new Error(
+        `Stage ${stage}: recorded intrinsics/camera association differ from the input handoff`
+      );
+    }
+  }
+  const candidate =
+    candidateDirectory === undefined
+      ? null
+      : await readExport(candidateDirectory);
+  const checked = safetyModels(
+    original,
+    baseline.model,
+    candidate?.model ?? null,
+    JSON.parse(matchBytes.toString('utf8')),
+    manifest
+  );
+  const scoreBytes = await readFile(
+    join(runDirectory, 'metrics/scores-baseline.json')
+  );
+  const frozenScores = object(
+    JSON.parse(scoreBytes.toString('utf8')),
+    'frozen baseline scores'
+  );
+  for (const [key, expected] of Object.entries({
+    inputSha256: hash(bytes),
+    colmap: manifest.colmap,
+    metricFormula: manifest.metricFormula,
+    pixelConvention: manifest.pixelConvention,
+    policy: checked.epipolar.policy,
+    before: checked.epipolar.before,
+    correspondences: {
+      path: resolve(runDirectory, String(correspondence.path)),
+      sha256: hash(matchBytes),
+    },
+    baseline: {
+      path: baseline.source.path,
+      hashes: {
+        'cameras.txt': baseline.source.hashes['cameras.txt'],
+        'images.txt': baseline.source.hashes['images.txt'],
+      },
+    },
+  }))
+    if (!isDeepStrictEqual(frozenScores[key], expected))
+      throw new Error(`Safety ${key} differs from frozen baseline scores`);
+  const gauges = [];
+  for (const [stage, path, exported] of [
+    [
+      'triangulated',
+      join(runDirectory, 'metrics/gauge-baseline.json'),
+      baseline,
+    ],
+    ...(candidate
+      ? [
+          [
+            'adjusted',
+            join(candidate.source.path, 'gauge-evidence.json'),
+            candidate,
+          ] as const,
+        ]
+      : []),
+  ] as const) {
+    const receiptBytes = await readFile(path).catch(
+      (error: NodeJS.ErrnoException) => {
+        if (error.code !== 'ENOENT') throw error;
+        return null;
+      }
+    );
+    if (!receiptBytes) {
+      evidenceIssues.push(`${stage}: missing gauge evidence`);
+      continue;
+    }
+    const receipt = object(
+      JSON.parse(receiptBytes.toString('utf8')),
+      'gauge evidence'
+    );
+    // ponytail: one explicit gauge; a different native gauge needs reviewed evidence and a separate checker.
+    if (
+      receipt.verified !== true ||
+      receipt.constraint !== 'first-pose-and-anchor-distances' ||
+      receipt.stage !== stage ||
+      receipt.inputSha256 !== hash(bytes) ||
+      !isDeepStrictEqual(receipt.colmap, manifest.colmap) ||
+      !isDeepStrictEqual(receipt.anchors, manifest.gaugeAnchors) ||
+      !isDeepStrictEqual(receipt.exportHashes, exported.source.hashes)
+    )
+      evidenceIssues.push(
+        `${stage}: unverified, unsupported or stale gauge evidence`
+      );
+    const paths = strings(receipt.evidencePaths, 'gauge evidencePaths');
+    const sources: Record<string, string> = {};
+    for (const evidencePath of paths) {
+      const bytes = await readFile(resolve(runDirectory, evidencePath)).catch(
+        (error: NodeJS.ErrnoException) => {
+          if (error.code !== 'ENOENT') throw error;
+          return null;
+        }
+      );
+      if (!bytes) {
+        evidenceIssues.push(
+          `${stage}: missing gauge evidence source ${evidencePath}`
+        );
+        continue;
+      }
+      sources[evidencePath] = hash(bytes);
+      if (
+        stage === 'triangulated' &&
+        String(evidenceHashes[evidencePath]).toLowerCase() !==
+          sources[evidencePath]
+      )
+        evidenceIssues.push(
+          `Baseline gauge evidence is not frozen: ${evidencePath}`
+        );
+    }
+    gauges.push({ path, sha256: hash(receiptBytes), receipt, sources });
+  }
+  const preBaPassed =
+    candidate !== null ||
+    (checked.before.passed && evidenceIssues.length === 0);
+  const report = {
+    ...checked,
+    manifestSha256,
+    preparationSha256,
+    frozenManifest: manifest,
+    inputSha256: hash(bytes),
+    baseline: baseline.source,
+    candidate: candidate?.source ?? null,
+    baselineScoresSha256: hash(scoreBytes),
+    gauges,
+    evidenceIssues,
+    preBaPassed,
+    passed: preBaPassed && checked.passed && evidenceIssues.length === 0,
+    finalAcceptanceEvaluated: false as const,
+  };
+  if (candidate) {
+    const frozen = object(
+      JSON.parse(await readFile(baselinePath, 'utf8')),
+      'frozen pre-BA gate'
+    );
+    for (const key of ['baseline', 'before', 'baselineScoresSha256'] as const)
+      if (!isDeepStrictEqual(frozen[key], report[key]))
+        throw new Error(`Safety ${key} differs from frozen pre-BA gate`);
+  }
+  // Only a passing baseline reserves the closed gate; retain failed attempts separately.
+  const reportPath =
+    !candidate && preBaPassed
+      ? baselinePath
+      : join(
+          runDirectory,
+          `metrics/safety-${hash(new TextEncoder().encode(JSON.stringify(report)))}.json`
+        );
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, {
     flag: 'wx',
   });

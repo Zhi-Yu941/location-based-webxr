@@ -7,12 +7,26 @@ import { fileURLToPath, URL } from 'node:url';
 import {
   handoffRun,
   prepareRun,
+  safetyRun,
   scoreRun,
   validateManifest,
 } from '../dist/refiner-experiment.js';
 
 async function main() {
   const [stage, run, ...extra] = process.argv.slice(2);
+  if (stage === 'safety' && run !== undefined && extra.length <= 1) {
+    const { report, reportPath } = await safetyRun(
+      resolve(run),
+      extra[0] === undefined ? undefined : resolve(extra[0])
+    );
+    console.log(`Safety report: ${reportPath}`);
+    console.log(`Pre-BA gate: ${report.preBaPassed ? 'pass' : 'not passed'}`);
+    console.log(
+      'Safety checks only; BA participation and final acceptance are not evaluated.'
+    );
+    if (!report.passed) process.exitCode = 2;
+    return;
+  }
   if (stage === 'score' && run !== undefined && extra.length <= 1) {
     const { report, reportPath } = await scoreRun(
       resolve(run),
@@ -42,7 +56,7 @@ async function main() {
   }
   if (stage !== 'prepare' || run === undefined || extra.length !== 0) {
     throw new Error(
-      'Usage: node scripts/refiner-experiment.mjs prepare <run-manifest.json> | handoff <run-directory> [returned-txt-directory] | score <run-directory> [candidate-txt-directory]'
+      'Usage: node scripts/refiner-experiment.mjs prepare <run-manifest.json> | handoff <run-directory> [returned-txt-directory] | score <run-directory> [candidate-txt-directory] | safety <run-directory> [candidate-txt-directory]'
     );
   }
   const manifestPath = resolve(run);

@@ -7,11 +7,28 @@ import { fileURLToPath, URL } from 'node:url';
 import {
   handoffRun,
   prepareRun,
+  scoreRun,
   validateManifest,
 } from '../dist/refiner-experiment.js';
 
 async function main() {
   const [stage, run, ...extra] = process.argv.slice(2);
+  if (stage === 'score' && run !== undefined && extra.length <= 1) {
+    const { report, reportPath } = await scoreRun(
+      resolve(run),
+      extra[0] === undefined ? undefined : resolve(extra[0])
+    );
+    console.log(`Score report: ${reportPath}`);
+    console.log(
+      'Epipolar metrics only; safety and final acceptance are not evaluated.'
+    );
+    if (
+      report.before.medianOfPairMediansPx === null ||
+      (report.after !== null && report.after.medianOfPairMediansPx === null)
+    )
+      process.exitCode = 2;
+    return;
+  }
   // No export: create the initial handoff. With an export: inspect it after
   // handoff and retain a separate pose table without replacing initial evidence.
   if (stage === 'handoff' && run !== undefined && extra.length <= 1) {
@@ -25,7 +42,7 @@ async function main() {
   }
   if (stage !== 'prepare' || run === undefined || extra.length !== 0) {
     throw new Error(
-      'Usage: node scripts/refiner-experiment.mjs prepare <run-manifest.json> | handoff <run-directory> [returned-txt-directory]'
+      'Usage: node scripts/refiner-experiment.mjs prepare <run-manifest.json> | handoff <run-directory> [returned-txt-directory] | score <run-directory> [candidate-txt-directory]'
     );
   }
   const manifestPath = resolve(run);

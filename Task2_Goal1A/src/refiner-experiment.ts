@@ -775,7 +775,10 @@ async function readHandoffDatabase(path: string) {
 }
 
 function checkIdentityAndCalibration(
-  model: RecorderModel,
+  model: {
+    cameras: readonly HandoffCamera[];
+    images: readonly ImageIdentity[];
+  },
   other: { cameras: HandoffCamera[]; images: ImageIdentity[] },
   field: string
 ) {
@@ -946,6 +949,504 @@ function readWorkingImages(source: string): WorkingImage[] {
     });
   }
   return images;
+}
+
+type ScoringModel = {
+  cameras: HandoffCamera[];
+  images: Omit<WorkingImage, 'observations'>[];
+};
+interface FrozenPair extends RequiredPair {
+  matches: {
+    keypointIndices: [number, number];
+    xy: [[number, number], [number, number]];
+  }[];
+}
+const scoreFields = [
+  'numericEpsilon',
+  'quaternionTolerance',
+  'minVerifiedMatches',
+  'inlierThresholdPx',
+  'coverageGridRows',
+  'coverageGridColumns',
+  'minCoverageEachImage',
+  'improvementTolerancePx',
+  'pairMedianRegressionPx',
+  'pairP90RegressionPx',
+  'maxInlierRatioDrop',
+  'maxCoverageDrop',
+] as const;
+type ScorePolicy = Record<(typeof scoreFields)[number], number>;
+
+/** Epipolar metrics only: these cannot establish translation scale/sign or acceptance. */
+export function scoreModels(
+  before: ScoringModel,
+  after: ScoringModel | null,
+  value: unknown,
+  settings: Record<string, unknown>
+) {
+  const policy = Object.fromEntries(
+    scoreFields.map((field) => {
+      const positive = [
+        'numericEpsilon',
+        'quaternionTolerance',
+        'minVerifiedMatches',
+        'inlierThresholdPx',
+        'coverageGridRows',
+        'coverageGridColumns',
+        'minCoverageEachImage',
+      ].includes(field);
+      const max =
+        field === 'quaternionTolerance'
+          ? 1e-6
+          : [
+                'minCoverageEachImage',
+                'maxInlierRatioDrop',
+                'maxCoverageDrop',
+              ].includes(field)
+            ? 1
+            : Infinity;
+      number(settings[field], field, 0, max, positive);
+      if (
+        [
+          'minVerifiedMatches',
+          'coverageGridRows',
+          'coverageGridColumns',
+        ].includes(field) &&
+        !Number.isSafeInteger(settings[field])
+      )
+        invalid(field, 'expected a safe integer');
+      return [field, settings[field]];
+    })
+  ) as ScorePolicy;
+  if (
+    !Number.isSafeInteger(policy.coverageGridRows * policy.coverageGridColumns)
+  )
+    invalid('coverageGrid', 'cell count must be a safe integer');
+  checkIdentityAndCalibration(before, before, 'baseline');
+  if (after) checkIdentityAndCalibration(before, after, 'candidate');
+  const names = before.images.map((image) => image.name);
+  const required = [
+    ...pairs(settings.sequentialPairs, names, 'sequentialPairs'),
+    ...pairs(settings.loopPairs, names, 'loopPairs'),
+  ];
+  const frozen = readFrozenPairs(value, names, required);
+  const score = (model: ScoringModel) => {
+    const scores = frozen.map((pair) => ({
+      images: pair.images,
+      ...scorePair(model, pair, policy),
+    }));
+    return {
+      pairs: scores,
+      medianOfPairMediansPx: scores.every((pair) => pair.status === 'scored')
+        ? median(scores.map((pair) => pair.metrics!.medianPx))
+        : null,
+    };
+  };
+  const baseline = score(before);
+  const candidate = after ? score(after) : null;
+  const comparison = candidate
+    ? {
+        aggregateImproved:
+          baseline.medianOfPairMediansPx === null ||
+          candidate.medianOfPairMediansPx === null
+            ? null
+            : baseline.medianOfPairMediansPx - candidate.medianOfPairMediansPx >
+              policy.improvementTolerancePx,
+        pairs: baseline.pairs.map((pair, i) => {
+          const a = pair.metrics;
+          const b = candidate.pairs[i]!.metrics;
+          // A computable regression still matters if a support floor also fails.
+          const vetoes =
+            a && b
+              ? [
+                  ...(b.medianPx - a.medianPx > policy.pairMedianRegressionPx
+                    ? ['median regression']
+                    : []),
+                  ...(b.p90Px - a.p90Px > policy.pairP90RegressionPx
+                    ? ['p90 regression']
+                    : []),
+                  ...(a.inlierRatio - b.inlierRatio > policy.maxInlierRatioDrop
+                    ? ['inlier ratio drop']
+                    : []),
+                  ...(a.coverage[0]! - b.coverage[0]! > policy.maxCoverageDrop
+                    ? ['first-image coverage drop']
+                    : []),
+                  ...(a.coverage[1]! - b.coverage[1]! > policy.maxCoverageDrop
+                    ? ['second-image coverage drop']
+                    : []),
+                ]
+              : null;
+          return { images: pair.images, vetoes };
+        }),
+      }
+    : null;
+  return {
+    safetyEvaluated: false as const,
+    policy,
+    before: baseline,
+    after: candidate,
+    comparison,
+  };
+}
+
+/** JSON: {pairs:[{images:[name,name],required:true,matches:[{keypointIndices:[i,j],xy:[[u,v],[u,v]]}]}]}. */
+function readFrozenPairs(
+  value: unknown,
+  names: string[],
+  required: string[]
+): FrozenPair[] {
+  const entries = object(value, 'correspondences').pairs;
+  sameNames(
+    required,
+    pairs(entries, names, 'correspondences.pairs'),
+    'correspondences.pairs'
+  );
+  const coordinates = new Map<string, number[]>();
+  const result = (entries as Record<string, unknown>[]).map(
+    (entry): FrozenPair => {
+      const images = entry.images as [string, string];
+      if (!Array.isArray(entry.matches))
+        invalid('correspondences.matches', 'expected an array');
+      const seen = [new Set<number>(), new Set<number>()];
+      const matches = entry.matches.map((value) => {
+        const match = object(value, 'correspondences.match');
+        if (
+          !Array.isArray(match.keypointIndices) ||
+          match.keypointIndices.length !== 2 ||
+          !Array.isArray(match.xy) ||
+          match.xy.length !== 2
+        )
+          invalid(
+            'correspondences.match',
+            'expected two keypoint indices and two pixel coordinates'
+          );
+        for (let side = 0; side < 2; side++) {
+          const index: unknown = match.keypointIndices[side];
+          const xy: unknown = match.xy[side];
+          if (
+            typeof index !== 'number' ||
+            !Number.isSafeInteger(index) ||
+            index < 0 ||
+            seen[side]!.has(index)
+          )
+            invalid(
+              'correspondences.keypointIndices',
+              'expected distinct nonnegative safe indices within each pair'
+            );
+          seen[side]!.add(index);
+          if (
+            !Array.isArray(xy) ||
+            xy.length !== 2 ||
+            !xy.every((v) => typeof v === 'number')
+          )
+            invalid(
+              'correspondences.xy',
+              'expected original-resolution numeric pixel pairs'
+            );
+          const key = JSON.stringify([images[side], index]);
+          if (
+            coordinates.has(key) &&
+            !isDeepStrictEqual(coordinates.get(key), xy)
+          )
+            invalid(
+              'correspondences.xy',
+              `inconsistent coordinates for ${key}`
+            );
+          coordinates.set(key, xy);
+        }
+        return {
+          keypointIndices: match.keypointIndices as [number, number],
+          xy: match.xy as [[number, number], [number, number]],
+        };
+      });
+      return { images, required: true, matches };
+    }
+  );
+  // Preserve the declared pair order; never infer identity from numeric image IDs.
+  const byPair = new Map(result.map((pair) => [pairKey(pair.images), pair]));
+  return required.map((key) => byPair.get(key)!);
+}
+
+function scorePair(model: ScoringModel, pair: FrozenPair, policy: ScorePolicy) {
+  const count = pair.matches.length;
+  const inconclusive = (reason: string) => ({
+    status: 'inconclusive' as const,
+    reason,
+    count,
+    metrics: null,
+  });
+  const images = pair.images.map(
+    (name) => model.images.find((image) => image.name === name)!
+  );
+  const cameras = images.map(
+    (image) =>
+      model.cameras.find((camera) => camera.cameraId === image.cameraId)!
+  );
+  if (count === 0) return inconclusive('No verified correspondences');
+  const rotations = images.map((image) =>
+    scoringRotation(image.pose, policy.quaternionTolerance)
+  );
+  if (!rotations[0] || !rotations[1])
+    return inconclusive('Nonfinite or invalid W2C pose');
+  const relativeR = multiply3(rotations[1], transpose3(rotations[0]));
+  const rotatedT = multiplyVector3(relativeR, images[0]!.pose.tvec);
+  const t = images[1]!.pose.tvec.map((v, i) => v - rotatedT[i]!);
+  const baseline = Math.hypot(...t);
+  if (!Number.isFinite(baseline) || baseline === 0)
+    return inconclusive('Zero or nonfinite baseline');
+  const inverseK = cameras.map(({ intrinsics: k }) => [
+    1 / k.fx,
+    0,
+    -k.cx / k.fx,
+    0,
+    1 / k.fy,
+    -k.cy / k.fy,
+    0,
+    0,
+    1,
+  ]);
+  const skew = [0, -t[2]!, t[1]!, t[2]!, 0, -t[0]!, -t[1]!, t[0]!, 0];
+  const rawF = multiply3(
+    multiply3(multiply3(transpose3(inverseK[1]!), skew), relativeR),
+    inverseK[0]!
+  );
+  const norm = Math.hypot(...rawF);
+  if (!Number.isFinite(norm) || norm === 0)
+    return inconclusive('Degenerate fundamental matrix');
+  const f = rawF.map((v) => v / norm);
+  const ft = transpose3(f);
+  const errorsPx: number[] = [];
+  const cells = [new Set<number>(), new Set<number>()];
+  for (const match of pair.matches) {
+    for (let side = 0; side < 2; side++) {
+      const [u, v] = match.xy[side]!;
+      const camera = cameras[side]!;
+      if (
+        !Number.isFinite(u) ||
+        !Number.isFinite(v) ||
+        u < 0 ||
+        u >= camera.width ||
+        v < 0 ||
+        v >= camera.height
+      )
+        return inconclusive('Nonfinite or out-of-image correspondence');
+    }
+    const x = [...match.xy[0], 1];
+    const y = [...match.xy[1], 1];
+    const lineJ = multiplyVector3(f, x);
+    const lineI = multiplyVector3(ft, y);
+    const dj = Math.hypot(lineJ[0]!, lineJ[1]!);
+    const di = Math.hypot(lineI[0]!, lineI[1]!);
+    if (
+      !Number.isFinite(dj) ||
+      !Number.isFinite(di) ||
+      dj <= policy.numericEpsilon ||
+      di <= policy.numericEpsilon
+    )
+      return inconclusive('Near-zero or nonfinite epipolar denominator');
+    const residual = Math.abs(dot3(y, lineJ));
+    const error = (residual / dj + residual / di) / 2;
+    if (!Number.isFinite(error))
+      return inconclusive('Nonfinite epipolar residual');
+    errorsPx.push(error);
+    if (error <= policy.inlierThresholdPx) {
+      for (let side = 0; side < 2; side++) {
+        const [u, v] = match.xy[side]!;
+        const camera = cameras[side]!;
+        const column = Math.min(
+          policy.coverageGridColumns - 1,
+          Math.floor((u * policy.coverageGridColumns) / camera.width)
+        );
+        const row = Math.min(
+          policy.coverageGridRows - 1,
+          Math.floor((v * policy.coverageGridRows) / camera.height)
+        );
+        cells[side]!.add(row * policy.coverageGridColumns + column);
+      }
+    }
+  }
+  const sorted = [...errorsPx].sort((a, b) => a - b);
+  const inlierCount = errorsPx.filter(
+    (value) => value <= policy.inlierThresholdPx
+  ).length;
+  const coverage = cells.map(
+    (set) => set.size / (policy.coverageGridRows * policy.coverageGridColumns)
+  );
+  const reason =
+    count < policy.minVerifiedMatches
+      ? 'Insufficient verified matches'
+      : coverage.some((v) => v < policy.minCoverageEachImage)
+        ? 'Insufficient inlier coverage'
+        : null;
+  return {
+    status: reason ? ('inconclusive' as const) : ('scored' as const),
+    reason,
+    count,
+    metrics: {
+      errorsPx,
+      medianPx: median(sorted),
+      p90Px: sorted[Math.ceil(0.9 * count) - 1]!,
+      inlierCount,
+      inlierRatio: inlierCount / count,
+      coverage,
+    },
+  };
+}
+
+function scoringRotation(
+  pose: WorkingImage['pose'],
+  tolerance: number
+): number[] | null {
+  if (
+    pose.qvec.length !== 4 ||
+    pose.tvec.length !== 3 ||
+    [...pose.qvec, ...pose.tvec].some((v) => !Number.isFinite(v)) ||
+    Math.abs(Math.hypot(...pose.qvec) - 1) > tolerance
+  )
+    return null;
+  const [w, x, y, z] = pose.qvec as [number, number, number, number];
+  return [
+    1 - 2 * (y * y + z * z),
+    2 * (x * y - w * z),
+    2 * (x * z + w * y),
+    2 * (x * y + w * z),
+    1 - 2 * (x * x + z * z),
+    2 * (y * z - w * x),
+    2 * (x * z - w * y),
+    2 * (y * z + w * x),
+    1 - 2 * (x * x + y * y),
+  ];
+}
+function transpose3(a: number[]): number[] {
+  return [a[0]!, a[3]!, a[6]!, a[1]!, a[4]!, a[7]!, a[2]!, a[5]!, a[8]!];
+}
+function multiply3(a: number[], b: number[]): number[] {
+  return a.map((_, index) =>
+    [0, 1, 2].reduce(
+      (sum, k) =>
+        sum + a[Math.floor(index / 3) * 3 + k]! * b[k * 3 + (index % 3)]!,
+      0
+    )
+  );
+}
+function multiplyVector3(a: number[], b: number[]): number[] {
+  return [0, 1, 2].map(
+    (row) =>
+      a[row * 3]! * b[0]! + a[row * 3 + 1]! * b[1]! + a[row * 3 + 2]! * b[2]!
+  );
+}
+function dot3(a: number[], b: number[]): number {
+  return a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
+}
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2
+    ? sorted[middle]!
+    : sorted[middle - 1]! / 2 + sorted[middle]! / 2;
+}
+
+/** Baseline TXT is exports/triangulated; an optional later TXT export never changes that baseline. */
+export async function scoreRun(
+  runDirectory: string,
+  candidateDirectory?: string
+) {
+  const manifest: unknown = JSON.parse(
+    await readFile(join(runDirectory, 'manifest.json'), 'utf8')
+  );
+  validateManifest(manifest, 'preparation');
+  text(manifest.metricFormula, 'metricFormula');
+  text(manifest.pixelConvention, 'pixelConvention');
+  const correspondence = object(
+    manifest.correspondenceFile,
+    'correspondenceFile'
+  );
+  text(correspondence.path, 'correspondenceFile.path');
+  sha256Value(correspondence.hash, 'correspondenceFile.hash');
+  const correspondencePath = resolve(runDirectory, correspondence.path);
+  const matchBytes = await readFile(correspondencePath);
+  if (hash(matchBytes) !== String(correspondence.hash).toLowerCase())
+    invalid('correspondenceFile.hash', 'frozen correspondences changed');
+  const bytes = await readFile(join(runDirectory, 'input/original.zip'));
+  if (hash(bytes) !== manifest.input.sha256.toLowerCase())
+    invalid('input.sha256', 'isolated original ZIP changed');
+  const { model } = await readRecorderZip(bytes);
+  sameNames(
+    model.images.map((image) => image.name),
+    manifest.imageNames,
+    'imageNames'
+  );
+  const readExport = async (directory: string) => {
+    const cameras = await readFile(join(directory, 'cameras.txt'));
+    const images = await readFile(join(directory, 'images.txt'));
+    const model = {
+      cameras: readWorkingCameras(cameras.toString('utf8')),
+      images: readWorkingImages(images.toString('utf8')),
+    };
+    return {
+      model,
+      source: {
+        path: resolve(directory),
+        hashes: { 'cameras.txt': hash(cameras), 'images.txt': hash(images) },
+      },
+    };
+  };
+  const baseline = await readExport(join(runDirectory, 'exports/triangulated'));
+  checkIdentityAndCalibration(model, baseline.model, 'baseline');
+  const candidate =
+    candidateDirectory === undefined
+      ? null
+      : await readExport(candidateDirectory);
+  const scores = scoreModels(
+    baseline.model,
+    candidate?.model ?? null,
+    JSON.parse(matchBytes.toString('utf8')),
+    manifest
+  );
+  const report = {
+    ...scores,
+    inputSha256: hash(bytes),
+    colmap: manifest.colmap,
+    metricFormula: manifest.metricFormula,
+    pixelConvention: manifest.pixelConvention,
+    implementedMetric:
+      'abs(xj^T F xi) * (1 / norm((F xi).xy) + 1 / norm((F^T xj).xy)) / 2; F normalized by Frobenius norm',
+    correspondences: { path: correspondencePath, sha256: hash(matchBytes) },
+    baseline: baseline.source,
+    candidate: candidate?.source ?? null,
+  };
+  const baselinePath = join(runDirectory, 'metrics/scores-baseline.json');
+  if (candidate) {
+    const frozen = object(
+      JSON.parse(await readFile(baselinePath, 'utf8')),
+      'frozen baseline'
+    );
+    for (const key of [
+      'inputSha256',
+      'colmap',
+      'metricFormula',
+      'pixelConvention',
+      'implementedMetric',
+      'correspondences',
+      'baseline',
+      'policy',
+      'before',
+    ] as const) {
+      if (!isDeepStrictEqual(frozen[key], report[key]))
+        throw new Error(`Scoring ${key} differs from the frozen baseline`);
+    }
+  }
+  const reportPath = candidate
+    ? join(
+        runDirectory,
+        `metrics/scores-${hash(new TextEncoder().encode(JSON.stringify(report)))}.json`
+      )
+    : baselinePath;
+  await mkdir(join(runDirectory, 'metrics'), { recursive: true });
+  await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, {
+    flag: 'wx',
+  });
+  return { report, reportPath };
 }
 
 function invalid(field: string, message: string): never {

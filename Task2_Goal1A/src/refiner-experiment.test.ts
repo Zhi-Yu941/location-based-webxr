@@ -19,6 +19,8 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import {
   handoffRun,
   prepareRun,
+  scoreModels,
+  scoreRun,
   validateManifest,
 } from './refiner-experiment.js';
 
@@ -748,6 +750,381 @@ describe('slice 2 exact handoff', () => {
     ).toBe(101);
   });
 });
+
+describe('slice 3 deterministic epipolar scorer', () => {
+  test('computes known pixel residuals, even median, nearest-rank p90 and inlier-only coverage', () => {
+    const model = scoringModel();
+    const matches = frozenMatches([0, 1, 2, 4]);
+    const before = structuredClone({ model, matches });
+    const result = scoreModels(model, null, matches, scoringSettings());
+    const metrics = result.before.pairs[0]!.metrics!;
+    expect(metrics.errorsPx).toEqual([0, 1, 2, 4]);
+    expect(metrics.medianPx).toBe(1.5);
+    expect(metrics.p90Px).toBe(4);
+    expect(metrics.inlierCount).toBe(3);
+    expect(metrics.inlierRatio).toBe(0.75);
+    expect(metrics.coverage).toEqual([0.25, 0.25]);
+    expect(result.before.medianOfPairMediansPx).toBe(1.5);
+    expect(result.after).toBeNull();
+    expect(result.safetyEvaluated).toBe(false);
+    expect({ model, matches }).toEqual(before);
+  });
+
+  test('uses W2C relative rotation and both cameras intrinsics, not a fitted matrix', () => {
+    const model = scoringModel();
+    model.cameras.push({
+      cameraId: 8,
+      model: 'PINHOLE',
+      width: 100,
+      height: 100,
+      intrinsics: { fx: 20, fy: 20, cx: 7, cy: 9 },
+    });
+    model.images[1]!.cameraId = 8;
+    model.images[1]!.pose = {
+      qvec: [Math.SQRT1_2, 0, 0, Math.SQRT1_2],
+      tvec: [1, 0, 0],
+    };
+    const matches = frozenMatches([0]);
+    // X=(1,2,10): a=(9,8), b=(5,11). Moving b.y by 2 gives
+    // distance 2 in b and 1 in a, hence symmetric distance 1.5.
+    matches.pairs[0]!.matches[0]!.xy = [
+      [9, 8],
+      [5, 13],
+    ];
+    // Keep this frozen keypoint's identity/coordinate consistent across pairs.
+    matches.pairs[1]!.matches[0]!.xy[0] = [5, 13];
+    matches.pairs[2]!.matches[0]!.xy[0] = [9, 8];
+    const result = scoreModels(model, null, matches, scoringSettings());
+    expect(result.before.pairs[0]!.metrics!.errorsPx[0]).toBeCloseTo(1.5, 12);
+    // A common nonidentity world-to-camera transform must cancel in relative poses.
+    const transformed = scoringModel();
+    transformed.images.forEach((image) => {
+      image.pose.qvec = [Math.SQRT1_2, 0, 0, Math.SQRT1_2];
+      image.pose.tvec[1] = 3;
+    });
+    expect(
+      scoreModels(transformed, null, frozenMatches([1]), scoringSettings())
+        .before.pairs[0]!.metrics!.medianPx
+    ).toBeCloseTo(1, 12);
+  });
+
+  test('does not claim to establish translation scale or sign from epipolar scores', () => {
+    const original = scoringModel();
+    for (const scale of [10, -1, 1e-12]) {
+      const candidate = structuredClone(original);
+      candidate.images.forEach((image) => {
+        image.pose.tvec = image.pose.tvec.map((v) => v * scale);
+      });
+      const result = scoreModels(
+        original,
+        candidate,
+        frozenMatches([1, 2]),
+        scoringSettings()
+      );
+      expect(result.after!.medianOfPairMediansPx).toBeCloseTo(
+        result.before.medianOfPairMediansPx!,
+        12
+      );
+      expect(result.comparison!.aggregateImproved).toBe(false);
+      expect(result.safetyEvaluated).toBe(false);
+    }
+  });
+
+  test('keeps zero baseline, epipoles, nonfinite geometry, outside pixels and insufficient support inconclusive', () => {
+    const zero = scoringModel();
+    zero.images[1]!.pose.tvec = [0, 0, 0];
+    const epipole = scoringModel();
+    epipole.images[1]!.pose.tvec = [0, 0, 1];
+    const nonfinite = scoringModel();
+    nonfinite.images[1]!.pose.tvec = [Infinity, 0, 0];
+    const cases = [
+      { model: zero, matches: frozenMatches([0]), settings: scoringSettings() },
+      {
+        model: epipole,
+        matches: frozenMatches([0], [8, 6]),
+        settings: scoringSettings(),
+      },
+      {
+        model: nonfinite,
+        matches: frozenMatches([0]),
+        settings: scoringSettings(),
+      },
+      {
+        model: scoringModel(),
+        matches: frozenMatches([0], [16, 1]),
+        settings: scoringSettings(),
+      },
+      {
+        model: scoringModel(),
+        matches: frozenMatches([0], [NaN, 1]),
+        settings: scoringSettings(),
+      },
+      {
+        model: scoringModel(),
+        matches: frozenMatches([]),
+        settings: scoringSettings(),
+      },
+      {
+        model: scoringModel(),
+        matches: frozenMatches([0]),
+        settings: { ...scoringSettings(), minVerifiedMatches: 2 },
+      },
+      {
+        model: scoringModel(),
+        matches: frozenMatches([0]),
+        settings: { ...scoringSettings(), numericEpsilon: 1 },
+      },
+    ];
+    for (const { model, matches, settings } of cases) {
+      const result = scoreModels(model, null, matches, settings);
+      expect(result.before.pairs[0]!.status).toBe('inconclusive');
+      expect(result.before.pairs).toHaveLength(3);
+      expect(result.before.medianOfPairMediansPx).toBeNull();
+    }
+  });
+
+  test('keeps a required-pair regression veto when the aggregate and pooled median improve', () => {
+    const before = scoringModel();
+    before.images[1]!.pose.tvec = [1, 1, 0];
+    before.images[2]!.pose.tvec = [2, 2, 0];
+    const after = scoringModel();
+    const matches = frozenMatches([0]);
+    matches.pairs.forEach((pair, i) => {
+      pair.matches = Array.from({ length: i === 2 ? 1 : 10 }, (_, k) => ({
+        keypointIndices: [i * 20 + k, i * 20 + k],
+        xy: (i === 2
+          ? [
+              [1, 1],
+              [3, 3],
+            ]
+          : [
+              [1, 1],
+              [5, 1],
+            ]) as [[number, number], [number, number]],
+      }));
+    });
+    const result = scoreModels(before, after, matches, {
+      ...scoringSettings(),
+      inlierThresholdPx: 10,
+    });
+    expect(result.comparison!.aggregateImproved).toBe(true);
+    expect(result.before.medianOfPairMediansPx).toBeCloseTo(Math.SQRT2 * 2);
+    expect(result.after!.medianOfPairMediansPx).toBe(0);
+    expect(result.comparison!.pairs[2]!.vetoes).toContain('median regression');
+    expect(result.comparison!.pairs[2]!.vetoes).toContain('p90 regression');
+  });
+
+  test('vetoes lost inlier cells in each image independently using the full frozen population', () => {
+    const before = scoringModel();
+    const after = scoringModel();
+    after.images[1]!.pose.tvec = [1, 1, 0];
+    const matches = frozenMatches([0]);
+    matches.pairs[0]!.matches = [
+      {
+        keypointIndices: [10, 10],
+        xy: [
+          [1, 1],
+          [2, 2],
+        ],
+      },
+      {
+        keypointIndices: [11, 11],
+        xy: [
+          [9, 7],
+          [13, 7],
+        ],
+      },
+    ];
+    const result = scoreModels(before, after, matches, {
+      ...scoringSettings(),
+      inlierThresholdPx: 1.1,
+    });
+    expect(result.before.pairs[0]!.metrics!.coverage).toEqual([0.5, 0.5]);
+    expect(result.after!.pairs[0]!.metrics!.coverage).toEqual([0.25, 0.25]);
+    expect(result.after!.pairs[0]!.count).toBe(2);
+    expect(result.comparison!.pairs[0]!.vetoes).toEqual(
+      expect.arrayContaining([
+        'inlier ratio drop',
+        'first-image coverage drop',
+        'second-image coverage drop',
+      ])
+    );
+    matches.pairs[0]!.matches = [
+      {
+        keypointIndices: [10, 10],
+        xy: [
+          [1, 1],
+          [2, 1],
+        ],
+      },
+      {
+        keypointIndices: [11, 11],
+        xy: [
+          [9, 1],
+          [3, 1],
+        ],
+      },
+    ];
+    const asymmetric = scoreModels(before, after, matches, {
+      ...scoringSettings(),
+      inlierThresholdPx: 1.1,
+    });
+    expect(asymmetric.before.pairs[0]!.metrics!.coverage).toEqual([0.5, 0.25]);
+    expect(asymmetric.comparison!.pairs[0]!.vetoes).toContain(
+      'first-image coverage drop'
+    );
+    expect(asymmetric.comparison!.pairs[0]!.vetoes).not.toContain(
+      'second-image coverage drop'
+    );
+  });
+
+  test('rejects changed names, missing/duplicate pairs and inconsistent frozen keypoint identities', () => {
+    const model = scoringModel();
+    const variants = [
+      frozenMatches([0]),
+      frozenMatches([0]),
+      frozenMatches([0]),
+      frozenMatches([0]),
+    ];
+    variants[0]!.pairs[0]!.images[0] = 'A.jpg';
+    variants[1]!.pairs.pop();
+    variants[2]!.pairs.push(structuredClone(variants[2]!.pairs[0]!));
+    variants[3]!.pairs[1]!.matches[0]!.xy[0] = [2, 2];
+    variants[3]!.pairs[1]!.matches[0]!.keypointIndices[0] = 0;
+    for (const matches of variants)
+      expect(() =>
+        scoreModels(model, null, matches, scoringSettings())
+      ).toThrow(/correspondences/);
+    const duplicate = frozenMatches([0]);
+    duplicate.pairs[0]!.matches.push(
+      structuredClone(duplicate.pairs[0]!.matches[0]!)
+    );
+    expect(() =>
+      scoreModels(model, null, duplicate, scoringSettings())
+    ).toThrow(/keypoint/);
+    expect(() =>
+      scoreModels(model, null, frozenMatches([0]), {
+        ...scoringSettings(),
+        numericEpsilon: 'pending',
+      })
+    ).toThrow('numericEpsilon');
+  });
+
+  test('score CLI freezes baseline evidence, compares a later export, and rejects policy/hash changes and overwrite', async () => {
+    await prepareRun(manifest, runsRoot);
+    await handoffDatabase();
+    await handoffRun(runDirectory);
+    const baselineDirectory = join(runDirectory, 'exports/triangulated');
+    await mkdir(baselineDirectory, { recursive: true });
+    for (const name of ['cameras.txt', 'images.txt'])
+      await writeFile(
+        join(baselineDirectory, name),
+        await readFile(join(runDirectory, 'models/known', name))
+      );
+    const matches = frozenMatches([0, 1, 2, 4]);
+    const bytes = Buffer.from(JSON.stringify(matches));
+    await mkdir(join(runDirectory, 'metrics'));
+    await writeFile(join(runDirectory, 'metrics/correspondences.json'), bytes);
+    const scoringManifest = {
+      ...manifest,
+      ...scoringSettings(),
+      metricFormula: 'Plan section 8 symmetric point-to-line pixel distance',
+      pixelConvention: 'Synthetic continuous original-resolution pixels',
+      correspondenceFile: {
+        path: 'metrics/correspondences.json',
+        hash: hash(bytes),
+      },
+    };
+    await writeFile(
+      join(runDirectory, 'manifest.json'),
+      JSON.stringify(scoringManifest)
+    );
+    const cli = spawnSync(
+      process.execPath,
+      [
+        join(packageRoot, 'scripts/refiner-experiment.mjs'),
+        'score',
+        runDirectory,
+      ],
+      { cwd: scratch, encoding: 'utf8' }
+    );
+    expect(cli.status, cli.stderr).toBe(0);
+    expect(cli.stdout).toContain('Score report:');
+    const baselinePath = join(runDirectory, 'metrics/scores-baseline.json');
+    const baselineBytes = await readFile(baselinePath);
+    const candidate = await workingExport();
+    const result = await scoreRun(runDirectory, candidate);
+    expect(result.report.after!.medianOfPairMediansPx).toBe(1.5);
+    expect(await readFile(baselinePath)).toEqual(baselineBytes);
+    await expect(scoreRun(runDirectory, candidate)).rejects.toMatchObject({
+      code: 'EEXIST',
+    });
+    await writeFile(
+      join(runDirectory, 'manifest.json'),
+      JSON.stringify({ ...scoringManifest, inlierThresholdPx: 3 })
+    );
+    await expect(scoreRun(runDirectory, candidate)).rejects.toThrow(
+      /frozen baseline/
+    );
+    await writeFile(
+      join(runDirectory, 'manifest.json'),
+      JSON.stringify(scoringManifest)
+    );
+    await writeFile(join(runDirectory, 'metrics/correspondences.json'), '{}');
+    await expect(scoreRun(runDirectory, candidate)).rejects.toThrow(
+      'correspondenceFile.hash'
+    );
+    expect(await readFile(baselinePath)).toEqual(baselineBytes);
+  });
+});
+
+function scoringModel() {
+  return {
+    cameras: [
+      {
+        cameraId: 3,
+        model: 'PINHOLE' as const,
+        width: 16,
+        height: 12,
+        intrinsics: { fx: 10, fy: 10, cx: 8, cy: 6 },
+      },
+    ],
+    images: [9, 2, 7].map((imageId, i) => ({
+      imageId,
+      cameraId: 3,
+      name: ['a.jpg', 'b.jpg', 'c.jpg'][i]!,
+      pose: { qvec: [1, 0, 0, 0], tvec: [i, 0, 0] },
+    })),
+  };
+}
+
+function scoringSettings() {
+  return {
+    ...completedManifest(),
+    minVerifiedMatches: 1,
+    coverageGridRows: 2,
+    coverageGridColumns: 2,
+    minCoverageEachImage: 0.25,
+  };
+}
+
+function frozenMatches(errors: number[], xy: [number, number] = [1, 1]) {
+  return {
+    pairs: [...manifest.sequentialPairs, ...manifest.loopPairs].map(
+      (pair, p) => ({
+        ...pair,
+        images: [...pair.images],
+        matches: errors.map((error, i) => ({
+          keypointIndices: [p * 100 + i, p * 100 + i],
+          xy: [[...xy], [xy[0], xy[1] + error]] as [
+            [number, number],
+            [number, number],
+          ],
+        })),
+      })
+    ),
+  };
+}
 
 async function handoffDatabase() {
   const directory = join(runDirectory, 'database');

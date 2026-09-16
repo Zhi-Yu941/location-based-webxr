@@ -4,7 +4,7 @@ import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname, extname, join, resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 
-import { readRecorderZip } from './colmap/index.js';
+import { exactlyPreserved, readRecorderZip } from './colmap/index.js';
 import { recorderZipAdapter } from './colmap/recorder-zip-adapter.js';
 
 interface RequiredPair {
@@ -522,6 +522,46 @@ async function checkPreparationSnapshot(
 }
 
 type RecorderModel = Awaited<ReturnType<typeof readRecorderZip>>['model'];
+
+/** Mutation gate only: pose/frame safety and ZIP verification remain separate. */
+export function assertPoseOnlyMutation(
+  original: RecorderModel,
+  candidate: RecorderModel
+): void {
+  for (const [label, model] of [
+    ['original', original],
+    ['candidate', candidate],
+  ] as const) {
+    for (const image of model.images) {
+      if (!Array.isArray(image.observations) || image.observations.length !== 0)
+        throw new Error(
+          `${label} image ${image.imageId} (${image.name}): observations must be an empty array`
+        );
+    }
+    for (const point of model.points3D) {
+      if (!Array.isArray(point.track) || point.track.length !== 0)
+        throw new Error(
+          `${label} point ${point.point3DId}: track must be an empty array`
+        );
+    }
+  }
+  const masked = {
+    ...candidate,
+    images: candidate.images.map((image, i) => ({
+      ...image,
+      pose: {
+        ...image.pose,
+        qvec: original.images[i]?.pose.qvec ?? image.pose.qvec,
+        tvec: original.images[i]?.pose.tvec ?? image.pose.tvec,
+      },
+    })),
+  };
+  // Index masking does not remap records: the exact comparison also checks order/IDs.
+  const comparison = exactlyPreserved(original, masked);
+  if (!comparison.equal)
+    throw new Error(`Non-pose mutation: ${JSON.stringify(comparison)}`);
+}
+
 type HandoffCamera = RecorderModel['cameras'][number];
 type ImageIdentity = Pick<
   RecorderModel['images'][number],

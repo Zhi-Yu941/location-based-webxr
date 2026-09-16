@@ -16,7 +16,9 @@ import { fileURLToPath } from 'node:url';
 import { Uint8ArrayReader, Uint8ArrayWriter, ZipWriter } from '@zip.js/zip.js';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 
+import { readRecorderZip } from './colmap/index.js';
 import {
+  assertPoseOnlyMutation,
   handoffRun,
   prepareRun,
   safetyModels,
@@ -1526,6 +1528,164 @@ describe('slice 4 gauge and pose safety', () => {
     );
     await writeFile(join(runDirectory, 'evidence/settings.txt'), 'changed');
     await expect(safetyRun(runDirectory)).rejects.toThrow(/evidence.*hash/i);
+  });
+});
+
+describe('slice 5 pose-only mutation enforcement', () => {
+  test('allows unchanged or pose-only models without modifying either input', async () => {
+    const { model: original } = await readRecorderZip(inputBytes);
+    const candidate: typeof original = {
+      ...structuredClone(original),
+      images: original.images.map((image) => ({
+        ...structuredClone(image),
+        pose: {
+          qvec: [Math.SQRT1_2, 0, 0, Math.SQRT1_2],
+          tvec: [image.pose.tvec[0] + 0.25, 0.5, 0],
+        },
+      })),
+    };
+    const before = structuredClone({ original, candidate });
+    expect(() => assertPoseOnlyMutation(original, original)).not.toThrow();
+    expect(() => assertPoseOnlyMutation(original, candidate)).not.toThrow();
+    expect({ original, candidate }).toEqual(before);
+  });
+
+  type Model = Parameters<typeof assertPoseOnlyMutation>[0];
+  const mutations: [string, (model: Model) => Model][] = [
+    ['dropped image', (model) => ({ ...model, images: model.images.slice(1) })],
+    [
+      'added image',
+      (model) => ({ ...model, images: [...model.images, model.images[0]!] }),
+    ],
+    [
+      'image order',
+      (model) => ({ ...model, images: [...model.images].reverse() }),
+    ],
+    [
+      'image ID',
+      (model) => ({
+        ...model,
+        images: model.images.map((image) => ({
+          ...image,
+          imageId: image.imageId + 100,
+        })),
+      }),
+    ],
+    [
+      'camera reference',
+      (model) => ({
+        ...model,
+        images: model.images.map((image) => ({ ...image, cameraId: 99 })),
+      }),
+    ],
+    [
+      'exact filename',
+      (model) => ({
+        ...model,
+        images: model.images.map((image) => ({
+          ...image,
+          name: image.name.toUpperCase(),
+        })),
+      }),
+    ],
+    ['dropped camera', (model) => ({ ...model, cameras: [] })],
+    [
+      'camera ID',
+      (model) => ({
+        ...model,
+        cameras: model.cameras.map((camera) => ({ ...camera, cameraId: 99 })),
+      }),
+    ],
+    [
+      'camera dimensions',
+      (model) => ({
+        ...model,
+        cameras: model.cameras.map((camera) => ({
+          ...camera,
+          width: camera.width + 1,
+        })),
+      }),
+    ],
+    ...(['fx', 'fy', 'cx', 'cy'] as const).map(
+      (key): [string, (model: Model) => Model] => [
+        `camera ${key}`,
+        (model) => ({
+          ...model,
+          cameras: model.cameras.map((camera) => ({
+            ...camera,
+            intrinsics: {
+              ...camera.intrinsics,
+              [key]: camera.intrinsics[key] + 1,
+            },
+          })),
+        }),
+      ]
+    ),
+    ['dropped point', (model) => ({ ...model, points3D: [] })],
+    [
+      'point ID',
+      (model) => ({
+        ...model,
+        points3D: model.points3D.map((point) => ({
+          ...point,
+          point3DId: point.point3DId + 1,
+        })),
+      }),
+    ],
+    [
+      'point position',
+      (model) => ({
+        ...model,
+        points3D: model.points3D.map((point) => ({ ...point, xyz: [4, 5, 6] })),
+      }),
+    ],
+    [
+      'point colour',
+      (model) => ({
+        ...model,
+        points3D: model.points3D.map((point) => ({ ...point, rgb: [7, 8, 9] })),
+      }),
+    ],
+    [
+      'point error',
+      (model) => ({
+        ...model,
+        points3D: model.points3D.map((point) => ({ ...point, error: 1 })),
+      }),
+    ],
+  ];
+
+  test.each(mutations)('rejects %s changes', async (_name, mutate) => {
+    const { model: original } = await readRecorderZip(inputBytes);
+    const candidate = mutate(structuredClone(original));
+    const before = structuredClone({ original, candidate });
+    expect(() => assertPoseOnlyMutation(original, candidate)).toThrow(
+      /non-pose/i
+    );
+    expect({ original, candidate }).toEqual(before);
+  });
+
+  test('requires actual empty observation/track arrays in both models, even when they match', async () => {
+    const { model } = await readRecorderZip(inputBytes);
+    for (const field of ['observations', 'track'] as const) {
+      for (const value of [undefined, null, { length: 0 }, [1]]) {
+        const changed = structuredClone(model);
+        Reflect.set(
+          field === 'observations' ? changed.images[0]! : changed.points3D[0]!,
+          field,
+          value
+        );
+        for (const [original, candidate] of [
+          [model, changed],
+          [changed, model],
+          [changed, structuredClone(changed)],
+        ] as const) {
+          expect(() => assertPoseOnlyMutation(original, candidate)).toThrow(
+            field
+          );
+        }
+      }
+    }
   });
 });
 

@@ -2067,6 +2067,14 @@ function workingConnectivity(
       usable,
     };
   });
+  return {
+    pairs: supportPairs,
+    components: connectedComponents(edges),
+    baParticipationEvaluated: false as const,
+  };
+}
+
+function connectedComponents(edges: Map<string, Set<string>>) {
   const unseen = new Set(edges.keys());
   const components: string[][] = [];
   for (const name of edges.keys()) {
@@ -2077,11 +2085,7 @@ function workingConnectivity(
         if (unseen.delete(neighbor)) component.push(neighbor);
     components.push(component);
   }
-  return {
-    pairs: supportPairs,
-    components,
-    baParticipationEvaluated: false as const,
-  };
+  return components;
 }
 
 /** Only consume exported point/track identities; no recorder point import or BA residual claim. */
@@ -2103,6 +2107,351 @@ function readWorkingTracks(source: string): WorkingTrack[] {
       ]);
     return [{ pointId: handoffId(fields[0], 'track point ID'), observations }];
   });
+}
+
+/** Experiment-local, manually decoded evidence, NOT a claimed native COLMAP format.
+ * <adjusted export>/ba-evidence.json binds rawMatches (the correspondence JSON shape),
+ * the COMPLETE reprojection residual list {imageName,keypointIndex,pointId}, solver
+ * counts/termination and before/after reprojection statistics to retained source hashes.
+ * A reviewer must verify pinned-build filtering/selection and the decoding (verified:true).
+ * If native evidence cannot establish this, leave it absent: output tracks never fill it in.
+ */
+async function readBaSupport(
+  runDirectory: string,
+  manifest: ExperimentManifest,
+  baseline: { model: SafetyModel; source: { hashes: Record<string, string> } },
+  candidate: {
+    model: SafetyModel;
+    source: { path: string; hashes: Record<string, string> };
+  },
+  checked: ReturnType<typeof safetyModels>,
+  correspondenceValue: unknown,
+  preBaSha256: string
+) {
+  const path = join(candidate.source.path, 'ba-evidence.json');
+  const issues: string[] = [];
+  const names = manifest.imageNames;
+  const required = [...manifest.sequentialPairs, ...manifest.loopPairs].map(
+    (pair) => pairKey(pair.images)
+  );
+  const verified = readFrozenPairs(correspondenceValue, names, required);
+  let raw: FrozenPair[] = [];
+  const residuals = new Map<
+    string,
+    { imageName: string; keypointIndex: number; pointId: number }
+  >();
+  let receipt: {
+    path: string;
+    sha256: string;
+    value: Record<string, unknown>;
+  } | null = null;
+  let residualBlocks: number | null = null;
+  let scalarResiduals: number | null = null;
+  const count = (value: unknown, field: string) => {
+    number(value, field, 0, Number.MAX_SAFE_INTEGER, false);
+    if (!Number.isSafeInteger(value)) invalid(field, 'expected an integer');
+    return value as number;
+  };
+  const observationKey = (name: string, index: number) =>
+    JSON.stringify([name, index]);
+  const matchKey = (pair: FrozenPair, match: FrozenPair['matches'][number]) =>
+    JSON.stringify(
+      pair.images
+        .map((name, i) => [name, match.keypointIndices[i]] as const)
+        .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+    );
+  try {
+    const bytes = await readFile(path);
+    const value = object(JSON.parse(bytes.toString('utf8')), 'BA evidence');
+    receipt = { path, sha256: hash(bytes), value };
+    if (value.verified !== true || value.complete !== true)
+      throw new Error('Unverified or incomplete BA participation evidence');
+    if (
+      value.inputSha256 !== manifest.input.sha256 ||
+      value.preBaSha256 !== preBaSha256 ||
+      !isDeepStrictEqual(value.colmap, manifest.colmap) ||
+      !isDeepStrictEqual(value.exportHashes, {
+        triangulated: baseline.source.hashes,
+        adjusted: candidate.source.hashes,
+      })
+    )
+      throw new Error(
+        'Stale BA evidence: input, build, exports or frozen pre-BA gate differ'
+      );
+    const sources = object(value.sources, 'BA sources');
+    for (const role of ['rawMatches', 'selection', 'residuals', 'solver']) {
+      const source = object(sources[role], `BA ${role} source`);
+      text(source.path, `BA ${role} path`);
+      sha256Value(source.sha256, `BA ${role} sha256`);
+      const bytes = await readFile(resolve(runDirectory, source.path));
+      if (!bytes.length || hash(bytes) !== String(source.sha256).toLowerCase())
+        throw new Error(
+          `BA ${role} evidence hash differs or source is empty: ${source.path}`
+        );
+    }
+    const commandIndex = count(value.commandIndex, 'BA commandIndex');
+    if (!Array.isArray(manifest.commands) || !manifest.commands[commandIndex])
+      throw new Error('BA command must identify a frozen expanded command');
+    number(value.elapsedSeconds, 'BA elapsedSeconds', 0, Infinity, false);
+    text(value.termination, 'BA termination');
+    if (value.exitCode !== 0 || value.solutionUsable !== true)
+      issues.push('Failed BA execution or unusable solver termination');
+    const reprojection = object(value.reprojection, 'BA reprojection');
+    for (const [stage, model] of [
+      ['before', baseline.model],
+      ['after', candidate.model],
+    ] as const) {
+      const stats = object(reprojection[stage], `BA reprojection.${stage}`);
+      number(stats.rmsePx, `BA ${stage} rmsePx`, 0, Infinity, false);
+      if (
+        count(stats.observationCount, `BA ${stage} observationCount`) !==
+        model.tracks.reduce((n, track) => n + track.observations.length, 0)
+      )
+        throw new Error(
+          `BA ${stage} reprojection population does not match the export`
+        );
+    }
+    raw = readFrozenPairs(value.rawMatches, names, required);
+    raw.forEach((pair, i) => {
+      if (pair.matches.some((match) => !match.xy.flat().every(Number.isFinite)))
+        throw new Error('Nonfinite raw-match coordinates');
+      const rawMatches = new Map(
+        pair.matches.map((match) => [matchKey(pair, match), match])
+      );
+      for (const match of verified[i]!.matches) {
+        const found = rawMatches.get(matchKey(verified[i]!, match));
+        if (
+          !found ||
+          !verified[i]!.images.every((name, side) =>
+            isDeepStrictEqual(
+              match.xy[side],
+              found.xy[pair.images.indexOf(name)]
+            )
+          )
+        )
+          throw new Error(
+            'Verified match identity/coordinates missing from raw-match evidence'
+          );
+      }
+    });
+    if (!Array.isArray(value.residuals))
+      throw new Error('Missing actual BA residual identities');
+    for (const entry of value.residuals) {
+      const row = object(entry, 'BA residual');
+      text(row.imageName, 'BA residual imageName');
+      const index = count(row.keypointIndex, 'BA residual keypointIndex');
+      const pointId = handoffId(row.pointId, 'BA residual point ID');
+      const image = baseline.model.images.find(
+        (image) => image.name === row.imageName
+      );
+      const key = observationKey(row.imageName, index);
+      // safetyModels has already checked reciprocal exported tracks. Join by exact name/index.
+      if (
+        !image ||
+        image.observations[index]?.[2] !== pointId ||
+        residuals.has(key)
+      )
+        throw new Error(
+          `Unknown or duplicate BA residual identity: ${key}, point ${pointId}`
+        );
+      residuals.set(key, {
+        imageName: row.imageName,
+        keypointIndex: index,
+        pointId,
+      });
+    }
+    residualBlocks = count(value.residualBlocks, 'BA residualBlocks');
+    scalarResiduals = count(value.scalarResiduals, 'BA scalarResiduals');
+    // This receipt supports complete 2D reprojection residuals only, not guessed solver totals.
+    if (
+      residualBlocks !== residuals.size ||
+      scalarResiduals !== 2 * residuals.size
+    )
+      issues.push(
+        'Global BA residual counts do not reconcile with the complete identity list'
+      );
+  } catch (error) {
+    issues.push(
+      (error as NodeJS.ErrnoException).code === 'ENOENT'
+        ? `Missing BA participation evidence or source: ${(error as NodeJS.ErrnoException).path ?? path}`
+        : error instanceof Error
+          ? error.message
+          : String(error)
+    );
+  }
+  const evidenceComplete = issues.length === 0;
+  const edges = new Map(names.map((name) => [name, new Set<string>()]));
+  const supportPairs = verified.map((pair, i) => {
+    const rawPair = raw[i];
+    const verifiedByKey = new Map(
+      pair.matches.map((match) => [matchKey(pair, match), match])
+    );
+    const rawByKey = new Map(
+      rawPair?.matches.map((match) => [matchKey(rawPair, match), match])
+    );
+    const population = new Map(rawByKey);
+    for (const [key, match] of verifiedByKey) population.set(key, match);
+    const before = checked.before.support.pairs[i]!;
+    const after = checked.after!.support.pairs[i]!;
+    const baObservations = new Map<
+      string,
+      { imageName: string; keypointIndex: number; pointId: number }
+    >();
+    const matches = [...population].map(([key, match]) => {
+      const retained = verifiedByKey.get(key);
+      const indices =
+        retained?.keypointIndices ??
+        pair.images.map(
+          (name) => match.keypointIndices[rawPair!.images.indexOf(name)]
+        );
+      const linkedPoint = (model: SafetyModel) => {
+        const ids = pair.images.map(
+          (name, side) =>
+            model.images.find((image) => image.name === name)!.observations[
+              indices[side]!
+            ]?.[2]
+        );
+        return ids[0] !== undefined && ids[0] !== -1 && ids[0] === ids[1]
+          ? ids[0]
+          : null;
+      };
+      const triangulatedPointId = retained ? linkedPoint(baseline.model) : null;
+      const adjustedPointId = retained ? linkedPoint(candidate.model) : null;
+      const used = pair.images.map((name, side) =>
+        evidenceComplete
+          ? residuals.get(observationKey(name, indices[side]!))
+          : undefined
+      );
+      for (const row of used)
+        if (row && row.pointId === triangulatedPointId)
+          baObservations.set(
+            observationKey(row.imageName, row.keypointIndex),
+            row
+          );
+      const baUsed =
+        triangulatedPointId !== null &&
+        used.every((row) => row?.pointId === triangulatedPointId);
+      // Missing or invalid evidence cannot establish where support was lost.
+      const firstLoss = !evidenceComplete
+        ? 'unknown'
+        : !retained
+          ? 'verification'
+          : triangulatedPointId === null ||
+              !before.trackIds.includes(triangulatedPointId)
+            ? 'triangulation'
+            : !baUsed
+              ? 'bundle adjustment'
+              : adjustedPointId === null ||
+                  !after.trackIds.includes(adjustedPointId)
+                ? 'adjusted export'
+                : null;
+      return {
+        keypointIndices: indices,
+        triangulatedPointId,
+        adjustedPointId,
+        baUsed,
+        firstLoss,
+      };
+    });
+    const baTrackIds = [
+      ...new Set(
+        matches
+          .filter(
+            (match) =>
+              match.baUsed &&
+              before.trackIds.includes(match.triangulatedPointId!)
+          )
+          .map((match) => match.triangulatedPointId!)
+      ),
+    ];
+    const usableTrackIds = new Set(
+      matches
+        .filter((match) => match.firstLoss === null)
+        .map((match) => match.triangulatedPointId)
+    );
+    const usable =
+      evidenceComplete &&
+      usableTrackIds.size >= Number(manifest.minBATracks) &&
+      usableTrackIds.size * 2 >= Number(manifest.minBAObservations);
+    if (usable) {
+      edges.get(pair.images[0])!.add(pair.images[1]);
+      edges.get(pair.images[1])!.add(pair.images[0]);
+    } else
+      issues.push(
+        `${pair.images.join(' / ')}: insufficient evidenced BA-used support`
+      );
+    const firstLoss = evidenceComplete
+      ? ([
+          'verification',
+          'triangulation',
+          'bundle adjustment',
+          'adjusted export',
+        ].find((stage) => matches.some((match) => match.firstLoss === stage)) ??
+        null)
+      : 'unknown';
+    return {
+      images: pair.images,
+      loop: manifest.loopPairs.some(
+        (loop) => pairKey(loop.images) === pairKey(pair.images)
+      ),
+      rawCount: rawPair?.matches.length ?? null,
+      verifiedCount: pair.matches.length,
+      triangulatedTrackIds: before.trackIds,
+      baTrackIds,
+      baObservations: [...baObservations.values()],
+      positiveDepth: {
+        before: {
+          count: checked.before.pairs[i]!.positiveDepthCount,
+          ratio: checked.before.pairs[i]!.positiveDepthRatio,
+        },
+        after: {
+          count: checked.after!.pairs[i]!.positiveDepthCount,
+          ratio: checked.after!.pairs[i]!.positiveDepthRatio,
+        },
+      },
+      matches,
+      firstLoss,
+      usable,
+    };
+  });
+  const components = connectedComponents(edges);
+  if (components.length !== 1)
+    issues.push('BA-used support is disconnected or leaves unsupported images');
+  return {
+    passed: issues.length === 0,
+    issues,
+    pairs: supportPairs,
+    components,
+    residualBlocks,
+    scalarResiduals,
+    receipt,
+  };
+}
+
+function loopSupportMarkdown(
+  support: Awaited<ReturnType<typeof readBaSupport>>
+) {
+  const cell = (value: unknown) => JSON.stringify(value).replaceAll('|', '\\|');
+  return [
+    '# Loop-to-BA support',
+    '',
+    `Participation gate: ${support.passed ? 'pass' : 'inconclusive'}. Not a final experiment verdict.`,
+    `Evidence: ${support.receipt?.path ?? 'missing BA receipt'}`,
+    `Issues: ${cell(support.issues)}`,
+    '',
+    ...support.pairs
+      .filter((pair) => pair.loop)
+      .flatMap((pair) => [
+        `## ${cell(pair.images)}`,
+        '',
+        '| Raw matches | Verified matches | Triangulated tracks | BA-used observations / tracks | Positive depth before / after | Connectivity | First loss |',
+        '|---|---|---|---|---|---|---|',
+        `| ${pair.rawCount ?? 'unknown'} | ${pair.verifiedCount} | ${cell(pair.triangulatedTrackIds)} | ${cell(pair.baObservations)} / ${cell(pair.baTrackIds)} | ${cell(pair.positiveDepth)} | ${cell(support.components)} | ${pair.firstLoss ?? 'none'} |`,
+        '',
+        `Exact keypoint/track trace: ${cell(pair.matches)}`,
+        '',
+      ]),
+  ].join('\n');
 }
 
 /** Baseline gauge receipt: metrics/gauge-baseline.json; candidate: <export>/gauge-evidence.json.
@@ -2329,6 +2678,17 @@ export async function safetyRun(
   const preBaPassed =
     candidate !== null ||
     (checked.before.passed && evidenceIssues.length === 0);
+  const loopSupport = candidate
+    ? await readBaSupport(
+        runDirectory,
+        manifest,
+        baseline,
+        candidate,
+        checked,
+        JSON.parse(matchBytes.toString('utf8')),
+        hash(await readFile(baselinePath))
+      )
+    : null;
   const report = {
     ...checked,
     manifestSha256,
@@ -2339,9 +2699,14 @@ export async function safetyRun(
     candidate: candidate?.source ?? null,
     baselineScoresSha256: hash(scoreBytes),
     gauges,
+    loopSupport,
     evidenceIssues,
     preBaPassed,
-    passed: preBaPassed && checked.passed && evidenceIssues.length === 0,
+    passed:
+      preBaPassed &&
+      checked.passed &&
+      evidenceIssues.length === 0 &&
+      (loopSupport?.passed ?? true),
     finalAcceptanceEvaluated: false as const,
   };
   if (candidate) {
@@ -2364,6 +2729,19 @@ export async function safetyRun(
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, {
     flag: 'wx',
   });
+  if (loopSupport) {
+    const table = loopSupportMarkdown(loopSupport);
+    await writeFile(
+      join(
+        runDirectory,
+        loopSupport.passed
+          ? 'metrics/loop-support.md'
+          : `metrics/loop-support-${hash(new TextEncoder().encode(JSON.stringify(report)))}.md`
+      ),
+      table,
+      { flag: 'wx' }
+    );
+  }
   return { report, reportPath };
 }
 

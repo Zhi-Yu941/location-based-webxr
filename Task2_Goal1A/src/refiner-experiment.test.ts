@@ -1371,7 +1371,11 @@ describe('slice 4 gauge and pose safety', () => {
       JSON.stringify(gaugeEvidence(completed, baselineHashes, 'adjusted'))
     );
     const candidate = await safetyRun(runDirectory, candidateDirectory);
-    expect(candidate.report.passed).toBe(true);
+    expect(candidate.report.after!.passed).toBe(true);
+    expect(candidate.report.passed).toBe(false);
+    expect(candidate.report.loopSupport!.issues.join(' ')).toMatch(
+      /missing BA/i
+    );
     expect(await readFile(frozenPath)).toEqual(frozen);
     await expect(
       safetyRun(runDirectory, candidateDirectory)
@@ -1688,6 +1692,343 @@ describe('slice 5 pose-only mutation enforcement', () => {
     }
   });
 });
+
+describe('slice 6 loop-to-BA evidence', () => {
+  test.each(['missing', 'residualBlocks', 'scalarResiduals'] as const)(
+    'reports unknown loss stages in JSON and Markdown for %s BA evidence',
+    async (failure) => {
+      const { candidateDirectory, receipt } = await baFixture();
+      const path = join(candidateDirectory, 'ba-evidence.json');
+      if (failure === 'missing') await rm(path);
+      else {
+        receipt[failure] += 1;
+        await writeFile(path, JSON.stringify(receipt));
+      }
+      const { report, reportPath } = await safetyRun(
+        runDirectory,
+        candidateDirectory
+      );
+      expect(report.passed).toBe(false);
+      expect(report.loopSupport!.passed).toBe(false);
+      for (const pair of report.loopSupport!.pairs) {
+        expect(pair.firstLoss).toBe('unknown');
+        expect(pair.matches).toHaveLength(2);
+        expect(
+          pair.matches.every((match) => match.firstLoss === 'unknown')
+        ).toBe(true);
+      }
+      expect(
+        JSON.parse(await readFile(reportPath, 'utf8')).loopSupport
+      ).toEqual(report.loopSupport);
+      const tables = (await readdir(join(runDirectory, 'metrics'))).filter(
+        (name) => name.startsWith('loop-support-') && name.endsWith('.md')
+      );
+      expect(tables).toHaveLength(1);
+      const table = await readFile(
+        join(runDirectory, 'metrics', tables[0]!),
+        'utf8'
+      );
+      expect(table).toContain('| unknown |');
+      expect(table).toContain('"firstLoss":"unknown"');
+      expect(table).not.toMatch(
+        /"firstLoss":"(?:raw matches|bundle adjustment)"/
+      );
+    }
+  );
+
+  test('detects lost loop residuals even when output tracks and global counts are intact', async () => {
+    const { candidateDirectory, receipt } = await baFixture();
+    receipt.residuals = receipt.residuals.filter(
+      (row) => !(row.imageName === 'c.jpg' && row.pointId >= 104)
+    );
+    receipt.residualBlocks = receipt.residuals.length;
+    receipt.scalarResiduals = receipt.residuals.length * 2;
+    await writeFile(
+      join(candidateDirectory, 'ba-evidence.json'),
+      JSON.stringify(receipt)
+    );
+    const { report } = await safetyRun(runDirectory, candidateDirectory);
+    expect(report.after!.passed).toBe(true);
+    expect(report.passed).toBe(false);
+    const loop = report.loopSupport!.pairs.find((pair) => pair.loop)!;
+    expect(loop.triangulatedTrackIds).toEqual([104, 105]);
+    expect(loop.baTrackIds).toEqual([]);
+    expect(loop.baObservations).toHaveLength(2);
+    expect(loop.firstLoss).toBe('bundle adjustment');
+    expect(
+      loop.matches.every((match) => match.firstLoss === 'bundle adjustment')
+    ).toBe(true);
+  });
+
+  test('retains exact identities, depth support, connectivity and a no-overwrite loop table', async () => {
+    const { candidateDirectory, receipt, preserved } = await baFixture();
+    const { report } = await safetyRun(runDirectory, candidateDirectory);
+    expect(report.passed, JSON.stringify(report.loopSupport)).toBe(true);
+    expect(report.finalAcceptanceEvaluated).toBe(false);
+    expect(report.loopSupport!.components).toEqual([manifest.imageNames]);
+    expect(report.loopSupport!.residualBlocks).toBe(12);
+    expect(report.loopSupport!.scalarResiduals).toBe(24);
+    const loop = report.loopSupport!.pairs.find((pair) => pair.loop)!;
+    expect(loop.rawCount).toBe(2);
+    expect(loop.verifiedCount).toBe(2);
+    expect(loop.baTrackIds).toEqual([104, 105]);
+    expect(loop.baObservations).toHaveLength(4);
+    expect(loop.positiveDepth.before.ratio).toBe(1);
+    expect(loop.positiveDepth.after.ratio).toBe(1);
+    expect(loop.firstLoss).toBeNull();
+    expect(loop.matches[0]!.keypointIndices).toEqual([4, 4]);
+    expect(report.loopSupport!.receipt!.value).toEqual(receipt);
+    const tablePath = join(runDirectory, 'metrics/loop-support.md');
+    const table = await readFile(tablePath, 'utf8');
+    expect(table).toContain('a.jpg');
+    expect(table).toContain('c.jpg');
+    expect(table).toContain('104');
+    expect(table).toContain('ba-evidence.json');
+    await expect(
+      safetyRun(runDirectory, candidateDirectory)
+    ).rejects.toMatchObject({ code: 'EEXIST' });
+    expect(await readFile(tablePath, 'utf8')).toBe(table);
+    for (const [path, bytes] of preserved)
+      expect(await readFile(path)).toEqual(bytes);
+  });
+
+  test('traces raw-match filtering independently of pair direction or array order', async () => {
+    const { candidateDirectory, receipt } = await baFixture();
+    const rawLoop = receipt.rawMatches.pairs[2]!;
+    rawLoop.matches.push({
+      keypointIndices: [6, 7],
+      xy: [
+        [1, 1],
+        [2, 2],
+      ],
+    });
+    rawLoop.images.reverse();
+    for (const match of rawLoop.matches) {
+      match.keypointIndices.reverse();
+      match.xy.reverse();
+    }
+    receipt.rawMatches.pairs.reverse();
+    receipt.residuals.reverse();
+    await writeFile(
+      join(candidateDirectory, 'ba-evidence.json'),
+      JSON.stringify(receipt)
+    );
+    const { report } = await safetyRun(runDirectory, candidateDirectory);
+    expect(report.passed).toBe(true);
+    const loop = report.loopSupport!.pairs.find((pair) => pair.loop)!;
+    expect(loop.rawCount).toBe(3);
+    expect(loop.verifiedCount).toBe(2);
+    expect(loop.firstLoss).toBe('verification');
+    expect(
+      loop.matches.find((match) => match.firstLoss === 'verification')!
+        .keypointIndices
+    ).toEqual([6, 7]);
+  });
+
+  test('distinguishes adjusted-export loss from BA participation and reports disconnected solver support', async () => {
+    const { candidateDirectory, receipt } = await baFixture();
+    const imagesPath = join(candidateDirectory, 'images.txt');
+    const pointsPath = join(candidateDirectory, 'points3D.txt');
+    const images = await readFile(imagesPath, 'utf8');
+    const points = await readFile(pointsPath, 'utf8');
+    await writeFile(imagesPath, images.replace(/ 10[45](?= |\r?$)/gm, ' -1'));
+    await writeFile(pointsPath, points.replace(/^10[45] .*\n/gm, ''));
+    receipt.exportHashes.adjusted = {
+      ...receipt.exportHashes.adjusted,
+      'images.txt': hash(await readFile(imagesPath)),
+      'points3D.txt': hash(await readFile(pointsPath)),
+    };
+    receipt.reprojection.after.observationCount = 8;
+    await writeFile(
+      join(candidateDirectory, 'ba-evidence.json'),
+      JSON.stringify(receipt)
+    );
+    let result = await safetyRun(runDirectory, candidateDirectory);
+    let loop = result.report.loopSupport!.pairs.find((pair) => pair.loop)!;
+    expect(loop.baTrackIds).toEqual([104, 105]);
+    expect(loop.firstLoss).toBe('adjusted export');
+    expect(result.report.passed).toBe(false);
+    await writeFile(imagesPath, images);
+    await writeFile(pointsPath, points);
+    receipt.exportHashes.adjusted = receipt.exportHashes.triangulated;
+    receipt.reprojection.after.observationCount = 12;
+    receipt.residuals = receipt.residuals.filter(
+      (row) => row.imageName !== 'c.jpg'
+    );
+    receipt.residualBlocks = receipt.residuals.length;
+    receipt.scalarResiduals = receipt.residuals.length * 2;
+    await writeFile(
+      join(candidateDirectory, 'ba-evidence.json'),
+      JSON.stringify(receipt)
+    );
+    result = await safetyRun(runDirectory, candidateDirectory);
+    loop = result.report.loopSupport!.pairs.find((pair) => pair.loop)!;
+    expect(loop.firstLoss).toBe('bundle adjustment');
+    expect(result.report.loopSupport!.components).toEqual([
+      ['a.jpg', 'b.jpg'],
+      ['c.jpg'],
+    ]);
+    expect(result.report.passed).toBe(false);
+  });
+
+  test('does not infer participation from tracks, a cost or an unverified receipt', async () => {
+    const { candidateDirectory, receipt } = await baFixture();
+    const path = join(candidateDirectory, 'ba-evidence.json');
+    for (const value of [
+      null,
+      { cost: 0 },
+      { ...receipt, verified: false },
+      { ...receipt, complete: false },
+    ]) {
+      if (value === null) await rm(path);
+      else await writeFile(path, JSON.stringify(value));
+      const { report } = await safetyRun(runDirectory, candidateDirectory);
+      expect(report.passed).toBe(false);
+      expect(report.loopSupport!.passed).toBe(false);
+      expect(report.loopSupport!.issues.join(' ')).toMatch(
+        /missing|unverified|incomplete/i
+      );
+    }
+    await expect(
+      readFile(join(runDirectory, 'metrics/loop-support.md'))
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  test('rejects stale bindings, unknown/duplicate residual identities and unreconciled global counts', async () => {
+    const { candidateDirectory, receipt } = await baFixture();
+    const variants = [
+      { ...receipt, preBaSha256: '0'.repeat(64) },
+      { ...receipt, colmap: { ...receipt.colmap, build: 'other' } },
+      { ...receipt, exportHashes: { ...receipt.exportHashes, adjusted: {} } },
+      { ...receipt, residualBlocks: 999 },
+      { ...receipt, scalarResiduals: 12 },
+      { ...receipt, residuals: [...receipt.residuals, receipt.residuals[0]] },
+      {
+        ...receipt,
+        residuals: receipt.residuals.map((row) => ({
+          ...row,
+          imageName: row.imageName.toUpperCase(),
+        })),
+      },
+      {
+        ...receipt,
+        residuals: receipt.residuals.map((row) => ({ ...row, pointId: 999 })),
+      },
+      {
+        ...receipt,
+        residuals: receipt.residuals.map((row) => ({
+          ...row,
+          keypointIndex: -1,
+        })),
+      },
+      { ...receipt, rawMatches: { pairs: [] } },
+      { ...receipt, exitCode: 1 },
+      { ...receipt, solutionUsable: false },
+    ];
+    for (const value of variants) {
+      await writeFile(
+        join(candidateDirectory, 'ba-evidence.json'),
+        JSON.stringify(value)
+      );
+      const { report } = await safetyRun(runDirectory, candidateDirectory);
+      expect(report.loopSupport!.passed, JSON.stringify(value)).toBe(false);
+      expect(report.passed).toBe(false);
+    }
+  });
+
+  test('keeps missing or changed evidence inconclusive and requires the frozen pre-BA gate', async () => {
+    const { candidateDirectory } = await baFixture();
+    const evidencePath = join(runDirectory, 'evidence/ba.txt');
+    await writeFile(evidencePath, 'changed evidence');
+    let result = await safetyRun(runDirectory, candidateDirectory);
+    expect(result.report.loopSupport!.issues.join(' ')).toMatch(
+      /evidence.*hash/i
+    );
+    expect(result.report.passed).toBe(false);
+    await rm(evidencePath);
+    result = await safetyRun(runDirectory, candidateDirectory);
+    expect(result.report.loopSupport!.issues.join(' ')).toMatch(
+      /missing.*evidence/i
+    );
+    await rm(join(runDirectory, 'metrics/safety-baseline.json'));
+    await expect(
+      safetyRun(runDirectory, candidateDirectory)
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+});
+
+async function baFixture() {
+  const { completed, directory, baselineHashes } = await safetyFixture();
+  const baseline = await safetyRun(runDirectory);
+  const candidateDirectory = join(runDirectory, 'exports/adjusted');
+  await mkdir(candidateDirectory);
+  const preserved: [string, Buffer][] = [];
+  for (const name of ['cameras.txt', 'images.txt', 'points3D.txt']) {
+    const bytes = await readFile(join(directory, name));
+    await writeFile(join(candidateDirectory, name), bytes);
+    preserved.push(
+      [join(directory, name), bytes],
+      [join(candidateDirectory, name), bytes]
+    );
+  }
+  for (const path of [
+    'manifest.json',
+    'input/original.zip',
+    'metrics/safety-baseline.json',
+  ])
+    preserved.push([
+      join(runDirectory, path),
+      await readFile(join(runDirectory, path)),
+    ]);
+  await writeFile(
+    join(candidateDirectory, 'gauge-evidence.json'),
+    JSON.stringify(gaugeEvidence(completed, baselineHashes, 'adjusted'))
+  );
+  const evidence = Buffer.from(
+    'Synthetic raw-match, filtering, residual and solver log evidence; not a native COLMAP run.'
+  );
+  await writeFile(join(runDirectory, 'evidence/ba.txt'), evidence);
+  const model = safetyModel();
+  const receipt = {
+    verified: true,
+    complete: true,
+    inputSha256: completed.input.sha256,
+    colmap: completed.colmap,
+    preBaSha256: hash(await readFile(baseline.reportPath)),
+    exportHashes: { triangulated: baselineHashes, adjusted: baselineHashes },
+    sources: Object.fromEntries(
+      ['rawMatches', 'selection', 'residuals', 'solver'].map((role) => [
+        role,
+        { path: 'evidence/ba.txt', sha256: hash(evidence) },
+      ])
+    ),
+    commandIndex: 0,
+    exitCode: 0,
+    elapsedSeconds: 1,
+    termination: 'Synthetic convergence',
+    solutionUsable: true,
+    residualBlocks: 12,
+    scalarResiduals: 24,
+    reprojection: {
+      before: { rmsePx: 0.5, observationCount: 12 },
+      after: { rmsePx: 0.25, observationCount: 12 },
+    },
+    rawMatches: safetyMatches(),
+    residuals: model.tracks.flatMap((track) =>
+      track.observations.map(([imageId, keypointIndex]) => ({
+        imageName: model.images.find((image) => image.imageId === imageId)!
+          .name,
+        keypointIndex,
+        pointId: track.pointId,
+      }))
+    ),
+  };
+  await writeFile(
+    join(candidateDirectory, 'ba-evidence.json'),
+    JSON.stringify(receipt)
+  );
+  return { candidateDirectory, receipt, preserved };
+}
 
 function safetySettings() {
   return {

@@ -728,7 +728,7 @@ export async function handoffRun(
     for (const [name, content] of Object.entries(known)) {
       if (
         object(initial.knownModelHashes, 'initial handoff knownModelHashes')[
-          name
+        name
         ] !== hash(new TextEncoder().encode(content))
       ) {
         throw new Error(`Initial handoff known model changed: ${name}`);
@@ -794,7 +794,11 @@ async function readHandoffDatabase(path: string) {
   // https://github.com/colmap/colmap/blob/3.11.1/src/colmap/scene/database.cc
   // PINHOLE = 1; params = four float64 values in fx, fy, cx, cy order.
   const { DatabaseSync } = await import('node:sqlite');
-  const db = new DatabaseSync(path, { readOnly: true });
+  const dbPath =
+    process.platform === 'win32' && !path.startsWith('\\\\?\\')
+      ? `\\\\?\\${resolve(path)}`
+      : path;
+  const db = new DatabaseSync(dbPath, { readOnly: true });
   try {
     db.exec('BEGIN');
     const schema: Record<string, unknown> = {};
@@ -1090,10 +1094,10 @@ export function scoreModels(
         field === 'quaternionTolerance'
           ? 1e-6
           : [
-                'minCoverageEachImage',
-                'maxInlierRatioDrop',
-                'maxCoverageDrop',
-              ].includes(field)
+            'minCoverageEachImage',
+            'maxInlierRatioDrop',
+            'maxCoverageDrop',
+          ].includes(field)
             ? 1
             : Infinity;
       number(settings[field], field, 0, max, positive);
@@ -1137,39 +1141,39 @@ export function scoreModels(
   const candidate = after ? score(after) : null;
   const comparison = candidate
     ? {
-        aggregateImproved:
-          baseline.medianOfPairMediansPx === null ||
+      aggregateImproved:
+        baseline.medianOfPairMediansPx === null ||
           candidate.medianOfPairMediansPx === null
-            ? null
-            : baseline.medianOfPairMediansPx - candidate.medianOfPairMediansPx >
-              policy.improvementTolerancePx,
-        pairs: baseline.pairs.map((pair, i) => {
-          const a = pair.metrics;
-          const b = candidate.pairs[i]!.metrics;
-          // A computable regression still matters if a support floor also fails.
-          const vetoes =
-            a && b
-              ? [
-                  ...(b.medianPx - a.medianPx > policy.pairMedianRegressionPx
-                    ? ['median regression']
-                    : []),
-                  ...(b.p90Px - a.p90Px > policy.pairP90RegressionPx
-                    ? ['p90 regression']
-                    : []),
-                  ...(a.inlierRatio - b.inlierRatio > policy.maxInlierRatioDrop
-                    ? ['inlier ratio drop']
-                    : []),
-                  ...(a.coverage[0]! - b.coverage[0]! > policy.maxCoverageDrop
-                    ? ['first-image coverage drop']
-                    : []),
-                  ...(a.coverage[1]! - b.coverage[1]! > policy.maxCoverageDrop
-                    ? ['second-image coverage drop']
-                    : []),
-                ]
-              : null;
-          return { images: pair.images, vetoes };
-        }),
-      }
+          ? null
+          : baseline.medianOfPairMediansPx - candidate.medianOfPairMediansPx >
+          policy.improvementTolerancePx,
+      pairs: baseline.pairs.map((pair, i) => {
+        const a = pair.metrics;
+        const b = candidate.pairs[i]!.metrics;
+        // A computable regression still matters if a support floor also fails.
+        const vetoes =
+          a && b
+            ? [
+              ...(b.medianPx - a.medianPx > policy.pairMedianRegressionPx
+                ? ['median regression']
+                : []),
+              ...(b.p90Px - a.p90Px > policy.pairP90RegressionPx
+                ? ['p90 regression']
+                : []),
+              ...(a.inlierRatio - b.inlierRatio > policy.maxInlierRatioDrop
+                ? ['inlier ratio drop']
+                : []),
+              ...(a.coverage[0]! - b.coverage[0]! > policy.maxCoverageDrop
+                ? ['first-image coverage drop']
+                : []),
+              ...(a.coverage[1]! - b.coverage[1]! > policy.maxCoverageDrop
+                ? ['second-image coverage drop']
+                : []),
+            ]
+            : null;
+        return { images: pair.images, vetoes };
+      }),
+    }
     : null;
   return {
     safetyEvaluated: false as const,
@@ -1530,9 +1534,9 @@ export async function scoreRun(
   }
   const reportPath = candidate
     ? join(
-        runDirectory,
-        `metrics/scores-${hash(new TextEncoder().encode(JSON.stringify(report)))}.json`
-      )
+      runDirectory,
+      `metrics/scores-${hash(new TextEncoder().encode(JSON.stringify(report)))}.json`
+    )
     : baselinePath;
   await mkdir(join(runDirectory, 'metrics'), { recursive: true });
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, {
@@ -1670,10 +1674,10 @@ export function safetyModels(
       const turnDegrees =
         a && b && c
           ? vectorAngle(
-              subtract3(b.centre, a.centre),
-              subtract3(c.centre, b.centre),
-              epsilon
-            )
+            subtract3(b.centre, a.centre),
+            subtract3(c.centre, b.centre),
+            epsilon
+          )
           : null;
       if (
         step === null ||
@@ -1844,16 +1848,16 @@ export function safetyModels(
   const after = candidate ? evaluate(candidate, false, epipolar.after!) : null;
   const pairVetoes = after
     ? before.pairs.map((a, i) => {
-        const b = after.pairs[i]!;
-        const vetoes = [];
-        if (a.positiveDepthRatio - b.positiveDepthRatio > epsilon)
-          vetoes.push('positive-depth support loss');
-        if (a.parallaxRatio - b.parallaxRatio > epsilon)
-          vetoes.push('parallax support loss');
-        if (a.usableCount - b.usableCount > epsilon)
-          vetoes.push('usable fixed-population support loss');
-        return { images: a.images, vetoes };
-      })
+      const b = after.pairs[i]!;
+      const vetoes = [];
+      if (a.positiveDepthRatio - b.positiveDepthRatio > epsilon)
+        vetoes.push('positive-depth support loss');
+      if (a.parallaxRatio - b.parallaxRatio > epsilon)
+        vetoes.push('parallax support loss');
+      if (a.usableCount - b.usableCount > epsilon)
+        vetoes.push('usable fixed-population support loss');
+      return { images: a.images, vetoes };
+    })
     : [];
   return {
     before,
@@ -2308,7 +2312,7 @@ async function readBaSupport(
         const ids = pair.images.map(
           (name, side) =>
             model.images.find((image) => image.name === name)!.observations[
-              indices[side]!
+            indices[side]!
             ]?.[2]
         );
         return ids[0] !== undefined && ids[0] !== -1 && ids[0] === ids[1]
@@ -2337,12 +2341,12 @@ async function readBaSupport(
         : !retained
           ? 'verification'
           : triangulatedPointId === null ||
-              !before.trackIds.includes(triangulatedPointId)
+            !before.trackIds.includes(triangulatedPointId)
             ? 'triangulation'
             : !baUsed
               ? 'bundle adjustment'
               : adjustedPointId === null ||
-                  !after.trackIds.includes(adjustedPointId)
+                !after.trackIds.includes(adjustedPointId)
                 ? 'adjusted export'
                 : null;
       return {
@@ -2382,11 +2386,11 @@ async function readBaSupport(
       );
     const firstLoss = evidenceComplete
       ? ([
-          'verification',
-          'triangulation',
-          'bundle adjustment',
-          'adjusted export',
-        ].find((stage) => matches.some((match) => match.firstLoss === stage)) ??
+        'verification',
+        'triangulation',
+        'bundle adjustment',
+        'adjusted export',
+      ].find((stage) => matches.some((match) => match.firstLoss === stage)) ??
         null)
       : 'unknown';
     return {
@@ -2613,12 +2617,12 @@ export async function safetyRun(
     ],
     ...(candidate
       ? [
-          [
-            'adjusted',
-            join(candidate.source.path, 'gauge-evidence.json'),
-            candidate,
-          ] as const,
-        ]
+        [
+          'adjusted',
+          join(candidate.source.path, 'gauge-evidence.json'),
+          candidate,
+        ] as const,
+      ]
       : []),
   ] as const) {
     const receiptBytes = await readFile(path).catch(
@@ -2667,7 +2671,7 @@ export async function safetyRun(
       if (
         stage === 'triangulated' &&
         String(evidenceHashes[evidencePath]).toLowerCase() !==
-          sources[evidencePath]
+        sources[evidencePath]
       )
         evidenceIssues.push(
           `Baseline gauge evidence is not frozen: ${evidencePath}`
@@ -2680,14 +2684,14 @@ export async function safetyRun(
     (checked.before.passed && evidenceIssues.length === 0);
   const loopSupport = candidate
     ? await readBaSupport(
-        runDirectory,
-        manifest,
-        baseline,
-        candidate,
-        checked,
-        JSON.parse(matchBytes.toString('utf8')),
-        hash(await readFile(baselinePath))
-      )
+      runDirectory,
+      manifest,
+      baseline,
+      candidate,
+      checked,
+      JSON.parse(matchBytes.toString('utf8')),
+      hash(await readFile(baselinePath))
+    )
     : null;
   const report = {
     ...checked,
@@ -2723,9 +2727,9 @@ export async function safetyRun(
     !candidate && preBaPassed
       ? baselinePath
       : join(
-          runDirectory,
-          `metrics/safety-${hash(new TextEncoder().encode(JSON.stringify(report)))}.json`
-        );
+        runDirectory,
+        `metrics/safety-${hash(new TextEncoder().encode(JSON.stringify(report)))}.json`
+      );
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, {
     flag: 'wx',
   });

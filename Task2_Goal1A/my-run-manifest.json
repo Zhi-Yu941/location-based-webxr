@@ -1,0 +1,1606 @@
+{
+  "runId": "2026-09-19T13-45-00-000Z-a0f1b2c3-d4e5-4678-9abc-def012345678",
+  "input": {
+    "path": "C:/Users/sunmi/Downloads/2026-07-14_07-09-31utc.zip",
+    "sha256": "3832bd13776e71ca96025e95be4e82e525f76c134badfb0a9d231bc5cd6d3676"
+  },
+  "imageNames": [
+    "frame-000003.jpg",
+    "frame-000004.jpg",
+    "frame-000005.jpg",
+    "frame-000006.jpg",
+    "frame-000007.jpg",
+    "frame-000008.jpg",
+    "frame-000009.jpg",
+    "frame-000010.jpg",
+    "frame-000011.jpg",
+    "frame-000012.jpg",
+    "frame-000013.jpg",
+    "frame-000014.jpg",
+    "frame-000015.jpg",
+    "frame-000016.jpg",
+    "frame-000017.jpg",
+    "frame-000018.jpg",
+    "frame-000019.jpg",
+    "frame-000020.jpg",
+    "frame-000021.jpg",
+    "frame-000022.jpg",
+    "frame-000023.jpg",
+    "frame-000024.jpg",
+    "frame-000025.jpg",
+    "frame-000026.jpg",
+    "frame-000027.jpg",
+    "frame-000028.jpg",
+    "frame-000029.jpg",
+    "frame-000030.jpg",
+    "frame-000031.jpg",
+    "frame-000032.jpg",
+    "frame-000033.jpg",
+    "frame-000034.jpg",
+    "frame-000035.jpg",
+    "frame-000036.jpg",
+    "frame-000037.jpg",
+    "frame-000038.jpg",
+    "frame-000039.jpg",
+    "frame-000040.jpg",
+    "frame-000041.jpg",
+    "frame-000042.jpg",
+    "frame-000043.jpg",
+    "frame-000044.jpg",
+    "frame-000045.jpg",
+    "frame-000046.jpg",
+    "frame-000047.jpg",
+    "frame-000048.jpg",
+    "frame-000049.jpg",
+    "frame-000050.jpg",
+    "frame-000051.jpg",
+    "frame-000052.jpg",
+    "frame-000053.jpg",
+    "frame-000054.jpg",
+    "frame-000055.jpg",
+    "frame-000056.jpg",
+    "frame-000057.jpg",
+    "frame-000058.jpg",
+    "frame-000059.jpg",
+    "frame-000060.jpg",
+    "frame-000061.jpg",
+    "frame-000062.jpg",
+    "frame-000063.jpg",
+    "frame-000064.jpg",
+    "frame-000065.jpg",
+    "frame-000066.jpg",
+    "frame-000067.jpg",
+    "frame-000068.jpg",
+    "frame-000069.jpg",
+    "frame-000070.jpg",
+    "frame-000071.jpg",
+    "frame-000072.jpg",
+    "frame-000073.jpg",
+    "frame-000074.jpg",
+    "frame-000075.jpg",
+    "frame-000076.jpg",
+    "frame-000077.jpg",
+    "frame-000078.jpg",
+    "frame-000079.jpg",
+    "frame-000080.jpg",
+    "frame-000081.jpg",
+    "frame-000082.jpg",
+    "frame-000083.jpg",
+    "frame-000084.jpg",
+    "frame-000085.jpg",
+    "frame-000086.jpg",
+    "frame-000087.jpg",
+    "frame-000088.jpg",
+    "frame-000089.jpg",
+    "frame-000090.jpg",
+    "frame-000091.jpg",
+    "frame-000092.jpg",
+    "frame-000093.jpg"
+  ],
+  "chronologicalNames": [
+    "frame-000003.jpg",
+    "frame-000004.jpg",
+    "frame-000005.jpg",
+    "frame-000006.jpg",
+    "frame-000007.jpg",
+    "frame-000008.jpg",
+    "frame-000009.jpg",
+    "frame-000010.jpg",
+    "frame-000011.jpg",
+    "frame-000012.jpg",
+    "frame-000013.jpg",
+    "frame-000014.jpg",
+    "frame-000015.jpg",
+    "frame-000016.jpg",
+    "frame-000017.jpg",
+    "frame-000018.jpg",
+    "frame-000019.jpg",
+    "frame-000020.jpg",
+    "frame-000021.jpg",
+    "frame-000022.jpg",
+    "frame-000023.jpg",
+    "frame-000024.jpg",
+    "frame-000025.jpg",
+    "frame-000026.jpg",
+    "frame-000027.jpg",
+    "frame-000028.jpg",
+    "frame-000029.jpg",
+    "frame-000030.jpg",
+    "frame-000031.jpg",
+    "frame-000032.jpg",
+    "frame-000033.jpg",
+    "frame-000034.jpg",
+    "frame-000035.jpg",
+    "frame-000036.jpg",
+    "frame-000037.jpg",
+    "frame-000038.jpg",
+    "frame-000039.jpg",
+    "frame-000040.jpg",
+    "frame-000041.jpg",
+    "frame-000042.jpg",
+    "frame-000043.jpg",
+    "frame-000044.jpg",
+    "frame-000045.jpg",
+    "frame-000046.jpg",
+    "frame-000047.jpg",
+    "frame-000048.jpg",
+    "frame-000049.jpg",
+    "frame-000050.jpg",
+    "frame-000051.jpg",
+    "frame-000052.jpg",
+    "frame-000053.jpg",
+    "frame-000054.jpg",
+    "frame-000055.jpg",
+    "frame-000056.jpg",
+    "frame-000057.jpg",
+    "frame-000058.jpg",
+    "frame-000059.jpg",
+    "frame-000060.jpg",
+    "frame-000061.jpg",
+    "frame-000062.jpg",
+    "frame-000063.jpg",
+    "frame-000064.jpg",
+    "frame-000065.jpg",
+    "frame-000066.jpg",
+    "frame-000067.jpg",
+    "frame-000068.jpg",
+    "frame-000069.jpg",
+    "frame-000070.jpg",
+    "frame-000071.jpg",
+    "frame-000072.jpg",
+    "frame-000073.jpg",
+    "frame-000074.jpg",
+    "frame-000075.jpg",
+    "frame-000076.jpg",
+    "frame-000077.jpg",
+    "frame-000078.jpg",
+    "frame-000079.jpg",
+    "frame-000080.jpg",
+    "frame-000081.jpg",
+    "frame-000082.jpg",
+    "frame-000083.jpg",
+    "frame-000084.jpg",
+    "frame-000085.jpg",
+    "frame-000086.jpg",
+    "frame-000087.jpg",
+    "frame-000088.jpg",
+    "frame-000089.jpg",
+    "frame-000090.jpg",
+    "frame-000091.jpg",
+    "frame-000092.jpg",
+    "frame-000093.jpg"
+  ],
+  "sequentialPairs": [
+    {
+      "images": [
+        "frame-000003.jpg",
+        "frame-000004.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000004.jpg",
+        "frame-000005.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000005.jpg",
+        "frame-000006.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000006.jpg",
+        "frame-000007.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000007.jpg",
+        "frame-000008.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000008.jpg",
+        "frame-000009.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000009.jpg",
+        "frame-000010.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000010.jpg",
+        "frame-000011.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000011.jpg",
+        "frame-000012.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000012.jpg",
+        "frame-000013.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000013.jpg",
+        "frame-000014.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000014.jpg",
+        "frame-000015.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000015.jpg",
+        "frame-000016.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000016.jpg",
+        "frame-000017.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000017.jpg",
+        "frame-000018.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000018.jpg",
+        "frame-000019.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000019.jpg",
+        "frame-000020.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000020.jpg",
+        "frame-000021.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000021.jpg",
+        "frame-000022.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000022.jpg",
+        "frame-000023.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000023.jpg",
+        "frame-000024.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000024.jpg",
+        "frame-000025.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000025.jpg",
+        "frame-000026.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000026.jpg",
+        "frame-000027.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000027.jpg",
+        "frame-000028.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000028.jpg",
+        "frame-000029.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000029.jpg",
+        "frame-000030.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000030.jpg",
+        "frame-000031.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000031.jpg",
+        "frame-000032.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000032.jpg",
+        "frame-000033.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000033.jpg",
+        "frame-000034.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000034.jpg",
+        "frame-000035.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000035.jpg",
+        "frame-000036.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000036.jpg",
+        "frame-000037.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000037.jpg",
+        "frame-000038.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000038.jpg",
+        "frame-000039.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000039.jpg",
+        "frame-000040.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000040.jpg",
+        "frame-000041.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000041.jpg",
+        "frame-000042.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000042.jpg",
+        "frame-000043.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000043.jpg",
+        "frame-000044.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000044.jpg",
+        "frame-000045.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000045.jpg",
+        "frame-000046.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000046.jpg",
+        "frame-000047.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000047.jpg",
+        "frame-000048.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000048.jpg",
+        "frame-000049.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000049.jpg",
+        "frame-000050.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000050.jpg",
+        "frame-000051.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000051.jpg",
+        "frame-000052.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000052.jpg",
+        "frame-000053.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000053.jpg",
+        "frame-000054.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000054.jpg",
+        "frame-000055.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000055.jpg",
+        "frame-000056.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000056.jpg",
+        "frame-000057.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000057.jpg",
+        "frame-000058.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000058.jpg",
+        "frame-000059.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000059.jpg",
+        "frame-000060.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000060.jpg",
+        "frame-000061.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000061.jpg",
+        "frame-000062.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000062.jpg",
+        "frame-000063.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000063.jpg",
+        "frame-000064.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000064.jpg",
+        "frame-000065.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000065.jpg",
+        "frame-000066.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000066.jpg",
+        "frame-000067.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000067.jpg",
+        "frame-000068.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000068.jpg",
+        "frame-000069.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000069.jpg",
+        "frame-000070.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000070.jpg",
+        "frame-000071.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000071.jpg",
+        "frame-000072.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000072.jpg",
+        "frame-000073.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000073.jpg",
+        "frame-000074.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000074.jpg",
+        "frame-000075.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000075.jpg",
+        "frame-000076.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000076.jpg",
+        "frame-000077.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000077.jpg",
+        "frame-000078.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000078.jpg",
+        "frame-000079.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000079.jpg",
+        "frame-000080.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000080.jpg",
+        "frame-000081.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000081.jpg",
+        "frame-000082.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000082.jpg",
+        "frame-000083.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000083.jpg",
+        "frame-000084.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000084.jpg",
+        "frame-000085.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000085.jpg",
+        "frame-000086.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000086.jpg",
+        "frame-000087.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000087.jpg",
+        "frame-000088.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000088.jpg",
+        "frame-000089.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000089.jpg",
+        "frame-000090.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000090.jpg",
+        "frame-000091.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000091.jpg",
+        "frame-000092.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000092.jpg",
+        "frame-000093.jpg"
+      ],
+      "required": true
+    }
+  ],
+  "loopPairs": [
+    {
+      "images": [
+        "frame-000003.jpg",
+        "frame-000093.jpg"
+      ],
+      "required": true
+    }
+  ],
+  "overlapEvidence": {
+    "paths": [
+      "evidence/loop-overlap-start.jpg",
+      "evidence/loop-overlap-end.jpg"
+    ],
+    "rationale": "Visual overlap between frame-000003.jpg and frame-000093.jpg at loop closure"
+  },
+  "driftEvidence": {
+    "paths": [
+      "evidence/drift-trajectory-baseline.jpg"
+    ],
+    "rationale": "Loop closure drift observed between start and return path"
+  },
+  "colmap": {
+    "executable": "C:/colmap-x64-windows-cuda/bin/colmap.exe",
+    "version": "4.2.0",
+    "build": "be5e291 (CUDA)",
+    "hash": "ee5b79a836561723e10cacaf80ca685f92352f93b15273999a03af90c9e0ed20"
+  },
+  "nodeVersion": "v24.15.0",
+  "os": "Microsoft Windows NT 10.0.26200.0",
+  "cpu": "Intel(R) Core(TM) i7-14650HX",
+  "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "siftBackend": "CUDA",
+  "offlineCheck": "verified offline workstation execution",
+  "commands": [
+    {
+      "executable": "C:/colmap-x64-windows-cuda/bin/colmap.exe",
+      "args": [
+        "feature_extractor",
+        "--database_path",
+        "database/features.db",
+        "--image_path",
+        "images",
+        "--ImageReader.single_camera",
+        "1",
+        "--ImageReader.camera_model",
+        "PINHOLE",
+        "--SiftExtraction.use_gpu",
+        "1"
+      ],
+      "cwd": "."
+    },
+    {
+      "executable": "C:/colmap-x64-windows-cuda/bin/colmap.exe",
+      "args": [
+        "exhaustive_matcher",
+        "--database_path",
+        "database/exhaustive.db",
+        "--SiftMatching.use_gpu",
+        "1"
+      ],
+      "cwd": "."
+    },
+    {
+      "executable": "C:/colmap-x64-windows-cuda/bin/colmap.exe",
+      "args": [
+        "point_triangulator",
+        "--database_path",
+        "database/exhaustive.db",
+        "--image_path",
+        "images",
+        "--input_path",
+        "models/known",
+        "--output_path",
+        "models/triangulated"
+      ],
+      "cwd": "."
+    },
+    {
+      "executable": "C:/colmap-x64-windows-cuda/bin/colmap.exe",
+      "args": [
+        "bundle_adjuster",
+        "--input_path",
+        "models/triangulated",
+        "--output_path",
+        "models/adjusted",
+        "--BundleAdjustment.refine_focal_length",
+        "0",
+        "--BundleAdjustment.refine_principal_point",
+        "0",
+        "--BundleAdjustment.refine_extra_params",
+        "0"
+      ],
+      "cwd": "."
+    }
+  ],
+  "nonDefaultSettings": {},
+  "effectiveSettingsEvidence": "pending",
+  "intrinsicsByStage": "pending",
+  "matchingStrategy": "exhaustive-with-pairlist-fallback",
+  "exhaustiveTimeLimit": 600,
+  "resourceLimits": {
+    "maxMemoryBytes": 17179869184,
+    "maxRuntimeSeconds": 1800
+  },
+  "fallbackPairs": [
+    {
+      "images": [
+        "frame-000003.jpg",
+        "frame-000004.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000004.jpg",
+        "frame-000005.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000005.jpg",
+        "frame-000006.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000006.jpg",
+        "frame-000007.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000007.jpg",
+        "frame-000008.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000008.jpg",
+        "frame-000009.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000009.jpg",
+        "frame-000010.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000010.jpg",
+        "frame-000011.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000011.jpg",
+        "frame-000012.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000012.jpg",
+        "frame-000013.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000013.jpg",
+        "frame-000014.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000014.jpg",
+        "frame-000015.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000015.jpg",
+        "frame-000016.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000016.jpg",
+        "frame-000017.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000017.jpg",
+        "frame-000018.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000018.jpg",
+        "frame-000019.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000019.jpg",
+        "frame-000020.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000020.jpg",
+        "frame-000021.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000021.jpg",
+        "frame-000022.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000022.jpg",
+        "frame-000023.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000023.jpg",
+        "frame-000024.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000024.jpg",
+        "frame-000025.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000025.jpg",
+        "frame-000026.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000026.jpg",
+        "frame-000027.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000027.jpg",
+        "frame-000028.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000028.jpg",
+        "frame-000029.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000029.jpg",
+        "frame-000030.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000030.jpg",
+        "frame-000031.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000031.jpg",
+        "frame-000032.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000032.jpg",
+        "frame-000033.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000033.jpg",
+        "frame-000034.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000034.jpg",
+        "frame-000035.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000035.jpg",
+        "frame-000036.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000036.jpg",
+        "frame-000037.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000037.jpg",
+        "frame-000038.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000038.jpg",
+        "frame-000039.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000039.jpg",
+        "frame-000040.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000040.jpg",
+        "frame-000041.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000041.jpg",
+        "frame-000042.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000042.jpg",
+        "frame-000043.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000043.jpg",
+        "frame-000044.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000044.jpg",
+        "frame-000045.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000045.jpg",
+        "frame-000046.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000046.jpg",
+        "frame-000047.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000047.jpg",
+        "frame-000048.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000048.jpg",
+        "frame-000049.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000049.jpg",
+        "frame-000050.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000050.jpg",
+        "frame-000051.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000051.jpg",
+        "frame-000052.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000052.jpg",
+        "frame-000053.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000053.jpg",
+        "frame-000054.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000054.jpg",
+        "frame-000055.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000055.jpg",
+        "frame-000056.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000056.jpg",
+        "frame-000057.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000057.jpg",
+        "frame-000058.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000058.jpg",
+        "frame-000059.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000059.jpg",
+        "frame-000060.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000060.jpg",
+        "frame-000061.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000061.jpg",
+        "frame-000062.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000062.jpg",
+        "frame-000063.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000063.jpg",
+        "frame-000064.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000064.jpg",
+        "frame-000065.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000065.jpg",
+        "frame-000066.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000066.jpg",
+        "frame-000067.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000067.jpg",
+        "frame-000068.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000068.jpg",
+        "frame-000069.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000069.jpg",
+        "frame-000070.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000070.jpg",
+        "frame-000071.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000071.jpg",
+        "frame-000072.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000072.jpg",
+        "frame-000073.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000073.jpg",
+        "frame-000074.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000074.jpg",
+        "frame-000075.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000075.jpg",
+        "frame-000076.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000076.jpg",
+        "frame-000077.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000077.jpg",
+        "frame-000078.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000078.jpg",
+        "frame-000079.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000079.jpg",
+        "frame-000080.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000080.jpg",
+        "frame-000081.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000081.jpg",
+        "frame-000082.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000082.jpg",
+        "frame-000083.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000083.jpg",
+        "frame-000084.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000084.jpg",
+        "frame-000085.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000085.jpg",
+        "frame-000086.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000086.jpg",
+        "frame-000087.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000087.jpg",
+        "frame-000088.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000088.jpg",
+        "frame-000089.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000089.jpg",
+        "frame-000090.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000090.jpg",
+        "frame-000091.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000091.jpg",
+        "frame-000092.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000092.jpg",
+        "frame-000093.jpg"
+      ],
+      "required": true
+    },
+    {
+      "images": [
+        "frame-000003.jpg",
+        "frame-000093.jpg"
+      ],
+      "required": true
+    }
+  ],
+  "metricFormula": "pending",
+  "pixelConvention": "pending",
+  "correspondenceFile": {
+    "path": "pending",
+    "hash": "pending"
+  },
+  "minVerifiedMatches": "pending",
+  "minBATracks": "pending",
+  "minBAObservations": "pending",
+  "minParallaxDegrees": "pending",
+  "minPositiveDepthRatio": "pending",
+  "depthEpsilon": "pending",
+  "inlierThresholdPx": "pending",
+  "coverageGridRows": "pending",
+  "coverageGridColumns": "pending",
+  "minCoverageEachImage": "pending",
+  "numericEpsilon": "pending",
+  "quaternionTolerance": "pending",
+  "improvementTolerancePx": "pending",
+  "pairMedianRegressionPx": "pending",
+  "pairP90RegressionPx": "pending",
+  "maxInlierRatioDrop": "pending",
+  "maxCoverageDrop": "pending",
+  "gaugeAnchors": "pending",
+  "behaviorEvidence": "pending",
+  "scaleTolerance": "pending",
+  "originTolerance": "pending",
+  "orientationTolerance": "pending",
+  "maxCentreDelta": "pending",
+  "maxRotationDelta": "pending",
+  "sequentialStepLimits": "pending",
+  "sequentialTurnLimits": "pending",
+  "artifactPaths": "pending",
+  "baselineEvidenceHashes": "pending",
+  "freezeTime": "pending",
+  "filipApproval": "pending",
+  "mingnaApproval": "pending"
+}
